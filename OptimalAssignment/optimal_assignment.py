@@ -58,7 +58,18 @@ def tabs(size):
 
 def find_nqueens_combinations(accumulator, available_machine_ids, available_task_ids, size):
     """
-    Get the N Queen positions for size x size matrix
+    Get the N Queen positions of (machine, task) for size x size matrix
+
+    TODO:
+        No need to have machine in (mamchine, task). Only available_task_ids suffices.
+        [1, 0, 2]  can represent NQ combination [(0,1)(1,0)(2,2)] because its index is machine id.
+        If machine ID is not sequential, make it sequential and have a map table back to original ID.
+
+        Machine  Task1 Task2 Task3
+        0                X
+        1          X
+        2                      X
+
     :param size
     :return: List of the nqueen positions. A position for 3 x 3 can be [(0, 0), (1, 1), (2, 2)]
     """
