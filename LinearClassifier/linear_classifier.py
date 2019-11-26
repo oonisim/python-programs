@@ -1,3 +1,8 @@
+"""
+Three Points
+https://coderbyte.com/challenges
+"""
+
 def ThreePoints(coordinates):
     p1 = coordinates[0]
     p2 = coordinates[1]
