@@ -11,7 +11,7 @@ handler = logging.StreamHandler(sys.stdout)
 logger.addHandler(handler)
 #logger.setLevel(logging.DEBUG)
 
-NQ = []
+MACHINE_TASK_COMBINATIONS = []
 SIZE = 0
 
 def get_task_estimates_for_a_machine(row):
@@ -62,12 +62,12 @@ def find_nqueens_combinations(accumulator, available_machine_ids, available_task
     :param size
     :return: List of the nqueen positions. A position for 3 x 3 can be [(0, 0), (1, 1), (2, 2)]
     """
-    global NQ
+    global MACHINE_TASK_COMBINATIONS
     if size <= 0:
         accumulator.sort()
-        if accumulator not in NQ:
+        if accumulator not in MACHINE_TASK_COMBINATIONS:
             logger.debug("{}Adding a queen {}".format(tabs(size), accumulator))
-            NQ.append(accumulator)
+            MACHINE_TASK_COMBINATIONS.append(accumulator)
         return
 
     # --------------------------------------------------------------------------------
@@ -138,7 +138,7 @@ def get_machine_task_combinations_at_minimum_cost(matrix):
     Find (machine, task) combinations that has the minimal cost
     """
     costs = []
-    for nq in NQ:
+    for nq in MACHINE_TASK_COMBINATIONS:
         cost = 0
         for coordinate in nq:
             #logger.debug("coodinate is {}".format(coordinate))
@@ -147,10 +147,10 @@ def get_machine_task_combinations_at_minimum_cost(matrix):
 
     index = costs.index(min(costs))
     logger.debug("min cost in {} is {}".format(costs, costs[index]))
-    logger.debug("combination is {}".format(NQ[index]))
-    logger.debug("Result is {}".format(NQ[index]))
+    logger.debug("combination is {}".format(MACHINE_TASK_COMBINATIONS[index]))
+    logger.debug("Result is {}".format(MACHINE_TASK_COMBINATIONS[index]))
 
-    return NQ[index]
+    return MACHINE_TASK_COMBINATIONS[index]
 
 
 def OptimalAssignments(estimates):
@@ -172,7 +172,7 @@ def OptimalAssignments(estimates):
         available_task_ids,
         size
     )
-    logger.debug("NQ is {}".format(NQ))
+    logger.debug("MACHINE_TASK_COMBINATIONS is {}".format(MACHINE_TASK_COMBINATIONS))
 
     answer = ""
     minimum_cost_machine_task_combinations = get_machine_task_combinations_at_minimum_cost(matrix)
@@ -191,7 +191,7 @@ if __name__ == "__main__":
     tests.append(["(5,4,2)","(12,4,3)","(3,4,13)"])
     tests.append(["(13,4,7,6)","(1,11,5,4)","(6,7,2,8)", "(1,3,5,9)"])
 
-    NQ = []
+    MACHINE_TASK_COMBINATIONS = []
     test = tests[2]
     SIZE = len(test)
     print(OptimalAssignments(tests[2]))
