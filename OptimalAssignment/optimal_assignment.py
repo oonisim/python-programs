@@ -113,7 +113,7 @@ def find_nqueens_combinations(accumulator, available_machine_ids, available_task
         )
 
 
-def get_task_cost_for_machine(machine_task_to_cost_matrix, machine, task):
+def get_cost_for_machine_task(machine_task_to_cost_matrix, machine, task):
     """
     Get the cost at (machine, task)
     :param machine_task_to_cost_matrix: 
@@ -133,6 +133,26 @@ def get_task_cost_for_machine(machine_task_to_cost_matrix, machine, task):
     return cost
 
 
+def get_machine_task_combinations_at_minimum_cost(matrix):
+    """
+    Find (machine, task) combinations that has the minimal cost
+    """
+    costs = []
+    for nq in NQ:
+        cost = 0
+        for coordinate in nq:
+            #logger.debug("coodinate is {}".format(coordinate))
+            cost += get_cost_for_machine_task(matrix, coordinate[0], coordinate[1])
+        costs.append(cost)
+
+    index = costs.index(min(costs))
+    logger.debug("min cost in {} is {}".format(costs, costs[index]))
+    logger.debug("combination is {}".format(NQ[index]))
+    logger.debug("Result is {}".format(NQ[index]))
+
+    return NQ[index]
+
+
 def OptimalAssignments(estimates):
     matrix = get_machine_task_to_cost_matrix(estimates)
     logger.debug("Machine Task to Cost matrix is [".format(matrix))
@@ -141,7 +161,7 @@ def OptimalAssignments(estimates):
     logging.debug("]")
 
     # ----------------------------------------------------------------------
-    # Get possible (machine, task) combinations as N queens
+    # Get permissible (machine, task) combinations as N queens
     # ----------------------------------------------------------------------
     size = len(estimates)
     available_machine_ids = list(range(0, size))
@@ -154,31 +174,12 @@ def OptimalAssignments(estimates):
     )
     logger.debug("NQ is {}".format(NQ))
 
-    # ------------------------------------------------------------------------------------------
-    # Find the index of NQ that has the minimal cost
-    # ------------------------------------------------------------------------------------------
-    costs = []
-    for nq in NQ:
-        cost = 0
-        for coordinate in nq:
-            #logger.debug("coodinate is {}".format(coordinate))
-            cost += get_task_cost_for_machine(matrix, coordinate[0], coordinate[1])
-        costs.append(cost)
-
-    index = costs.index(min(costs))
-    logger.debug("min cost in {} is {}".format(costs, costs[index]))
-    logger.debug("combination is {}".format(NQ[index]))
-    logger.debug("Result is {}".format(NQ[index]))
-
     answer = ""
-    for coordinate in NQ[index]:
-        position = "".join([
-            '(',
-            str(coordinate[0] + 1),
-            '-',
-            str(coordinate[1] + 1),
-            ')'
-        ])
+    minimum_cost_machine_task_combinations = get_machine_task_combinations_at_minimum_cost(matrix)
+    for machine_task in minimum_cost_machine_task_combinations:
+        machine = str(machine_task[0] + 1)  # Adjust to start from 1
+        task = str(machine_task[1] + 1)     # Adjust to start from 1
+        position = "".join(['(', str(machine),  '-', str(task), ')'])
         answer += position
 
     return answer
