@@ -1,0 +1,41 @@
+Timer unit: 1e-06 s
+
+Total time: 0.00227 s
+File: <ipython-input-14-d6631fa9b32d>
+Function: create_cooccurrence_matrix_2 at line 1
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+     1                                           def create_cooccurrence_matrix_2(corpus, vector_size, context_size=3):
+     2                                               """
+     3                                               Create a co-occurrence matrix for the copus with two paths.
+     4                                                   1. Handle co-occurrences to the right of the word in the context.
+     5                                                   2. Handle co-occurrences to the left  of the word in the context.
+     6                                               Args: 
+     7                                                   copus: Original text as word indices
+     8                                                   vector_size: Co-occurrence vector size (including the word itself)
+     9                                                   context_size: Context (N-gram) size N
+    10                                                   
+    11                                               """
+    12         1          4.0      4.0      0.2      corpus_size = len(corpus)
+    13         1         14.0     14.0      0.6      co_ccurrence_matrix = np.zeros((vector_size, vector_size), dtype=np.int32)
+    14                                           
+    15         1          3.0      3.0      0.1      stride = int((context_size - 1)/2 )
+    16                                           
+    17                                               # Handle right stride
+    18        10         19.0      1.9      0.8      for index in range(0, (corpus_size-1) - stride +1):
+    19         9         53.0      5.9      2.3          debug(corpus, index, stride)
+    20        27       1598.0     59.2     70.4          co_ccurrence_matrix[
+    21        18         30.0      1.7      1.3              corpus[index],                       # index to the word
+    22         9         23.0      2.6      1.0              corpus[index+1 : (index+stride) +1]  # indices to right co-occurance words excluding word itself
+    23         9         16.0      1.8      0.7          ] += 1
+    24                                                   
+    25                                               # Handle left stride
+    26        10         22.0      2.2      1.0      for index in range(stride, (corpus_size-1) +1):
+    27         9         35.0      3.9      1.5          debug(corpus, index, stride) 
+    28        27        400.0     14.8     17.6          co_ccurrence_matrix[
+    29        18         23.0      1.3      1.0              corpus[index],                      # index to the word
+    30         9         17.0      1.9      0.7              corpus[(index-stride) : index]      # indices to left co-occurance words excluding word itself
+    31         9         12.0      1.3      0.5          ] += 1
+    32                                           
+    33         1          1.0      1.0      0.0      return co_ccurrence_matrix

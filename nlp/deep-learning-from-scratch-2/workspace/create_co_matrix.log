@@ -1,0 +1,34 @@
+Timer unit: 1e-06 s
+
+Total time: 13.2143 s
+File: <ipython-input-8-571efcd7c8c3>
+Function: create_co_matrix at line 1
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+     1                                           def create_co_matrix(corpus, vocab_size, window_size=1):
+     2                                               '''Generate co-occurreance matrix for the corpus.
+     3                                           
+     4                                               :param corpus:
+     5                                               :param vocab_size:The number of unique words in the corpus. 
+     6                                               :param window_size: 
+     7                                                   The number of words either left or right of the word to count co-occurreances, which is (context_ize / 2)
+     8                                               :return: co-occurrence matrix
+     9                                               '''
+    10         1          2.0      2.0      0.0      corpus_size = len(corpus)
+    11         1         77.0     77.0      0.0      co_matrix = np.zeros((vocab_size, vocab_size), dtype=np.int32)
+    12                                           
+    13    929713     478303.0      0.5      3.6      for idx, word_id in enumerate(corpus):
+    14   1859424    1476481.0      0.8     11.2          for i in range(1, window_size + 1):
+    15    929712     511056.0      0.5      3.9              left_idx = idx - i
+    16    929712     458708.0      0.5      3.5              right_idx = idx + i
+    17                                           
+    18    929712     455724.0      0.5      3.4              if left_idx >= 0:
+    19    929711     470474.0      0.5      3.6                  left_word_id = corpus[left_idx]
+    20    929711    4291243.0      4.6     32.5                  co_matrix[word_id, left_word_id] += 1
+    21                                           
+    22    929712     550669.0      0.6      4.2              if right_idx < corpus_size:
+    23    929711     521573.0      0.6      3.9                  right_word_id = corpus[right_idx]
+    24    929711    3999985.0      4.3     30.3                  co_matrix[word_id, right_word_id] += 1
+    25                                           
+    26         1          1.0      1.0      0.0      return co_matrix
