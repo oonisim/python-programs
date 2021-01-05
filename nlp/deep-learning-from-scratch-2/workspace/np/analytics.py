@@ -1,5 +1,6 @@
 from typing import Dict
 import numpy as np
+import logging
 
 
 def debug_print_context(sequence: np.ndarray, index: int, stride: int, id_to_word: Dict[int, str], flag: bool = False):
@@ -91,3 +92,59 @@ def total_frequencies(co_occurrence_matrix: np.ndarray, word_to_id: Dict[str, in
     """Sum of all word occurrence except the padding words e.g. NIL (same with vocabulary size excluding paddings)"""
     assert int(context_size % 2) == 1
     return (co_occurrence_matrix.sum() - co_occurrence_matrix[word_to_id[padding]].sum()) / (context_size - 1)
+
+
+# ================================================================================
+# PMI
+# ================================================================================
+def pmi(co_occurrence_matrix: np.ndarray, eps: float = 1e-8) -> np.ndarray:
+    """ Compute PMI (Pointwise Mutual Information) PMI(x, y) = P(x, y) / ( P(x) * P(y) ) from a co occurrence matrix.
+    When P(x) is the probability of the word x to occur in a sequence and P(x) for P(y).
+    If P(x), P(y) are independent, expected co-occurrence probability P(x, y) is P(x) * P(y).
+    When PMI(x, y) > 1 then x and y may have a co-relation.
+    Args:
+        co_occurrence_matrix:
+            including NIL so as to get F(w) which is occurrence of the word w.
+        eps:
+            small value to avoid log2() -> inf, not for divide by zero.
+    """
+    c = co_occurrence_matrix
+
+    assert(c.sum() > 0)
+
+    m = mutual_occurrence_probability = np.divide(c, c.sum())
+    s = single_occurrence_probability = np.divide(c.sum(axis=1), c.sum())
+    # --------------------------------------------------------------------------------
+    # Because c is symmetric, s and t are the same in 1D form. Hence no need to get t.
+    # To shape s * t into c.shape for (m / i) operation, use numpy.ix_() to broadcast.
+    # --------------------------------------------------------------------------------
+    # t = target_occurrence_probability = np.divide(c.T.sum(axis=0), c.sum())
+    t = s
+    sx, tx = np.ix_(s, t)
+
+    # --------------------------------------------------------------------------------
+    # NIL word padding gives F(w) via Z.sum(axis=1), and c has a row for NIL whose
+    # co-occurrences with other words are all zero because NIL will not see other words.
+    # "See" is an analogy. W co-occur with X -> W sees X.
+    # To avoid divide by zero for NIL word, add eps.
+    # --------------------------------------------------------------------------------
+    i = independent_cooccurrence_probability = sx * tx + eps
+
+    # print("p(x) is {} shape {}".format(sx, sx.shape))
+    # print("p(y) is {} shape {}".format(tx, tx.shape))
+    # print("p(s @ t) is {} shape {}\n".format(i, i.shape))
+    with np.errstate(divide='ignore'):
+        # Add eps to avoid log2() -> inf
+        _pmi = np.log2(m / i + eps)
+
+    return _pmi
+
+
+def ppmi(co_occurrence_matrix: np.ndarray, eps: float = 1e-8):
+    """Positive PMI
+    Elements in co_occurrence_matrix is zero between words that have no co-occurrence.
+    Then PMI value log2(0) -> -inf. Replace them with zero, which leave only positives.
+    """
+    _pmi = pmi(co_occurrence_matrix, eps)
+    _pmi[_pmi < 0] = 0
+    return _pmi
