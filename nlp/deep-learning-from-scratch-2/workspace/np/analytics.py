@@ -22,7 +22,7 @@ def debug_print_context(sequence: np.ndarray, index: int, stride: int, id_to_wor
 
 
 def create_cooccurrence_matrix(sequence: np.ndarray, co_occurrence_vector_size: int, context_size: int):
-    """Create a co-occurrence matrix from the integer word index sequence.
+    """Create a co-occurrence matrix from the integer index sequence.
     Args:
         sequence: word index sequence of the original corpus text
         co_occurrence_vector_size:
@@ -148,3 +148,45 @@ def ppmi(co_occurrence_matrix: np.ndarray, eps: float = 1e-8):
     _pmi = pmi(co_occurrence_matrix, eps)
     _pmi[_pmi < 0] = 0
     return _pmi
+
+
+def create_context_set(sequence: np.ndarray, context_size: int) -> (np.ndarray, np.ndarray):
+    """Create a set of context and its label from a integer sequence.
+    When there is a sequence [1, 2, 3, 4, 5, 6 7] with context_size = 5:
+        contexts = [[1,2,4,5], [2,3,5,6],[3,4,6,7]]
+        labels   = [3, 4, 5]
+    Args:
+        sequence: index sequence of the original corpus
+        context_size: context (N-gram size N) within to check co-occurrences.
+    Returns:
+        contexts, labels
+    """
+    n = sequence_size = len(sequence)
+    assert n >= context_size
+    assert int(context_size % 2) == 1
+
+    stride = int((context_size - 1) / 2)
+    contexts = np.array([]).reshape(0, context_size-1)
+    labels = np.array([]).reshape(0,)
+
+    # The first position of the last context in the sequence is (n-1) - context_size +1.
+    # For range(), needs +1 to include the start position of the last context.
+    # [(n-1) - context_size +1] + 1
+    for position in range(0, (n - 1) - context_size + 2):
+        # --------------------------------------------------------------------------------
+        # Consider counting a word multiple time, and the word itself for performance.
+        # e.g. stride=2
+        # |W|W|W|W|W| If co-occurrences are all same word W at the position, need +4 for W
+        # |X|X|W|X|X| If co-occurrences are all same word X, need +4 for X
+        # |X|X|W|Y|Y| If co-occurrences X x 2, Y x 2, then need +2 for X and Y respectively.
+        # --------------------------------------------------------------------------------
+        contexts = np.vstack([
+            contexts,
+            sequence[np.r_[
+                position: (position+stride),                         # left stride
+                (position + stride) + 1 : (position + context_size)  # right stride
+            ]]
+        ])
+        labels = np.append(labels, sequence[position + stride])
+
+    return contexts.astype(int), labels.astype(int)
