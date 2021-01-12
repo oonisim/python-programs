@@ -344,8 +344,8 @@ def get_options(argv) -> Optional[Tuple[str, int, int]]:
 
     Logger.debug("get_path: argv [{}]".format(argv))
     path: str = ''
-    m: int = 5
-    n: int = 5
+    m: int = -1
+    n: int = -1
 
     try:
         opts, args = getopt.getopt(argv, "hf:m:n:")
@@ -395,6 +395,7 @@ def main(argv):
         m = options[1]
         n = options[2]
 
+        assert path
         assert m > 0
         assert n > 0
 
