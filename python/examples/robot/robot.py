@@ -64,7 +64,7 @@ LEFT/RIGHT is a rotation of the current Move. New Move is set as rotation.dot(Mo
 # --------------------------------------------------------------------------------
 (N, M) = -1, -1           # Board geometry. N is horizontal/x, M is vertical/y
 BASE = None               # Base coordinate (0, 0)
-END = None                # Top right coordinate (n-1, m-1)
+TIP = None                # Top right coordinate (n-1, m-1)
 
 DIRECTIONS = None         # Directions in string e.g. SOUTH
 DIRECTION_TO_MOVE = None  # Mapping from direction string to move vector. e.g. SOUTH -> (0, -1)
@@ -88,7 +88,7 @@ def initialize(n=5, m=5) -> None:
     global N
     global M
     global BASE
-    global END
+    global TIP
     global DIRECTIONS
     global DIRECTION_TO_MOVE
     global MOVE_TO_DIRECTION
@@ -107,10 +107,13 @@ def initialize(n=5, m=5) -> None:
     M = m  # y / north direction
 
     BASE = np.zeros(2).astype(int)
-    END = np.array([N - 1, M - 1])
+    TIP = np.array([N - 1, M - 1])
 
     DIRECTION_TO_MOVE = {
-        "NORTH": [0, 1], "EAST": [1, 0], "WEST": [-1, 0], "SOUTH": [0, -1]
+        "NORTH": [0, 1],
+        "EAST": [1, 0],
+        "WEST": [-1, 0],
+        "SOUTH": [0, -1]
     }
     DIRECTIONS = list(DIRECTION_TO_MOVE.keys())
 
@@ -118,7 +121,7 @@ def initialize(n=5, m=5) -> None:
         tuple(DIRECTION_TO_MOVE["NORTH"]): "NORTH",
         tuple(DIRECTION_TO_MOVE["EAST"]): "EAST",
         tuple(DIRECTION_TO_MOVE["WEST"]): "WEST",
-        tuple(DIRECTION_TO_MOVE["SOUTH"]): "SOUTH",
+        tuple(DIRECTION_TO_MOVE["SOUTH"]): "SOUTH"
     }
     MOVES = [list(_move) for _move in MOVE_TO_DIRECTION.keys()]
 
@@ -134,7 +137,7 @@ def is_inside(position) -> bool:
     Return:
         True if inside
     """
-    decision = np.all(position >= BASE) and np.all(position <= END)
+    decision = np.all(position >= BASE) and np.all(position <= TIP)
     Logger.debug("position is {} and is inside is {}".format(
         position, decision
     ))
@@ -195,9 +198,9 @@ def move() -> List:
     """
     global Position
 
-    moved = np.add(Position, Move)
-    if is_inside(moved):
-        Position = moved
+    destination = np.add(Position, Move)
+    if is_inside(destination):
+        Position = destination
 
     return Position
 
@@ -293,23 +296,6 @@ def execute_command(line) -> Optional[str]:
     return None
 
 
-def read_lines(path: str) -> str:
-    """Read lines from the file at path
-    Args:
-        path: file path
-    Returns: line
-    Raises: ValueError for file I/O error
-    """
-    Logger.debug("read_lines: path [{}]".format(path))
-    _file = pathlib.Path(path)
-    if not _file.is_file():
-        raise ValueError("file {} does not exist or non file".format(path))
-    else:
-        with _file.open() as f:
-            for line in f:
-                yield line.rstrip()
-
-
 def process_commands(lines) -> None:
     """Process commands from the command file
     Args:
@@ -322,6 +308,23 @@ def process_commands(lines) -> None:
 
         except StopIteration:
             break
+
+
+def read_commands(path: str) -> str:
+    """Read lines from the file at path
+    Args:
+        path: file path
+    Returns: line
+    Raises: ValueError for file I/O error
+    """
+    Logger.debug("read_commands: path [{}]".format(path))
+    _file = pathlib.Path(path)
+    if not _file.is_file():
+        raise ValueError("file {} does not exist or non file".format(path))
+    else:
+        with _file.open() as f:
+            for line in f:
+                yield line.rstrip()
 
 
 def usage():
@@ -359,10 +362,10 @@ def get_options(argv) -> Optional[Tuple[str, int, int]]:
         return None
 
     for opt, arg in opts:
-        if opt == '-h':
+        if opt == '-h':     # Help message
             usage()
             return None
-        elif opt == "-f":
+        elif opt == "-f":   # File path
             Logger.debug('command file is {}'.format(arg))
             path = arg
             _file = pathlib.Path(path)
@@ -370,13 +373,13 @@ def get_options(argv) -> Optional[Tuple[str, int, int]]:
                 print("invalid -f {}. The file does not exist or not a file.".format(arg))
                 return None
 
-        elif opt == "-m":
+        elif opt == "-m":   # board vertical size
             if arg.isdigit() and int(arg) > 0:
                 m = int(arg)
             else:
                 print("invalid m {}".format(arg))
                 return None
-        elif opt == "-n":
+        elif opt == "-n":   # board horizontal size
             if arg.isdigit() and int(arg) > 0:
                 n = int(arg)
             else:
@@ -396,7 +399,7 @@ def main(argv):
         assert n > 0
 
         initialize(n=n, m=m)
-        process_commands(read_lines(path))
+        process_commands(read_commands(path))
 
 
 if __name__ == "__main__":
