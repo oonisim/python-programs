@@ -100,7 +100,7 @@ def initialize(n=5, m=5) -> None:
     global Logger
 
     logging.basicConfig()
-    logging.getLogger().setLevel(logging.DEBUG)
+    logging.getLogger().setLevel(logging.ERROR)
     Logger = logging.getLogger(__name__)
 
     N = n  # x / east direction
@@ -294,6 +294,12 @@ def execute_command(line) -> Optional[str]:
 
 
 def read_lines(path: str) -> str:
+    """Read lines from the file at path
+    Args:
+        path: file path
+    Returns: line
+    Raises: ValueError for file I/O error
+    """
     Logger.debug("read_lines: path [{}]".format(path))
     _file = pathlib.Path(path)
     if not _file.is_file():
@@ -305,6 +311,11 @@ def read_lines(path: str) -> str:
 
 
 def process_commands(lines) -> None:
+    """Process commands from the command file
+    Args:
+        lines: generator that provides a command line at each call.
+    Returns: None
+    """
     while True:
         try:
             execute_command(next(lines))
@@ -314,12 +325,20 @@ def process_commands(lines) -> None:
 
 
 def usage():
+    """Program usage message"""
     print("{} -m <y max> -n <x max> -f <path>".format(
         sys.argv[0]
     ))
 
 
 def get_options(argv) -> Optional[Tuple[str, int, int]]:
+    """Handle command line options -f <file path> -m -n and -h
+    Args:
+        command line args from sys.argv[1:]
+    Returns:
+        (path, m, n) : command file path and (m, n) as board size
+    """
+
     Logger.debug("get_path: argv [{}]".format(argv))
     path: str = ''
     m: int = 5
@@ -346,10 +365,23 @@ def get_options(argv) -> Optional[Tuple[str, int, int]]:
         elif opt == "-f":
             Logger.debug('command file is {}'.format(arg))
             path = arg
+            _file = pathlib.Path(path)
+            if not _file.is_file():
+                print("invalid -f {}. The file does not exist or not a file.".format(arg))
+                return None
+
         elif opt == "-m":
-            m = int(arg)
+            if arg.isdigit() and int(arg) > 0:
+                m = int(arg)
+            else:
+                print("invalid m {}".format(arg))
+                return None
         elif opt == "-n":
-            n = int(arg)
+            if arg.isdigit() and int(arg) > 0:
+                n = int(arg)
+            else:
+                print("invalid n {}".format(arg))
+                return None
 
     return path, m, n
 
