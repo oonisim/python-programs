@@ -2,6 +2,7 @@
 """
 SYSTEM REQUIREMENT:
 - Python 3.8.x as using the assignment operation (https://www.python.org/dev/peps/pep-0572/)
+- Numpy 1.19.x or later.
 
 HOW TO EXECUTE:
 - python3 -f <command file path> [-m m [-n n]]
