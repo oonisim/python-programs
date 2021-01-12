@@ -313,6 +313,12 @@ def process_commands(lines) -> None:
             break
 
 
+def usage():
+    print("{} -m <y max> -n <x max> -f <path>".format(
+        sys.argv[0]
+    ))
+
+
 def get_options(argv) -> Optional[Tuple[str, int, int]]:
     Logger.debug("get_path: argv [{}]".format(argv))
     path: str = ''
@@ -326,16 +332,16 @@ def get_options(argv) -> Optional[Tuple[str, int, int]]:
         ))
     except getopt.GetoptError:
         Logger.error("Invalid command line")
-        print("{} -m <y max> -n <x max> -f <path>".format(
-            sys.argv[0]
-        ))
+        usage()
+        return None
+
+    if not opts:
+        usage()
         return None
 
     for opt, arg in opts:
         if opt == '-h':
-            print("{} -m <y max> -n <x max> -f <path>".format(
-                sys.argv[0]
-            ))
+            usage()
             return None
         elif opt == "-f":
             Logger.debug('command file is {}'.format(arg))
