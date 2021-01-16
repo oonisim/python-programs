@@ -1,12 +1,6 @@
 """
 OBJECTIVE:
-Implement an operator which operates a robot in a board.
-
-RESPONSIBILITY:
-Director of the Director Pattern of GoF used e.g. compiler parser.
-Separate the parsing command source and from the robot
-1. Operator receive the information of a board, a robot, and the command file.
-2. Operator read lines from the command file and send them to the robot.
+Implement an operator which operates a robot in a self._board.
 """
 from typing import (
     Optional,
@@ -15,7 +9,8 @@ from typing import (
     List,
     Dict,
     TypedDict,
-    Final
+    Final,
+    Generator
 )
 import logging
 import pathlib
@@ -35,8 +30,7 @@ from constant import (
     RIGHT,
     COMMAND_ACTIONS
 )
-from board import Board
-import robot
+from area import Board
 from robot import (
     Robot,
     State,
@@ -45,7 +39,11 @@ from robot import (
 
 
 class Operator(object):
-    """Operator to operates a robot on a board"""
+    """Operator class
+    RESPONSIBILITY:
+    1. Command source handling to read command lines to build robot commands.
+    2. Interface with the robot.
+    """
     # --------------------------------------------------------------------------------
     # Class initialization
     # --------------------------------------------------------------------------------
@@ -53,7 +51,7 @@ class Operator(object):
     # --------------------------------------------------------------------------------
     # Instance initialization
     # --------------------------------------------------------------------------------
-    def __init__(self, board: Board, path: str, log_level: int = logging.ERROR):
+    def __init__(self, board: Board, path: str, log_level: int = logging.ERROR, blocking: bool = False):
         """Initialize the operator
         Args:
             board: Board
@@ -70,71 +68,67 @@ class Operator(object):
         # The robot which the operator is in charge of.
         self._robot: Robot = Robot(
             board=board,
-            state=State(location=board.base, direction=NORTH),
+            state=State(location=self._board.base, direction=NORTH),
             log_level=log_level
         )
+        # Flag for synch operation.
+        self._blocking = blocking
 
         logging.basicConfig()
         self._log_level: int = log_level
         self._logger: logging.Logger = logging.getLogger(__name__)
         self._logger.setLevel(log_level)
 
+    @property
+    def path(self):
+        """Command file path"""
+        return self._path
+
     # --------------------------------------------------------------------------------
-    # Functions
+    # Command processing
     # --------------------------------------------------------------------------------
-    def _send_command(self, line) -> Optional[State]:
-        """Parse a command line and run the corresponding command
+    def _build_command(self, command_lines: Generator[str]) -> Generator[Command]:
+        """Parse a command line to build a robot command to send to the robot.
         Args:
-            line: command line
-        Return:
-            State after the command or None if not executed by the robot.
-        """
-        self._logger.debug("execute: line [{}]".format(line))
-        for action in COMMAND_ACTIONS:
-            if action == PLACE:
-                pattern = r'[\t\s]*^PLACE[\t\s]+([0-9]+)[\t\s]+([0-9]+)[\t\s]+(NORTH|EAST|WEST|SOUTH)'
-                if match := re.search(pattern, line, re.IGNORECASE):
-                    self._logger.debug("execute: matched action {}".format(
-                        match.group(0).upper()
-                    ))
-
-                    x = int(match.group(1))
-                    y = int(match.group(2))
-                    direction = match.group(3).upper()
-
-                    anterior: State = State(location=[x, y], direction=direction)
-                    posterior: State = self._robot.execute(Command(action=action, state=anterior))
-                    return posterior
-            else:
-                pattern = r'^[\t\s]*({})[\t\s]*'.format(action)
-                if match := re.search(pattern, line, re.IGNORECASE):
-                    self._logger.debug("execute: matched action {}".format(
-                        match.group(0).upper()
-                    ))
-
-                    anterior: State = State(location=[-1, -1], direction="NOWHERE")
-                    posterior: State = self._robot.execute(Command(action=action, state=anterior))
-                    return posterior
-
-        self._logger.debug("execute: none executed.")
-        return None
-
-    def process_commands(self, commands) -> None:
-        """Process commands from the command file
-        Args:
-            commands: generator that provides a command line at each call.
+            command_lines: generator to stream command lines
         Returns: None
         """
-        while True:
-            try:
-                self._send_command(next(self._read_commands(self._path)))
+        try:
+            for line in command_lines:
+                self._logger.debug("_build_command: command line[{}]".format(line))
 
-            except StopIteration:
-                self._logger.debug("process_commands(): no more command.")
-                break
+                for action in COMMAND_ACTIONS:
+                    if action == PLACE:
+                        pattern = r'[\t\s]*^PLACE[\t\s]+([0-9]+)[\t\s]+([0-9]+)[\t\s]+(NORTH|EAST|WEST|SOUTH)'
+                        if match := re.search(pattern, line, re.IGNORECASE):
+                            self._logger.debug("_build_command: matched action {}".format(
+                                match.group(0).upper()
+                            ))
 
-    def _read_commands(self, path: str) -> str:
-        """Read lines from the file at path
+                            x = int(match.group(1))
+                            y = int(match.group(2))
+                            direction = match.group(3).upper()
+
+                            target: State = State(location=[x, y], direction=direction)
+                            yield Command(action=action, state=target)
+                    else:
+                        pattern = r'^[\t\s]*({})[\t\s]*'.format(action)
+                        if match := re.search(pattern, line, re.IGNORECASE):
+                            self._logger.debug("execute: matched action {}".format(
+                                match.group(0).upper()
+                            ))
+                            dummy: State = State(location=[-1, -1], direction="NOWHERE")
+                            yield Command(action=action, state=dummy)
+
+        except StopIteration:
+            self._logger.debug("_build_command(): no more command line left.")
+            return  # End the generator
+
+    def _command_line_stream(self, path: str) -> Generator[str]:
+        """Stream command lines from the file command source.
+        Responsibility:
+            Encapsulate a command data source (e.g. file, socket, API, etc) to
+            provide command lines as a stream.
         Args:
             path: file path
         Returns: line
@@ -147,3 +141,31 @@ class Operator(object):
                     yield line.rstrip()
         except Exception as e:
             self._logger.error(e)
+
+    # --------------------------------------------------------------------------------
+    # Robot control
+    # --------------------------------------------------------------------------------
+    def _send_command(self, command: Command) -> Optional[State]:
+        """Send a command to the robot.
+        Args:
+            command: robot command
+        Return:
+            State after the command or None if not executed by the robot.
+        """
+        return self._robot.execute(command)
+
+    def direct(self):
+        """Direct the robot to execute commands
+        """
+        try:
+            message: str = ''
+            for command in self._build_command(self._command_line_stream(self.path)):
+                current: State = self._send_command(command)
+
+                if self._blocking:
+                    message = (yield current)
+
+        except StopIteration:
+            self._logger.debug("_build_command(): no more command line left.")
+
+        return

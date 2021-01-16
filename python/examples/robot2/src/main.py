@@ -34,7 +34,7 @@ Position is represented as a vector (x, y). Move is represented as vector (dx, d
 Move is either (0, 1): NORTH, (1, 0): EAST, (-1, 0): WEST, or (0, -1): SOUTH.
 
 At MOVE command, the current Position is updated by np.add(Position, Move) if the
-destination is still on the board. np.zero(2) <= Position <= np.array([n-1, m-1)]).
+destination is still on the self._board. np.zero(2) <= Position <= np.array([n-1, m-1)]).
 
 LEFT/RIGHT is a rotation of the current Move. New Move is set as rotation.dot(Move).
 ```
@@ -52,9 +52,8 @@ import sys
 import pathlib
 import getopt
 import logging
-from .board import Board
-from .robot import Robot
-
+from area import Board
+from operator import Operator
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.ERROR)
@@ -151,11 +150,9 @@ def main(argv):
         assert m > 0
         assert n > 0
 
-        board = Board(n, m)
-
-        # Replace with Operator
-        # Replace x=0,y=0,direction=south with robot.State class(TypedDict)
-        robot = Robot(board=board, x=0, y=0, direction="NORTH")
+        board: Board = Board(n, m)
+        operator: Operator = Operator(board=board, path=path, log_level=logging.DEBUG,blocking=False)
+        operator.direct()
 
 
 if __name__ == "__main__":

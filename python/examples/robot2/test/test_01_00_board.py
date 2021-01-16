@@ -2,8 +2,7 @@ from typing import (
     Final
 )
 import random
-import pytest
-from board import Board
+from area import Board
 
 MAX_BOARD_SIZE: Final[int] = 999999999
 MAX_TEST_TIMES: Final[int] = 100
@@ -12,7 +11,7 @@ MAX_TEST_TIMES: Final[int] = 100
 def test_board_setup():
     """Test (x, y) is inside the board(n, m)"""
     negative = random.randint(-MAX_BOARD_SIZE, -1)
-    positive = random.randint(0, MAX_BOARD_SIZE
+    positive = random.randint(0, MAX_BOARD_SIZE)
 
     # --------------------------------------------------------------------------------
     # Board creation for size (m, n) where m < 0 or n < 0
@@ -63,25 +62,25 @@ def test_board_setup():
         board = Board(n, m)
 
         location = [random.randint(-MAX_BOARD_SIZE, -1), 0]
-        assert board.is_inside(location) is False, "is_inside({}) needs to be False".format(location)
+        assert board.contains(location) is False, "contains({}) needs to be False".format(location)
 
         location = [0, random.randint(-MAX_BOARD_SIZE, -1)]
-        assert board.is_inside(location) is False, "is_inside({}) needs to be False".format(location)
+        assert board.contains(location) is False, "contains({}) needs to be False".format(location)
 
         location = [random.randint(n, MAX_BOARD_SIZE+1), 0]
-        assert board.is_inside(location) is False, "is_inside({}) needs to be False".format(location)
+        assert board.contains(location) is False, "contains({}) needs to be False".format(location)
 
         location = [0, random.randint(m, MAX_BOARD_SIZE+1)]
-        assert board.is_inside(location) is False, "is_inside({}) needs to be False".format(location)
+        assert board.contains(location) is False, "contains({}) needs to be False".format(location)
 
         location = [random.randint(n, MAX_BOARD_SIZE+1), random.randint(m, MAX_BOARD_SIZE+1)]
-        assert board.is_inside(location) is False, "is_inside({}) needs to be False".format(location)
+        assert board.contains(location) is False, "contains({}) needs to be False".format(location)
 
         location = [0, random.randint(0, m-1)]
-        assert board.is_inside(location) is True, "is_inside({}) needs to be False".format(location)
+        assert board.contains(location) is True, "contains({}) needs to be False".format(location)
 
         location = [random.randint(0, n-1), m]
-        assert board.is_inside(location) is True, "is_inside({}) needs to be False".format(location)
+        assert board.contains(location) is True, "contains({}) needs to be False".format(location)
 
         location = [random.randint(0, n-1), random.randint(0, m-1)]
-        assert board.is_inside(location) is True, "is_inside({}) needs to be False".format(location)
+        assert board.contains(location) is True, "contains({}) needs to be False".format(location)

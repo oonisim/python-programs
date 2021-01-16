@@ -2,38 +2,6 @@
 """
 OBJECTIVE:
 Implement a robot which can move on a board of size n x m.
-------------
-1. Robot is always facing one of the following directions: NORTH, EAST,SOUTH or WEST.
-2. Robot can turn left, right, and move one step at a time.
-3. Robot cannot move off the board and ignores a command forcing it to do it.
-4. Robot can report its current position on the board and direction.
-5. A newly created robot must be placed into location x=0 y=0 and face NORTH.
-6. The board is aligned with Cartesian coordinate system.
-   Its bottom left corner has coordinate (0,0) and top right (n-1, m-1).
-
-The solution will receive commands as a text file and outputs robot's reports into STDOUT.
-Below are the only commands that robot understands:
-
-PLACE x y direction     -- places robot into specified location on a board and set initial direction
-MOVE                    -- moves robot one step in the current direction
-LEFT                    -- turns robot 90 degrees anticlockwise
-RIGHT                   -- turns robot 90 degrees clockwise
-REPORT                  -- outputs current state into STDOUT
-
-APPROACH:
-location is represented as a vector (x, y). move is represented as vector (dx, dy).
-move is either (0, 1): NORTH, (1, 0): EAST, (-1, 0): WEST, or (0, -1): SOUTH.
-
-At MOVE command, the current location is updated by np.add(location, move) if the
-destination is still on the board. np.zero(2) <= location <= np.array([n-1, m-1)]).
-
-LEFT/RIGHT is a rotation of the current move. New move is set as rotation.dot(move).
-```
-    rotation = np.array([
-        [np.cos(radian), np.sin(radian)],
-        [-np.sin(radian), np.cos(radian)]
-    ])
-```
 """
 from typing import (
     Optional,
@@ -47,7 +15,6 @@ from typing import (
 import logging
 import numpy as np
 import mathematics
-# Intentionally not following Google style for domain specific packages
 from constant import (
     DIRECTIONS,
     DIRECTION_TO_MOVE,
@@ -60,7 +27,7 @@ from constant import (
     RIGHT,
     COMMAND_ACTIONS
 )
-from board import Board
+from area import Board
 
 
 class State(TypedDict):
@@ -76,11 +43,39 @@ class Command(TypedDict):
 
 
 class Robot:
+    """Robot class that executes the robot commands while staying on the board.
+    The board is aligned with Cartesian coordinate system.
+    Its bottom left corner has coordinate (0,0) and top right (n-1, m-1).
+    Robot cannot move off the board and ignores a command forcing it to do it.
+    A newly created robot must be placed into location x=0 y=0 and face NORTH.
+
+    The commands that robot understands:
+    PLACE x y direction     -- re-places robot into the location set the direction
+    MOVE                    -- moves robot one step in the current direction
+    LEFT                    -- turns robot 90 degrees anticlockwise
+    RIGHT                   -- turns robot 90 degrees clockwise
+    REPORT                  -- outputs current state into STDOUT
+
+    APPROACH:
+    location is represented as a vector (x, y). move is represented as vector (dx, dy).
+    move is either (0, 1): NORTH, (1, 0): EAST, (-1, 0): WEST, or (0, -1): SOUTH.
+
+    At MOVE command, the current location is updated by np.add(location, move) if the
+    destination is still on the self._board. np.zero(2) <= location <= np.array([n-1, m-1)]).
+
+    LEFT/RIGHT is a rotation of the current move. New move is set as rotation.dot(move).
+    ```
+        rotation = np.array([
+            [np.cos(radian), np.sin(radian)],
+            [-np.sin(radian), np.cos(radian)]
+        ])
+    ```
+    """
     # --------------------------------------------------------------------------------
     # Class initialization
     # --------------------------------------------------------------------------------
-    ROTATION_LEFT_MATRIX = mathematics.rotation_matrix(-90)
-    ROTATION_RIGHT_MATRIX = mathematics.rotation_matrix(90)
+    ROTATE_LEFT_MATRIX = mathematics.rotation_matrix(-90)
+    ROTATION_LEFT_MATRIX = mathematics.rotation_matrix(90)
 
     # --------------------------------------------------------------------------------
     # Instance initialization
@@ -89,8 +84,8 @@ class Robot:
         """Initialize Robot class instance"""
         assert state['direction'] in DIRECTIONS, \
             "direction is incorrect {}".format(state['direction'])
-        assert Board.is_inside(state['location']), \
-            "location {} outside the board ({})".format(state['location'], board.shape)
+        assert self._board.contains(state['location']), \
+            "location {} outside the board ({})".format(state['location'], self._board.shape)
 
         self._board: Board = board      # Board where the robot is placed
         self._state: State = state      # Robot state
@@ -106,16 +101,16 @@ class Robot:
     # However, not using @staticmethod as per Google Style.
     # --------------------------------------------------------------------------------
     def _place(self, state: State) -> Optional[State]:
-        """Set the new state of the robot
+        """Set the new state to the robot
         Args:
             state: new state
         Returns:
-            new state if valid command or None
+            new state after the command if it was valid or None
         """
         assert 'direction' in state and 'location' in state, \
             "_place(): invalid state".format(state)
 
-        if state['direction'] in DIRECTIONS and Board.is_inside(state['location']):
+        if state['direction'] in DIRECTIONS and self._board.contains(state['location']):
             return state
         else:
             self._logger.debug("_place(): Not setting to the new state {}".format(state))
@@ -139,37 +134,41 @@ class Robot:
             New robot state
         """
         destination = np.add(state['location'], DIRECTION_TO_MOVE[state['direction']])
-        if Board.is_inside(destination):
-            self._logger.debug("_move(): state [{}] to destination {}".format(
+        if self._board.contains(destination):
+            self._logger.debug("_move(): moved from {} to destination {}".format(
                 state['location'], destination
             ))
             state['location'] = destination
+        else:
+            self._logger.debug("_move(): did not move from {} to destination {}".format(
+                state['location'], destination
+            ))
 
         return state
 
     def _left(self, state: State) -> State:
-        """LEFT command handler
+        """Turn the robot to the left
         Args:
-            state: state of the robot
+            state: Current state of the robot
         Returns:
-            New robot state
+            Robot state after the command
         """
         vector = DIRECTION_TO_MOVE[state['direction']]
-        rotated = Robot.ROTATION_LEFT_MATRIX.dot(vector).astype(int)
+        rotated = Robot.ROTATE_LEFT_MATRIX.dot(vector).astype(int)
         self._logger.debug("_left() pre-step {} post step {}".format(vector, rotated))
 
         state['direction'] = MOVE_TO_DIRECTION[rotated]
         return state
 
     def _right(self, state: State) -> State:
-        """RIGHT command handler
+        """Turn the robot to the right
         Args:
-            state: state of the robot
+            state: Current state of the robot
         Returns:
-            New robot state
+            Robot state after the command
         """
         vector = DIRECTION_TO_MOVE[state['direction']]
-        rotated = Robot.ROTATION_RIGHT_MATRIX.dot(vector).astype(int)
+        rotated = Robot.ROTATION_LEFT_MATRIX.dot(vector).astype(int)
         self._logger.debug("_right() pre-step {} post step {}".format(vector, rotated))
 
         state['direction'] = MOVE_TO_DIRECTION[rotated]
@@ -208,6 +207,6 @@ class Robot:
             self._logger.error("execute: unknown command {}".format(command))
             pass
 
-        self._logger.debug("execute: new state {}".format(self._state, command['state']))
+        self._logger.debug("execute: state after the command is {}".format(self._state))
 
         return self._state
