@@ -27,7 +27,7 @@ from constant import (
     RIGHT,
     COMMAND_ACTIONS
 )
-from area import Board
+from . area import Board
 
 
 class State(TypedDict):
@@ -83,9 +83,9 @@ class Robot:
     def __init__(self, board: Board, state: State, log_level=logging.ERROR) -> None:
         """Initialize Robot class instance"""
         assert state['direction'] in DIRECTIONS, \
-            "direction is incorrect {}".format(state['direction'])
-        assert self._board.contains(state['location']), \
-            "location {} outside the board ({})".format(state['location'], self._board.shape)
+            f"direction is incorrect {state['direction']}"
+        assert board.contains(state['location']), \
+            f"location {state['location']} outside the board ({board.shape})"
 
         self._board: Board = board      # Board where the robot is placed
         self._state: State = state      # Robot state
@@ -108,22 +108,19 @@ class Robot:
             new state after the command if it was valid or None
         """
         assert 'direction' in state and 'location' in state, \
-            "_place(): invalid state".format(state)
+            f"_place(): invalid state {state}"
 
         if state['direction'] in DIRECTIONS and self._board.contains(state['location']):
             return state
-        else:
-            self._logger.debug("_place(): Not setting to the new state {}".format(state))
-            return None
+
+        self._logger.debug("_place(): Not setting to the new state %s", state)
+        return None
 
     def _report(self, state: State) -> State:
         """Report the current location and direction"""
-        formatting: str = "X: {} Y: {} direction: {}"
-        print(formatting.format(
-            state['location'][0],
-            state['location'][1],
-            state['direction']
-        ))
+        print(
+            f"X: {state['location'][0]} Y: {state['location'][1]} direction: {state['direction']}"
+        )
         return state
 
     def _move(self, state) -> State:
@@ -135,14 +132,15 @@ class Robot:
         """
         destination = np.add(state['location'], DIRECTION_TO_MOVE[state['direction']])
         if self._board.contains(destination):
-            self._logger.debug("_move(): moved from {} to destination {}".format(
+            self._logger.debug(
+                "_move(): moved from %s to destination %s",
                 state['location'], destination
-            ))
-            state['location'] = destination
+            )
         else:
-            self._logger.debug("_move(): did not move from {} to destination {}".format(
+            self._logger.debug(
+                "_move(): did not move from %s to destination [%s]",
                 state['location'], destination
-            ))
+            )
 
         return state
 
@@ -155,9 +153,9 @@ class Robot:
         """
         vector = DIRECTION_TO_MOVE[state['direction']]
         rotated = Robot.ROTATE_LEFT_MATRIX.dot(vector).astype(int)
-        self._logger.debug("_left() pre-step {} post step {}".format(vector, rotated))
+        self._logger.debug("_left() pre-step %s post step %s", vector, rotated)
 
-        state['direction'] = MOVE_TO_DIRECTION[rotated]
+        state['direction'] = MOVE_TO_DIRECTION[tuple(rotated)]
         return state
 
     def _right(self, state: State) -> State:
@@ -169,9 +167,9 @@ class Robot:
         """
         vector = DIRECTION_TO_MOVE[state['direction']]
         rotated = Robot.ROTATION_LEFT_MATRIX.dot(vector).astype(int)
-        self._logger.debug("_right() pre-step {} post step {}".format(vector, rotated))
+        self._logger.debug("_right() pre-step %s post step %s", vector, rotated)
 
-        state['direction'] = MOVE_TO_DIRECTION[rotated]
+        state['direction'] = MOVE_TO_DIRECTION[tuple(rotated)]
         return state
 
     # --------------------------------------------------------------------------------
@@ -187,26 +185,26 @@ class Robot:
         assert command and 'action' in command and command['action'].upper() in COMMAND_ACTIONS
         command['action'] = command['action'].upper()
 
-        self._logger.debug("execute: action {}: command {} current state {}".format(
+        self._logger.debug(
+            "execute: action %s: command %s current state %s",
             command['action'], command, self._state
-        ))
+        )
 
         if command['action'] == PLACE:
             assert 'state' in command
-            posterior = Robot._place(state=command['state'])
+            posterior = self._place(state=command['state'])
             self._state = posterior if posterior else self._state
         elif command['action'] == LEFT:
-            self._state = Robot._left(state=self._state)
+            self._state = self._left(state=self._state)
         elif command['action'] == RIGHT:
-            self._state = Robot._right(state=self._state)
+            self._state = self._right(state=self._state)
         elif command['action'] == MOVE:
-            self._state = Robot._move(state=self._state)
+            self._state = self._move(state=self._state)
         elif command['action'] == REPORT:
-            Robot._report(state=self._state)
+            self._report(state=self._state)
         else:
-            self._logger.error("execute: unknown command {}".format(command))
-            pass
+            self._logger.error("execute: unknown command %s.", command)
 
-        self._logger.debug("execute: state after the command is {}".format(self._state))
+        self._logger.debug("execute: state after the command is %s", self._state)
 
         return self._state

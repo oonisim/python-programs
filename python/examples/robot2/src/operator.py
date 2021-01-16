@@ -30,8 +30,8 @@ from constant import (
     RIGHT,
     COMMAND_ACTIONS
 )
-from area import Board
-from robot import (
+from . area import Board
+from . robot import (
     Robot,
     State,
     Command
@@ -51,7 +51,9 @@ class Operator(object):
     # --------------------------------------------------------------------------------
     # Instance initialization
     # --------------------------------------------------------------------------------
-    def __init__(self, board: Board, path: str, log_level: int = logging.ERROR, blocking: bool = False):
+    def __init__(
+        self, board: Board, path: str, log_level: int = logging.ERROR, blocking: bool = False
+    ):
         """Initialize the operator
         Args:
             board: Board
@@ -60,7 +62,7 @@ class Operator(object):
             ValueError if the path is invalid.
         """
         if not pathlib.Path(path).is_file():
-            raise ValueError("file {} does not exist or non file".format(path))
+            raise FileNotFoundError(f"file {path} does not exist or non file")
         self._path: str = path
 
         # Board where the robot is placed
@@ -95,15 +97,15 @@ class Operator(object):
         """
         try:
             for line in command_lines:
-                self._logger.debug("_build_command: command line[{}]".format(line))
+                self._logger.debug("_build_command: command line [%s]", line)
 
                 for action in COMMAND_ACTIONS:
                     if action == PLACE:
                         pattern = r'[\t\s]*^PLACE[\t\s]+([0-9]+)[\t\s]+([0-9]+)[\t\s]+(NORTH|EAST|WEST|SOUTH)'
                         if match := re.search(pattern, line, re.IGNORECASE):
-                            self._logger.debug("_build_command: matched action {}".format(
-                                match.group(0).upper()
-                            ))
+                            self._logger.debug(
+                                "_build_command: matched action %s", match.group(0).upper()
+                            )
 
                             x = int(match.group(1))
                             y = int(match.group(2))
@@ -114,9 +116,9 @@ class Operator(object):
                     else:
                         pattern = r'^[\t\s]*({})[\t\s]*'.format(action)
                         if match := re.search(pattern, line, re.IGNORECASE):
-                            self._logger.debug("execute: matched action {}".format(
-                                match.group(0).upper()
-                            ))
+                            self._logger.debug(
+                                "execute: matched action %s", match.group(0).upper()
+                            )
                             dummy: State = State(location=[-1, -1], direction="NOWHERE")
                             yield Command(action=action, state=dummy)
 
@@ -139,7 +141,7 @@ class Operator(object):
             with _file.open() as f:
                 for line in f:
                     yield line.rstrip()
-        except Exception as e:
+        except (IOError, FileNotFoundError) as e:
             self._logger.error(e)
 
     # --------------------------------------------------------------------------------
@@ -166,6 +168,4 @@ class Operator(object):
                     message = (yield current)
 
         except StopIteration:
-            self._logger.debug("_build_command(): no more command line left.")
-
-        return
+            self._logger.debug("direct(): ended execution.")

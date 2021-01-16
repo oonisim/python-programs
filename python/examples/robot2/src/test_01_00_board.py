@@ -2,7 +2,7 @@ from typing import (
     Final
 )
 import random
-from area import Board
+from . area import Board
 
 MAX_BOARD_SIZE: Final[int] = 999999999
 MAX_TEST_TIMES: Final[int] = 100
@@ -16,41 +16,42 @@ def test_board_setup():
     # --------------------------------------------------------------------------------
     # Board creation for size (m, n) where m < 0 or n < 0
     # --------------------------------------------------------------------------------
-    for i in range(MAX_TEST_TIMES):
+    for _ in range(MAX_TEST_TIMES):
         try:
             board: Board = Board(n=negative, m=negative)
-            assert False, "Board creation needs to fail for (x, y)=({},{})".format(negative, negative)
-        except Exception as e:
+            print()
+            assert False, f"Board creation needs to fail for (x, y)=({negative},{negative})"
+        except Exception:
             pass
 
         try:
             board: Board = Board(n=negative, m=0)
-            assert False, "Board creation needs to fail for (x, y)=({},{})".format(negative, 0)
-        except Exception as e:
+            assert False, f"Board creation needs to fail for (x, y)=({negative},0)"
+        except Exception:
             pass
 
         try:
             board: Board = Board(n=0, m=-1)
-            assert False, "Board creation needs to fail for (x, y)=({},{})".format(0, negative)
-        except Exception as e:
+            assert False, f"Board creation needs to fail for (x, y)=(0,{negative})"
+        except Exception:
             pass
 
         try:
             board: Board = Board(n=0, m=-1)
-            assert False, "Board creation needs to fail for (x, y)=({},{})".format(0, 0)
-        except Exception as e:
+            assert False, "Board creation needs to fail for (x, y)=(0,0)"
+        except Exception:
             pass
 
         try:
             board: Board = Board(n=positive, m=0)
-            assert False, "Board creation needs to fail for (x, y)=({},{})".format(positive, 0)
-        except Exception as e:
+            assert False, f"Board creation needs to fail for (x, y)=({positive},0)"
+        except Exception:
             pass
 
         try:
             board: Board = Board(n=positive, m=0)
-            assert False, "Board creation needs to fail for (x, y)=({},{})".format(0, positive)
-        except Exception as e:
+            assert False, f"Board creation needs to fail for (x, y)=({positive},0)"
+        except Exception:
             pass
 
         # --------------------------------------------------------------------------------
@@ -61,26 +62,34 @@ def test_board_setup():
 
         board = Board(n, m)
 
+        # False for x < 0
         location = [random.randint(-MAX_BOARD_SIZE, -1), 0]
-        assert board.contains(location) is False, "contains({}) needs to be False".format(location)
+        assert not board.contains(location), f"contains({location}) needs to be False"
 
+        # False for y < 0
         location = [0, random.randint(-MAX_BOARD_SIZE, -1)]
-        assert board.contains(location) is False, "contains({}) needs to be False".format(location)
+        assert not board.contains(location), f"contains({location}) needs to be False"
 
+        # False for x > n-1
         location = [random.randint(n, MAX_BOARD_SIZE+1), 0]
-        assert board.contains(location) is False, "contains({}) needs to be False".format(location)
+        assert not board.contains(location), f"contains({location}) needs to be False"
 
+        # False for y > m-1
         location = [0, random.randint(m, MAX_BOARD_SIZE+1)]
-        assert board.contains(location) is False, "contains({}) needs to be False".format(location)
+        assert not board.contains(location), f"contains({location}) needs to be False"
 
+        # False for x > n-1 and y > m-1
         location = [random.randint(n, MAX_BOARD_SIZE+1), random.randint(m, MAX_BOARD_SIZE+1)]
-        assert board.contains(location) is False, "contains({}) needs to be False".format(location)
+        assert not board.contains(location), f"contains({location}) needs to be False"
 
+        # True for x = 0 and 0 <= y <= m-1
         location = [0, random.randint(0, m-1)]
-        assert board.contains(location) is True, "contains({}) needs to be False".format(location)
+        assert board.contains(location), f"contains({location}) needs to be True"
 
-        location = [random.randint(0, n-1), m]
-        assert board.contains(location) is True, "contains({}) needs to be False".format(location)
+        # True for 0 <= x <= n-1 and y = 0
+        location = [random.randint(0, n-1), 0]
+        assert board.contains(location), f"contains({location}) needs to be True"
 
+        # True for 0 <= x <= n-1 and 0 <= y <= m-1
         location = [random.randint(0, n-1), random.randint(0, m-1)]
-        assert board.contains(location) is True, "contains({}) needs to be False".format(location)
+        assert board.contains(location), f"contains({location}) needs to be False"

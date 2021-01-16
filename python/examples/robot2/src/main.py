@@ -67,10 +67,10 @@ def read_commands(path: str) -> str:
     Returns: line
     Raises: ValueError for file I/O error
     """
-    LOGGER.debug("read_commands: path [{}]".format(path))
+    LOGGER.debug("read_commands: path [%s]", path)
     _file = pathlib.Path(path)
     if not _file.is_file():
-        raise ValueError("file {} does not exist or non file".format(path))
+        raise ValueError(f"file {path} does not exist or non file")
 
     with _file.open() as f:
         for line in f:
@@ -79,9 +79,7 @@ def read_commands(path: str) -> str:
 
 def usage():
     """Program usage message"""
-    print("{} -m <y max> -n <x max> -f <path>".format(
-        sys.argv[0]
-    ))
+    print("{sys.argv[0]} -m <y max> -n <x max> -f <path>")
 
 
 def get_options(argv) -> Optional[Tuple[str, int, int]]:
@@ -92,16 +90,14 @@ def get_options(argv) -> Optional[Tuple[str, int, int]]:
         (path, m, n) : command file path and (m, n) as board size
     """
 
-    LOGGER.debug("get_path: argv [{}]".format(argv))
+    LOGGER.debug("get_path: argv [%s]", argv)
     path: str = ''
     m: int = -1
     n: int = -1
 
     try:
         opts, args = getopt.getopt(argv, "hf:m:n:")
-        LOGGER.debug("get_path opts {} args {}".format(
-            opts, args
-        ))
+        LOGGER.debug("get_path opts %s args %s", opts, args)
         if not opts:
             return None
 
@@ -109,25 +105,25 @@ def get_options(argv) -> Optional[Tuple[str, int, int]]:
             if opt == '-h':  # Help message
                 usage()
             elif opt == "-f":  # File path
-                LOGGER.debug('command file is {}'.format(arg))
+                LOGGER.debug("command file is %s", arg)
                 if pathlib.Path(arg).is_file():
                     path = arg
                 else:
                     path = ''
-                    print("invalid -f {}. The file does not exist or not a file.".format(arg))
+                    print("invalid -f %s. The file does not exist or not a file.", arg)
             elif opt == "-m":  # board vertical size
                 if arg.isdigit() and int(arg) > 0:
                     m = int(arg)
                 else:
-                    print("invalid m {}".format(arg))
+                    print(f"invalid m {arg}")
                     return None
             elif opt == "-n":  # board horizontal size
                 if arg.isdigit() and int(arg) > 0:
                     n = int(arg)
                 else:
-                    print("invalid n {}".format(arg))
+                    print(f"invalid n {arg}")
             else:
-                LOGGER.debug("unknown option {}".format(opt))
+                LOGGER.debug("unknown option %s", opt)
 
     except getopt.GetoptError:
         LOGGER.error("Invalid command line")
@@ -151,7 +147,9 @@ def main(argv):
         assert n > 0
 
         board: Board = Board(n, m)
-        operator: Operator = Operator(board=board, path=path, log_level=logging.DEBUG,blocking=False)
+        operator: Operator = Operator(
+            board=board, path=path, log_level=logging.DEBUG,blocking=False
+        )
         operator.direct()
 
 

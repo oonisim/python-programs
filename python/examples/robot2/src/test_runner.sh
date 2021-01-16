@@ -10,12 +10,12 @@ clear
 #--------------------------------------------------------------------------------
 set -eu
 
-rm -rf __pycache__/
-rm -f *.pyc
+rm -rf test/__pycache__/
+rm -f test/*.pyc
 
 echo "--------------------------------------------------------------------------------"
-echo "Running pylint...
-for test in $(ls *.py)
+echo "Running pylint in src (run in the directory in case of xxx not found in module)..."
+for test in $(ls src/*.py)
 do
     if [[ "${test}" != "python/six.py" ]]
      then
@@ -23,11 +23,18 @@ do
     fi
 done
 
+echo "--------------------------------------------------------------------------------"
+echo "Running pylint in test"
+for test in $(ls test/test_*.py)
+do
+    python3 -m pylint -E ${test}
+done
+
 #--------------------------------------------------------------------------------
 # PyTest
 #--------------------------------------------------------------------------------
 echo "--------------------------------------------------------------------------------"
 echo "Running PyTest..."
-pytest --verbose --cache-clear -x ${DIR}
+pytest --verbose --cache-clear -x ${DIR}/test/
 
 

@@ -33,8 +33,10 @@ class Board:
         """
         self._n = n
         self._m = m
-        self._base = np.zeros(2).astype(int)     # Base coordinate of the board (0,0)
-        self._tip = np.array([n - 1, m - 1])     # Farthest (north, east) coordinate of the self._board.
+        # Base coordinate of the board (0,0)
+        self._base = np.zeros(2).astype(int)
+        # Farthest (north, east) coordinate of the self._board.
+        self._tip = np.array([n - 1, m - 1])
 
         logging.basicConfig()
         self._log_level = log_level
@@ -105,8 +107,6 @@ class Board:
         Return:
             True if inside
         """
-        decision = np.all(self._base <=position) and np.all(position <= self._tip)
-        self._logger.debug("position is {} and is inside is {}".format(
-            position, decision
-        ))
+        decision = np.all(self._base <= position) and np.all(position <= self._tip)
+        self._logger.debug("position is %s and is inside is %s", position, decision)
         return decision

@@ -1,3 +1,4 @@
+"""Math utlities"""
 from typing import (
     Optional,
     Union,
