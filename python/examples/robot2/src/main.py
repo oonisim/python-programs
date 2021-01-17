@@ -52,8 +52,8 @@ import sys
 import pathlib
 import getopt
 import logging
-from area import Board
-from operator import Operator
+from . area import Board
+from . operator import Operator
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.ERROR)

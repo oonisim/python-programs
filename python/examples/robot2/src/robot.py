@@ -14,8 +14,7 @@ from typing import (
 )
 import logging
 import numpy as np
-import mathematics
-from constant import (
+from . constant import (
     DIRECTIONS,
     DIRECTION_TO_MOVE,
     MOVE_TO_DIRECTION,
@@ -26,6 +25,10 @@ from constant import (
     LEFT,
     RIGHT,
     COMMAND_ACTIONS
+)
+from . mathematics import (
+    rotation_matrix,
+    rotate_vector
 )
 from . area import Board
 
@@ -74,8 +77,8 @@ class Robot:
     # --------------------------------------------------------------------------------
     # Class initialization
     # --------------------------------------------------------------------------------
-    ROTATE_LEFT_MATRIX = mathematics.rotation_matrix(-90)
-    ROTATION_LEFT_MATRIX = mathematics.rotation_matrix(90)
+    ROTATE_LEFT_MATRIX = rotation_matrix(-90)
+    ROTATION_LEFT_MATRIX = rotation_matrix(90)
 
     # --------------------------------------------------------------------------------
     # Instance initialization

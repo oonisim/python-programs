@@ -1,8 +1,9 @@
-#!/usr/bin/env bash
+# Bash crea
+set +e
 DIR=$(realpath $(dirname $0))
 cd ${DIR}
 
-export PYTHONPATH=${DIR}/src:${PYTHONPATH}
+export PYTHONPATH=${DIR}:${PYTHONPATH}
 clear
 
 #--------------------------------------------------------------------------------
@@ -15,19 +16,19 @@ rm -f test/*.pyc
 
 echo "--------------------------------------------------------------------------------"
 echo "Running pylint in src (run in the directory in case of xxx not found in module)..."
-for test in $(ls src/*.py)
+for test in $(ls *.py)
 do
-    if [[ "${test}" != "python/six.py" ]]
+    if [[ "${test}" != "six.py" ]]
      then
-        python3 -m pylint -E ${test}
+        pylint -E ${test}
     fi
 done
 
 echo "--------------------------------------------------------------------------------"
 echo "Running pylint in test"
-for test in $(ls test/test_*.py)
+for test in $(ls test_*.py)
 do
-    python3 -m pylint -E ${test}
+    pylint -E ${test}
 done
 
 #--------------------------------------------------------------------------------
@@ -35,6 +36,6 @@ done
 #--------------------------------------------------------------------------------
 echo "--------------------------------------------------------------------------------"
 echo "Running PyTest..."
-pytest --verbose --cache-clear -x ${DIR}/test/
+pytest --verbose --cache-clear -x ${DIR}
 
 
