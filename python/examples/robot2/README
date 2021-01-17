@@ -14,9 +14,6 @@ To run the pytest:
 1. ```cd package```.
 2. Run ```pytest -ra --verbose```.
 
-To run the ```pylint```
-1. cd to the package directory.
-2. Run ```pylint -E *.py```,
 
 pylint has a known open issue of reporting "relative import beyond top-level package".
 [pylint false positive attempted relative import beyond top-level package](https://github.com/flycheck/flycheck/issues/1758)
@@ -53,3 +50,34 @@ pylint has a known open issue of reporting "relative import beyond top-level pac
 ├── run_test.sh                 # Not used for now
 └── test                        # Test directory (Not used for now)
 ```
+
+# Design
+
+## Board
+The responsibility of the Board class is to provide the board where a robot operates and its utilities to check the
+board boundary to tell if a location is within its boundaries.
+
+## Operator
+The responsibility of the Operator class is to provide a communication I/F to a robot.
+
+* Create a robot and sending commands to a robot to operate in a board.
+* Handle a command source to cope with different data sources.
+
+Each operator can operate on its own board and can accept any command source as a Python generator.
+Different command source e.g. HTTP endpoint, message queue, etc would be possible.
+
+To make a robot as a remote device e.g. IoT device, Operator is the remote communication I/F e.g. MQTT such as AWS IoT.
+Operator will be managing the shadow state of the remote robot and manage the connection reties for unreliable communiation.
+
+To orchestrate multiple robots, Operator.direct() can be used to synchronize the robots. Currently it is a generator which
+runs on a single thread and blocks for a message sent to to the operator via the generator send() (or iterable next()) method.
+By invoking generator's close(), an operator and its robot can be terminated.
+
+
+## Robot
+The responsibility of the Robot class is to execute the commands from its operator. Operator and Robot has one-to-one relationship.
+
+# Unit testing
+
+Using pytest to test each class. See test.doc for the details on test conditions and cases.
+
