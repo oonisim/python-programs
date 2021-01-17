@@ -1,0 +1,4 @@
+numpy==1.19.2
+pytest==6.2.1
+# Need the version which support the assignment operator
+pylint==2.6.0

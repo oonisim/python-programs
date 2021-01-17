@@ -8,7 +8,7 @@ def test_board_robot_placement():
     """
     Test Condition:
         Board creation for size (m, n) where m < 0 or/and n < 0
-    Expected result: Creation fails.
+    Expected: Creation fails.
     """
     # Location within the board boundary (0, 0) <= (x, y) < (n, m) for location (x,y)
     for _ in range(MAX_TEST_TIMES):

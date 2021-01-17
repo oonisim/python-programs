@@ -1,0 +1,55 @@
+# System requirements
+1. Python 3.8.x which support the assignment expression
+(https://www.python.org/dev/peps/pep-0572/)
+2. numpy (see requirements.txt)
+3. pytest to run test scripts (see requirements.txt)
+
+
+# How to run
+In the root folder:
+1. Run ```pip3 install -r requirements.txt```.
+2. Run ```chmod u+x ./run.sh && ./run.sh```.
+
+To run the pytest:
+1. ```cd package```.
+2. Run ```pytest -ra --verbose```.
+
+To run the ```pylint```
+1. cd to the package directory.
+2. Run ```pylint -E *.py```,
+
+pylint has a known open issue of reporting "relative import beyond top-level package".
+[pylint false positive attempted relative import beyond top-level package](https://github.com/flycheck/flycheck/issues/1758)
+
+
+# Directory structure
+```
+<root>
+├── README
+├── requirements.txt                # Python requirement packages
+├── run.sh                          # Run the program
+├── package                         # Source directory
+│  ├── __init__.py
+│  ├── main.py
+│  ├── constant.py                  # Constant declarations
+│  ├── mathematics.py               # math utility e.g. vector rotation
+│  ├── area.py                      # Board class (to avoid the standard package name)
+│  ├── robot.py                     # Robot class
+│  ├── operator.py                  # Operator class
+│  ├── test_00_config.py            # Pytest common configuration
+│  ├── test_010_board.py            # Board class test case for Board creation
+│  ├── test_011_board.py            # Board class test case for Board boundary checks
+│  ├── test_020_robot_creation.py   # Robot class test case for Robot creation
+│  ├── test_030_robot_operation.py  # Robot class test case for Robot control operations
+│  ├── test_040_operator_handles_invalid_path.py
+│  ├── test_041_config.py           # Pytest configuration for test_041 test case.
+│  ├── test_041_operator_read_command.py    # Operator class test case for reading commands
+│  └── data                     # Data directory
+│     ├── command.txt
+│     ├── commands.txt
+│     ├── test_041_empty.txt
+│     ├── test_041_invalid_commands.txt
+│     └── test_050_commands.txt
+├── run_test.sh                 # Not used for now
+└── test                        # Test directory (Not used for now)
+```
