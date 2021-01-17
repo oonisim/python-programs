@@ -137,7 +137,7 @@ def tc_005(n: int, m: int, board: Board, robot: Robot, state: State):
         f"robot x location expected {EAST} actual {reply['direction']}"
 
 
-def test_operator_operate_robot_003_004():
+def test_operator_operate_robot_003_005():
     """Test robot operations
     """
     for _ in range(MAX_TEST_TIMES):
@@ -152,6 +152,6 @@ def test_operator_operate_robot_003_004():
             # TC 004: Move to the EAST boundary
             tc_004(n, m, board, robot, state)
             # TC 005: Push the robot further EAST
-            tc_004(n, m, board, robot, state)
+            tc_005(n, m, board, robot, state)
         except Exception:
             assert False, "Robot operations TC 003-005: move EAST need to succeed."
