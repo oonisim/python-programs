@@ -5,10 +5,7 @@ from . test_00_config import *
 
 
 def test_board_robot_placement():
-    """
-    Test Condition:
-        Board creation for size (m, n) where m < 0 or/and n < 0
-    Expected: Creation fails.
+    """Test case for board boundaries to check if a robot can be placed at a location.
     """
     # Location within the board boundary (0, 0) <= (x, y) < (n, m) for location (x,y)
     for _ in range(MAX_TEST_TIMES):
@@ -49,4 +46,4 @@ def test_board_robot_placement():
 
         # True for 0 <= x <= n-1 and 0 <= y <= m-1
         location = [random.randint(0, n-1), random.randint(0, m-1)]
-        assert board.contains(location), f"contains({location}) needs to be False"
+        assert board.contains(location), f"contains({location}) needs to be True"

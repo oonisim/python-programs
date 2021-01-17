@@ -34,7 +34,7 @@ def test_operator_create_robot():
         # --------------------------------------------------------------------------------
         # TC 003 direction is incorrect.
         #   Robot creation with the state (x=0,y=0,d=NOT IN [NORTH, SOUTH, EAST, WEST])
-        # Expected: Creation succeed.
+        # Expected: Creation fail.
         # --------------------------------------------------------------------------------
         try:
             d: str = random_string(6)

@@ -1,4 +1,4 @@
-"""Pytest test case for the operator read commands"""
+"""Pytest test case for an operator handles an invalid path"""
 from typing import (
     List,
     Dict,
@@ -30,7 +30,7 @@ from . operator import Operator
 
 
 def tc_001():
-    """TC 001: Operator handles invalid path.
+    """TC 001: Operator handles an invalid path.
     """
     _path = random_string(40)
     try:

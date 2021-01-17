@@ -1,4 +1,4 @@
-"""Pytest Test case for the Robot Creation"""
+"""Pytest Test case for the Robot Operations"""
 from typing import (
     List,
     Dict,
@@ -70,8 +70,7 @@ def tc_002(n: int, m: int, board: Board, robot: Robot, state: State):
 
 
 def test_operator_operate_robot_001_002():
-    """Test robot operations
-    Test conditions: 001-002
+    """Test Case for an operator controls a robot to MOVE NORTH
     """
     for _ in range(MAX_TEST_TIMES):
         n, m, board, robot, state = create_robot()
@@ -138,7 +137,7 @@ def tc_005(n: int, m: int, board: Board, robot: Robot, state: State):
 
 
 def test_operator_operate_robot_003_005():
-    """Test robot operations
+    """Test Case for an operator controls a robot to turn LEFT and MOVE EAST
     """
     for _ in range(MAX_TEST_TIMES):
         n, m, board, robot, state = create_robot()

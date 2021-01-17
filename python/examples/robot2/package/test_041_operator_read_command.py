@@ -30,22 +30,6 @@ from . test_00_config import *
 from . test_041_config import *
 
 
-def tc_001_empty(_path: str):
-    """TC 001: Operator reads an empty command file
-    """
-    operator: Operator
-    try:
-        operator = create_operator(_path)
-        _stream = operator._command_line_stream(_path)
-        for line in _stream:
-            print(f"TC 001 Empty: Command line from {_path} is {line}")
-
-        _stream.close()
-    except Exception as e:
-        assert False, \
-            f"Operator needs to succeed with a file path {_path} but raised {e}"
-
-
 def tc_001(_path: str):
     """TC 001: Operator reads an empty command file
     """
@@ -81,8 +65,8 @@ def tc_002(_path: str):
             f"Operator needs to succeed path {_path} but raised {e}"
 
 
-def tc_004(_path: str):
-    """TC 004: Operator reads commands
+def tc_003(_path: str):
+    """TC 003: Operator reads commands
     """
     try:
         operator: Operator = create_operator(_path,log_level=logging.DEBUG)
@@ -100,12 +84,9 @@ def tc_004(_path: str):
 def test_operator_handle_read_commands():
     """
     Test Case:
-        Operator handles an invalid file path.
-    Expected: Operator fails.
+        Operator reads commands.
+    Expected: Operator succeeds
     """
-    # TC: 001 Read a command file (empty)
-    tc_001_empty(EMPTY_COMMAND_FILE)
-
     # TC: 001 Read a command file
     tc_001(EMPTY_COMMAND_FILE)
 
@@ -113,5 +94,5 @@ def test_operator_handle_read_commands():
     tc_002(INVALID_COMMAND_FILE)
 
     # TC: 004 Read commands
-    tc_004(COMMAND_FILE)
+    tc_003(COMMAND_FILE)
 

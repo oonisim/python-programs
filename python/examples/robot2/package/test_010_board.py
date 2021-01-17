@@ -5,9 +5,11 @@ from . test_00_config import *
 
 
 def test_create_board_001():
-    """Test Case:
-        Board creation for size (m, n) where m < 0 or/and n < 0
-    Expected: Creation fails.
+    """Test Case for a board creation
+    Test Conditions:
+        size (m, n) where m < 0 or/and n < 0
+    Expected:
+        Creation fails.
     """
     for _ in range(MAX_TEST_TIMES):
         negative = random.randint(-MAX_BOARD_SIZE, -1)
@@ -46,10 +48,11 @@ def test_create_board_001():
 
 
 def test_create_board_002():
-    """
-    Test Case:
-        Board creation for size (m, n) where m 0 0 or n = 0
-    Expected: Creation fails.
+    """Test Case for a board creation
+    Test Conditions:
+        size (m, n) where m = 0 or n = 0
+    Expected:
+        Creation fails.
     """
 
     try:
@@ -76,10 +79,11 @@ def test_create_board_002():
 
 
 def test_create_board_003():
-    """
-    Test Case:
-        Board creation for size (m, n) where m > 0 or/and > < 0
-    Expected: Creation fails.
+    """Test Case for a board creation
+    Test Conditions:
+        size (m, n) where m > 0 or/and > < 0
+    Expected:
+        Creation fails.
     """
     for _ in range(MAX_TEST_TIMES):
         n = random.randint(1, MAX_BOARD_SIZE)
