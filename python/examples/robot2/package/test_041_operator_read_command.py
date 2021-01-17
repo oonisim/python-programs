@@ -82,9 +82,7 @@ def tc_003(_path: str):
 
 
 def test_operator_handle_read_commands():
-    """
-    Test Case:
-        Operator reads commands.
+    """Test Case for an operator reads from a command file.
     Expected: Operator succeeds
     """
     # TC: 001 Read a command file
