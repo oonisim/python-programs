@@ -1,5 +1,5 @@
 """Pytest Test case for the Robot Creation"""
-from typing import(
+from typing import (
     List,
     Dict,
     Tuple
@@ -8,8 +8,6 @@ import random
 import string
 import logging
 import numpy as np
-from . area import Board
-from . test_10_board_config import *
 from . constant import (
     NORTH,
     SOUTH,
@@ -21,24 +19,13 @@ from . constant import (
     RIGHT,
     PLACE
 )
+from . area import Board
 from . robot import (
     Robot,
     State,
     Command
 )
-
-
-def create_robot() -> (Robot, State):
-    n = random.randint(1, MAX_BOARD_SIZE)
-    m = random.randint(1, MAX_BOARD_SIZE)
-
-    board: Board = Board(n=n, m=m)
-    location: List[int] = [0, 0]
-    d: str = NORTH
-    state: State = State(location=location, direction=d)
-    robot: Robot = Robot(board=board, state=state)
-
-    return n, m, board, robot, state
+from . test_00_config import *
 
 
 # ====================================================================================================

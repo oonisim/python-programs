@@ -5,12 +5,8 @@ Implement a robot which can move on a board of size n x m.
 """
 from typing import (
     Optional,
-    Union,
-    Tuple,
     List,
-    Dict,
     TypedDict,
-    Final
 )
 import logging
 import numpy as np
@@ -18,7 +14,6 @@ from . constant import (
     DIRECTIONS,
     DIRECTION_TO_MOVE,
     MOVE_TO_DIRECTION,
-    MOVES,
     PLACE,
     REPORT,
     MOVE,
@@ -28,7 +23,6 @@ from . constant import (
 )
 from . mathematics import (
     rotation_matrix,
-    rotate_vector
 )
 from . area import Board
 

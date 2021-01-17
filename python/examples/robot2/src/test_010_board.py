@@ -1,12 +1,12 @@
 """Pytest for the Board test case 010 Board Creation"""
 import random
 from . area import Board
-from . test_10_board_config import *
+from . test_00_config import *
 
 
 def test_create_board_001():
     """
-    Test Condition:
+    Test Case:
         Board creation for size (m, n) where m < 0 or/and n < 0
     Expected result: Creation fails.
     """
@@ -48,7 +48,7 @@ def test_create_board_001():
 
 def test_create_board_002():
     """
-    Test Condition:
+    Test Case:
         Board creation for size (m, n) where m 0 0 or n = 0
     Expected result: Creation fails.
     """
@@ -78,11 +78,10 @@ def test_create_board_002():
 
 def test_create_board_003():
     """
-    Test Condition:
+    Test Case:
         Board creation for size (m, n) where m > 0 or/and > < 0
     Expected result: Creation fails.
     """
-
     for _ in range(MAX_TEST_TIMES):
         n = random.randint(1, MAX_BOARD_SIZE)
         m = random.randint(1, MAX_BOARD_SIZE)

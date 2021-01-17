@@ -7,7 +7,13 @@ from typing import (
     Dict,
     Final
 )
+import logging
 import numpy as np
+
+# ================================================================================
+# Log
+# ================================================================================
+DEFAULT_LOG_LEVEL = logging.ERROR
 
 # ================================================================================
 # Cardinal directions
@@ -29,6 +35,12 @@ DIRECTION_TO_MOVE: Final[Dict[str, np.ndarray]] = {
 DIRECTIONS: Final[List[str]] = list(DIRECTION_TO_MOVE.keys())
 
 # ================================================================================
+# Board constant
+# ================================================================================
+DEFAULT_N = 10      # Default board size for n
+DEFAULT_M = 11      # Default board size for m
+
+# ================================================================================
 # Robot constant
 # ================================================================================
 # Mapping from move vector to direction string. e.g. (1, 0) -> EAST
@@ -40,7 +52,7 @@ MOVE_TO_DIRECTION: Final[Dict[np.ndarray, str]] = {
 }
 
 # List of all available move vectors
-MOVES: Final[List[np.ndarray]] = [_move for _move in MOVE_TO_DIRECTION]
+MOVES: Final[List[np.ndarray]] = [list(_move) for _move in MOVE_TO_DIRECTION]
 
 # Robot commands
 PLACE = "PLACE"

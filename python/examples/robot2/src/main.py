@@ -52,11 +52,16 @@ import sys
 import pathlib
 import getopt
 import logging
+from . constant import (
+    DEFAULT_M,
+    DEFAULT_N,
+    DEFAULT_LOG_LEVEL
+)
 from . area import Board
 from . operator import Operator
 
-logging.basicConfig()
-logging.getLogger().setLevel(logging.ERROR)
+# logging.getLogger().setLevel(logging.ERROR)
+logging.basicConfig(level=DEFAULT_LOG_LEVEL)
 LOGGER = logging.getLogger(__name__)
 
 
@@ -92,8 +97,8 @@ def get_options(argv) -> Optional[Tuple[str, int, int]]:
 
     LOGGER.debug("get_path: argv [%s]", argv)
     path: str = ''
-    m: int = -1
-    n: int = -1
+    m: int = DEFAULT_M
+    n: int = DEFAULT_N
 
     try:
         opts, args = getopt.getopt(argv, "hf:m:n:")
@@ -138,19 +143,28 @@ def main(argv):
         argv: command line parameters
     """
     if options := get_options(argv[1:]):
-        path = options[0]
+        _path = options[0]
         m = options[1]
         n = options[2]
 
-        assert path
+        LOGGER.debug("n is %s m is %s path is %s", n, m, _path)
+
+        assert _path
         assert m > 0
         assert n > 0
 
         board: Board = Board(n, m)
         operator: Operator = Operator(
-            board=board, path=path, log_level=logging.DEBUG,blocking=False
+            board=board, path=_path, log_level=LOGGER.level, blocking=False
         )
-        operator.direct()
+
+        # operation_director = operator.direct()
+        # for command in operation_director:
+        #     LOGGER.debug()
+        operator.execute()
+
+    else:
+        print("no option")
 
 
 if __name__ == "__main__":

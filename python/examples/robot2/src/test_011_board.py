@@ -1,7 +1,7 @@
 """Pytest Test case for the robot placement check on the board"""
 import random
 from . area import Board
-from . test_10_board_config import *
+from . test_00_config import *
 
 
 def test_board_robot_placement():

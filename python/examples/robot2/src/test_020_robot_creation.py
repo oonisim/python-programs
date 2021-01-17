@@ -8,7 +8,7 @@ import random
 import string
 import logging
 from . area import Board
-from . test_10_board_config import *
+from . test_00_config import *
 from . constant import (
     NORTH,
     SOUTH,
