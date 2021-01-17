@@ -139,6 +139,7 @@ class Robot:
                 "_move(): moved from %s to destination %s",
                 state['location'], destination
             )
+            state['location'] = destination
         else:
             self._logger.debug(
                 "_move(): did not move from %s to destination [%s]",

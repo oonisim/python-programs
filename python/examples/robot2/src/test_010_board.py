@@ -1,10 +1,7 @@
 """Pytest for the Board test case 010 Board Creation"""
 import random
 from . area import Board
-from . test_10_board_config import (
-    MAX_BOARD_SIZE,
-    MAX_TEST_TIMES
-)
+from . test_10_board_config import *
 
 
 def test_create_board_001():
@@ -15,7 +12,7 @@ def test_create_board_001():
     """
     for _ in range(MAX_TEST_TIMES):
         negative = random.randint(-MAX_BOARD_SIZE, -1)
-        positive = random.randint(0, MAX_BOARD_SIZE)
+        positive = random.randint(1, MAX_BOARD_SIZE)
 
         try:
             board: Board = Board(n=negative, m=0)
@@ -64,7 +61,7 @@ def test_create_board_002():
 
     for _ in range(MAX_TEST_TIMES):
         negative = random.randint(-MAX_BOARD_SIZE, -1)
-        positive = random.randint(0, MAX_BOARD_SIZE)
+        positive = random.randint(1, MAX_BOARD_SIZE)
 
         try:
             board: Board = Board(n=positive, m=0)
@@ -87,8 +84,8 @@ def test_create_board_003():
     """
 
     for _ in range(MAX_TEST_TIMES):
-        n = random.randint(0, MAX_BOARD_SIZE)
-        m = random.randint(0, MAX_BOARD_SIZE)
+        n = random.randint(1, MAX_BOARD_SIZE)
+        m = random.randint(1, MAX_BOARD_SIZE)
 
         try:
             board: Board = Board(n=n, m=m)

@@ -8,10 +8,7 @@ import random
 import string
 import logging
 from . area import Board
-from . test_10_board_config import (
-    MAX_BOARD_SIZE,
-    MAX_TEST_TIMES
-)
+from . test_10_board_config import *
 from . constant import (
     NORTH,
     SOUTH,
@@ -24,11 +21,6 @@ from . robot import (
     State,
     Command
 )
-
-
-def random_string() -> str:
-    n: int = 6
-    ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(n))
 
 
 def test_operator_create_robot():
@@ -45,9 +37,9 @@ def test_operator_create_robot():
         # Expected result: Creation succeed.
         # --------------------------------------------------------------------------------
         try:
-            d: str = random_string()
+            d: str = random_string(6)
             state: State = State(location=[0, 0], direction=d)
-            Robot(board=board, state=state, log_level=logging.DEBUG)
+            Robot(board=board, state=state)
             assert False, f"Robot creation needs to fail for state({n}, {m}, {d})"
         except Exception:
             pass
@@ -62,7 +54,7 @@ def test_operator_create_robot():
             #   Robot creation with the state (x=0,y=0,d=NORTH)
             # Expected result: Creation succeeds.
             # --------------------------------------------------------------------------------
-            robot: Robot = Robot(board=board, state=state, log_level=logging.DEBUG)
+            robot: Robot = Robot(board=board, state=state)
 
             # --------------------------------------------------------------------------------
             # TC 002 robot initial state
@@ -78,4 +70,3 @@ def test_operator_create_robot():
 
         except Exception:
             assert False, f"Robot creation needs to succeed for state({n}, {m}, {d})"
-

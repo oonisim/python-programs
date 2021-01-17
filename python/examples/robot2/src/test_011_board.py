@@ -1,10 +1,7 @@
 """Pytest Test case for the robot placement check on the board"""
 import random
 from . area import Board
-from . test_10_board_config import (
-    MAX_BOARD_SIZE,
-    MAX_TEST_TIMES
-)
+from . test_10_board_config import *
 
 
 def test_board_robot_placement():
@@ -16,9 +13,9 @@ def test_board_robot_placement():
     # Location within the board boundary (0, 0) <= (x, y) < (n, m) for location (x,y)
     for _ in range(MAX_TEST_TIMES):
         negative = random.randint(-MAX_BOARD_SIZE, -1)
-        positive = random.randint(0, MAX_BOARD_SIZE)
-        n = random.randint(0, MAX_BOARD_SIZE)
-        m = random.randint(0, MAX_BOARD_SIZE)
+        positive = random.randint(1, MAX_BOARD_SIZE)
+        n = random.randint(1, MAX_BOARD_SIZE)
+        m = random.randint(1, MAX_BOARD_SIZE)
 
         board = Board(n, m)
 

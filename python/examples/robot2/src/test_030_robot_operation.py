@@ -7,11 +7,9 @@ from typing import(
 import random
 import string
 import logging
+import numpy as np
 from . area import Board
-from . test_10_board_config import (
-    MAX_BOARD_SIZE,
-    MAX_TEST_TIMES
-)
+from . test_10_board_config import *
 from . constant import (
     NORTH,
     SOUTH,
@@ -30,11 +28,6 @@ from . robot import (
 )
 
 
-def random_string() -> str:
-    n: int = 6
-    ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(n))
-
-
 def create_robot() -> (Robot, State):
     n = random.randint(1, MAX_BOARD_SIZE)
     m = random.randint(1, MAX_BOARD_SIZE)
@@ -43,7 +36,7 @@ def create_robot() -> (Robot, State):
     location: List[int] = [0, 0]
     d: str = NORTH
     state: State = State(location=location, direction=d)
-    robot: Robot = Robot(board=board, state=state, log_level=logging.DEBUG)
+    robot: Robot = Robot(board=board, state=state)
 
     return n, m, board, robot, state
 
@@ -51,25 +44,31 @@ def create_robot() -> (Robot, State):
 # ====================================================================================================
 # TC 001-002
 # ====================================================================================================
-def tc_001(n:int, m:int, board: Board, robot: Robot, state: State):
-    """TC 001: move to the north boundary
+def tc_001(n: int, m: int, board: Board, robot: Robot, state: State):
+    """TC 001: move to the NORTH boundary
     """
     command: Command = Command(action=MOVE, state=state)
 
     # Move (m-1) times
     reply: State = None
+
     for y in range(0 + 1, (m - 1) + 1):
         reply = robot.execute(command=command)
-        assert reply['location'][1] == y, \
+        assert reply['location'][1] == min(y, m-1), \
             f"robot y location expected {y} actual {reply['location'][1]}"
 
-    assert reply and reply['location'] == [0, m - 1], \
-        f"robot y location expected [0, {m - 1}] actual {reply['location']}"
-    assert reply and reply['direction'] == NORTH, \
-        f"robot y location expected {NORTH} actual {reply['direction']}"
+    # --------------------------------------------------------------------------------
+    # If m=1, no move.
+    # --------------------------------------------------------------------------------
+    if m > 1:
+        assert reply, f"robot.execute() returned None m {m} n {n} command {command}"
+        assert np.all(reply['location'] == [0, m - 1]), \
+            f"robot y location expected [0, {m - 1}] actual {reply['location']}"
+        assert reply['direction'] == NORTH, \
+            f"robot y location expected {NORTH} actual {reply['direction']}"
 
 
-def tc_002(n:int, m:int, board: Board, robot: Robot, state: State):
+def tc_002(n: int, m: int, board: Board, robot: Robot, state: State):
     """TC 002: Push the robot further NORTH
     """
     command: Command = Command(action=MOVE, state=state)
@@ -77,7 +76,7 @@ def tc_002(n:int, m:int, board: Board, robot: Robot, state: State):
     for _ in range(random.randint(1, 100)):
         reply = robot.execute(command=command)
 
-    assert reply and reply['location'] == [0, m - 1], \
+    assert reply and np.all(reply['location'] == [0, m - 1]), \
         f"robot y location expected [0, {m - 1}] actual {reply['location']}"
     assert reply and reply['direction'] == NORTH, \
         f"robot y location expected {NORTH} actual {reply['direction']}"
@@ -91,7 +90,7 @@ def test_operator_operate_robot_001_002():
         n, m, board, robot, state = create_robot()
 
         try:
-            # TC 001: move to the north boundary
+            # TC 001: move to the NORTH boundary
             tc_001(n, m, board, robot, state)
             # TC 002 Push the robot further NORTH
             tc_002(n, m, board, robot, state)
@@ -103,11 +102,11 @@ def test_operator_operate_robot_001_002():
 # TC 003-005
 # ====================================================================================================
 def tc_003(n: int, m: int, board: Board, robot: Robot, state: State):
-    """TC 003: Turn left to EAST
+    """TC 003: Turn RIGHT to EAST
     """
-    command: Command = Command(action=LEFT, state=state)
+    command: Command = Command(action=RIGHT, state=state)
     reply = robot.execute(command=command)
-    assert reply and reply['location'] == [0, m - 1], \
+    assert reply and np.all(reply['location'] == [0, m - 1]), \
         f"robot y location expected [0, {m - 1}] actual {reply['location']}"
     assert reply and reply['direction'] == EAST, \
         f"robot y location expected {EAST} actual {reply['direction']}"
@@ -122,13 +121,19 @@ def tc_004(n: int, m: int, board: Board, robot: Robot, state: State):
     reply: State = None
     for x in range(0 + 1, (n - 1) + 1):
         reply = robot.execute(command=command)
-        assert reply['location'][1] == x, \
-            f"robot x location expected {x} actual {reply['location'][1]}"
 
-    assert reply and reply['location'] == [n-1, m - 1], \
-        f"robot x location expected [{n-1}, {m - 1}] actual {reply['location']}"
-    assert reply and reply['direction'] == EAST, \
-        f"robot x location expected {EAST} actual {reply['direction']}"
+    # --------------------------------------------------------------------------------
+    # If n=1, no move.
+    # --------------------------------------------------------------------------------
+    # --------------------------------------------------------------------------------
+    # If m=1, no move.
+    # --------------------------------------------------------------------------------
+    if n > 1:
+        assert reply, f"robot.execute() returned None m {m} n {n} command {command}"
+        assert np.all(reply['location'] == [n-1, m - 1]), \
+            f"robot x location expected [{n-1}, {m - 1}] actual {reply['location']}"
+        assert reply['direction'] == EAST, \
+            f"robot x location expected {EAST} actual {reply['direction']}"
 
 
 def tc_005(n: int, m: int, board: Board, robot: Robot, state: State):
@@ -139,7 +144,7 @@ def tc_005(n: int, m: int, board: Board, robot: Robot, state: State):
     for _ in range(random.randint(1, 100)):
         reply = robot.execute(command=command)
 
-    assert reply and reply['location'] == [n-1, m - 1], \
+    assert reply and np.all(reply['location'] == [n-1, m - 1]), \
         f"robot x location expected [{n-1}, {m - 1}] actual {reply['location']}"
     assert reply and reply['direction'] == EAST, \
         f"robot x location expected {EAST} actual {reply['direction']}"
@@ -155,11 +160,11 @@ def test_operator_operate_robot_003_004():
             tc_001(n, m, board, robot, state)
             tc_002(n, m, board, robot, state)
 
-            # TC 003: Turn left to EAST
+            # TC 003: Turn RIGHT to EAST
             tc_003(n, m, board, robot, state)
             # TC 004: Move to the EAST boundary
             tc_004(n, m, board, robot, state)
             # TC 005: Push the robot further EAST
             tc_004(n, m, board, robot, state)
         except Exception:
-            assert False, f"Robot operations TC 003-005: move EAST need to succeed."
+            assert False, "Robot operations TC 003-005: move EAST need to succeed."
