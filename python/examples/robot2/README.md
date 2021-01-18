@@ -42,7 +42,7 @@ X: 3 Y: 3 Direction: NORTH
 ```
 
 # How to run
-## System requirements
+### System requirements
 1. Python 3.8.x which support the assignment expression
 (https://www.python.org/dev/peps/pep-0572/)
 2. numpy (see requirements.txt)
