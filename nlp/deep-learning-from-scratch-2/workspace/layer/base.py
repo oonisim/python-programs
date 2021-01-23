@@ -4,7 +4,7 @@ import numpy as np
 class Layer:
     @property
     def name(self) -> str:
-        """Layer ID"""
+        """A unique name to identify each layer"""
         return self._name
 
     def forward(self, X):
