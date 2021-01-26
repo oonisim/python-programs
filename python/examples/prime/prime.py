@@ -4,10 +4,10 @@ import numpy as np
 
 def prime_numpy_version(n: int) -> List[int]:
     """Generate prime numbers
-    P = A - D
+    P = Z - D
     P: Primes
-    A: All numbers
-    D: Divisibles (non-primes)
+    Z: All integer numbers
+    D: Divisible (non-primes)
 
     Args:
         n: upper bound to generate primes in-between 0 and n (inclusive)
@@ -17,9 +17,9 @@ def prime_numpy_version(n: int) -> List[int]:
     arm = range(2, np.floor(n / 2).astype(int) + 1)
     x, y = np.meshgrid(*([arm] * 2))
 
-    A = range(2, n + 1)
+    Z = range(2, n + 1)
     D = x * y
-    Minus = np.setdiff1d
+    Diff = np.setdiff1d
 
-    P = Minus(A, D[D <= n].ravel())
+    P = Diff(Z, D[D <= n].ravel())
     return P.tolist()
