@@ -1,4 +1,4 @@
-"""Affine layer implementation
+"""Matmul layer implementation
 Note:
     Python passes a pointer to an object storage if it is mutable.
     Matrices can take up lage storage, hence to avoid temporary copies,
@@ -91,7 +91,7 @@ class Matmul(Layer):
             optimizer: Optimizer = SGD(),
             log_level: int = logging.ERROR
     ):
-        """Initialize an matmul layer that has 'num_nodes' nodes
+        """Initialize a matmul layer that has 'num_nodes' nodes
         Args:
             name: Layer identity name
             num_nodes: Number of nodes in the layer
