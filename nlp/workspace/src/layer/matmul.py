@@ -22,8 +22,8 @@ from .. optimizer import (
 )
 
 
-class Affine(Layer):
-    """Affine (MatMul) Layer class"""
+class Matmul(Layer):
+    """MatMul Layer class"""
     # --------------------------------------------------------------------------------
     # Class initialization
     # --------------------------------------------------------------------------------
@@ -38,18 +38,18 @@ class Affine(Layer):
 
     @property
     def M(self) -> int:
-        """Number of nodes in the affine layer"""
+        """Number of nodes in the matmul layer"""
         return self._M
 
     @property
     def D(self) -> int:
-        """Number of feature of a node in the affine layer"""
+        """Number of feature of a node in the matmul layer"""
         return self._D
 
     @property
     def N(self) -> int:
         """Batch size of X"""
-        return self._m
+        return self._N
 
     @property
     def dW(self) -> np.ndarray:
@@ -63,7 +63,7 @@ class Affine(Layer):
 
     @property
     def Y(self) -> np.ndarray:
-        """Latest affine layer output"""
+        """Latest matmul layer output"""
         return self._Y
 
     @property
@@ -86,17 +86,17 @@ class Affine(Layer):
             name: str,
             num_nodes: int,
             W: np.ndarray,
-            posteriors: List[Layer],
+            posteriors: Optional[List[Layer]],
             l2: float = 0,
             optimizer: Optimizer = SGD(),
             log_level: int = logging.ERROR
     ):
-        """Initialize an affine layer that has 'num_nodes' nodes
+        """Initialize an matmul layer that has 'num_nodes' nodes
         Args:
             name: Layer identity name
             num_nodes: Number of nodes in the layer
             W: Weight matrix of shape(M=num_nodes, D), each row of which is a weight vector of a node.
-            posteriors: Post layers to which forward the affine layer output
+            posteriors: Post layers to which forward the matmul layer output
             l2: L2 regularization hyper parameter, e.g. 1e-3, set to 0 by default not to use it.
             optimizer: Gradient descent implementation e.g SGD, Adam.
             log_level: logging level
@@ -137,7 +137,7 @@ class Affine(Layer):
         # X: batch input of shape(N, D)
         # --------------------------------------------------------------------------------
         self._X: np.ndarray = np.empty((0, num_nodes), dtype=float)  # Batch input
-        self._m: int = -1                   # batch size: X.shape[0]
+        self._N: int = -1                   # batch size: X.shape[0]
 
         # --------------------------------------------------------------------------------
         # Gradient dL/dX of shape(N,D).
@@ -157,7 +157,7 @@ class Affine(Layer):
         # --------------------------------------------------------------------------------
         self._dY = np.empty(0, num_nodes)
 
-        # Layers to which forward the affine output
+        # Layers to which forward the matmul output
         self._layers: List[Layer] = posteriors
         self._num_posteriors = len(posteriors)
 
@@ -169,9 +169,8 @@ class Affine(Layer):
         self._logger = logging.getLogger(__name__)
         self._logger.setLevel(log_level)
 
-
     def _forward(self, Y: np.ndarray, layer: Layer) -> float:
-        """Forward the affine output Y to a next layer
+        """Forward the matmul output Y to a next layer
         Args:
             Y: Affine output
             layer: Layer where to propagate Y.
@@ -181,32 +180,30 @@ class Affine(Layer):
         loss: float = layer.forward(Y)
         return loss
 
-    
     def forward(self, X: np.ndarray):
-        """Forward propagate the affine layer output Y = X@W
+        """Forward propagate the matmul layer output Y = X@W.T
         Args:
             X: Batch input data from the input layer.
         Returns:
-            Normalized loss of those returned from the post posteriors.
+            Y: X@W.T
         """
         assert X and X.shape[1] > 0 and X.shape[1] == self._D, \
             f"X is expected to have shape (N, {self._D}) but {X.shape}"
         self._X = X
-        self._m = X.shape[0]
+        self._N = X.shape[0]
 
         # --------------------------------------------------------------------------------
-        # Forward propagate the affine output Y = X@W.T to post posteriors.
         # X:shape(N, D) W.T:shape(D, M) -> Y:shape(N, M)
         # The backward() need to validate the dY shape is (N, M)
         # --------------------------------------------------------------------------------
-        np.matmul(X, self._W.T, out=self._Y)
-        loss = np.add.reduce(
-            map(self._forward, self.Y, self._layers),
-            axis=0
-        ) / self._num_posteriors
+        Y = np.matmul(X, self._W.T, out=self._Y)
+        # Forward propagate the matmul output Y = X@W.T to post posteriors.
+        # Y = np.add.reduce(
+        #     map(self._forward, self.Y, self._layers),
+        #     axis=0
+        # ) / self._num_posteriors
 
-        return loss
-
+        return Y
 
     def _backward(self, layer: Layer) -> np.ndarray:
         """Get a back-propagation gradient from a post layer
@@ -216,7 +213,7 @@ class Affine(Layer):
             The gradient from the post layer
         """
         # --------------------------------------------------------------------------------
-        # Get a gradient dL/dY of  from a post layer
+        # Get a gradient dL/dY from a post layer
         # dL/dY has the same shape with Y:shape(N, M) as L and dL are scalar.
         # --------------------------------------------------------------------------------
         dY: np.ndarray = layer.backward()
@@ -224,7 +221,6 @@ class Affine(Layer):
             f"dY.shape is expected as ({self.N}, {self.M}) but ({dY.shape}))"
 
         return dY
-
 
     def _gradient_descent_W(self, dW: np.ndarray, W: np.ndarray, X: np.ndarray, dY: np.ndarray):
         """Gradient descent e.g. SGD: W = W - lr * dW (1 + l2)
