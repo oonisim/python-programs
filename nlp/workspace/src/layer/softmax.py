@@ -26,8 +26,10 @@ from .. common.functions import (
 )
 
 
-class Softmax:
-    """Softmax class to calculate the probability
+class SoftmaxWithLogLoss:
+    """Softmax cross entropy log loss class
+    Combined with the log loss because calculating gradients separately is not simple.
+    When combined, the dL/dX, impact on L by input delta dX, is (P - T)/N.
     """
     # --------------------------------------------------------------------------------
     # Class initialization
@@ -38,8 +40,9 @@ class Softmax:
     # --------------------------------------------------------------------------------
     def __init__(self):
         """Initialize a softmax layer"""
-        self.P = None  # Probability
-        self.T = None  # 教師データ
+        self.P = None  # Probabilities of shape (N, M)
+        self.T = None  # Labels of shape (N, M) for OHE or (N,) for index labels.
+        self.L = None  # Loss of shape ()/scalar.
 
     def forward(self, X, T):
         """Calculate the node values (probabilities)
@@ -51,21 +54,22 @@ class Softmax:
         """
         self.T = T
         self.P = softmax(X)
-        return self.P
+        self.L = cross_entropy_error(self.P, self.T)
+        return self.L
 
     def backward(self, dP=1):
-        """Calculate the gradient dL/dX, the impact on L by the dA form the anterior
+        """Calculate the gradient dL/dX, the impact on L by the dX form the anterior layer
         Args:
             dP: Gradient dL/dP, impact on L by dP, given from the post layer.
         Returns:
             Gradient dL/dX
         """
-        batch_size = self.T.shape[0]
+        N = batch_size = self.T.shape[0]
         if self.T.size == self.P.size:  # 教師データがone-hot-vectorの場合
-            dX = (self.P - self.T)
+            dX = (self.P - self.T) / N
         else:
             dX = self.P.copy()
+            dX = dP * dX
             dX[np.arange(batch_size), self.T] -= 1
-            dX = dX
 
-        return dX
+        return dX / N
