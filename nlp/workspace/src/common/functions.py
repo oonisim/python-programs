@@ -5,17 +5,35 @@ https://github.com/oreilly-japan/deep-learning-from-scratch
 import numpy as np
 
 
-def softmax(x):
+def sigmoid(X):
+    return 1 / (1 + np.exp(-X))
+
+
+def sigmoid_grad(X):
+    return (1.0 - sigmoid(X)) * sigmoid(X)
+
+
+def relu(X):
+    return np.maximum(0, X)
+
+
+def relu_grad(X):
+    grad = np.zeros_like(X)
+    grad[X >= 0] = 1
+    return grad
+
+
+def softmax(X):
     """Softmax function from deep-learning-from-scratch
     Args:
-        x: batch input data of shape (N x M).
+        X: batch input data of shape (N X M).
             N: Batch size
             M: Number of nodes
     Returns:
-        Prediction probability matrix P of shape (N x M)
+        Prediction probability matrix P of shape (N X M)
     """
-    c = np.max(x, axis=-1, keepdims=True)   # オーバーフロー対策
-    exp = np.exp(x - c)
+    C = np.max(X, axis=-1, keepdims=True)   # オーバーフロー対策
+    exp = np.exp(X - C)
     return exp / np.sum(exp, axis=-1, keepdims=True)
 
 

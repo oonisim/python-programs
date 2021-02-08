@@ -26,7 +26,7 @@ from .. common.functions import (
 )
 
 
-class SoftmaxWithLogLoss:
+class SoftmaxWithLogLoss(Layer):
     """Softmax cross entropy log loss class
     Combined with the log loss because calculating gradients separately is not simple.
     When combined, the dL/dX, impact on L by input delta dX, is (P - T)/N.
@@ -38,8 +38,13 @@ class SoftmaxWithLogLoss:
     # --------------------------------------------------------------------------------
     # Instance initialization
     # --------------------------------------------------------------------------------
-    def __init__(self):
-        """Initialize a softmax layer"""
+    def __init__(self, name: str):
+        """Initialize a softmax layer
+        Args
+            name: Instance ID
+        """
+        super().__init__(name=name)
+
         self.P = None  # Probabilities of shape (N, M)
         self.T = None  # Labels of shape (N, M) for OHE or (N,) for index labels.
         self.L = None  # Loss of shape ()/scalar.
@@ -62,14 +67,14 @@ class SoftmaxWithLogLoss:
         Args:
             dP: Gradient dL/dP, impact on L by dP, given from the post layer.
         Returns:
-            Gradient dL/dX
+            Gradient dL/dX of shape (N, M)
         """
         N = batch_size = self.T.shape[0]
         if self.T.size == self.P.size:  # 教師データがone-hot-vectorの場合
             dX = (self.P - self.T) / N
         else:
             dX = self.P.copy()
-            dX = dP * dX
+            dX = dP * dX if dP != 1 else dP
             dX[np.arange(batch_size), self.T] -= 1
 
         return dX / N
