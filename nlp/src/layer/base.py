@@ -8,15 +8,24 @@ class Layer:
         return self._name
 
     def forward(self, X):
-        """Forward propagate the affine layer output Y = X@W
+        """ Calculate the layer output.
+        Note that "forward" is the process of calculating the layer output which
+        is to be brought forward as the input to the post layer(s). To actually
+        "forward" the  output to the post layer is an implementation matter.
+
         Args:
-            X: Batch input data from the input layer.
+            X: Batch input data from the previous layer.
         Returns:
-            Normalized loss of those returned from the post layers.
+            Y: Layer output
         """
         pass
 
     def backward(self):
+        """Calculate the gradient dL/dX
+        Note that "backward" is the process of calculating the gradient(s) which is
+        to be brought backward to the previous layer. To actually "backward" the
+        gradient to the previous layer is an implementation matter.
+        """
         pass
 
     def __init__(self, name: str):

@@ -14,6 +14,7 @@ from typing import (
     Callable
 )
 import logging
+import copy
 import numpy as np
 from . base import Layer
 from .. optimizer import (
@@ -47,11 +48,6 @@ class Matmul(Layer):
         return self._D
 
     @property
-    def N(self) -> int:
-        """Batch size of X"""
-        return self._N
-
-    @property
     def dW(self) -> np.ndarray:
         """Layer weight gradients dW"""
         return self._dW
@@ -62,18 +58,24 @@ class Matmul(Layer):
         return self._X
 
     @property
+    def N(self) -> int:
+        """Batch size of X"""
+        return self._N
+
+    @property
     def Y(self) -> np.ndarray:
         """Latest matmul layer output"""
         return self._Y
 
     @property
     def dY(self) -> np.ndarray:
-        """Latest gradient (normalized) from the post posteriors"""
+        """Latest gradient dL/dY (impact on L by dY) given from the post layer(s)"""
         return self._dY
 
     @property
-    def optimizer(self) -> Callable[[np.ndarray, np.ndarray], np.ndarray]:
-        """Gradient descent optimizer for the layer"""
+    def optimizer(self) -> Optimizer:
+        """Optimizer instance for gradient descent
+        """
         return self._optimizer
 
     @property
@@ -103,22 +105,33 @@ class Matmul(Layer):
 
         Batch X: shape(N, D)
         --------------------
-        A batch X has N rows of x, that has D features and x[d=0] has a bias value 1.
-        X[j] = [x(j)(0), x(j)(1), ... x(j)(D)]
+        A batch X has N rows and each row x has D features where x[d=0] is the bias value 1.
+        X[j] = [x(j)(0), x(j)(1), ... x(j)(D-1)]
         "input" is not limited to the 0th input layer e.g. image pixels but to any layer.
+
+        Note that the original input data e.g. a 28x28 pixel image (784 features) does not
+        have D-1 features without the bias. A bias 1 is to be prepended as x[0].
 
         Weights W: shape(M, D) where M=num_nodes
         --------------------
-        Node k (k:0, 1, .. M-1) has a weight vector W(k):[w(k)(0), w(k)(1), ... w(k)(D)].
+        Node k (k:0, 1, .. M-1) has a weight vector W(k):[w(k)(0), w(k)(1), ... w(k)(D-1)].
         w(k)(0) is a bias weight. Each w(k)(i) amplifies i-th feature in an input x.
         """
+        super().__init__(name=name)
+        self._log_level = log_level
+        self._logger = logging.getLogger(__name__)
+        self._logger.setLevel(log_level)
+
         # --------------------------------------------------------------------------------
         # Validate the expected dimensions.
         # `W` has `M` nodes (nodes)
         # --------------------------------------------------------------------------------
-        super().__init__(name=name)
+        self._logger.debug(
+            "Matmul name [%s] W.shape is [%s], numer of nodes is [%s]",
+            name, W.shape, num_nodes
+        )
         assert W.shape[0] == num_nodes, \
-            f"W has {W.shape[0]} weight vectors that should have matched num_nodes {num_nodes}"
+            f"W has {W.shape[0]} number of weight vectors that should have matched num_nodes {num_nodes}"
 
         # --------------------------------------------------------------------------------
         # W: weight matrix of shape(M,D) where M=num_nodes
@@ -131,86 +144,89 @@ class Matmul(Layer):
         # Gradient dL/dW of shape(M, D)
         # Because the loss L is scalar, dL/dW has the same shape with W.
         # --------------------------------------------------------------------------------
-        self._dW: np.ndarray = np.empty(num_nodes, W.shape[1])
+        self._dW: np.ndarray = np.empty(num_nodes, W.shape[1], dtype=float)
 
         # --------------------------------------------------------------------------------
         # X: batch input of shape(N, D)
+        # Gradient dL/dX of has the same shape(N,D) with X because L is scalar.
         # --------------------------------------------------------------------------------
-        self._X: np.ndarray = np.empty((0, num_nodes), dtype=float)  # Batch input
+        self._X: np.ndarray = np.empty((0, num_nodes), dtype=float)
         self._N: int = -1                   # batch size: X.shape[0]
+        self._dX: np.ndarray = np.empty((0, num_nodes), dtype=float)
 
         # --------------------------------------------------------------------------------
-        # Gradient dL/dX of shape(N,D).
-        # Because the loss L is scalar, dL/dX has the same shape with X.
+        # Matmul layer output Y of shape(N, M) as per X:shape(N, D) @ W.T:shape(D, M)
+        # Gradient dL/dY has the same shape (N, M) with Y because the L is scalar.
+        # dL/dY is the sum of all the impact on L by dY.
         # --------------------------------------------------------------------------------
-        self._dX: np.ndarray
-
-        # --------------------------------------------------------------------------------
-        # Affine layer output Y of shape(N, M) as per X:shape(N, D) @ W.T:shape(D, M)
-        # --------------------------------------------------------------------------------
-        self._Y = np.empty(0, num_nodes)
-
-        # --------------------------------------------------------------------------------
-        # Gradient dL/dY of shape(N, M)
-        # Because the loss L is scalar, dL/dY has the same shape with Y.
-        # Normalize gradients from the post posteriors as np.sum(dL/dY) / len(posteriors).
-        # --------------------------------------------------------------------------------
-        self._dY = np.empty(0, num_nodes)
+        self._Y: np.ndarray = np.empty(0, num_nodes)
+        self._dY: np.ndarray = None
 
         # Layers to which forward the matmul output
         self._layers: List[Layer] = posteriors
-        self._num_posteriors = len(posteriors)
+        self._num_posteriors: int = len(posteriors)
 
-        # Optimizer
-        self._optimizer = optimizer
-        self._l2 = l2
-
-        self._log_level = log_level
-        self._logger = logging.getLogger(__name__)
-        self._logger.setLevel(log_level)
-
-    def _forward(self, Y: np.ndarray, layer: Layer) -> float:
-        """Forward the matmul output Y to a next layer
-        Args:
-            Y: Affine output
-            layer: Layer where to propagate Y.
-        Returns:
-            Layer return
-        """
-        loss: float = layer.forward(Y)
-        return loss
+        # --------------------------------------------------------------------------------
+        # Optimizer for gradient descent
+        # Z(n+1) = optimizer.update((Z(n), dL/dZ(n)+regularization)
+        # --------------------------------------------------------------------------------
+        assert isinstance(optimizer, Optimizer)
+        self._optimizer: Optimizer = optimizer
+        self._l2: float = l2
 
     def forward(self, X: np.ndarray):
-        """Forward propagate the matmul layer output Y = X@W.T
+        """Calculate the layer output Y = X@W.T, and forward it to posteriors if set.
         Args:
             X: Batch input data from the input layer.
         Returns:
-            Y: X@W.T
+            Y: Layer value of X@W.T
         """
-        assert X and X.shape[1] > 0 and X.shape[1] == self._D, \
+        assert X and X.shape[0] > 0 and X.shape[1] == self._D, \
             f"X is expected to have shape (N, {self._D}) but {X.shape}"
+
         self._X = X
         self._N = X.shape[0]
+        self._dX = np.empty(self.N, self.D) if self.dX.shape[0] != self.N else self.dX
 
         # --------------------------------------------------------------------------------
-        # X:shape(N, D) W.T:shape(D, M) -> Y:shape(N, M)
-        # The backward() need to validate the dY shape is (N, M)
+        # Y:shape(N,M) = [ X:shape(N,D) @ W.T:shape(D,M) ]
+        # backward() need to validate the dY shape is (N, M)
         # --------------------------------------------------------------------------------
-        Y = np.matmul(X, self._W.T, out=self._Y)
-        # Forward propagate the matmul output Y = X@W.T to post posteriors.
-        # Y = np.add.reduce(
-        #     map(self._forward, self.Y, self._layers),
-        #     axis=0
-        # ) / self._num_posteriors
+        if self.Y.shape[0] != self.N:
+            self._Y = np.empty(self.N, self.M)
+            # --------------------------------------------------------------------------------
+            # DO NOT allocate memory area for the gradient that has already been calculated.
+            # dL/dY is calculated at the post layer, hence it has the buffer allocated already.
+            # --------------------------------------------------------------------------------
+            # self._dY = np.empty(self.N, self.M)
 
-        return Y
+        np.matmul(X, self._W.T, out=self._Y)
+
+        # --------------------------------------------------------------------------------
+        # Forward propagate the matmul output Y to post posteriors if they are set.
+        # --------------------------------------------------------------------------------
+        def _forward(self, Y: np.ndarray, layer: Layer) -> float:
+            """Forward the matmul output Y to a next layer
+            Args:
+                Y: Matmul output
+                layer: Layer where to propagate Y.
+            Returns:
+                Z: Return value from the post layer.
+            """
+            Z: float = layer.forward(Y)
+            return Z
+
+        if self._layers:
+            list(map(_forward, self.Y, self._layers))
+
+        return self.Y
 
     def _backward(self, layer: Layer) -> np.ndarray:
-        """Get a back-propagation gradient from a post layer
+        """Get gradient dL/dY from a post layer
         Args:
             layer: a post layer
         Returns:
-            The gradient from the post layer
+            dL/dY, the impact on L by dY (delta of the layer output Y)
         """
         # --------------------------------------------------------------------------------
         # Get a gradient dL/dY from a post layer
@@ -222,51 +238,63 @@ class Matmul(Layer):
 
         return dY
 
-    def _gradient_descent_W(self, dW: np.ndarray, W: np.ndarray, X: np.ndarray, dY: np.ndarray):
-        """Gradient descent e.g. SGD: W = W - lr * dW (1 + l2)
-        Directly updating matrices to avoid the temporary copies
+    def backward(self, dY=1) -> np.ndarray:
+        """Calculate the gradients dL/dX and dL/dW.T.
+        A layer does not know how L=f(Y) is calculated with its output Y.
+        f'(Y) = dL/dY is given from the back (posterior) layer, hence "back" propagation.
 
         Args:
-            dY: Gradient dL/dY from the post layer
+            dY: Gradient dL/dY, the total impact on L by dY.
         Returns:
-            W
+            dL/dX of shape (N,D):  [ dL/dY (N,M) @ W (M,D)) ]
         """
         # --------------------------------------------------------------------------------
-        # Gradient on W: dL/dW = dY/dW @ dL/dY = X.T @ dL/dY because dY/dW = X.T
-        # dL/dW has the same shape with W:shape(M, D) because L and dL is scalar.
+        # Gradient dL/dY, the total impact on L by dY, from posteriors if it is set.
         # --------------------------------------------------------------------------------
-        dW = np.matmul(X.T, dY, out=dW) / X.shape[0]        # Normalize with batch size
-        assert np.array_equal(dW.shape, (self.M, self.D)), \
-            f"dL/dW shape is expected as ({self.M}, {self.D}) but ({dW.shape}))"
+        if self._layers:
+            self._dY = np.sum(list(map(self._backward, self._layers)), axis=0)
+        else:
+            self._dY = dY
 
-        W = self._optimizer(W, dW + self.dW * self.l2)
-        assert np.array_equal(W.shape, (self.M, self.D)), \
-            f"Updated W shape is expected as ({self.M}, {self.D}) but ({self._dW.shape}))"
+        assert np.array_equal(self.dY.shape, (self.N, self.M)), \
+            f"Gradient dL/dY shape is expected as ({self.N}, {self.M}) but ({self.dY.shape}))"
 
-        return W
+        # --------------------------------------------------------------------------------
+        # dL/dW of shape (M,D):  [ X.T (D, N)  @ dL/dY (N,M) ].T
+        # --------------------------------------------------------------------------------
+        self._dW = np.matmul(self.X.T, dY).T
+        assert np.array_equal(self.dW.shape, (self.M, self.D)), \
+            f"Gradient dL/dW shape is expected as ({self.M}, {self.D}) but ({self.dW.shape}))"
 
-    def backward(self):
-        """Back-propagate the gradient dX to the input layer.
-        Returns:
-            Gradient dL/dX = W.T @ dL/dY
+        # --------------------------------------------------------------------------------
+        # dL/dX of shape (N,D):  [ dL/dY (N,M) @ W (M,D)) ]
+        # --------------------------------------------------------------------------------
+        np.matmul(self.dY, self.W, out=self._dX)
+        assert np.array_equal(self.dX.shape, (self.N, self.D)), \
+            f"Gradient dL/dX shape is expected as ({self.N}, {self.D}) but ({self.dX.shape}))"
+
+        return self.dX
+
+    def _gradient_descent(self) -> None:
+        """Apply gradient descent
+        Directly update matrices to avoid the temporary copies
         """
-        # --------------------------------------------------------------------------------
-        # Normalized gradient dL/dY from the post layer
-        # dL/dY:shape(N, M) as per X:shape(N, D) @ W.T:shape(D, M)
-        # --------------------------------------------------------------------------------
-        self._dY = np.sum(
-            map(self._backward, self._layers),
-            axis=0
-        ) / self._num_posteriors
+        regularization = self.dW * self.l2
+        if self._logger.level == logging.DEBUG:
+            # np.copy is a shallow copy and will not copy object elements within arrays.
+            # To ensure all elements within an object array are copied, use copy.deepcopy.
+            backup = copy.deepcopy(self.W)
+            self.optimizer.update(self._W, self.dW + regularization)
+            assert not np.array_equal(backup, self.W), \
+                "W is not updated by the gradient descent"
+        else:
+            self.optimizer.update(self._W, self.dW + regularization)
 
-        # --------------------------------------------------------------------------------
-        # Gradient update on W
-        # --------------------------------------------------------------------------------
-        self._W = self._gradient_descent_W(self.dW, self.W, self.X, self.dY)
+        assert np.array_equal(self.W.shape, (self.M, self.D)), \
+            f"Updated W shape is expected as ({self.M}, {self.D}) but ({self.W.shape}))"
 
-        # --------------------------------------------------------------------------------
-        # Back-propagate dL/dX
-        # --------------------------------------------------------------------------------
-        self._dX = np.matmul(self.W.T, self.dY) / self.N    # Normalize by batch size
-        assert np.array_equal(self._dX, (self.M, self.D)), \
-            f"Gradient dL/dX shape is expected as ({self.N}, {self.D}) but ({self._dX.shape}))"
+    def update(self):
+        self._gradient_descent()
+
+
+
