@@ -174,24 +174,27 @@ class Matmul(Layer):
         self._optimizer: Optimizer = optimizer
         self._l2: float = l2
 
-    def forward(self, X: np.ndarray):
+    def forward(self, X: np.ndarray) -> float:
         """Calculate the layer output Y = X@W.T, and forward it to posteriors if set.
         Args:
             X: Batch input data from the input layer.
         Returns:
             Y: Layer value of X@W.T
         """
-        assert X and X.shape[0] > 0 and X.shape[1] == self._D, \
-            f"X is expected to have shape (N, {self._D}) but {X.shape}"
+        assert X and X.shape[0] > 0 and X.shape[1] == self.D, \
+            f"X is expected to have shape (N, {self.D}) but ({X.shape})"
+        assert self.W and np.array_equal(self.W.shape, (self.M, self.D)), \
+            f"W is expected to have shape {(self.M, self.D)} but ({self.W.shape})"
 
         self._X = X
         self._N = X.shape[0]
-        self._dX = np.empty(self.N, self.D) if self.dX.shape[0] != self.N else self.dX
 
         # --------------------------------------------------------------------------------
-        # Y:shape(N,M) = [ X:shape(N,D) @ W.T:shape(D,M) ]
-        # backward() need to validate the dY shape is (N, M)
+        # Allocate array for np.func(out=) for dX, Y but not dY.
+        # Y:(N,M) = [ X:(N,D) @ W.T:(D,M) ]
+        # backward() need to validate the dY shape is (N,M)
         # --------------------------------------------------------------------------------
+        self._dX = np.empty(self.N, self.D) if self.dX.shape[0] != self.N else self.dX
         if self.Y.shape[0] != self.N:
             self._Y = np.empty(self.N, self.M)
             # --------------------------------------------------------------------------------
@@ -200,13 +203,13 @@ class Matmul(Layer):
             # --------------------------------------------------------------------------------
             # self._dY = np.empty(self.N, self.M)
 
-        np.matmul(X, self._W.T, out=self._Y)
+        np.matmul(X, self.W.T, out=self._Y)
 
         # --------------------------------------------------------------------------------
-        # Forward propagate the matmul output Y to post posteriors if they are set.
+        # Forward propagate the matmul output Y to post layers if exist.
         # --------------------------------------------------------------------------------
-        def _forward(self, Y: np.ndarray, layer: Layer) -> float:
-            """Forward the matmul output Y to a next layer
+        def _forward(Y: np.ndarray, layer: Layer) -> float:
+            """Forward the matmul output Y to a post layer
             Args:
                 Y: Matmul output
                 layer: Layer where to propagate Y.
@@ -229,12 +232,12 @@ class Matmul(Layer):
             dL/dY, the impact on L by dY (delta of the layer output Y)
         """
         # --------------------------------------------------------------------------------
-        # Get a gradient dL/dY from a post layer
+        # Back propagation from the post layer(s)
         # dL/dY has the same shape with Y:shape(N, M) as L and dL are scalar.
         # --------------------------------------------------------------------------------
         dY: np.ndarray = layer.backward()
         assert np.array_equal(dY.shape, (self.N, self.M)), \
-            f"dY.shape is expected as ({self.N}, {self.M}) but ({dY.shape}))"
+            f"dY.shape is expected as {(self.N, self.M)} but ({dY.shape}))"
 
         return dY
 
@@ -249,29 +252,30 @@ class Matmul(Layer):
             dL/dX of shape (N,D):  [ dL/dY (N,M) @ W (M,D)) ]
         """
         # --------------------------------------------------------------------------------
-        # Gradient dL/dY, the total impact on L by dY, from posteriors if it is set.
+        # Gradient dL/dY, the total impact on L by dY, from post layer(s) if exist.
+        # np.add.reduce() is faster than np.sum() as sum() calls it internally.
         # --------------------------------------------------------------------------------
         if self._layers:
-            self._dY = np.sum(list(map(self._backward, self._layers)), axis=0)
+            self._dY = np.add.reduce(map(self._backward, self._layers), axis=0)
         else:
             self._dY = dY
 
         assert np.array_equal(self.dY.shape, (self.N, self.M)), \
-            f"Gradient dL/dY shape is expected as ({self.N}, {self.M}) but ({self.dY.shape}))"
+            f"Gradient dL/dY shape is expected as {(self.N, self.M)} but ({self.dY.shape}))"
 
         # --------------------------------------------------------------------------------
-        # dL/dW of shape (M,D):  [ X.T (D, N)  @ dL/dY (N,M) ].T
+        # dL/dW of shape (M,D):  [ X.T:(D, N)  @ dL/dY:(N,M) ].T
         # --------------------------------------------------------------------------------
         self._dW = np.matmul(self.X.T, dY).T
         assert np.array_equal(self.dW.shape, (self.M, self.D)), \
-            f"Gradient dL/dW shape is expected as ({self.M}, {self.D}) but ({self.dW.shape}))"
+            f"Gradient dL/dW shape is expected as {(self.M, self.D)} but ({self.dW.shape}))"
 
         # --------------------------------------------------------------------------------
-        # dL/dX of shape (N,D):  [ dL/dY (N,M) @ W (M,D)) ]
+        # dL/dX of shape (N,D):  [ dL/dY:(N,M) @ W:(M,D)) ]
         # --------------------------------------------------------------------------------
         np.matmul(self.dY, self.W, out=self._dX)
         assert np.array_equal(self.dX.shape, (self.N, self.D)), \
-            f"Gradient dL/dX shape is expected as ({self.N}, {self.D}) but ({self.dX.shape}))"
+            f"Gradient dL/dX shape is expected as {(self.N, self.D)} but ({self.dX.shape}))"
 
         return self.dX
 
@@ -281,8 +285,8 @@ class Matmul(Layer):
         """
         regularization = self.dW * self.l2
         if self._logger.level == logging.DEBUG:
-            # np.copy is a shallow copy and will not copy object elements within arrays.
-            # To ensure all elements within an object array are copied, use copy.deepcopy.
+            # np.copy() is a shallow copy and will not copy object elements within arrays.
+            # To ensure all elements within an object array are copied, use copy.deepcopy().
             backup = copy.deepcopy(self.W)
             self.optimizer.update(self._W, self.dW + regularization)
             assert not np.array_equal(backup, self.W), \
@@ -291,7 +295,7 @@ class Matmul(Layer):
             self.optimizer.update(self._W, self.dW + regularization)
 
         assert np.array_equal(self.W.shape, (self.M, self.D)), \
-            f"Updated W shape is expected as ({self.M}, {self.D}) but ({self.W.shape}))"
+            f"Updated W shape is expected as {(self.M, self.D)} but ({self.W.shape}))"
 
     def update(self):
         self._gradient_descent()

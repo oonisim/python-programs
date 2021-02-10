@@ -7,7 +7,7 @@ class Layer:
         """A unique name to identify each layer"""
         return self._name
 
-    def forward(self, X):
+    def forward(self, *args) -> float:
         """ Calculate the layer output.
         Note that "forward" is the process of calculating the layer output which
         is to be brought forward as the input to the post layer(s). To actually
@@ -20,8 +20,8 @@ class Layer:
         """
         pass
 
-    def backward(self):
-        """Calculate the gradient dL/dX
+    def backward(self, *args):
+        """Calculate the gradient dL/dX, the impact on L by the input delta X.
         Note that "backward" is the process of calculating the gradient(s) which is
         to be brought backward to the previous layer. To actually "backward" the
         gradient to the previous layer is an implementation matter.
