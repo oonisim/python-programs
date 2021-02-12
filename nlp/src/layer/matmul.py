@@ -5,9 +5,10 @@ Note:
     directly update the target storage area.
 """
 from typing import (
+    Optional,
+    Union,
     List,
     Dict,
-    Optional,
     Final,
     Generator,
     Iterator,
@@ -25,64 +26,13 @@ from .. optimizer import (
 
 class Matmul(Layer):
     """MatMul Layer class"""
-    # --------------------------------------------------------------------------------
+    # ================================================================================
     # Class initialization
-    # --------------------------------------------------------------------------------
+    # ================================================================================
 
-    # --------------------------------------------------------------------------------
+    # ================================================================================
     # Instance initialization
-    # --------------------------------------------------------------------------------
-    @property
-    def W(self) -> np.ndarray:
-        """Layer weight vectors W"""
-        return self._W
-
-    @property
-    def M(self) -> int:
-        """Number of nodes in the matmul layer"""
-        return self._M
-
-    @property
-    def D(self) -> int:
-        """Number of feature of a node in the matmul layer"""
-        return self._D
-
-    @property
-    def dW(self) -> np.ndarray:
-        """Layer weight gradients dW"""
-        return self._dW
-
-    @property
-    def X(self) -> np.ndarray:
-        """Latest batch input to the layer"""
-        return self._X
-
-    @property
-    def N(self) -> int:
-        """Batch size of X"""
-        return self._N
-
-    @property
-    def Y(self) -> np.ndarray:
-        """Latest matmul layer output"""
-        return self._Y
-
-    @property
-    def dY(self) -> np.ndarray:
-        """Latest gradient dL/dY (impact on L by dY) given from the post layer(s)"""
-        return self._dY
-
-    @property
-    def optimizer(self) -> Optimizer:
-        """Optimizer instance for gradient descent
-        """
-        return self._optimizer
-
-    @property
-    def l2(self) -> float:
-        """L2 regularization hyper parameter"""
-        return self._l2
-
+    # ================================================================================
     def __init__(
             self,
             name: str,
@@ -135,16 +85,12 @@ class Matmul(Layer):
 
         # --------------------------------------------------------------------------------
         # W: weight matrix of shape(M,D) where M=num_nodes
+        # Gradient dL/dW has the same shape shape(M, D) with W because L is scalar.
         # --------------------------------------------------------------------------------
         self._W: np.ndarray = W             # node weight vectors
         self._M: int = num_nodes            # number of nodes in the layer
         self._D: int = W.shape[1]           # number of features in x
-
-        # --------------------------------------------------------------------------------
-        # Gradient dL/dW of shape(M, D)
-        # Because the loss L is scalar, dL/dW has the same shape with W.
-        # --------------------------------------------------------------------------------
-        self._dW: np.ndarray = np.empty(num_nodes, W.shape[1], dtype=float)
+        self._dW: np.ndarray = np.empty((num_nodes, W.shape[1]), dtype=float)
 
         # --------------------------------------------------------------------------------
         # X: batch input of shape(N, D)
@@ -160,7 +106,7 @@ class Matmul(Layer):
         # dL/dY is the sum of all the impact on L by dY.
         # --------------------------------------------------------------------------------
         self._Y: np.ndarray = np.empty(0, num_nodes)
-        self._dY: np.ndarray = None
+        self._dY: np.ndarray = np.empty(0, num_nodes)
 
         # Layers to which forward the matmul output
         self._layers: List[Layer] = posteriors
@@ -172,10 +118,77 @@ class Matmul(Layer):
         # --------------------------------------------------------------------------------
         assert isinstance(optimizer, Optimizer)
         self._optimizer: Optimizer = optimizer
-        self._l2: float = l2
+        self._l2: Union[float, np.ndarray] = l2
 
-    def forward(self, X: np.ndarray) -> float:
-        """Calculate the layer output Y = X@W.T, and forward it to posteriors if set.
+    # --------------------------------------------------------------------------------
+    # Instance properties to expose
+    # --------------------------------------------------------------------------------
+    @property
+    def W(self) -> np.ndarray:
+        """Layer weight vectors W"""
+        return self._W
+
+    @property
+    def M(self) -> int:
+        """Number of nodes in the matmul layer"""
+        return self._M
+
+    @property
+    def D(self) -> int:
+        """Number of feature of a node in the matmul layer"""
+        return self._D
+
+    @property
+    def dW(self) -> np.ndarray:
+        """Layer weight gradients dW"""
+        assert self._dW.size, "dW is not initialized"
+        return self._dW
+
+    @property
+    def X(self) -> np.ndarray:
+        """Latest batch input to the layer"""
+        assert self._X and self._X.size, "X is not initialized"
+        return self._X
+
+    @property
+    def N(self) -> int:
+        """Batch size of X"""
+        return self._N
+
+    @property
+    def dX(self) -> np.ndarray:
+        """Gradient dL/dX"""
+        assert self._dX and self._dX.size, "dX is not initialized"
+        return self._dX
+
+    @property
+    def Y(self) -> np.ndarray:
+        """Latest matmul layer output"""
+        assert self._Y and self._Y.size, "Y is not initialized"
+        return self._Y
+
+    @property
+    def dY(self) -> np.ndarray:
+        """Latest gradient dL/dY (impact on L by dY) given from the post layer(s)"""
+        assert self._dY and self._dY.size, "dY is not initialized"
+        return self._dY
+
+    @property
+    def optimizer(self) -> Optimizer:
+        """Optimizer instance for gradient descent
+        """
+        return self._optimizer
+
+    @property
+    def l2(self) -> Union[float, np.ndarray]:
+        """L2 regularization hyper parameter"""
+        return self._l2
+
+    # --------------------------------------------------------------------------------
+    # Instance methods
+    # --------------------------------------------------------------------------------
+    def output(self, X: np.ndarray) -> np.ndarray:
+        """Calculate the layer output Y = X@W.T
         Args:
             X: Batch input data from the input layer.
         Returns:
@@ -192,7 +205,7 @@ class Matmul(Layer):
         # --------------------------------------------------------------------------------
         # Allocate array for np.func(out=) for dX, Y but not dY.
         # Y:(N,M) = [ X:(N,D) @ W.T:(D,M) ]
-        # backward() need to validate the dY shape is (N,M)
+        # gradient() need to validate the dY shape is (N,M)
         # --------------------------------------------------------------------------------
         self._dX = np.empty(self.N, self.D) if self.dX.shape[0] != self.N else self.dX
         if self.Y.shape[0] != self.N:
@@ -204,11 +217,12 @@ class Matmul(Layer):
             # self._dY = np.empty(self.N, self.M)
 
         np.matmul(X, self.W.T, out=self._Y)
+        return self.Y
 
-        # --------------------------------------------------------------------------------
-        # Forward propagate the matmul output Y to post layers if exist.
-        # --------------------------------------------------------------------------------
-        def _forward(Y: np.ndarray, layer: Layer) -> float:
+    def forward(self, X: np.ndarray) -> None:
+        """Calculate and forward-propagate the matmul output Y to post layers if exist.
+        """
+        def _forward(Y: np.ndarray, layer: Layer) -> None:
             """Forward the matmul output Y to a post layer
             Args:
                 Y: Matmul output
@@ -216,32 +230,12 @@ class Matmul(Layer):
             Returns:
                 Z: Return value from the post layer.
             """
-            Z: float = layer.forward(Y)
-            return Z
+            layer.forward(Y)
 
         if self._layers:
-            list(map(_forward, self.Y, self._layers))
+            list(map(_forward, self.output(X), self._layers))
 
-        return self.Y
-
-    def _backward(self, layer: Layer) -> np.ndarray:
-        """Get gradient dL/dY from a post layer
-        Args:
-            layer: a post layer
-        Returns:
-            dL/dY, the impact on L by dY (delta of the layer output Y)
-        """
-        # --------------------------------------------------------------------------------
-        # Back propagation from the post layer(s)
-        # dL/dY has the same shape with Y:shape(N, M) as L and dL are scalar.
-        # --------------------------------------------------------------------------------
-        dY: np.ndarray = layer.backward()
-        assert np.array_equal(dY.shape, (self.N, self.M)), \
-            f"dY.shape is expected as {(self.N, self.M)} but ({dY.shape}))"
-
-        return dY
-
-    def backward(self, dY=1) -> np.ndarray:
+    def gradient(self, dY=1) -> np.ndarray:
         """Calculate the gradients dL/dX and dL/dW.T.
         A layer does not know how L=f(Y) is calculated with its output Y.
         f'(Y) = dL/dY is given from the back (posterior) layer, hence "back" propagation.
@@ -251,17 +245,9 @@ class Matmul(Layer):
         Returns:
             dL/dX of shape (N,D):  [ dL/dY (N,M) @ W (M,D)) ]
         """
-        # --------------------------------------------------------------------------------
-        # Gradient dL/dY, the total impact on L by dY, from post layer(s) if exist.
-        # np.add.reduce() is faster than np.sum() as sum() calls it internally.
-        # --------------------------------------------------------------------------------
-        if self._layers:
-            self._dY = np.add.reduce(map(self._backward, self._layers), axis=0)
-        else:
-            self._dY = dY
-
-        assert np.array_equal(self.dY.shape, (self.N, self.M)), \
+        assert dY == 1 or np.array_equal(self.dY.shape, (self.N, self.M)), \
             f"Gradient dL/dY shape is expected as {(self.N, self.M)} but ({self.dY.shape}))"
+        self._dY = dY
 
         # --------------------------------------------------------------------------------
         # dL/dW of shape (M,D):  [ X.T:(D, N)  @ dL/dY:(N,M) ].T
@@ -279,8 +265,41 @@ class Matmul(Layer):
 
         return self.dX
 
+    def backward(self) -> np.ndarray:
+        """Calculate and back-propagate the gradient dL/dX"""
+        if not self._layers:
+            self._logger.warning("backward() called when no post layer exist.")
+
+        def _backward(layer: Layer) -> np.ndarray:
+            """Get gradient dL/dY from a post layer
+            Args:
+                layer: a post layer
+            Returns:
+                dL/dY, the impact on L by dY (delta of the layer output Y)
+            """
+            # --------------------------------------------------------------------------------
+            # Back propagation from the post layer(s)
+            # dL/dY has the same shape with Y:shape(N, M) as L and dL are scalar.
+            # --------------------------------------------------------------------------------
+            dY: np.ndarray = layer.backward()
+            assert np.array_equal(dY.shape, (self.N, self.M)), \
+                f"dY.shape is expected as {(self.N, self.M)} but ({dY.shape}))"
+
+            return dY
+
+        # --------------------------------------------------------------------------------
+        # Gradient dL/dY, the total impact on L by dY, from post layer(s) if exist.
+        # np.add.reduce() is faster than np.sum() as sum() calls it internally.
+        # --------------------------------------------------------------------------------
+        dY = np.add.reduce(map(_backward, self._layers), axis=0) if self._layers else 1
+        dX = self.gradient(dY)
+        assert self.X and dX.shape == self.X.shape, \
+            f"dX.shape:{dX.shape} needs to be that of X:{self.X.shape}."
+
+        return dX
+
     def _gradient_descent(self) -> None:
-        """Apply gradient descent
+        """Gradient descent
         Directly update matrices to avoid the temporary copies
         """
         regularization = self.dW * self.l2
@@ -300,5 +319,6 @@ class Matmul(Layer):
     def update(self):
         self._gradient_descent()
 
-
+    def numeric_gradient(self, h: float = 1e-05):
+        """Calculate numerical gradient"""
 

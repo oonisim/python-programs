@@ -1,4 +1,4 @@
-"""Output layer implementations
+"""Loss layer implementations
 """
 from typing import (
     List,
@@ -49,8 +49,8 @@ class SoftmaxWithLogLoss(Layer):
         self.J: np.ndarray = None   # Cross entropy log loss of shape (N,).
         self.L: float = -np.inf     # Loss of shape ()/scalar.
 
-    def forward(self, X: np.ndarray, T: np.ndarray) -> float:
-        """Calculate the node values (probabilities)
+    def output(self, X: np.ndarray, T: np.ndarray) -> np.ndarray:
+        """Layer output
         Args:
             X: Input of shape (N, M) to calculate the probabilities for the M nodes.
             T: Labels for input X. Shape(N,M) for OHE label and shape(N,) for index label.
@@ -71,9 +71,10 @@ class SoftmaxWithLogLoss(Layer):
         self.J = cross_entropy_log_loss(self.P, self.T)         # dJ/dP -> -T/P
         self.L = np.sum(self.J)                                 # dL/dJ ->  1/N
 
+        assert self.L.ndim == 0
         return self.L
 
-    def backward(self, dL=1):
+    def gradient(self, dL=1):
         """Calculate the gradient dL/dX, the impact on L by the input dX (NOT dL)
 
         dL: dF/dL is the impact on F by dL when the output L has a post layer F.

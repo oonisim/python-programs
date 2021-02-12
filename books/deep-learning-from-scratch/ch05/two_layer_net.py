@@ -1,10 +1,13 @@
-# coding: utf-8
-import sys, os
-sys.path.append(os.pardir)  # 親ディレクトリのファイルをインポートするための設定
-import numpy as np
-from src.common import numerical_gradient
 from collections import OrderedDict
-
+import numpy as np
+from common.gradient import (
+    numerical_gradient
+)
+from common.layers import (
+    Affine,
+    Relu,
+    SoftmaxWithLoss
+)
 
 class TwoLayerNet:
 
@@ -45,8 +48,9 @@ class TwoLayerNet:
         
     # x:入力データ, t:教師データ
     def numerical_gradient(self, x, t):
-        loss_W = lambda W: self.loss(x, t)
-        
+        #loss_W = lambda W: self.loss(x, t)
+        loss_W = lambda : self.loss(x, t)
+
         grads = {}
         grads['W1'] = numerical_gradient(loss_W, self.params['W1'])
         grads['b1'] = numerical_gradient(loss_W, self.params['b1'])

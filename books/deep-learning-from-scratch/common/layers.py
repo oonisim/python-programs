@@ -1,6 +1,12 @@
-# coding: utf-8
 import numpy as np
-from src.common import im2col, col2im
+from common.util import (
+    im2col,
+    col2im
+)
+from common.functions import (
+    cross_entropy_error,
+    softmax
+)
 
 
 class Relu:

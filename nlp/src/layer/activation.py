@@ -31,14 +31,14 @@ class Relu(Layer):
         self.mask = None    # To zero clear the outputs where x <= 0
         self.A = None       # Activation
 
-    def forward(self, X):
+    def output(self, X):
         self.mask = (X <= 0)
         A = X.copy()
         A[self.mask] = 0
 
         return A
 
-    def backward(self, dA):
+    def gradient(self, dA):
         dA[self.mask] = 0
         dX = dA
 
@@ -50,12 +50,12 @@ class Sigmoid(Layer):
         super().__init__(name=name)
         self.A = None   # Activation
 
-    def forward(self, X):
+    def output(self, X):
         A = sigmoid(X)
         self.A = A
         return A
 
-    def backward(self, dA):
+    def gradient(self, dA):
         dX = dA * (1.0 - self.A) * self.A
 
         return dX
