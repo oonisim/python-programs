@@ -49,7 +49,7 @@ class SoftmaxWithLogLoss(Layer):
         self.J: np.ndarray = None   # Cross entropy log loss of shape (N,).
         self.L: float = -np.inf     # Loss of shape ()/scalar.
 
-    def output(self, X: np.ndarray, T: np.ndarray) -> np.ndarray:
+    def function(self, X: np.ndarray, T: np.ndarray) -> np.ndarray:
         """Layer output
         Args:
             X: Input of shape (N, M) to calculate the probabilities for the M nodes.

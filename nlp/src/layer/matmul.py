@@ -67,7 +67,7 @@ class Matmul(Layer):
         Node k (k:0, 1, .. M-1) has a weight vector W(k):[w(k)(0), w(k)(1), ... w(k)(D-1)].
         w(k)(0) is a bias weight. Each w(k)(i) amplifies i-th feature in an input x.
         """
-        super().__init__(name=name)
+        super().__init__(name=name, num_nodes=num_nodes)
         self._log_level = log_level
         self._logger = logging.getLogger(__name__)
         self._logger.setLevel(log_level)
@@ -81,7 +81,7 @@ class Matmul(Layer):
             name, W.shape, num_nodes
         )
         assert W.shape[0] == num_nodes, \
-            f"W has {W.shape[0]} number of weight vectors that should have matched num_nodes {num_nodes}"
+            f"W shape needs to be (N, {num_nodes}) but (M, {W.shape[0]})."
 
         # --------------------------------------------------------------------------------
         # W: weight matrix of shape(M,D) where M=num_nodes
@@ -109,7 +109,7 @@ class Matmul(Layer):
         self._dY: np.ndarray = np.empty(0, num_nodes)
 
         # Layers to which forward the matmul output
-        self._layers: List[Layer] = posteriors
+        self._posteriors: List[Layer] = posteriors
         self._num_posteriors: int = len(posteriors)
 
         # --------------------------------------------------------------------------------
@@ -187,7 +187,7 @@ class Matmul(Layer):
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
-    def output(self, X: np.ndarray) -> np.ndarray:
+    def function(self, X: np.ndarray) -> np.ndarray:
         """Calculate the layer output Y = X@W.T
         Args:
             X: Batch input data from the input layer.
@@ -232,8 +232,8 @@ class Matmul(Layer):
             """
             layer.forward(Y)
 
-        if self._layers:
-            list(map(_forward, self.output(X), self._layers))
+        if self._posteriors:
+            list(map(_forward, self.function(X), self._posteriors))
 
     def gradient(self, dY=1) -> np.ndarray:
         """Calculate the gradients dL/dX and dL/dW.T.
@@ -267,8 +267,7 @@ class Matmul(Layer):
 
     def backward(self) -> np.ndarray:
         """Calculate and back-propagate the gradient dL/dX"""
-        if not self._layers:
-            self._logger.warning("backward() called when no post layer exist.")
+        assert self._posteriors, "backward() called when no post layer exist."
 
         def _backward(layer: Layer) -> np.ndarray:
             """Get gradient dL/dY from a post layer
@@ -291,7 +290,7 @@ class Matmul(Layer):
         # Gradient dL/dY, the total impact on L by dY, from post layer(s) if exist.
         # np.add.reduce() is faster than np.sum() as sum() calls it internally.
         # --------------------------------------------------------------------------------
-        dY = np.add.reduce(map(_backward, self._layers), axis=0) if self._layers else 1
+        dY = np.add.reduce(map(_backward, self._posteriors)) if self._posteriors else 1
         dX = self.gradient(dY)
         assert self.X and dX.shape == self.X.shape, \
             f"dX.shape:{dX.shape} needs to be that of X:{self.X.shape}."

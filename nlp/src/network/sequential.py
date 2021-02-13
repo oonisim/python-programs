@@ -21,7 +21,6 @@ class Sequential(Base):
         """
         super().__init__(name)
         self._layers = layers
-        self._M = self._num_classes = layers[-1].
 
     @property
     def layers(self) -> List:

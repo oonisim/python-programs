@@ -31,7 +31,7 @@ class Relu(Layer):
         self.mask = None    # To zero clear the outputs where x <= 0
         self.A = None       # Activation
 
-    def output(self, X):
+    def function(self, X):
         self.mask = (X <= 0)
         A = X.copy()
         A[self.mask] = 0
@@ -50,7 +50,7 @@ class Sigmoid(Layer):
         super().__init__(name=name)
         self.A = None   # Activation
 
-    def output(self, X):
+    def function(self, X):
         A = sigmoid(X)
         self.A = A
         return A
