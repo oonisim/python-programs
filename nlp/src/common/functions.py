@@ -93,3 +93,30 @@ def cross_entropy_log_loss(P, T) -> float:
     assert J.shape[0] == N
 
     return J
+
+
+def numerical_gradient(loss, X, h:float = 1e-5) -> np.ndarray:
+    """Calculate numerical gradient (loss(X+h) - loss(X-h)) / 2h
+    Args:
+        loss: loss function for X
+        X: input
+        h: small delta value to calculate the loss for X+/-h
+    Returns:
+        dX: Numerical gradient
+    """
+    G = gradient = np.zeros_like(X)
+    it = np.nditer(X, flags=['multi_index'], op_flags=['readwrite'])
+    while not it.finished:
+        idx = it.multi_index
+        tmp_val = X[idx]
+        X[idx] = tmp_val + h
+        fx1 = loss(X)  # f(x+h)
+
+        X[idx] = tmp_val - h
+        fx2 = loss(X)  # f(x-h)
+        G[idx] = (fx1 - fx2) / (2 * h)
+
+        X[idx] = tmp_val  # 値を元に戻す
+        it.iternext()
+
+    return G

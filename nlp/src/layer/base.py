@@ -35,47 +35,56 @@ Loss function L:
 
 [Design]
 f(arg):
-    f is a function that calculates the layer output Z=f(arg) where arg is the
+    f is a function that calculates the layer output Y=f(arg) where arg is the
     output of the previous layer.
 
-g(dL/dZ):
-    g is a function that calculates a gradient dL/dX = g(dL/dZ) = dL/dZ * dZ/dX
-    and back-propagate it to the previous layers. dL/dZ is given because the
+g(dL/dY):
+    g is a function that calculates a gradient dL/dX = g(dL/dY) = dL/dY * dY/dX
+    and back-propagate it to the previous layers. dL/dY is given because the
     layer i does not know fi at layers i+1, ... n-1 hence cannot calculate it.
 
 gn(Li, h):
     gn is a function that calculate numerical gradients, given L and h, as
     gn=( L(arg+h) - L(arg-h) ) / 2h
 
-    arg: any argument that computes the output of the layer Z.
+    arg: any argument that computes the output Y of the layer.
          Although fi can take a single arg, the actual computation may need
          multiple arguments e.g. X and W for matmul. Then gn calculates for
          X and W, and returns two numerical gradients.
     Li: the loss function of the layer Li=(fn-1 o ... fi+1) with i < n-1
-        loss=Li(Z)=L(f(arg)), NOT L(arg).
+        loss=Li(Y)=L(f(arg)), NOT L(arg).
     h: a small number e.g. 1e-5
 
 state S:
     A state in a layer is a combination of variables at a specific cycle t.
 
-u(dL/dZ):
-    u is a function that calculates dL/dS = u(dL/dZ) = dL/dZ * dZ/dS to update
+u(dL/dY):
+    u is a function that calculates dL/dS = u(dL/dY) = dL/dY * dY/dS to update
     the state S in a layer with gradient descent as S=optimizer(S, dL/dS).
+    There may be multiple dS to calculate and u returns all dL/dS.
+
+    Why not calculating all gradients in g? -> Separation of concerns.
+        It will be efficient to calculate all in g, but for this implementation
+        f focuses on Y=f(X) for X and g only focuses on dL/dX, impact on L by X.
+        Focus on concern and one concern only. g for dX and u for dS.
 
 [Example]
     Matmul at cycle t with a input X(t), its state is [ W(t) ], NOT [ X(t), W(t)].
     X(t) is a constant for the layer and the layer will not update it in itself.
     Such a constant is pre-set to a layer before calculations at each cycle.
 
-    f calculates the output Z = f(X). g calculates the gradient dL/dX = g(dL/dZ).
+    f calculates the output Y = f(X). g calculates the gradient dL/dX = g(dL/dY).
 
-    u calculate the gradient dL/dW=u(dL/dZ) and updates W as W=optimizer(W,dL/dW).
+    u calculate the gradient dL/dW=u(dL/dY) and updates W as W=optimizer(W,dL/dW).
 """
 from typing import (
     Optional,
     Union,
+    List,
+    Dict,
     Callable,
-    NoReturn
+    NoReturn,
+    Final
 )
 import numpy as np
 
@@ -134,20 +143,22 @@ class Layer:
         """
         pass
 
-    def forward(self) -> NoReturn:
+    def forward(self, X: np.ndarray) -> NoReturn:
         """Forward the layer output to the post layers
-        Args: None
-        Returns: None
+        Args:
+            X: input to the layer
+        Returns:
+            Y: layer output
         """
         pass
 
-    def gradient(self, dZ: np.ndarray):
-        """Calculate the gradient dL/dX=g(dL/dZ), the impact on L by the input dX.
+    def gradient(self, dY: np.ndarray) -> np.ndarray:
+        """Calculate the gradient dL/dX=g(dL/dY), the impact on L by the input dX.
         Note that "gradient" is the process of calculating the gradient to back
         propagate to the previous layer.
 
         Args:
-            dZ: dL/dZ, impact on L by the layer output Z
+            dY: dL/dY, impact on L by the layer output Y
         Returns:
             dL/dX, impact on L by the layer input X
         """
@@ -158,19 +169,22 @@ class Layer:
         pass
 
     def gradient_numerical(
-            self, Li: Callable[[np.ndarray], np.ndarray], h: float = 1e-05
-    ) -> np.ndarray:
+            self, L: Callable[[np.ndarray], np.ndarray], h: float = 1e-05
+    ) -> Union[np.ndarray, List[np.ndarray]]:
         """Calculate numerical gradient
         Args:
-            Li: Loss fouction
+            L: Loss function for the layer. loss=L(f(X))
+            h: small number for delta to calculate the numerical gradient
+        Returns:
+            Numerical gradients
         """
         pass
 
-    def update(self, dZ: np.ndarray):
+    def update(self, dY: np.ndarray) -> Union[np.ndarray, List[np.ndarray]]:
         """Calculate the gradient dL/dS and update S
         Args:
-            dZ: dL/dZ
+            dY: dL/dY
         Returns:
-            dL/dS
+            dL/dS: Gradient(s) on state S. There may be multiple dL/dS.
         """
         pass

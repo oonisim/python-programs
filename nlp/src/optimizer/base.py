@@ -1,4 +1,5 @@
 """Gradient descent base"""
+import numpy as np
 
 
 class Optimizer:
@@ -11,15 +12,16 @@ class Optimizer:
     def __init__(self, lr=0.01):
         self._lr = lr
 
-    def update(self, W, dW):
+    def update(self, W, dW, out=None) -> np.ndarray:
         """Default method to update the weight matrix W
         Args:
             W: weight matrix to update
             dW: gradient of dL/dW, the impact of dW on the system output L
+            out: Location into which the result is stored
         Returns:
             Updated W
         """
-        assert False, "You need to override and implement the update method"
+        pass
 
 
 
