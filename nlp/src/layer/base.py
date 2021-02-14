@@ -87,6 +87,9 @@ from typing import (
     Final
 )
 import numpy as np
+from .. common.functions import (
+    numerical_gradient
+)
 
 
 class Layer:
@@ -99,9 +102,16 @@ class Layer:
         assert name
         self._name: str = name
 
+        # number of nodes in the layer
         assert num_nodes > 0
         self._num_nodes = num_nodes
+        self._M: int = num_nodes
 
+        # X: batch input of shape(N, D)
+        self._X: np.ndarray = np.empty((0, num_nodes), dtype=float)
+        self._N: int = -1
+
+        # Loss Li function for the layer. L = Li o fi
         self._loss: Union[Callable[[np.ndarray], np.ndarray], None] = None
 
     # --------------------------------------------------------------------------------
@@ -116,6 +126,24 @@ class Layer:
     def num_nodes(self) -> int:
         """Number of nodes in a layer"""
         return self._num_nodes
+
+    @property
+    def X(self) -> np.ndarray:
+        """Latest batch input to the layer"""
+        assert self._X and self._X.size, "X is not initialized"
+        return self._X
+
+    @X.setter
+    def X(self, X: np.ndarray):
+        assert X
+        self._X = X
+        self._N = X.shape[0]
+
+    @property
+    def N(self) -> int:
+        """Batch size"""
+        assert self._N > 0, "N is not initialized"
+        return self._N
 
     @property
     def loss(self) -> Callable[[np.ndarray], np.ndarray]:
@@ -166,15 +194,18 @@ class Layer:
 
     def gradient_numerical(
             self, L: Callable[[np.ndarray], np.ndarray], h: float = 1e-05
-    ) -> Union[np.ndarray, List[np.ndarray]]:
-        """Calculate numerical gradient
+    ) -> np.ndarray:
+        """Calculate numerical gradients
         Args:
-            L: Loss function for the layer. loss=L(f(X))
+            L: Loss function for the layer. loss=L(f(X)), NOT L for NN.
             h: small number for delta to calculate the numerical gradient
         Returns:
-            gn: Numerical gradients
+            dX: [L(f(X+h) - L(f(X-h)] / 2h
         """
-        pass
+        def loss(X: np.ndarray): return L(self.function(X))
+        dX = numerical_gradient(loss, self.X)
+
+        return dX
 
     def update(self, dY: np.ndarray) -> Union[np.ndarray, List[np.ndarray]]:
         """Calculate the gradient dL/dS and update S

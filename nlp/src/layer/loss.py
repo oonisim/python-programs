@@ -31,13 +31,13 @@ class SoftmaxWithLogLoss(Layer):
     Combined with the log loss because calculating gradients separately is not simple.
     When combined, the dL/dX, impact on L by input delta dX, is (P - T)/N.
     """
-    # --------------------------------------------------------------------------------
+    # ================================================================================
     # Class initialization
-    # --------------------------------------------------------------------------------
+    # ================================================================================
 
-    # --------------------------------------------------------------------------------
+    # ================================================================================
     # Instance initialization
-    # --------------------------------------------------------------------------------
+    # ================================================================================
     def __init__(self, name: str):
         """Initialize a softmax layer
         Args
@@ -61,12 +61,6 @@ class SoftmaxWithLogLoss(Layer):
         """Layer input"""
         assert self._X and self.X.size > 0, "T is not initialized"
         return self._X
-
-    @property
-    def N(self) -> int:
-        """Batch size"""
-        assert self._N > 0, "N is not initialized"
-        return self._N
 
     @property
     def M(self) -> int:

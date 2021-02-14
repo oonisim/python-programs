@@ -101,7 +101,6 @@ class Matmul(Layer):
         # Gradient dL/dX of has the same shape(N,D) with X because L is scalar.
         # --------------------------------------------------------------------------------
         self._X: np.ndarray = np.empty((0, num_nodes), dtype=float)
-        self._N: int = -1                   # batch size: X.shape[0]
         self._dX: np.ndarray = np.empty((0, num_nodes), dtype=float)
 
         # --------------------------------------------------------------------------------
@@ -165,11 +164,6 @@ class Matmul(Layer):
         # Allocate the storage for np.func(out=dX).
         self._dX = np.empty(X.shape, dtype=float) \
             if self.dX.shape[0] != X.shape[0] else self.dX
-
-    @property
-    def N(self) -> int:
-        """Batch size of X"""
-        return self._N
 
     @property
     def dX(self) -> np.ndarray:
