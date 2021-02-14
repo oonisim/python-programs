@@ -37,11 +37,13 @@ class Optimizer:
     @property
     def lr(self) -> Union[float, np.ndarray]:
         """Learning rate of the gradient descent"""
+        assert self._lr and self._lr >= 0
         return self._lr
 
     @property
     def l2(self) -> Union[float, np.ndarray]:
         """L2 regularization hyper parameter"""
+        assert self._l2 and self._l2 >= 0
         return self._l2
 
     # --------------------------------------------------------------------------------
