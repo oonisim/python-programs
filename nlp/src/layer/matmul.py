@@ -43,7 +43,6 @@ class Matmul(Layer):
             num_nodes: int,
             W: np.ndarray,
             posteriors: Optional[List[Layer]],
-            l2: float = 0,
             optimizer: Optimizer = SGD(),
             log_level: int = logging.ERROR
     ):
@@ -53,7 +52,6 @@ class Matmul(Layer):
             num_nodes: Number of nodes in the layer
             W: Weight matrix of shape(M=num_nodes, D), each row of which is a weight vector of a node.
             posteriors: Post layers to which forward the matmul layer output
-            l2: L2 regularization hyper parameter, e.g. 1e-3, set to 0 by default not to use it.
             optimizer: Gradient descent implementation e.g SGD, Adam.
             log_level: logging level
 
@@ -71,16 +69,13 @@ class Matmul(Layer):
         Node k (k:0, 1, .. M-1) has a weight vector W(k):[w(k)(0), w(k)(1), ... w(k)(D-1)].
         w(k)(0) is a bias weight. Each w(k)(i) amplifies i-th feature in an input x.
         """
-        super().__init__(name=name, num_nodes=num_nodes)
-        self._log_level = log_level
-        self._logger = logging.getLogger(__name__)
-        self._logger.setLevel(log_level)
+        super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
 
         # --------------------------------------------------------------------------------
         # Validate the expected dimensions.
         # `W` has `M` nodes (nodes)
         # --------------------------------------------------------------------------------
-        self._logger.debug(
+        self.logger.debug(
             "Matmul name [%s] W.shape is [%s], numer of nodes is [%s]",
             name, W.shape, num_nodes
         )
@@ -121,10 +116,9 @@ class Matmul(Layer):
         # --------------------------------------------------------------------------------
         assert isinstance(optimizer, Optimizer)
         self._optimizer: Optimizer = optimizer
-        self._l2: Union[float, np.ndarray] = l2
 
     # --------------------------------------------------------------------------------
-    # Instance properties to expose
+    # Instance properties
     # --------------------------------------------------------------------------------
     @property
     def W(self) -> np.ndarray:
@@ -188,11 +182,6 @@ class Matmul(Layer):
         """Optimizer instance for gradient descent
         """
         return self._optimizer
-
-    @property
-    def l2(self) -> Union[float, np.ndarray]:
-        """L2 regularization hyper parameter"""
-        return self._l2
 
     # --------------------------------------------------------------------------------
     # Instance methods
@@ -296,16 +285,15 @@ class Matmul(Layer):
         """Gradient descent
         Directly update matrices to avoid the temporary copies
         """
-        regularization = self.dW * self.l2
-        if self._logger.level == logging.DEBUG:
+        if self.logger.level == logging.DEBUG:
             # np.copy() is a shallow copy and will not copy object elements within arrays.
             # To ensure all elements within an object array are copied, use copy.deepcopy().
             backup = copy.deepcopy(self.W)
-            W = self.optimizer.update(self._W, self.dW + regularization, out=self._W)
+            W = self.optimizer.update(self._W, self.dW, out=self._W)
             assert not np.array_equal(backup, self.W), \
                 "W is not updated by the gradient descent"
         else:
-            W = self.optimizer.update(self._W, self.dW + regularization, out=self._W)
+            W = self.optimizer.update(self._W, self.dW, out=self._W)
 
         assert W == self._W
         assert np.array_equal(self.W.shape, (self.M, self.D)), \
@@ -350,18 +338,6 @@ class Matmul(Layer):
         """
         def loss(W: np.ndarray): return L(self.X @ W.T)
         dW = numerical_gradient(loss, self.W)
-
         def loss(X: np.ndarray): return L(X @ self.W.T)
         dX = numerical_gradient(loss, self.X)
-
         return dX, dW
-
-    def validate_gradients(
-            self, L: Callable[[np.ndarray], np.ndarray], threshold: float = 1e-05
-    ) :
-        gnx, gnw = self.gradient_numerical(L)
-        self._logger.debug("Numerical gradient for X is \n%s", gnx)
-        self._logger.debug("Numerical gradient for W is \n%s", gnw)
-
-        if np.average(np.abs(self.dW - gnw)) > threshold:
-           msg: str = f"Delta between numerical gradient average {np.average(gnw)}"

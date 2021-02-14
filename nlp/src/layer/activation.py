@@ -34,8 +34,9 @@ class Relu(Layer):
     # ================================================================================
     # Instance initialization
     # ================================================================================
-    def __init__(self, name: str, num_nodes: int):
-        super().__init__(name=name, num_nodes=num_nodes)
+    def __init__(self, name: str, num_nodes: int, log_level: int = logging.ERROR):
+        super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
+
         self.mask: np.ndarray = np.empty(())    # To zero clear the outputs where x <= 0
         self._A: np.ndarray = np.empty(())      # Activation
         self._M = num_nodes                     # Number of nodes alias
@@ -94,8 +95,8 @@ class Sigmoid(Layer):
     # ================================================================================
     # Instance initialization
     # ================================================================================
-    def __init__(self, name: str, num_nodes: int):
-        super().__init__(name=name, num_nodes=num_nodes)
+    def __init__(self, name: str, num_nodes: int, log_level: int = logging.ERROR):
+        super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
         self.mask: np.ndarray = np.empty(())    # To zero clear the outputs where x <= 0
         self._A: np.ndarray = np.empty(())       # Activation
         self._M = num_nodes                     # Number of nodes alias

@@ -1,17 +1,52 @@
 """Gradient descent base"""
+from typing import (
+    Optional,
+    Union,
+    List,
+    Dict,
+    Tuple,
+    Final,
+    Generator,
+    Iterator,
+    Callable
+)
 import numpy as np
 
 
 class Optimizer:
     """Gradient descent optimization base class implementation"""
+    # ================================================================================
+    # Class initialization
+    # ================================================================================
+
+    # ================================================================================
+    # Instance initialization
+    # ================================================================================
+    def __init__(self, lr=0.01, l2: float = 1e-3):
+        """
+        Args:
+            lr: learning rate of the gradient descent
+            l2: L2 regularization hyper parameter, e.g. 1e-3, set to 0 not to use it
+        """
+        self._lr: Union[float, np.ndarray] = lr
+        self._l2: Union[float, np.ndarray] = l2
+
+    # --------------------------------------------------------------------------------
+    # Instance properties
+    # --------------------------------------------------------------------------------
     @property
-    def lr(self) -> float:
+    def lr(self) -> Union[float, np.ndarray]:
         """Learning rate of the gradient descent"""
         return self._lr
 
-    def __init__(self, lr=0.01):
-        self._lr = lr
+    @property
+    def l2(self) -> Union[float, np.ndarray]:
+        """L2 regularization hyper parameter"""
+        return self._l2
 
+    # --------------------------------------------------------------------------------
+    # Instance methods
+    # --------------------------------------------------------------------------------
     def update(self, W, dW, out=None) -> np.ndarray:
         """Default method to update the weight matrix W
         Args:

@@ -86,6 +86,7 @@ from typing import (
     NoReturn,
     Final
 )
+import logging
 import numpy as np
 from .. common.functions import (
     numerical_gradient
@@ -93,7 +94,15 @@ from .. common.functions import (
 
 
 class Layer:
-    def __init__(self, name: str, num_nodes: int):
+    """Neural network layer base class"""
+    # ================================================================================
+    # Class initialization
+    # ================================================================================
+
+    # ================================================================================
+    # Instance initialization
+    # ================================================================================
+    def __init__(self, name: str, num_nodes: int, log_level: int = logging.ERROR):
         """
         Args:
             name: layer ID name
@@ -113,6 +122,9 @@ class Layer:
 
         # Loss Li function for the layer. L = Li o fi
         self._loss: Union[Callable[[np.ndarray], np.ndarray], None] = None
+
+        self._logger = logging.getLogger(name)
+        self._logger.setLevel(log_level)
 
     # --------------------------------------------------------------------------------
     # Instance properties
@@ -155,6 +167,12 @@ class Layer:
     def loss(self, Li: Callable[[np.ndarray], np.ndarray]) -> NoReturn:
         assert Li
         self._loss = Li
+
+    @property
+    def logger(self) -> logging.Logger:
+        """Instance logger"""
+        assert self._logger, "logger is not initialized"
+        return self._logger
 
     # --------------------------------------------------------------------------------
     # Instance methods

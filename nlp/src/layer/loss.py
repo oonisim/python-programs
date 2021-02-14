@@ -38,12 +38,12 @@ class SoftmaxWithLogLoss(Layer):
     # ================================================================================
     # Instance initialization
     # ================================================================================
-    def __init__(self, name: str):
+    def __init__(self, name: str, num_nodes: int, log_level: int = logging.ERROR):
         """Initialize a softmax layer
         Args
             name: Instance ID
         """
-        super().__init__(name=name)
+        super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
 
         self._X: np.ndarray = np.empty((0,0))
         self._N: int = -1                   # Batch size of X
