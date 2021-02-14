@@ -14,7 +14,7 @@ i: 0, ... n-1. A function composition g o f = g(f(arg))
 [Considerations]
 Loss function L:
     Each layer i has its loss function Li = (fn-1 o ... fi+1) with i < n-1 that
-    calculates L as Li(Zi) where Zi = fi(arg).
+    calculates L as Li(Yi) from the layer output Yi=fi(arg).
 
     L = Li(fi) i < n-1   (last layer Ln-1 does not have Ln)
 
@@ -41,11 +41,11 @@ f(arg):
 g(dL/dY):
     g is a function that calculates a gradient dL/dX = g(dL/dY) = dL/dY * dY/dX
     and back-propagate it to the previous layers. dL/dY is given because the
-    layer i does not know fi at layers i+1, ... n-1 hence cannot calculate it.
+    layer i does not know f at layers i+1, ... n-1 hence cannot calculate it.
 
 gn(Li, h):
     gn is a function that calculate numerical gradients, given L and h, as
-    gn=( L(arg+h) - L(arg-h) ) / 2h
+    gn=[ Li(fi(arg+h)) = Li(fi(arg-h)) ] / 2h
 
     arg: any argument that computes the output Y of the layer.
          Although fi can take a single arg, the actual computation may need
@@ -59,22 +59,22 @@ state S:
     A state in a layer is a combination of variables at a specific cycle t.
 
 u(dL/dY):
-    u is a function that calculates dL/dS = u(dL/dY) = dL/dY * dY/dS to update
-    the state S in a layer with gradient descent as S=optimizer(S, dL/dS).
+    u is a function that calculates dL/dS = u(dL/dY) = dL/dY * dY/dS and updates
+    the state S in the layer with gradient descent as S=optimizer(S, dL/dS).
     There may be multiple dS to calculate and u returns all dL/dS.
 
     Why not calculating all gradients in g? -> Separation of concerns.
-        It will be efficient to calculate all in g, but for this implementation
-        f focuses on Y=f(X) for X and g only focuses on dL/dX, impact on L by X.
-        Focus on concern and one concern only. g for dX and u for dS.
+        f focuses on X, g focuses on its gradient dL/dX, u focuses on dL/dS.
+        It can be efficient to calculate all in g, but loses transparency (
+        clear declaration of intentions) and ambiguates what it focuses on.
 
 [Example]
     Matmul at cycle t with a input X(t), its state is [ W(t) ], NOT [ X(t), W(t)].
     X(t) is a constant for the layer and the layer will not update it in itself.
-    Such a constant is pre-set to a layer before calculations at each cycle.
+    Such constants can be pre-set to each layer before calculations at each cycle.
+    L is regarded as L(W, X, T) where X, T are constants during a cycle t.
 
     f calculates the output Y = f(X). g calculates the gradient dL/dX = g(dL/dY).
-
     u calculate the gradient dL/dW=u(dL/dY) and updates W as W=optimizer(W,dL/dW).
 """
 from typing import (
@@ -109,7 +109,7 @@ class Layer:
     # --------------------------------------------------------------------------------
     @property
     def name(self) -> str:
-        """A unique name to identify each layer"""
+        """A unique name to identify a layer"""
         return self._name
 
     @property
@@ -132,14 +132,11 @@ class Layer:
     # Instance methods
     # --------------------------------------------------------------------------------
     def function(self, X: np.ndarray) -> np.ndarray:
-        """ Calculate the layer output f(arg).
-        Note that "output" is the process of calculating the layer output which
-        is to be brought forward as the input to a post layer.
-
+        """Calculate the output f(arg) to forward as the input to the post layer.
         Args:
             X: input to the layer
         Returns:
-            Layer output
+            Y: Layer output
         """
         pass
 
@@ -153,14 +150,13 @@ class Layer:
         pass
 
     def gradient(self, dY: np.ndarray) -> np.ndarray:
-        """Calculate the gradient dL/dX=g(dL/dY), the impact on L by the input dX.
-        Note that "gradient" is the process of calculating the gradient to back
-        propagate to the previous layer.
+        """Calculate the gradient dL/dX=g(dL/dY), the impact on L by the input dX
+        to back propagate to the previous layer.
 
         Args:
             dY: dL/dY, impact on L by the layer output Y
         Returns:
-            dL/dX, impact on L by the layer input X
+            dL/dX: impact on L by the layer input X
         """
         pass
 
@@ -176,7 +172,7 @@ class Layer:
             L: Loss function for the layer. loss=L(f(X))
             h: small number for delta to calculate the numerical gradient
         Returns:
-            Numerical gradients
+            gn: Numerical gradients
         """
         pass
 
