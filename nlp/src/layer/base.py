@@ -76,6 +76,10 @@ u(dL/dY):
 
     f calculates the output Y = f(X). g calculates the gradient dL/dX = g(dL/dY).
     u calculate the gradient dL/dW=u(dL/dY) and updates W as W=optimizer(W,dL/dW).
+
+[Python]
+Python relative import is defective. Use sys.path + absolute import ONLY.
+Or spend hours on "attempted relative import beyond top-level package"
 """
 from typing import (
     Optional,
@@ -88,7 +92,7 @@ from typing import (
 )
 import logging
 import numpy as np
-from .. common.functions import (
+from common.functions import (
     numerical_gradient
 )
 

@@ -18,12 +18,12 @@ from typing import (
 import logging
 import copy
 import numpy as np
-from . base import Layer
-from .. optimizer import (
+from layer import Layer
+from optimizer import (
     Optimizer,
     SGD,
 )
-from .. common.functions import (
+from common.functions import (
     numerical_gradient
 )
 

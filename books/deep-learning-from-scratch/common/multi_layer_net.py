@@ -3,7 +3,7 @@ import sys, os
 sys.path.append(os.pardir)  # 親ディレクトリのファイルをインポートするための設定
 import numpy as np
 from collections import OrderedDict
-from src.common import numerical_gradient
+from common import numerical_gradient
 
 
 class MultiLayerNet:

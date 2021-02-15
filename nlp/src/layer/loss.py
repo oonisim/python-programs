@@ -14,12 +14,8 @@ from typing import (
 import logging
 import copy
 import numpy as np
-from .base import Layer
-from ..optimizer import (
-    Optimizer,
-    SGD,
-)
-from .. common.functions import (
+from . base import Layer
+from common.functions import (
     cross_entropy_log_loss,
     softmax,
     numerical_gradient
