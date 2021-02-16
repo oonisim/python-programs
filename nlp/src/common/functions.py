@@ -124,7 +124,6 @@ def numerical_gradient(objective, X, h:float = 1e-5) -> np.ndarray:
 
 def compose(*args):
     """compose(f1, f2, ..., fn) == lambda x: fn(...(f2(f1(x))...)"""
-
     def _(x):
         result = x
         for f in args:

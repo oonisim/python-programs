@@ -193,8 +193,11 @@ class Matmul(Layer):
         Returns:
             Y: Layer value of X@W.T
         """
+        self.logger.debug(
+            "layer[%s] function(): X.shape %s W.shape %s", self.name, X.shape, self.W.shape
+        )
         self.X = X
-        assert self.W and np.array_equal(self.W.shape, (self.M, self.D)), \
+        assert self.W and self.W.shape == (self.M, self.D), \
             f"W shape needs {(self.M, self.D)} but ({self.W.shape})"
 
         # --------------------------------------------------------------------------------
@@ -239,6 +242,7 @@ class Matmul(Layer):
         Returns:
             dL/dX of shape (N,D):  [ dL/dY:(N,M) @ W:(M,D)) ]
         """
+        self.logger.debug("layer[%s] gradient(): dY.shape %s", self.name, dY.shape)
         assert dY == 1 or np.array_equal(self.dY.shape, (self.N, self.M)), \
             f"Gradient dL/dY shape needs {(self.N, self.M)} but ({self.dY.shape}))"
         self._dY = dY
@@ -326,16 +330,16 @@ class Matmul(Layer):
         self._gradient_descent()
         return self.dW
 
-    def gradient_numerical(
-            self, L: Callable[[np.ndarray], np.ndarray], h: float = 1e-05
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    def gradient_numerical(self, h: float = 1e-05) -> Tuple[np.ndarray, np.ndarray]:
         """Calculate numerical gradients
         Args:
-            L: Objective function for the layer. objective=L(f(X)), NOT L for NN.
             h: small number for delta to calculate the numerical gradient
         Returns:
             (dX, dW): Numerical gradients for X and W
         """
+        self.logger.debug("layer[%s] gradient_numerical()", self.name)
+        L = self.objective
+
         def objective_X(X: np.ndarray):
             return L(X @ self.W.T)
 

@@ -30,41 +30,56 @@ class Base:
             self,
             name: str,
             layers: List[Layer],
-            objectives: List[Layer],
+            objective: Layer,
             log_level: int = logging.ERROR
     ):
         """
         Args:
             name: network ID
             layers: layers for inference
-            objectives: objective layer
+            objective: objective layer
             log_level: logging level
         """
         assert name
         self._name: str = name
+        self._logger = logging.getLogger(name)
+        self._logger.setLevel(log_level)
 
+        # --------------------------------------------------------------------------------
+        # Objective layers in the network
+        # --------------------------------------------------------------------------------
+        assert objective
+        self._layer_objective: Layer = objective
+        self._num_layers_objective = 1
+
+        # Objective value
+        self._L: np.ndarray = -np.inf
+
+        # --------------------------------------------------------------------------------
         # Inference layers in the network
+        # --------------------------------------------------------------------------------
         assert layers
         self._layers_inference: List[Layer] = layers
         self._num_layers_inference = len(layers)
         self._inference: Callable[[np.ndarray], np.ndarray] = \
             compose(*[l.forward for l in layers])
 
-        # Objective layers in the network
-        assert objectives
-        self._layers_objective: List[Layer] = objectives
-        self._num_layers_objective = len(objectives)
+        # Each layer i has its objective function Li = (fn-1 o ... fi+1) with i < n-1
+        # that calculates L as Li(Yi) from the layer output Yi=fi(arg).
+        # L = Li(fi) i < n-1   (last layer Ln-1 does not have Ln)
+        Li: Callable[[np.ndarray], np.ndarray] = objective.forward
+        for layer in layers:
+            layer.objective = Li
+            Li = compose(*[layer.forward, Li])
 
-        self._layers_all: List[Layer] = layers + objectives
+        # After the first inference layer, Li is the objective function L.
+        self._objective: Callable[[np.ndarray], np.ndarray] = Li
+
+        # --------------------------------------------------------------------------------
+        # Entire network layers
+        # --------------------------------------------------------------------------------
+        self._layers_all: List[Layer] = layers + [objective]
         self._num_layers_all = len(self._layers_all)
-        self._objective: Callable[[np.ndarray], np.ndarray] = \
-            compose(*[layer.forward for layer in self._layers_all])
-
-        # Objective value
-        self._L: np.ndarray = -np.inf
-
-        self._logger = logging.getLogger(name)
-        self._logger.setLevel(log_level)
 
     # --------------------------------------------------------------------------------
     # Instance properties
@@ -144,18 +159,6 @@ class Base:
 
     def backward(self) -> np.ndarray:
         """Calculate and back-propagate the gradient dL/dX"""
-        assert False, "I am a template method. You need to override me."
-
-    def gradient_numerical(
-            self, L: Callable[[np.ndarray], np.ndarray], h: float = 1e-05
-    ) -> np.ndarray:
-        """Calculate numerical gradients
-        Args:
-            L: Objective function for the layer. objective=L(f(X)), NOT L for NN.
-            h: small number for delta to calculate the numerical gradient
-        Returns:
-            dX: [L(f(X+h) - L(f(X-h)] / 2h
-        """
         assert False, "I am a template method. You need to override me."
 
     def update(self, dY: np.ndarray) -> Union[np.ndarray, List[np.ndarray]]:

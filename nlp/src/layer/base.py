@@ -226,17 +226,16 @@ class Layer:
         """Calculate and back-propagate the gradient dL/dX"""
 
     def gradient_numerical(
-            self, L: Callable[[np.ndarray], np.ndarray], h: float = 1e-05
+            self, h: float = 1e-05
     ) -> np.ndarray:
         """Calculate numerical gradients
         Args:
-            L: Objective function for the layer. objective=L(f(X)), NOT L for NN.
             h: small number for delta to calculate the numerical gradient
         Returns:
             dX: [L(f(X+h) - L(f(X-h)] / 2h
         """
-        def objective(X: np.ndarray): return L(self.function(X))
-        dX = numerical_gradient(objective, self.X)
+        def L(X: np.ndarray): return self.objective(self.function(X))
+        dX = numerical_gradient(L, self.X)
 
         return dX
 

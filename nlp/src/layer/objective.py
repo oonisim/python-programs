@@ -152,18 +152,3 @@ class SoftmaxWithLogLoss(Layer):
             np.multiply((dL * dJ), dX, out=dX)
 
         return dX
-
-    def gradient_numerical(
-            self, L: Callable[[np.ndarray], np.ndarray], h: float = 1e-05
-    ) -> np.ndarray:
-        """Calculate numerical gradients
-        Args:
-            L: Objective function for the layer. loss=L(f(X)), NOT L for NN.
-            h: small number for delta to calculate the numerical gradient
-        Returns:
-            dX: [L(f(X+h) - L(f(X-h)] / 2h
-        """
-        def objective(X: np.ndarray): return L(self.function(X))
-        dX = numerical_gradient(objective, self.X)
-
-        return dX
