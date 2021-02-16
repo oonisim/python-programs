@@ -50,7 +50,7 @@ class Matmul(Layer):
         Args:
             name: Layer identity name
             num_nodes: Number of nodes in the layer
-            W: Weight matrix of shape(M=num_nodes, D), each row of which is a weight vector of a node.
+            W: Weight of shape(M=num_nodes, D). A row is a weight vector of a node.
             posteriors: Post layers to which forward the matmul layer output
             optimizer: Gradient descent implementation e.g SGD, Adam.
             log_level: logging level
@@ -331,13 +331,17 @@ class Matmul(Layer):
     ) -> Tuple[np.ndarray, np.ndarray]:
         """Calculate numerical gradients
         Args:
-            L: Loss function for the layer. loss=L(f(X)), NOT L for NN.
+            L: Objective function for the layer. objective=L(f(X)), NOT L for NN.
             h: small number for delta to calculate the numerical gradient
         Returns:
             (dX, dW): Numerical gradients for X and W
         """
-        def loss(W: np.ndarray): return L(self.X @ W.T)
-        dW = numerical_gradient(loss, self.W)
-        def loss(X: np.ndarray): return L(X @ self.W.T)
-        dX = numerical_gradient(loss, self.X)
+        def objective_X(X: np.ndarray):
+            return L(X @ self.W.T)
+
+        def objective_W(W: np.ndarray):
+            return L(self.X @ W.T)
+
+        dX = numerical_gradient(objective_X, self.X)
+        dW = numerical_gradient(objective_W, self.W)
         return dX, dW

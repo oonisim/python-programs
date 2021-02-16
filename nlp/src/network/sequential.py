@@ -16,7 +16,7 @@ class Sequential(Base):
         Args:
             name: Network ID name
             layers:
-                Sequential layers for the prediction, hence excluding the loss layer.
+                Sequential layers for the prediction, hence excluding the objective layer.
                 Ordered from the input to the prediction at the end.
         """
         super().__init__(name)

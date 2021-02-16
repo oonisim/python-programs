@@ -1,4 +1,4 @@
-"""Loss layer implementations
+"""Objective function layer implementations
 """
 from typing import (
     Tuple,
@@ -12,7 +12,6 @@ from typing import (
     Callable
 )
 import logging
-import copy
 import numpy as np
 from . base import Layer
 from common.functions import (
@@ -41,38 +40,20 @@ class SoftmaxWithLogLoss(Layer):
         """
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
 
-        self._X: np.ndarray = np.empty((0,0))
         self._N: int = -1                   # Batch size of X
         self._M: int = -1                   # Number of nodes
-        self._T: np.ndarray = np.empty(())  # Labels of shape(N, M) for OHE or (N,) for index.
         self._P: np.ndarray = np.empty(())  # Probabilities of shape (N, M)
         self._J: np.ndarray = np.empty(())  # Cross entropy log loss of shape (N,).
-        self._L: np.ndarray = -np.inf       # Loss of shape ()
+        self._L: np.ndarray = -np.inf       # Objective value of shape ()
 
     # --------------------------------------------------------------------------------
     # Instance properties
     # --------------------------------------------------------------------------------
     @property
-    def X(self) -> np.ndarray:
-        """Layer input"""
-        assert self._X and self.X.size > 0, "T is not initialized"
-        return self._X
-
-    @property
     def M(self) -> int:
         """Number of nodes"""
         assert self._M > 0, "M is not initialized"
         return self._M
-
-    @property
-    def T(self) -> np.ndarray:
-        """Label in OHE or index format"""
-        assert self._T and self.T.size > 0, "T is not initialized"
-        return self._T
-
-    @T.setter
-    def T(self, T):
-        self._T = T
 
     @property
     def P(self) -> np.ndarray:
@@ -102,7 +83,7 @@ class SoftmaxWithLogLoss(Layer):
             X: Input of shape (N,M) to calculate the probabilities for the M nodes.
             T: Labels for input X. Shape(N,M) for OHE label and shape(N,) for index label.
         Returns:
-            L: Loss value of shape ()
+            L: Objective value of shape ()
         """
         assert X and X.shape[0] == self.T.shape[0], \
             f"Batch size of X {X.shape[0]} and T {self.T.shape[0]} needs to be the same."
@@ -110,7 +91,7 @@ class SoftmaxWithLogLoss(Layer):
         # DO NOT reshape for numpy tuple indexing to work.
         # self._X = X.reshape(1, X.size) if X.ndim == 1 else X
         # self.T = T.reshape(1, T.size) if T.ndim == 1 else T
-        self._X = X
+        self.X = X
         self._N, self._M = X.shape
 
         self._P = softmax(self.X)
@@ -177,12 +158,12 @@ class SoftmaxWithLogLoss(Layer):
     ) -> np.ndarray:
         """Calculate numerical gradients
         Args:
-            L: Loss function for the layer. loss=L(f(X)), NOT L for NN.
+            L: Objective function for the layer. loss=L(f(X)), NOT L for NN.
             h: small number for delta to calculate the numerical gradient
         Returns:
             dX: [L(f(X+h) - L(f(X-h)] / 2h
         """
-        def loss(X: np.ndarray): return L(self.function(X))
-        dX = numerical_gradient(loss, self.X)
+        def objective(X: np.ndarray): return L(self.function(X))
+        dX = numerical_gradient(objective, self.X)
 
         return dX

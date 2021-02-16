@@ -95,12 +95,12 @@ def cross_entropy_log_loss(P, T) -> float:
     return J
 
 
-def numerical_gradient(loss, X, h:float = 1e-5) -> np.ndarray:
-    """Calculate numerical gradient (loss(X+h) - loss(X-h)) / 2h
+def numerical_gradient(objective, X, h:float = 1e-5) -> np.ndarray:
+    """Calculate numerical gradient (objective(X+h) - objective(X-h)) / 2h
     Args:
-        loss: loss function for X
+        objective: objective function for X
         X: input
-        h: small delta value to calculate the loss for X+/-h
+        h: small delta value to calculate the objective value for X+/-h
     Returns:
         dX: Numerical gradient
     """
@@ -110,13 +110,26 @@ def numerical_gradient(loss, X, h:float = 1e-5) -> np.ndarray:
         idx = it.multi_index
         tmp_val = X[idx]
         X[idx] = tmp_val + h
-        fx1 = loss(X)  # f(x+h)
+        fx1 = objective(X)  # f(x+h)
 
         X[idx] = tmp_val - h
-        fx2 = loss(X)  # f(x-h)
+        fx2 = objective(X)  # f(x-h)
         G[idx] = (fx1 - fx2) / (2 * h)
 
         X[idx] = tmp_val  # 値を元に戻す
         it.iternext()
 
     return G
+
+
+def compose(*args):
+    """compose(f1, f2, ..., fn) == lambda x: fn(...(f2(f1(x))...)"""
+
+    def _(x):
+        result = x
+        for f in args:
+            result = f(result)
+        return result
+
+    return _
+

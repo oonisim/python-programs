@@ -7,14 +7,14 @@ To avoid DAG and simplify this specific NN implementation, NN is sequential.
 That is, each layer has only one layer as its successor. The layer i output fi
 is the input to the fi+1 of the next layer i+1.
 
-When there are n layers (i:0,1,...n-1) in NN, the objective loss function L is
-L = (fn-1 o ... fi o ... f0) as a sequential composition of functions fi where
-i: 0, ... n-1. A function composition g o f = g(f(arg))
+When there are n layers (i:0,1,...n-1) in NN, the objective objective function
+L is L = (fn-1 o ... fi o ... f0) as a sequential composition of functions fi
+where i: 0, ... n-1. A function composition g o f = g(f(arg))
 
 [Considerations]
-Loss function L:
-    Each layer i has its loss function Li = (fn-1 o ... fi+1) with i < n-1 that
-    calculates L as Li(Yi) from the layer output Yi=fi(arg).
+Objective function L:
+    Each layer i has its objective function Li = (fn-1 o ... fi+1) with i < n-1
+    that calculates L as Li(Yi) from the layer output Yi=fi(arg).
 
     L = Li(fi) i < n-1   (last layer Ln-1 does not have Ln)
 
@@ -23,7 +23,7 @@ Loss function L:
     as Li( (X+/-h)@W.T ) and Li( X@(W+/-h) ) respectively for X and W.
 
     Li may be written as L when a specific layer 'i' is difficult to identify.
-    Be clear if L is the NN loss function L or a layer loss function Li.
+    Be clear if L is the NN objective function L or a layer objective function Li.
 
     ```
     Li = reduce(lambda f,g: lambda x: g(f(x), [ for layer.f in layers[i+1:n] ])
@@ -51,8 +51,8 @@ gn(Li, h):
          Although fi can take a single arg, the actual computation may need
          multiple arguments e.g. X and W for matmul. Then gn calculates for
          X and W, and returns two numerical gradients.
-    Li: the loss function of the layer Li=(fn-1 o ... fi+1) with i < n-1
-        loss=Li(Y)=L(f(arg)), NOT L(arg).
+    Li: the objective function of the layer Li=(fn-1 o ... fi+1) with i < n-1
+        objective=Li(Y)=L(f(arg)), NOT L(arg).
     h: a small number e.g. 1e-5
 
 state S:
@@ -124,8 +124,11 @@ class Layer:
         self._X: np.ndarray = np.empty((0, num_nodes), dtype=float)
         self._N: int = -1
 
-        # Loss Li function for the layer. L = Li o fi
-        self._loss: Union[Callable[[np.ndarray], np.ndarray], None] = None
+        # Labels of shape(N, M) for OHE or (N,) for index.
+        self._T: np.ndarray = np.empty((), dtype=int)
+
+        # Objective Li function for the layer. L = Li o fi
+        self._objective: Union[Callable[[np.ndarray], np.ndarray], None] = None
 
         self._logger = logging.getLogger(name)
         self._logger.setLevel(log_level)
@@ -162,15 +165,27 @@ class Layer:
         return self._N
 
     @property
-    def loss(self) -> Callable[[np.ndarray], np.ndarray]:
-        """Loss function L=fn-1 o fn-2 o ... o fi"""
-        assert self._loss, "Loss function L has not been initialized."
-        return self._loss
+    def T(self) -> np.ndarray:
+        """Label in OHE or index format"""
+        assert self._T and self.T.size > 0, "T is not initialized"
+        return self._T
 
-    @loss.setter
-    def loss(self, Li: Callable[[np.ndarray], np.ndarray]) -> NoReturn:
+    @T.setter
+    def T(self, T: np.ndarray):
+        assert T and T.shape[0] == self.N, \
+            f"The batch size of T should be {self.N} but {T.shape[0]}"
+        self._T = T.astype(int)
+
+    @property
+    def objective(self) -> Callable[[np.ndarray], np.ndarray]:
+        """Objective function L=fn-1 o fn-2 o ... o fi"""
+        assert self._objective, "Objective function L has not been initialized."
+        return self._objective
+
+    @objective.setter
+    def objective(self, Li: Callable[[np.ndarray], np.ndarray]) -> NoReturn:
         assert Li
-        self._loss = Li
+        self._objective = Li
 
     @property
     def logger(self) -> logging.Logger:
@@ -188,7 +203,6 @@ class Layer:
         Returns:
             Y: Layer output
         """
-        pass
 
     def forward(self, X: np.ndarray) -> NoReturn:
         """Forward the layer output to the post layers
@@ -197,7 +211,6 @@ class Layer:
         Returns:
             Y: layer output
         """
-        pass
 
     def gradient(self, dY: np.ndarray) -> np.ndarray:
         """Calculate the gradient dL/dX=g(dL/dY), the impact on L by the input dX
@@ -208,24 +221,22 @@ class Layer:
         Returns:
             dL/dX: impact on L by the layer input X
         """
-        pass
 
     def backward(self) -> np.ndarray:
         """Calculate and back-propagate the gradient dL/dX"""
-        pass
 
     def gradient_numerical(
             self, L: Callable[[np.ndarray], np.ndarray], h: float = 1e-05
     ) -> np.ndarray:
         """Calculate numerical gradients
         Args:
-            L: Loss function for the layer. loss=L(f(X)), NOT L for NN.
+            L: Objective function for the layer. objective=L(f(X)), NOT L for NN.
             h: small number for delta to calculate the numerical gradient
         Returns:
             dX: [L(f(X+h) - L(f(X-h)] / 2h
         """
-        def loss(X: np.ndarray): return L(self.function(X))
-        dX = numerical_gradient(loss, self.X)
+        def objective(X: np.ndarray): return L(self.function(X))
+        dX = numerical_gradient(objective, self.X)
 
         return dX
 
@@ -236,4 +247,3 @@ class Layer:
         Returns:
             dL/dS: Gradient(s) on state S. There may be multiple dL/dS.
         """
-        pass
