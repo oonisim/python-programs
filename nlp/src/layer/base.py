@@ -252,7 +252,7 @@ class Layer:
         return np.array(-np.inf)
 
     def gradient_numerical(
-            self, h: float = 1e-0
+            self, h: float = 1e-5
     ) -> List[Union[float, np.ndarray]]:
         """Calculate numerical gradients
         Args:
@@ -267,13 +267,11 @@ class Layer:
         dX = numerical_gradient(L, self.X)
         return [dX]
 
-    def update(self, dY: np.ndarray) -> List[Union[float, np.ndarray]]:
+    def update(self) -> List[Union[float, np.ndarray]]:
         """Calculate the gradient dL/dS and update S with gradient descent.
-        Args:
-            dY: dL/dY
         Returns:
             dL/dS: Gradient(s) on state S. There may be multiple dL/dS.
         """
         # Return 0 as the default for dL/dS to mark no change in case there is none
         # to update in a layer.
-        return [0]
+        return [0.0]

@@ -49,7 +49,14 @@ class Base:
         # Objective layers in the network. List although only one layer.
         # --------------------------------------------------------------------------------
         assert objective
-        self._L: np.ndarray = -np.inf   # Objective value
+        self._X = List[Union[float, np.ndarray]] = []   # Bath input to the network
+        self._T = List[Union[float, np.ndarray]] = []   # Labels for the bach.
+
+        self._L: np.ndarray = -np.inf                   # Network objective value L
+        self._G: List[Union[float, np.ndarray]] = []    # Gradients dL/dX of layers
+        self._GN: List[Union[float, np.ndarray]] = []   # Numerical gradients GN of layers
+        self._U: List[Union[float, np.ndarray]] = []    # Gradients dL/dS of layers
+
         self._layers_objective: List[Layer] = [objective]
         self._num_layers_objective = len(self._layers_objective)
 
@@ -68,7 +75,7 @@ class Base:
         assert layers
         self._layers_inference: List[Layer] = layers
         self._num_layers_inference = len(layers)
-        self._inference: Callable[[np.ndarray], np.ndarray] = \
+        self.__inference: Callable[[np.ndarray], np.ndarray] = \
             compose(*[layer.forward for layer in layers])
 
         # Each layer i has its objective function Li = (fn-1 o ... o fi+1) with i < n-1
@@ -80,19 +87,15 @@ class Base:
 
         # After the first inference layer, Li is the network objective function L.
         # L = (fn-1 o ... o f0)
-        self._objective: Callable[[np.ndarray], np.ndarray] = Li
+        self.__objective: Callable[[np.ndarray], np.ndarray] = Li
 
         # --------------------------------------------------------------------------------
         # Entire network layers
         # --------------------------------------------------------------------------------
         self._layers_all: List[Layer] = layers + [objective]
         self._num_layers_all = len(layers + [objective])
-        self._gradient = \
-            compose(*[layer.gradient for layer in (layers + [objective])])
-        self._gradient_numerical = \
-            compose(*[layer.gradient for layer in (layers + [objective])])
-        self._update = \
-            compose(*[layer.update for layer in (layers + [objective])])
+        self.__gradient = \
+            compose(*[layer.gradient for layer in layers + [objective]])
 
     # --------------------------------------------------------------------------------
     # Instance properties
@@ -103,10 +106,40 @@ class Base:
         return self._name
 
     @property
+    def X(self) -> List[Union[float, np.ndarray]]:
+        """Network batch input"""
+        assert self._X, "Batch input not initialized or an invalid value."
+        return self._X
+
+    @property
+    def T(self) -> List[Union[float, np.ndarray]]:
+        """Network batch input"""
+        assert self._T, "Label T not initialized or an invalid value."
+        return self._T
+
+    @property
     def L(self) -> np.ndarray:
         """Network objective value (Loss)"""
-        assert self._L > 0, "Objective value not initialized or an invalid value."
+        assert self._L > 0, "Objective value L not initialized or an invalid value."
         return self._L
+
+    @property
+    def GN(self) -> List[Union[float, np.ndarray]]:
+        """Numerical gradients of network layers"""
+        assert self._GN, "Numerical gradients GN of the network not initialized."
+        return self._GN
+
+    @property
+    def G(self) -> List[Union[float, np.ndarray]]:
+        """Gradients dL/dX of network layers"""
+        assert self._G, "Gradients dL/dX of the network not initialized."
+        return self._G
+
+    @property
+    def U(self) -> List[Union[float, np.ndarray]]:
+        """Gradients dL/dS of network layers used to update S"""
+        assert self._U, "Gradients dL/dS of the network not initialized."
+        return self._U
 
     @property
     def layers_inference(self) -> List[Layer]:
@@ -123,28 +156,35 @@ class Base:
         return self._layers_objective
 
     @property
+    def layers_all(self) -> List[Layer]:
+        """all layers"""
+        assert self._layers_all and len(self._layers_all) > 0, \
+            "Network all layers not initialized"
+        return self._layers_all
+
+    @property
     def num_layers(self) -> int:
         """Number of layers"""
         assert self._num_layers_all > 0, "Network num_layers is not initialized."
         return self._num_layers_all
 
     @property
-    def inference(self) -> Callable[[np.ndarray], np.ndarray]:
+    def _inference(self) -> Callable[[np.ndarray], np.ndarray]:
         """Network inference function I=fn-2 o ... o f0"""
-        assert self._inference, "Inference function I has not been initialized."
-        return self._inference
+        assert self.__inference, "Inference function I has not been initialized."
+        return self.__inference
 
     @property
-    def objective(self) -> Callable[[np.ndarray], np.ndarray]:
+    def _objective(self) -> Callable[[np.ndarray], np.ndarray]:
         """Network Objective function L=fn-1 o fn-2 o ... o f0"""
-        assert self._objective, "Objective function L has not been initialized."
-        return self._objective
+        assert self.__objective, "Objective function L has not been initialized."
+        return self.__objective
 
     @property
-    def gradient(self) -> Callable[[np.ndarray], np.ndarray]:
+    def _gradient(self) -> Callable[[np.ndarray], np.ndarray]:
         """Network gradient function G=gn-1 o gn-2 o ... o g0"""
-        assert self._gradient, "gradient function G has not been initialized."
-        return self._gradient
+        assert self.__gradient, "gradient function G has not been initialized."
+        return self.__gradient
 
     @property
     def logger(self) -> logging.Logger:
@@ -155,43 +195,21 @@ class Base:
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
-    def set(self, T: np.ndarray):
+    def set(self, T: List[Union[float, np.ndarray]]):
         """Setup a batch
         Args:
             T: labels
         """
+        self._T = T
         for layer in self.layers_objective:
             layer.T = T
 
-    def function(self, X: np.ndarray) -> np.ndarray:
-        """Calculate the network inference F(arg)
-        Args:
-            X: input to the layer
-        Returns:
-            Y: Layer output
-        """
-        return self.inference(X)
+    def gradient_numerical(self):
+        """Numerical Gradients GN"""
+        self._GN = [layer.gradient_numerical() for layer in self.layers_all]
+        return self.GN
 
-    def gradient(self, dY: np.ndarray) -> np.ndarray:
-        """Calculate the gradient dL/dX=g(dL/dY), the impact on L by the input dX
-        to back propagate to the previous layer.
-
-        Args:
-            dY: dL/dY, impact on L by the layer output Y
-        Returns:
-            dL/dX: impact on L by the layer input X
-        """
-        assert False, "I am a template method. You need to override me."
-
-    def backward(self) -> np.ndarray:
-        """Calculate and back-propagate the gradient dL/dX"""
-        assert False, "I am a template method. You need to override me."
-
-    def update(self, dY: np.ndarray) -> Union[np.ndarray, List[np.ndarray]]:
-        """Calculate the gradient dL/dS and update S
-        Args:
-            dY: dL/dY
-        Returns:
-            dL/dS: Gradient(s) on state S. There may be multiple dL/dS.
-        """
-        assert False, "I am a template method. You need to override me."
+    def update(self):
+        """Layer state S updates"""
+        self._U = [layer.update() for layer in self.layers_all]
+        return self.U

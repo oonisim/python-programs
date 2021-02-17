@@ -305,7 +305,7 @@ class Matmul(Layer):
 
         return W
 
-    def gradient_numerical(self, h: float = 1e-05) -> List[Union[float, np.ndarray]]:
+    def gradient_numerical(self, h: float = 1e-5) -> List[Union[float, np.ndarray]]:
         """Calculate numerical gradients
         Args:
             h: small number for delta to calculate the numerical gradient
@@ -325,24 +325,18 @@ class Matmul(Layer):
         dW = numerical_gradient(objective_W, self.W)
         return [dX, dW]
 
-    def update(self, dY) -> List[Union[float, np.ndarray]]:
+    def update(self) -> List[Union[float, np.ndarray]]:
         """Calculate dL/dW = dL/dY * dY/dW and update W with gradient descent
         dL/dW.T = X.T @ dL/dY is shape (D,M) as  [ X.T:(D, N)  @ dL/dY:(N,M) ].
         Hence dL/dW of shape (M,D):  [ X.T:(D, N)  @ dL/dY:(N,M) ].T.
 
-        Args:
-            dY: dL/dY, impact on L by the layer output dY.
         Returns:
             [self.dX, self.dW]: dL/dS=[dL/ds for s in S]
         """
-        assert dY == 1 or np.array_equal(self.dY.shape, (self.N, self.M)), \
-            f"Gradient dL/dY shape needs {(self.N, self.M)} but ({self.dY.shape}))"
-        self._dY = dY
-
         # --------------------------------------------------------------------------------
         # dL/dW of shape (M,D):  [ X.T:(D, N)  @ dL/dY:(N,M) ].T
         # --------------------------------------------------------------------------------
-        dW = np.matmul(self.X.T, dY).T
+        dW = np.matmul(self.X.T, self.dY).T
         assert np.array_equal(dW.shape, (self.M, self.D)), \
             f"Gradient dL/dW shape needs {(self.M, self.D)} but ({dW.shape}))"
 
