@@ -46,14 +46,21 @@ class Base:
         self._logger.setLevel(log_level)
 
         # --------------------------------------------------------------------------------
-        # Objective layers in the network
+        # Objective layers in the network. List although only one layer.
         # --------------------------------------------------------------------------------
         assert objective
-        self._layer_objective: Layer = objective
-        self._num_layers_objective = 1
+        self._L: np.ndarray = -np.inf   # Objective value
+        self._layers_objective: List[Layer] = [objective]
+        self._num_layers_objective = len(self._layers_objective)
 
-        # Objective value
-        self._L: np.ndarray = -np.inf
+        # Layer i objective function Li: (i includes all inference and objective layers)
+        # Each layer i has its objective function Li = (fn-1 o ... o fi+1) with i < n-1
+        # that calculates L as Li(Yi) from its output Yi=fi(arg). L = Li(fi) i < n-1.
+        # The last layer Ln-1 is the objective function that does not have Ln, hence
+        # set an identity function.
+        # The last inference layer has fn-1 of the objective layer as its objective function.
+        def identity(x: np.ndarray): return x
+        objective.objective = identity
 
         # --------------------------------------------------------------------------------
         # Inference layers in the network
@@ -62,24 +69,30 @@ class Base:
         self._layers_inference: List[Layer] = layers
         self._num_layers_inference = len(layers)
         self._inference: Callable[[np.ndarray], np.ndarray] = \
-            compose(*[l.forward for l in layers])
+            compose(*[layer.forward for layer in layers])
 
-        # Each layer i has its objective function Li = (fn-1 o ... fi+1) with i < n-1
-        # that calculates L as Li(Yi) from the layer output Yi=fi(arg).
-        # L = Li(fi) i < n-1   (last layer Ln-1 does not have Ln)
+        # Each layer i has its objective function Li = (fn-1 o ... o fi+1) with i < n-1
+        # The last inference layer has fn-1 of the objective layer as its Li.
         Li: Callable[[np.ndarray], np.ndarray] = objective.forward
         for layer in layers:
             layer.objective = Li
             Li = compose(*[layer.forward, Li])
 
-        # After the first inference layer, Li is the objective function L.
+        # After the first inference layer, Li is the network objective function L.
+        # L = (fn-1 o ... o f0)
         self._objective: Callable[[np.ndarray], np.ndarray] = Li
 
         # --------------------------------------------------------------------------------
         # Entire network layers
         # --------------------------------------------------------------------------------
         self._layers_all: List[Layer] = layers + [objective]
-        self._num_layers_all = len(self._layers_all)
+        self._num_layers_all = len(layers + [objective])
+        self._gradient = \
+            compose(*[layer.gradient for layer in (layers + [objective])])
+        self._gradient_numerical = \
+            compose(*[layer.gradient for layer in (layers + [objective])])
+        self._update = \
+            compose(*[layer.update for layer in (layers + [objective])])
 
     # --------------------------------------------------------------------------------
     # Instance properties
@@ -88,6 +101,12 @@ class Base:
     def name(self) -> str:
         """A unique name to identify a network"""
         return self._name
+
+    @property
+    def L(self) -> np.ndarray:
+        """Network objective value (Loss)"""
+        assert self._L > 0, "Objective value not initialized or an invalid value."
+        return self._L
 
     @property
     def layers_inference(self) -> List[Layer]:
@@ -111,14 +130,21 @@ class Base:
 
     @property
     def inference(self) -> Callable[[np.ndarray], np.ndarray]:
-        """Network inference function"""
+        """Network inference function I=fn-2 o ... o f0"""
+        assert self._inference, "Inference function I has not been initialized."
         return self._inference
 
     @property
     def objective(self) -> Callable[[np.ndarray], np.ndarray]:
-        """Objective function L=fn-1 o fn-2 o ... o fi"""
+        """Network Objective function L=fn-1 o fn-2 o ... o f0"""
         assert self._objective, "Objective function L has not been initialized."
         return self._objective
+
+    @property
+    def gradient(self) -> Callable[[np.ndarray], np.ndarray]:
+        """Network gradient function G=gn-1 o gn-2 o ... o g0"""
+        assert self._gradient, "gradient function G has not been initialized."
+        return self._gradient
 
     @property
     def logger(self) -> logging.Logger:

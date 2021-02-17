@@ -196,13 +196,14 @@ class Layer:
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
-    def function(self, X: np.ndarray) -> np.ndarray:
+    def function(self, X: np.ndarray) -> Union[np.ndarray, float]:
         """Calculate the output f(arg) to forward as the input to the post layer.
         Args:
             X: input to the layer
         Returns:
             Y: Layer output
         """
+        return 1.0
 
     def forward(self, X: np.ndarray) -> NoReturn:
         """Forward the layer output to the post layers
@@ -212,7 +213,7 @@ class Layer:
             Y: layer output
         """
 
-    def gradient(self, dY: np.ndarray) -> np.ndarray:
+    def gradient(self, dY: np.ndarray) -> Union[np.ndarray, float]:
         """Calculate the gradient dL/dX=g(dL/dY), the impact on L by the input dX
         to back propagate to the previous layer.
 
@@ -221,9 +222,12 @@ class Layer:
         Returns:
             dL/dX: impact on L by the layer input X
         """
+        # In case the layer is a repeater or no gradient, pass dY through.
+        return dY
 
-    def backward(self) -> np.ndarray:
+    def backward(self) -> Union[np.ndarray, float]:
         """Calculate and back-propagate the gradient dL/dX"""
+        return np.array(1.0)
 
     def gradient_numerical(
             self, h: float = 1e-05
@@ -236,13 +240,15 @@ class Layer:
         """
         def L(X: np.ndarray): return self.objective(self.function(X))
         dX = numerical_gradient(L, self.X)
-
         return dX
 
-    def update(self, dY: np.ndarray) -> Union[np.ndarray, List[np.ndarray]]:
+    def update(self, dY: np.ndarray) -> Union[float, np.ndarray, List[np.ndarray]]:
+        # Do need to return? Update is to update the internal state.
+        # Need to be observable from outside?
         """Calculate the gradient dL/dS and update S
         Args:
             dY: dL/dY
         Returns:
             dL/dS: Gradient(s) on state S. There may be multiple dL/dS.
         """
+        return 1.0
