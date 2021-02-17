@@ -100,7 +100,7 @@ class SoftmaxWithLogLoss(Layer):
 
         return self.L
 
-    def gradient(self, dL=1) -> np.ndarray:
+    def gradient(self, dL=1) -> Union[np.ndarray, float]:
         """Calculate the gradient dL/dX, the impact on L by the input dX (NOT dL)
         dL: dF/dL is the impact on F by dL when the output L has a post layer F.
         dJ: dL/dJ is the impact on L by dJ where J = cross_entropy_log_loss(P,T).= 1/N

@@ -5,9 +5,10 @@ Note:
     directly update the target storage area.
 """
 from typing import (
+    Optional,
+    Union,
     List,
     Dict,
-    Optional,
     Final,
     Generator,
     Iterator,
@@ -55,7 +56,7 @@ class Relu(Layer):
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
-    def function(self, X) -> np.ndarray:
+    def function(self, X) -> Union[np.ndarray, float]:
         assert X.shape[1] == self.M, \
             f"Number of node X {X.shape[1] } does not match {self.M}."
 
@@ -66,7 +67,7 @@ class Relu(Layer):
 
         return A
 
-    def gradient(self, dA) -> np.ndarray:
+    def gradient(self, dA) -> Union[np.ndarray, float]:
         """Calculate gradient dL/dX=(dL/dA * dA/dX) to back-propagate
         to the previous layer. dA has the same shape (N,M) with A as L is scalar.
 
@@ -115,7 +116,7 @@ class Sigmoid(Layer):
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
-    def function(self, X):
+    def function(self, X) -> Union[np.ndarray, float]:
         assert X.shape[1] == self.M, \
             f"Number of node X {X.shape[1] } does not match {self.M}."
 
@@ -123,7 +124,7 @@ class Sigmoid(Layer):
         self._A = sigmoid(X)
         return self.A
 
-    def gradient(self, dA) -> np.ndarray:
+    def gradient(self, dA) -> Union[np.ndarray, float]:
         """Calculate gradient dL/dX=(dL/dA * dA/dX) to back-propagate
         to the previous layer. dA has the same shape (N,M) with A as L is scalar.
 

@@ -186,7 +186,7 @@ class Matmul(Layer):
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
-    def function(self, X: np.ndarray) -> np.ndarray:
+    def function(self, X: np.ndarray) -> Union[np.ndarray, float]:
         """Calculate the layer output Y = X@W.T
         Args:
             X: Batch input data from the input layer.
@@ -216,7 +216,7 @@ class Matmul(Layer):
         np.matmul(X, self.W.T, out=self._Y)
         return self.Y
 
-    def forward(self, X: np.ndarray) -> np.ndarray:
+    def forward(self, X: np.ndarray) -> Union[np.ndarray, float]:
         """Calculate and forward-propagate the matmul output Y to post layers if exist.
         """
         assert self._posteriors, "forward(): No post layer exists."
@@ -235,7 +235,7 @@ class Matmul(Layer):
         list(map(_forward, Y, self._posteriors))
         return Y
 
-    def gradient(self, dY=1) -> np.ndarray:
+    def gradient(self, dY=1) -> Union[np.ndarray, float]:
         """Calculate the gradients dL/dX and dL/dW.
         Args:
             dY: Gradient dL/dY, the total impact on L by dY.
@@ -256,8 +256,8 @@ class Matmul(Layer):
 
         return self.dX
 
-    def backward(self) -> np.ndarray:
-        """Calculate and back-propagate the gradient dL/dX
+    def backward(self) -> Union[np.ndarray, float]:
+        """Calculate the gradient dL/dX to back-propagate
         """
         assert self._posteriors, "backward() called when no post layer exist."
 
@@ -285,7 +285,7 @@ class Matmul(Layer):
         dY = np.add.reduce(map(_backward, self._posteriors))
         return self.gradient(dY)
 
-    def _gradient_descent(self) -> np.ndarray:
+    def _gradient_descent(self) -> Union[np.ndarray, float]:
         """Gradient descent
         Directly update matrices to avoid the temporary copies
         """
@@ -305,15 +305,35 @@ class Matmul(Layer):
 
         return W
 
-    def update(self, dY) -> Union[np.ndarray, List[np.ndarray]]:
-        """Calculate dL/dW = dL/dY * dY/dW
+    def gradient_numerical(self, h: float = 1e-05) -> List[Union[float, np.ndarray]]:
+        """Calculate numerical gradients
+        Args:
+            h: small number for delta to calculate the numerical gradient
+        Returns:
+            [dX, dW]: Numerical gradients for X and W
+        """
+        self.logger.debug("layer[%s] gradient_numerical()", self.name)
+        L = self.objective
+
+        def objective_X(X: np.ndarray):
+            return L(X @ self.W.T)
+
+        def objective_W(W: np.ndarray):
+            return L(self.X @ W.T)
+
+        dX = numerical_gradient(objective_X, self.X)
+        dW = numerical_gradient(objective_W, self.W)
+        return [dX, dW]
+
+    def update(self, dY) -> List[Union[float, np.ndarray]]:
+        """Calculate dL/dW = dL/dY * dY/dW and update W with gradient descent
         dL/dW.T = X.T @ dL/dY is shape (D,M) as  [ X.T:(D, N)  @ dL/dY:(N,M) ].
         Hence dL/dW of shape (M,D):  [ X.T:(D, N)  @ dL/dY:(N,M) ].T.
 
         Args:
             dY: dL/dY, impact on L by the layer output dY.
         Returns:
-            dL/dW: Impact on L by dW.
+            [self.dX, self.dW]: dL/dS=[dL/ds for s in S]
         """
         assert dY == 1 or np.array_equal(self.dY.shape, (self.N, self.M)), \
             f"Gradient dL/dY shape needs {(self.N, self.M)} but ({self.dY.shape}))"
@@ -328,24 +348,4 @@ class Matmul(Layer):
 
         self._dW = dW
         self._gradient_descent()
-        return self.dW
-
-    def gradient_numerical(self, h: float = 1e-05) -> Tuple[np.ndarray, np.ndarray]:
-        """Calculate numerical gradients
-        Args:
-            h: small number for delta to calculate the numerical gradient
-        Returns:
-            (dX, dW): Numerical gradients for X and W
-        """
-        self.logger.debug("layer[%s] gradient_numerical()", self.name)
-        L = self.objective
-
-        def objective_X(X: np.ndarray):
-            return L(X @ self.W.T)
-
-        def objective_W(W: np.ndarray):
-            return L(self.X @ W.T)
-
-        dX = numerical_gradient(objective_X, self.X)
-        dW = numerical_gradient(objective_W, self.W)
-        return dX, dW
+        return [self.dX, self.dW]

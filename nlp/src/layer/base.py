@@ -34,17 +34,31 @@ Objective function L:
     ```
 
 [Design]
-f(arg):
-    f is a function that calculates the layer output Y=f(arg) where arg is the
+1. Use 'to' to clarify the goal
+2. Be specific what a function outputs as its observable behavior and why.
+
+state S = List[s]:
+    A state in a layer is a combination of variables [s] at a specific cycle t.
+
+Y=f(arg):
+    f is a function to calculates the layer output Y=f(arg) where arg is the
     output of the previous layer.
 
-g(dL/dY):
-    g is a function that calculates a gradient dL/dX = g(dL/dY) = dL/dY * dY/dX
-    and back-propagate it to the previous layers. dL/dY is given because the
-    layer i does not know f at layers i+1, ... n-1 hence cannot calculate it.
+G=g(dL/dY):
+    g is a function to calculates gradients. dL/dY is given because the layer i
+    does not know f at layers i+1, ... n-1 hence cannot calculate it.
+    Later 'u' runs gradient descents to update S.
 
-gn(Li, h):
-    gn is a function that calculate numerical gradients, given L and h, as
+    As its observable behaviour, returns the gradient dL/dX = dL/dY * dY/dX
+    to back-propagate to the previous layers.
+
+    The internal behavior of calculating dL/dS=(dL/dY * dY/dS) is not observable,
+    but g focuses on gradients and u focuses on updating state S as the
+    separation of concerns.
+
+
+List[GN]=gn(Li, h):
+    gn is a function to calculate numerical gradients, given L and h, as
     gn=[ Li(fi(arg+h)) = Li(fi(arg-h)) ] / 2h
 
     arg: any argument that computes the output Y of the layer.
@@ -55,18 +69,21 @@ gn(Li, h):
         objective=Li(Y)=L(f(arg)), NOT L(arg).
     h: a small number e.g. 1e-5
 
-state S:
-    A state in a layer is a combination of variables at a specific cycle t.
+    As its observable behavior of what it has done, returns a list of
+    numerical gradients as [GN] as there can be multiple GN.
 
-u(dL/dY):
+List[dL/ds]=u(dL/dY):
     u is a function that calculates dL/dS = u(dL/dY) = dL/dY * dY/dS and updates
     the state S in the layer with gradient descent as S=optimizer(S, dL/dS).
-    There may be multiple dS to calculate and u returns all dL/dS.
+    There may be multiple dS to calculate and u handles all.
 
-    Why not calculating all gradients in g? -> Separation of concerns.
-        f focuses on X, g focuses on its gradient dL/dX, u focuses on dL/dS.
-        It can be efficient to calculate all in g, but loses transparency (
-        clear declaration of intentions) and ambiguates what it focuses on.
+    As its observable behaviour of what is has done, returns the dL/dS
+    as a list of gradients for the state variables as List[dL/ds].
+
+    As u is to 'update' S, the observable behaviour can be returning updated S.
+    However, to be able to validate the dL/dS with the numerical gradient [GN],
+    externally, returns dL/dS. It would be possible to return updated S and
+    validate dL/dS with GN internally with another function 'v' to validate.
 
 [Example]
     Matmul at cycle t with a input X(t), its state is [ W(t) ], NOT [ X(t), W(t)].
@@ -203,19 +220,23 @@ class Layer:
         Returns:
             Y: Layer output
         """
-        return 1.0
+        # In case for the layer is a repeater, pass X through as the default behavior.
+        return X
 
-    def forward(self, X: np.ndarray) -> NoReturn:
+    def forward(self, X: np.ndarray) -> Union[np.ndarray, float]:
         """Forward the layer output to the post layers
         Args:
             X: input to the layer
         Returns:
             Y: layer output
         """
+        # In case for the layer is a repeater, pass X through as the default behavior.
+        return X
 
     def gradient(self, dY: np.ndarray) -> Union[np.ndarray, float]:
-        """Calculate the gradient dL/dX=g(dL/dY), the impact on L by the input dX
-        to back propagate to the previous layer.
+        """Calculate the gradient dL/dX, the impact on L by the input dX
+        to back propagate to the previous layer, and other gradients on S
+        dL/dS = dL/dY * dY/dS.
 
         Args:
             dY: dL/dY, impact on L by the layer output Y
@@ -227,28 +248,32 @@ class Layer:
 
     def backward(self) -> Union[np.ndarray, float]:
         """Calculate and back-propagate the gradient dL/dX"""
-        return np.array(1.0)
+        assert False, "Need to override"
+        return np.array(-np.inf)
 
     def gradient_numerical(
-            self, h: float = 1e-05
-    ) -> np.ndarray:
+            self, h: float = 1e-0
+    ) -> List[Union[float, np.ndarray]]:
         """Calculate numerical gradients
         Args:
             h: small number for delta to calculate the numerical gradient
         Returns:
             dX: [L(f(X+h) - L(f(X-h)] / 2h
         """
-        def L(X: np.ndarray): return self.objective(self.function(X))
-        dX = numerical_gradient(L, self.X)
-        return dX
+        # L = Li(f(arg))
+        def L(X: np.ndarray):
+            return self.objective(self.function(X))
 
-    def update(self, dY: np.ndarray) -> Union[float, np.ndarray, List[np.ndarray]]:
-        # Do need to return? Update is to update the internal state.
-        # Need to be observable from outside?
-        """Calculate the gradient dL/dS and update S
+        dX = numerical_gradient(L, self.X)
+        return [dX]
+
+    def update(self, dY: np.ndarray) -> List[Union[float, np.ndarray]]:
+        """Calculate the gradient dL/dS and update S with gradient descent.
         Args:
             dY: dL/dY
         Returns:
             dL/dS: Gradient(s) on state S. There may be multiple dL/dS.
         """
-        return 1.0
+        # Return 0 as the default for dL/dS to mark no change in case there is none
+        # to update in a layer.
+        return [0]
