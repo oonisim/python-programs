@@ -2,6 +2,15 @@
 Those marked as "From deep-learning-from-scratch" is copied from the github.
 https://github.com/oreilly-japan/deep-learning-from-scratch
 """
+from typing import (
+    Optional,
+    Union,
+    List,
+    Dict,
+    Callable,
+    NoReturn,
+    Final
+)
 import numpy as np
 
 
@@ -95,7 +104,7 @@ def cross_entropy_log_loss(P, T) -> float:
     return J
 
 
-def numerical_gradient(objective, X, h:float = 1e-5) -> np.ndarray:
+def numerical_gradient(objective: Callable[[np.ndarray], np.ndarray], X: np.ndarray, h:float = 1e-5) -> np.ndarray:
     """Calculate numerical gradient (objective(X+h) - objective(X-h)) / 2h
     Args:
         objective: objective function for X
@@ -104,6 +113,7 @@ def numerical_gradient(objective, X, h:float = 1e-5) -> np.ndarray:
     Returns:
         dX: Numerical gradient
     """
+    assert h > 0.0
     G = gradient = np.zeros_like(X)
     it = np.nditer(X, flags=['multi_index'], op_flags=['readwrite'])
     while not it.finished:

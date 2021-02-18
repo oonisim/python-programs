@@ -213,7 +213,7 @@ class Layer:
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
-    def function(self, X: np.ndarray) -> Union[np.ndarray, float]:
+    def function(self, X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
         """Calculate the output f(arg) to forward as the input to the post layer.
         Args:
             X: input to the layer
@@ -221,9 +221,10 @@ class Layer:
             Y: Layer output
         """
         # In case for the layer is a repeater, pass X through as the default behavior.
+        X = np.array(X).reshape((1, -1)) if isinstance(X, float) else X
         return X
 
-    def forward(self, X: np.ndarray) -> Union[np.ndarray, float]:
+    def forward(self, X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
         """Forward the layer output to the post layers
         Args:
             X: input to the layer
@@ -233,7 +234,7 @@ class Layer:
         # In case for the layer is a repeater, pass X through as the default behavior.
         return X
 
-    def gradient(self, dY: np.ndarray) -> Union[np.ndarray, float]:
+    def gradient(self, dY: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
         """Calculate the gradient dL/dX, the impact on L by the input dX
         to back propagate to the previous layer, and other gradients on S
         dL/dS = dL/dY * dY/dS.
@@ -244,6 +245,7 @@ class Layer:
             dL/dX: impact on L by the layer input X
         """
         # In case the layer is a repeater or no gradient, pass dY through.
+        dY = np.array(dY).reshape((1, -1)) if isinstance(dY, float) else dY
         return dY
 
     def backward(self) -> Union[np.ndarray, float]:

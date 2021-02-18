@@ -100,7 +100,7 @@ class SoftmaxWithLogLoss(Layer):
 
         return self.L
 
-    def gradient(self, dL=1) -> Union[np.ndarray, float]:
+    def gradient(self, dL: Union[np.ndarray, float] = 1.0) -> Union[np.ndarray, float]:
         """Calculate the gradient dL/dX, the impact on L by the input dX (NOT dL)
         dL: dF/dL is the impact on F by dL when the output L has a post layer F.
         dJ: dL/dJ is the impact on L by dJ where J = cross_entropy_log_loss(P,T).= 1/N
@@ -114,7 +114,7 @@ class SoftmaxWithLogLoss(Layer):
             dL/dX: (P-T)/N of shape (N, M)
         """
         # Gradient dJ:(N,) = dL/dJ is 1/N for each node.
-        dJ: float = np.ones(self.N) / self.N
+        dJ: np.ndarray = np.ones(self.N, dtype=float) / self.N
 
         if self.T.size == self.P.size:  # Label is in OHE format.
             assert self.T.shape == self.P.shape, \

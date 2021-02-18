@@ -57,6 +57,7 @@ class Relu(Layer):
     # Instance methods
     # --------------------------------------------------------------------------------
     def function(self, X) -> Union[np.ndarray, float]:
+        X = np.array(X).reshape((1, -1)) if isinstance(X, float) else X
         assert X.shape[1] == self.M, \
             f"Number of node X {X.shape[1] } does not match {self.M}."
 
@@ -67,7 +68,7 @@ class Relu(Layer):
 
         return A
 
-    def gradient(self, dA) -> Union[np.ndarray, float]:
+    def gradient(self, dA: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
         """Calculate gradient dL/dX=(dL/dA * dA/dX) to back-propagate
         to the previous layer. dA has the same shape (N,M) with A as L is scalar.
 
@@ -76,9 +77,9 @@ class Relu(Layer):
         Returns:
             dL/dX: impact on L by the layer input dX
         """
-        assert dA and dA.shape == (self.N, self.M), \
+        dA = np.array(dA).reshape((1, -1)) if isinstance(dA, float) else dA
+        assert dA.shape == (self.N, self.M), \
             f"dA shape should be {(self.N, self.M)} but {dA.shape}."
-
         dX: np.ndarray = copy.deepcopy(dA)
         dX[self.mask] = 0
         return dX
@@ -116,7 +117,8 @@ class Sigmoid(Layer):
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
-    def function(self, X) -> Union[np.ndarray, float]:
+    def function(self, X: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+        X = np.array(X).reshape((1, -1)) if isinstance(X, float) else X
         assert X.shape[1] == self.M, \
             f"Number of node X {X.shape[1] } does not match {self.M}."
 
@@ -124,7 +126,7 @@ class Sigmoid(Layer):
         self._A = sigmoid(X)
         return self.A
 
-    def gradient(self, dA) -> Union[np.ndarray, float]:
+    def gradient(self, dA: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
         """Calculate gradient dL/dX=(dL/dA * dA/dX) to back-propagate
         to the previous layer. dA has the same shape (N,M) with A as L is scalar.
 
@@ -133,8 +135,8 @@ class Sigmoid(Layer):
         Returns:
             dL/dX: impact on L by the layer input dX
         """
-        assert dA and dA.shape == (self.N, self.M), \
+        dA = np.array(dA).reshape((1, -1)) if isinstance(dA, float) else dA
+        assert dA.shape == (self.N, self.M), \
             f"dA shape should be {(self.N, self.M)} but {dA.shape}."
-
         dX = dA * (1.0 - self.A) * self.A
         return dX

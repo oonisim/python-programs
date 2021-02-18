@@ -196,6 +196,8 @@ class Matmul(Layer):
         self.logger.debug(
             "layer[%s] function(): X.shape %s W.shape %s", self.name, X.shape, self.W.shape
         )
+
+        X = np.array(X).reshape((1, -1)) if isinstance(X, float) else X
         self.X = X
         assert self.W and self.W.shape == (self.M, self.D), \
             f"W shape needs {(self.M, self.D)} but ({self.W.shape})"
@@ -235,7 +237,7 @@ class Matmul(Layer):
         list(map(_forward, Y, self._posteriors))
         return Y
 
-    def gradient(self, dY=1) -> Union[np.ndarray, float]:
+    def gradient(self, dY: Union[np.ndarray, float] = 1.0) -> Union[np.ndarray, float]:
         """Calculate the gradients dL/dX and dL/dW.
         Args:
             dY: Gradient dL/dY, the total impact on L by dY.
@@ -243,7 +245,9 @@ class Matmul(Layer):
             dL/dX of shape (N,D):  [ dL/dY:(N,M) @ W:(M,D)) ]
         """
         self.logger.debug("layer[%s] gradient(): dY.shape %s", self.name, dY.shape)
-        assert dY == 1 or np.array_equal(self.dY.shape, (self.N, self.M)), \
+
+        dY = np.array(dY).reshape((1, -1)) if isinstance(dY, float) else dY
+        assert self.dY.shape == (self.N, self.M), \
             f"Gradient dL/dY shape needs {(self.N, self.M)} but ({self.dY.shape}))"
         self._dY = dY
 
@@ -251,7 +255,7 @@ class Matmul(Layer):
         # dL/dX of shape (N,D):  [ dL/dY:(N,M) @ W:(M,D)) ]
         # --------------------------------------------------------------------------------
         np.matmul(self.dY, self.W, out=self._dX)
-        assert np.array_equal(self.dX.shape, (self.N, self.D)), \
+        assert self.dX.shape == (self.N, self.D), \
             f"Gradient dL/dX shape needs {(self.N, self.D)} but ({self.dX.shape}))"
 
         return self.dX
