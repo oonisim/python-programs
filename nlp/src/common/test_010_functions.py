@@ -16,6 +16,43 @@ def test_001_sigmoid(h:float = 1e-5):
     assert np.all(np.abs(t - sigmoid(x)) < h), f"delta (t-x) is expected < {h} but {x-t}"
 
 
+def test_001_cross_entropy_log_loss(h: float = 1e-5):
+    """Test case for cross_entropy_log_loss
+    log(P=1) -> 0
+    """
+    for _ in range(100):
+        length = np.random.randint(2, 4)  # length > 1
+        index = np.random.randint(0, length)
+        # --------------------------------------------------------------------------------
+        # For 1D OHE array P [0, 0, ..., 1, 0, ...] where Xi = 1 and 1D OHE array T = P,
+        # sum(-t * log(t)) -> 0 (log(1) = 0)
+        # --------------------------------------------------------------------------------
+        P = np.zeros(length)
+        P[index] = 1
+        T = P
+        Z = cross_entropy_log_loss(P, T)    # log(P=1) -> 0
+        assert np.all(Z < h), \
+            f"cross_entropy_log_loss(1,1) is expected to be 0 but {Z}"
+
+        # --------------------------------------------------------------------------------
+        # For 1D OHE array P [0, 0, ..., 1, 0, ...] where Xi = 1.
+        # For 1D OHE array T [0, 0, ..., 0, 1, ...] where Tj = 1 and i != j
+        # sum(-t * log(t)) -> -np.inf (log(1) = -np.inf)
+        # --------------------------------------------------------------------------------
+        P = np.zeros(length)
+        T = np.zeros(length)
+
+        while (position:= np.random.randint(0, length)) == index: pass
+        T[position] = 1
+
+        # Z will not get to np.inf as the function avoid it by adding a small number e
+        # log(+e)
+        E = -1 * np.log(1e-7)
+        Z = cross_entropy_log_loss(P, T)
+        assert (Z -E) < h, \
+            f"cross_entropy_log_loss(1=0,T=0) is expected to be inf but {Z}"
+
+
 def test_002_numerical_gradient_avg(h:float = 1e-5):
     """Test Case for numerical gradient calculation for average function
     A Jacobian matrix whose element 1/N is expected where N is X.size

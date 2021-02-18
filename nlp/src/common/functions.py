@@ -11,7 +11,11 @@ from typing import (
     NoReturn,
     Final
 )
+import logging
 import numpy as np
+
+Logger = logging.getLogger("functions")
+Logger.setLevel(logging.DEBUG)
 
 
 def sigmoid(X):
@@ -50,8 +54,10 @@ def softmax(X: Union[np.ndarray, float]):
     return exp / np.sum(exp, axis=-1, keepdims=True)
 
 
-def cross_entropy_log_loss(P, T) -> np.ndarray:
+def cross_entropy_log_loss(P, T, e: float = 1e-7) -> np.ndarray:
     """Cross entropy log loss [ -t(n)(m) * log(p(n)(m)) ] for multi labels.
+    log(P=1) -> 0
+
     NOTE:
         Handle only the label whose value is True. The reason not to use non-labels to
         calculate the loss is TBD.
@@ -62,6 +68,7 @@ def cross_entropy_log_loss(P, T) -> np.ndarray:
             M is Number of nodes
         T: label either in OHE format of shape (N,M) or index format of shape (N,).
            OHE: One Hot Encoding
+        e: small number to avoid np.inf by log(0) by log(0+e)
     Returns:
         J: Loss value of shape (N,)
     """
@@ -72,8 +79,7 @@ def cross_entropy_log_loss(P, T) -> np.ndarray:
         P = P.reshape(1, P.size)
 
     assert T.shape[0] == P.shape[0], \
-        f"Batch size of T {T.shape[0]} and P {P.shape[0]} should have been the same [{N}]."
-
+        f"Batch size of T {T.shape[0]} and P {P.shape[0]} should be the same."
     N = batch_size = P.shape[0]
 
     # --------------------------------------------------------------------------------
@@ -96,13 +102,14 @@ def cross_entropy_log_loss(P, T) -> np.ndarray:
     assert rows.ndim == cols.ndim and len(rows) == len(cols), \
         f"numpy tuple indices need to have the same size."
 
-    # --------------------------------------------------------------------------------
     # Log( +e) prevents the infinitive value log(0).
-    # --------------------------------------------------------------------------------
-    e = 1e-7
     J = -np.sum(np.log(P[rows, cols] + e), axis=-1)
-    assert J.shape[0] == N
 
+    Logger.debug("P.shape %s", P.shape)
+    Logger.debug("J is [%s]", J)
+    Logger.debug("J.shape %s", J.shape)
+
+    assert (1 < N == J.shape[0]) or (N == 1 and J.ndim == 0)
     return J
 
 
