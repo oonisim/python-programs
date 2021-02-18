@@ -21,12 +21,23 @@ def test_001_cross_entropy_log_loss(h: float = 1e-5):
     log(P=1) -> 0
     """
     for _ in range(100):
-        length = np.random.randint(2, 4)  # length > 1
-        index = np.random.randint(0, length)
+        # --------------------------------------------------------------------------------
+        # For scalar P=1, T=1 for -t * log(t) -> 0 (log(1) = 0)
+        # For scalar P=0, T=1 for -t * log(e) -> log(e)
+        # For scalar P=1, T=0 for -t * log(e) -> 0
+        # --------------------------------------------------------------------------------
+        e = 1e-7
+        assert cross_entropy_log_loss(P=1., T=1) < h
+        assert np.abs(cross_entropy_log_loss(P=0., T=1, e=e) - (-1 * np.log(e)))< h
+        assert cross_entropy_log_loss(P=1., T=0, e=e) < h
+
         # --------------------------------------------------------------------------------
         # For 1D OHE array P [0, 0, ..., 1, 0, ...] where Xi = 1 and 1D OHE array T = P,
         # sum(-t * log(t)) -> 0 (log(1) = 0)
         # --------------------------------------------------------------------------------
+        length = np.random.randint(2, 100)  # length > 1
+        index = np.random.randint(0, length)
+
         P = np.zeros(length)
         P[index] = 1
         T = P

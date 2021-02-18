@@ -54,9 +54,14 @@ def softmax(X: Union[np.ndarray, float]):
     return exp / np.sum(exp, axis=-1, keepdims=True)
 
 
-def cross_entropy_log_loss(P, T, e: float = 1e-7) -> np.ndarray:
+def cross_entropy_log_loss(
+        P: Union[np.ndarray, float],
+        T: Union[int, np.ndarray],
+        e: float = 1e-7
+) -> np.ndarray:
     """Cross entropy log loss [ -t(n)(m) * log(p(n)(m)) ] for multi labels.
-    log(P=1) -> 0
+    Assumption:
+        Label is integer 0 or 1 for an OHE label and any integer for an index label.
 
     NOTE:
         Handle only the label whose value is True. The reason not to use non-labels to
@@ -72,14 +77,20 @@ def cross_entropy_log_loss(P, T, e: float = 1e-7) -> np.ndarray:
     Returns:
         J: Loss value of shape (N,)
     """
+    # --------------------------------------------------------------------------------
+    # Convert scalar and 1D array into (N,M) shape to to run run P[rows, cols]
+    # --------------------------------------------------------------------------------
     P = np.array(P) if isinstance(P, float) else P
-    T = np.array(T) if isinstance(T, float) else T
-    if P.ndim == 1:
+    T = np.array(T) if isinstance(T, (float, int)) else T
+    if P.ndim <= 1:
         T = T.reshape(1, T.size)
         P = P.reshape(1, P.size)
 
+    # Label is integer
+    T = T.astype(int)
     assert T.shape[0] == P.shape[0], \
         f"Batch size of T {T.shape[0]} and P {P.shape[0]} should be the same."
+
     N = batch_size = P.shape[0]
 
     # --------------------------------------------------------------------------------
@@ -97,18 +108,27 @@ def cross_entropy_log_loss(P, T, e: float = 1e-7) -> np.ndarray:
     #   (2, 4)
     # ]
     # --------------------------------------------------------------------------------
-    rows = np.arange(N)     # tuple index for rows
-    cols = T                # tuple index for columns
-    assert rows.ndim == cols.ndim and len(rows) == len(cols), \
-        f"numpy tuple indices need to have the same size."
+    rows = np.arange(N)     # 1D tuple index for rows
+    cols = T                # 1D tuple index for columns
+    assert rows.ndim == cols.ndim == 1 and rows.size == cols.size, \
+        f"np tuple indices size need to be same but rows {rows.size} cols {cols.size}."
 
     # Log( +e) prevents the infinitive value log(0).
     J = -np.sum(np.log(P[rows, cols] + e), axis=-1)
 
     Logger.debug("P.shape %s", P.shape)
+    Logger.debug("P[rows, cols].shape %s", P[rows, cols].shape)
+    Logger.debug("N is [%s]", N)
     Logger.debug("J is [%s]", J)
     Logger.debug("J.shape %s", J.shape)
 
+    # --------------------------------------------------------------------------------
+    # Possible P shape can be (1,1), (1, M), (N, 1), (N, M), for each of which
+    # P (1,1) -> P[rows, cols] ()
+    # P (1,M) -> P[rows, cols] ()
+    # P (N,1) -> P[rows, cols] (N,)
+    # P (N,M) -> P[rows, cols] (N,)
+    # --------------------------------------------------------------------------------
     assert (1 < N == J.shape[0]) or (N == 1 and J.ndim == 0)
     return J
 
@@ -130,9 +150,8 @@ def numerical_jacobian(
         J: Jacobian matrix that has the same shape of X.
     """
     assert h > 0.0
-
-    X = np.array(X) if isinstance(X, float) or isinstance(X, int) else X
-    J = jacobian = np.zeros_like(X)
+    X = np.array(X) if isinstance(X, (float, int)) else X
+    J = np.zeros_like(X)
 
     it = np.nditer(X, flags=['multi_index'], op_flags=['readwrite'])
     while not it.finished:
@@ -166,4 +185,3 @@ def compose(*args):
         return result
 
     return _
-
