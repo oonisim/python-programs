@@ -24,7 +24,7 @@ from optimizer import (
     SGD,
 )
 from common.functions import (
-    numerical_gradient
+    numerical_jacobian
 )
 
 
@@ -325,8 +325,8 @@ class Matmul(Layer):
         def objective_W(W: np.ndarray):
             return L(self.X @ W.T)
 
-        dX = numerical_gradient(objective_X, self.X)
-        dW = numerical_gradient(objective_W, self.W)
+        dX = numerical_jacobian(objective_X, self.X)
+        dW = numerical_jacobian(objective_W, self.W)
         return [dX, dW]
 
     def update(self) -> List[Union[float, np.ndarray]]:

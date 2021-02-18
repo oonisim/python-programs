@@ -110,7 +110,7 @@ from typing import (
 import logging
 import numpy as np
 from common.functions import (
-    numerical_gradient
+    numerical_jacobian
 )
 
 
@@ -266,7 +266,7 @@ class Layer:
         def L(X: np.ndarray):
             return self.objective(self.function(X))
 
-        dX = numerical_gradient(L, self.X)
+        dX = numerical_jacobian(L, self.X)
         return [dX]
 
     def update(self) -> List[Union[float, np.ndarray]]:

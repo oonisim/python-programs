@@ -17,7 +17,7 @@ from . base import Layer
 from common.functions import (
     cross_entropy_log_loss,
     softmax,
-    numerical_gradient
+    numerical_jacobian
 )
 
 

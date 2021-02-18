@@ -32,7 +32,7 @@ def relu_grad(X):
     return grad
 
 
-def softmax(X):
+def softmax(X: Union[np.ndarray, float]):
     """Softmax P = exp(X) / sum(exp(X))
     Args:
         X: batch input data of shape (N,M).
@@ -50,7 +50,7 @@ def softmax(X):
     return exp / np.sum(exp, axis=-1, keepdims=True)
 
 
-def cross_entropy_log_loss(P, T) -> float:
+def cross_entropy_log_loss(P, T) -> np.ndarray:
     """Cross entropy log loss [ -t(n)(m) * log(p(n)(m)) ] for multi labels.
     NOTE:
         Handle only the label whose value is True. The reason not to use non-labels to
@@ -65,6 +65,8 @@ def cross_entropy_log_loss(P, T) -> float:
     Returns:
         J: Loss value of shape (N,)
     """
+    P = np.array(P) if isinstance(P, float) else P
+    T = np.array(T) if isinstance(T, float) else T
     if P.ndim == 1:
         T = T.reshape(1, T.size)
         P = P.reshape(1, P.size)
@@ -104,32 +106,48 @@ def cross_entropy_log_loss(P, T) -> float:
     return J
 
 
-def numerical_gradient(objective: Callable[[np.ndarray], np.ndarray], X: np.ndarray, h:float = 1e-5) -> np.ndarray:
-    """Calculate numerical gradient (objective(X+h) - objective(X-h)) / 2h
+def numerical_jacobian(
+        f: Callable[[np.ndarray], np.ndarray],
+        X: Union[np.ndarray, float],
+        h: float = 1e-5
+) -> np.ndarray:
+    """Calculate Jacobian matrix J numerically with (f(X+h) - f(X-h)) / 2h
+    Jacobian matrix element Jpq = df/dXpq, the impact on J by the
+    small difference to Xpq where p is row index and q is col index of J.
+
     Args:
-        objective: objective function for X
-        X: input
-        h: small delta value to calculate the objective value for X+/-h
+        f: Y=f(X) where Y is a scalar or shape() array.
+        X: input of shame (N, M), or (N,) or ()
+        h: small delta value to calculate the f value for X+/-h
     Returns:
-        dX: Numerical gradient
+        J: Jacobian matrix that has the same shape of X.
     """
     assert h > 0.0
-    G = gradient = np.zeros_like(X)
+
+    X = np.array(X) if isinstance(X, float) or isinstance(X, int) else X
+    J = jacobian = np.zeros_like(X)
+
     it = np.nditer(X, flags=['multi_index'], op_flags=['readwrite'])
     while not it.finished:
         idx = it.multi_index
         tmp_val = X[idx]
         X[idx] = tmp_val + h
-        fx1 = objective(X)  # f(x+h)
+        fx1 = f(X)  # f(x+h)
 
         X[idx] = tmp_val - h
-        fx2 = objective(X)  # f(x-h)
-        G[idx] = (fx1 - fx2) / (2 * h)
+        fx2 = f(X)  # f(x-h)
 
-        X[idx] = tmp_val  # 値を元に戻す
+        # --------------------------------------------------------------------------------
+        # Set the gradient element scalar value or shape()
+        # --------------------------------------------------------------------------------
+        g = (fx1 - fx2) / (2 * h)
+        assert g.size == 1, "The f function needs to return scalar or shape ()"
+        J[idx] = g
+
+        X[idx] = tmp_val
         it.iternext()
 
-    return G
+    return J
 
 
 def compose(*args):
