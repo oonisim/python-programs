@@ -18,25 +18,40 @@ Logger = logging.getLogger("functions")
 Logger.setLevel(logging.DEBUG)
 
 
-def sigmoid(X):
+def sigmoid(X: Union[int, float, np.ndarray]) -> Union[int, float, np.ndarray]:
+    """Sigmoid activate function
+    Args:
+        X:
+    """
     return 1 / (1 + np.exp(-X))
 
 
-def sigmoid_grad(X):
+def sigmoid_gradient(X: Union[int, float, np.ndarray]) -> Union[int, float, np.ndarray]:
+    """Sigmoid gradient
+    Args:
+        X:
+    Returns: gradient
+    """
     return (1.0 - sigmoid(X)) * sigmoid(X)
 
 
-def relu(X):
+def relu(X: Union[int, float, np.ndarray]) -> Union[int, float, np.ndarray]:
+    """ReLU activation function"""
     return np.maximum(0, X)
 
 
-def relu_grad(X):
+def relu_gradient(X: Union[int, float, np.ndarray]) -> Union[int, float, np.ndarray]:
+    """ReLU gradient
+    Args:
+        X:
+    Returns: gradient
+    """
     grad = np.zeros_like(X)
     grad[X >= 0] = 1
     return grad
 
 
-def softmax(X: Union[np.ndarray, float]):
+def softmax(X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
     """Softmax P = exp(X) / sum(exp(X))
     Args:
         X: batch input data of shape (N,M).
@@ -56,7 +71,7 @@ def softmax(X: Union[np.ndarray, float]):
 
 def cross_entropy_log_loss(
         P: Union[np.ndarray, float],
-        T: Union[int, np.ndarray],
+        T: Union[np.ndarray, int],
         e: float = 1e-7
 ) -> np.ndarray:
     """Cross entropy log loss [ -t(n)(m) * log(p(n)(m)) ] for multi labels.
@@ -75,10 +90,10 @@ def cross_entropy_log_loss(
            OHE: One Hot Encoding
         e: small number to avoid np.inf by log(0) by log(0+e)
     Returns:
-        J: Loss value of shape (N,)
+        J: Loss value of shape (N,), a loss value per batch.
     """
     # --------------------------------------------------------------------------------
-    # Convert scalar and 1D array into (N,M) shape to to run run P[rows, cols]
+    # Convert scalar and 1D array into (N,M) shape to to run P[rows, cols]
     # --------------------------------------------------------------------------------
     P = np.array(P) if isinstance(P, float) else P
     T = np.array(T) if isinstance(T, (float, int)) else T
@@ -101,35 +116,43 @@ def cross_entropy_log_loss(
         T = T.argmax(axis=1)
 
     # --------------------------------------------------------------------------------
-    # Numpy tuple indexing. The tuple size must be the same.
-    # e.g. select P[n=0][m=2] and P[n=3][m=4]:
+    # Calculate Cross entropy log loss -t * log(p).
+    # Select an element P[n][t] at each row n which corresponds to the true label t.
+    # Use the Numpy tuple indexing. e.g. P[n=0][t=2] and P[n=3][t=4].
     # P[
     #   (0, 3),
-    #   (2, 4)
+    #   (2, 4)     # The tuple sizes must be the same at all axes
     # ]
+    #
+    # Tuple indexing selects only one element per row.
+    # Beware the numpy behavior difference between P[(n),(m)] and P[[n],[m]].
+    # https://stackoverflow.com/questions/66269684
+    # P[1,1]  and P[(0)(0)] results in a scalar value, HOWEVER, P[[1],[1]] in array.
+    #
+    # P shape can be (1,1), (1, M), (N, 1), (N, M), hence P[rows, cols] are:
+    # P (1,1) -> P[rows, cols] results in a 1D of  (1,).
+    # P (1,M) -> P[rows, cols] results in a 1D of  (1,)
+    # P (N,1) -> P[rows, cols] results in a 1D of  (N,)
+    # P (N,M) -> P[rows, cols] results in a 1D of  (N,)
+    #
+    # J shape matches with the P[rows, cols] shape.
     # --------------------------------------------------------------------------------
     rows = np.arange(N)     # 1D tuple index for rows
     cols = T                # 1D tuple index for columns
     assert rows.ndim == cols.ndim == 1 and rows.size == cols.size, \
         f"np tuple indices size need to be same but rows {rows.size} cols {cols.size}."
 
-    # Log( +e) prevents the infinitive value log(0).
-    J = -np.sum(np.log(P[rows, cols] + e), axis=-1)
+    # Log loss per batch. Log( +e) prevents the infinitive value log(0).
+    # Do NOT sum as it results in a total loss for a batch.
+    J = -np.log(P[rows, cols] + e)
 
     Logger.debug("P.shape %s", P.shape)
     Logger.debug("P[rows, cols].shape %s", P[rows, cols].shape)
     Logger.debug("N is [%s]", N)
     Logger.debug("J is [%s]", J)
-    Logger.debug("J.shape %s", J.shape)
+    Logger.debug("J.shape %s\n", J.shape)
 
-    # --------------------------------------------------------------------------------
-    # Possible P shape can be (1,1), (1, M), (N, 1), (N, M), for each of which
-    # P (1,1) -> P[rows, cols] ()
-    # P (1,M) -> P[rows, cols] ()
-    # P (N,1) -> P[rows, cols] (N,)
-    # P (N,M) -> P[rows, cols] (N,)
-    # --------------------------------------------------------------------------------
-    assert (1 < N == J.shape[0]) or (N == 1 and J.ndim == 0)
+    assert 0 < N == J.shape[0], f"Loss J.shape is expected to be ({N},) but {J.shape}"
     return J
 
 

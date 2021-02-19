@@ -17,7 +17,7 @@ from typing import (
 import logging
 import copy
 import numpy as np
-from base import Layer
+from layer import Layer
 from common.functions import (
     sigmoid
 )

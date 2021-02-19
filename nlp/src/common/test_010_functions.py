@@ -1,10 +1,14 @@
+import random
+import numpy as np
 from common import (
     numerical_jacobian,
     sigmoid,
     softmax,
     cross_entropy_log_loss
 )
-import numpy as np
+
+NUM_MAX_NODES: int = 1000
+NUM_MAX_BATCH_SIZE: int = 1000
 
 
 def test_001_sigmoid(h:float = 1e-5):
@@ -22,6 +26,7 @@ def test_001_cross_entropy_log_loss(h: float = 1e-5):
     """
     for _ in range(100):
         # --------------------------------------------------------------------------------
+        # [Scalar test case]
         # For scalar P=1, T=1 for -t * log(t) -> 0 (log(1) = 0)
         # For scalar P=0, T=1 for -t * log(e) -> log(e)
         # For scalar P=1, T=0 for -t * log(e) -> 0
@@ -31,10 +36,8 @@ def test_001_cross_entropy_log_loss(h: float = 1e-5):
         assert np.abs(cross_entropy_log_loss(P=0., T=1, e=e) - (-1 * np.log(e)))< h
         assert cross_entropy_log_loss(P=1., T=0, e=e) < h
 
-        # --------------------------------------------------------------------------------
-        # For 1D OHE array P [0, 0, ..., 1, 0, ...] where Xi = 1 and 1D OHE array T = P,
+        # For 1D OHE array P [0, 0, ..., 1, 0, ...] where Pi = 1 and 1D OHE array T = P,
         # sum(-t * log(t)) -> 0 (log(1) = 0)
-        # --------------------------------------------------------------------------------
         length = np.random.randint(2, 100)  # length > 1
         index = np.random.randint(0, length)
 
@@ -46,7 +49,8 @@ def test_001_cross_entropy_log_loss(h: float = 1e-5):
             f"cross_entropy_log_loss(1,1) is expected to be 0 but {Z}"
 
         # --------------------------------------------------------------------------------
-        # For 1D OHE array P [0, 0, ..., 1, 0, ...] where Xi = 1.
+        # [1D test case]
+        # For 1D OHE array P [0, 0, ..., 1, 0, ...] where Pi = 1.
         # For 1D OHE array T [0, 0, ..., 0, 1, ...] where Tj = 1 and i != j
         # sum(-t * log(t)) -> -np.inf (log(1) = -np.inf)
         # --------------------------------------------------------------------------------
@@ -63,6 +67,28 @@ def test_001_cross_entropy_log_loss(h: float = 1e-5):
         assert (Z -E) < h, \
             f"cross_entropy_log_loss(1=0,T=0) is expected to be inf but {Z}"
 
+        # --------------------------------------------------------------------------------
+        # [2D test case]
+        # P:(N, M) is probability matrix where Pnm = p, 0 <=n<N-1, 0<=m<M-1
+        # T:(N,)   is index label where Tn=m is label as integer e.g. m=3 for 3rd label.
+        # Pnm = log(P[i][j] + e)
+        # --------------------------------------------------------------------------------
+        e = 1e-7
+        p = np.random.uniform(0, 1)
+        N = np.random.randint(2, NUM_MAX_BATCH_SIZE)
+        M = np.random.randint(2, NUM_MAX_NODES)
+        T = np.random.randint(0, M, N)  # N rows of labels, max label value is M-1
+        P = np.zeros((N, M))
+        P[
+            range(N),                    # Set p at random row position
+            T
+        ] = p
+
+        E = np.full(T.shape, np.log(p+e))
+        L = cross_entropy_log_loss(P, T, e=e)
+        assert np.all(np.abs(E-L) < h), \
+            f"Loss deviation (E-L) is expected to be < {h} but {np.abs(E-L)}"
+
 
 def test_002_numerical_gradient_avg(h:float = 1e-5):
     """Test Case for numerical gradient calculation for average function
@@ -73,9 +99,9 @@ def test_002_numerical_gradient_avg(h:float = 1e-5):
 
     for _ in range(100):
         # Batch input X of shape (N, M)
-        n = np.random.randint(low=1, high=10, size=1)
-        m = np.random.randint(low=1, high=10, size=1)
-        X = np.random.randn(np.asscalar(n),np.asscalar(m))
+        n = np.random.randint(low=1, high=10)
+        m = np.random.randint(low=1, high=10)
+        X = np.random.randn(n,m)
 
         # Expected gradient matrix of shape (N,M) as label T
         T = np.full(X.shape, 1 / X.size)
@@ -98,5 +124,4 @@ def test_002_numerical_gradient_sigmoid(h:float = 1e-5):
         z = numerical_jacobian(sigmoid, x)
 
         assert np.all((t - z) < h), f"delta (t-x) is expected < {h} but {x-t}"
-
 
