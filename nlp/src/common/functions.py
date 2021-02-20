@@ -127,7 +127,7 @@ def cross_entropy_log_loss(
     # ]
     # ================================================================================
     assert isinstance(P, np.ndarray)
-    T = np.array(T)     # convert to np array in case it is int.
+    T = np.array(T, dtype=int) if isinstance(T, int) else T
 
     # --------------------------------------------------------------------------------
     # P is 1D array, then T dim should be in (1,2)
@@ -143,13 +143,13 @@ def cross_entropy_log_loss(
 
     # --------------------------------------------------------------------------------
     # P is 2D array, then
-    # Convert T.ndim==2 OHE labels into index labels.
-    # Otherwise P should be T.ndim==1 index label.
+    # Convert the OHE labels into index labels when T.ndim==2.
+    # Otherwise T should be index labels when T.ndim==1.
     # --------------------------------------------------------------------------------
     if P.ndim == T.ndim == 2:
         T = T.argmax(axis=-1)
 
-    assert P.ndim == 2 and T.ndim ==1, \
+    assert P.ndim == 2 and T.ndim == 1, \
         "P.ndim==2 and T.ndim==1 are expected but P %s T %s" % (P.shape, T.shape)
 
     # ================================================================================
