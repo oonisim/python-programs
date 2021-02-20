@@ -102,41 +102,57 @@ def cross_entropy_log_loss(
     Returns:
         J: Loss value of shape (N,), a loss value per batch.
     """
+    # --------------------------------------------------------------------------------
+    # P must be float, T must be integer.
+    # --------------------------------------------------------------------------------
     assert (isinstance(P, np.ndarray) and P.dtype == float) or isinstance(P, float), \
         "Type of P must be float"
     assert (isinstance(T, np.ndarray) and T.dtype == int) or isinstance(T, int), \
         "Type of T must be integer"
 
     # --------------------------------------------------------------------------------
-    # For scalar values, calculate -t * log(p) and return
+    # P is scalar, then return -t * log(p).
     # --------------------------------------------------------------------------------
     if isinstance(P, float) or P.ndim == 0:
+        assert isinstance(T, int) or T.ndim == 0
         return -T * np.log(P+offset)
 
-    # --------------------------------------------------------------------------------
-    # T.ndim is 1
-    # --------------------------------------------------------------------------------
-    if isinstance(T, int):
-        T = np.array(T)
-    else:
-        T = T.reshape(T.size)
+    # ================================================================================
+    # Hereafter, P and T are np arrays.
+    # Convert T in OHE format into index format with T = np.argmax(T). If P is in 1D,
+    # convert it into 2D so as to get the log loss with numpy tuple- like indices
+    # P[
+    #   rangee(N),
+    #   T
+    # ]
+    # ================================================================================
+    assert isinstance(P, np.ndarray)
+    T = np.array(T)     # convert to np array in case it is int.
 
     # --------------------------------------------------------------------------------
-    # Handle P/T as (N,M) matrix to use P[[N], [M]] to select T=1 elements.
+    # P is 1D array, then T dim should be in (1,2)
+    # Convert T.ndim==0 scalar index label into single element 1D index label T.
+    # Convert T.ndim==1 OHE labels into a 1D index labels T.
+    # T.reshape(-1) because np.argmax(ndim=1) results in ().
     # --------------------------------------------------------------------------------
-    if P.ndim <= 1:
-        P = P.reshape(1, P.size)
+    if P.ndim == 1:
+        assert T.ndim in {1, 2}, \
+            "For P.ndim=1, T.ndim is 0 or 1 but %s" % T.ndim
+        P = P.reshape(1, -1)
+        T = T.reshape(-1) if T.ndim == 0 else np.argmax(T).reshape(-1)
 
-    N = batch_size = P.shape[0]
-
     # --------------------------------------------------------------------------------
-    # Convert OHE format into index label format of shape (N,).
-    # T in OHE format has the shape (N,M) with P, hence same size N*M.
+    # P is 2D array, then
+    # Convert T.ndim==2 OHE labels into index labels.
+    # Otherwise P should be T.ndim==1 index label.
     # --------------------------------------------------------------------------------
-    if T.size == P.size:
+    if P.ndim == T.ndim == 2:
         T = T.argmax(axis=-1)
 
-    # --------------------------------------------------------------------------------
+    assert P.ndim == 2 and T.ndim ==1, \
+        "P.ndim==2 and T.ndim==1 are expected but P %s T %s" % (P.shape, T.shape)
+
+    # ================================================================================
     # Calculate Cross entropy log loss -t * log(p).
     # Select an element P[n][t] at each row n which corresponds to the true label t.
     # Use the Numpy tuple indexing. e.g. P[n=0][t=2] and P[n=3][t=4].
@@ -157,30 +173,31 @@ def cross_entropy_log_loss(
     # P (N,M) -> P[rows, cols] results in a 1D of  (N,)
     #
     # J shape matches with the P[rows, cols] shape.
-    # --------------------------------------------------------------------------------
-    rows = np.arange(N)     # 1D index for rows
-    cols = T                # () or (N,) 1D index for columns
-    assert rows.size == cols.size, \
-        f"np tuple indices size need to be same but rows {rows.size} cols {cols.size}."
+    # ================================================================================
+    N = batch_size = P.shape[0]
+    rows = np.arange(N)     # (N,)
+    cols = T                # Same shape (N,) with rows
+    assert rows.shape == cols.shape, \
+        f"np P indices need the same shape but rows {rows.shape} cols {cols.shape}."
+
+    _P = P[rows, cols]
+    Logger.debug("cross_entropy_log_loss(): N is [%s]", N)
+    Logger.debug("cross_entropy_log_loss(): P.shape %s", P.shape)
+    Logger.debug("cross_entropy_log_loss(): P[rows, cols].shape %s", _P.shape)
+    Logger.debug("cross_entropy_log_loss(): P[rows, cols] is %s" % _P)
 
     # --------------------------------------------------------------------------------
     # Log loss per batch. Log(0+e) prevents the infinitive value log(0).
-    # NOTE: numerical gradient check.
+    # NOTE:
     #   Numerical gradient calculate f(x+/-h) with a small h e.g. 1e-5.
-    #   However, when x=0 and h >> e, f(0-h)=log(e-h) is np.nan as because x in log(x)
-    #   cannot be < 0.
+    #   When x=0 and h >> e, f(0-h)=log(e-h) is nan as x in log(x) cannot be < 0.
     # --------------------------------------------------------------------------------
-    assert np.all((P[rows, cols] + offset) > 0), \
-        "x for log(x) needs to be > 0 but %s." % (P[rows, cols] + offset)
+    assert np.all((_P + offset) > 0), \
+        "x for log(x) needs to be > 0 but %s." % (_P + offset)
 
-    _P = P[rows, cols]
-    Logger.debug("P[rows, cols] is %s" % P[rows, cols])
     J = -np.log(_P + offset)
-    assert not np.all(np.isnan(J))
 
-    Logger.debug("P.shape %s", P.shape)
-    Logger.debug("P[rows, cols].shape %s", P[rows, cols].shape)
-    Logger.debug("N is [%s]", N)
+    assert not np.all(np.isnan(J)), "log(x) caused nan for P \n%s." % P
     Logger.debug("J is [%s]", J)
     Logger.debug("J.shape %s\n", J.shape)
 
