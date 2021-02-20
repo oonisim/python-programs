@@ -156,7 +156,7 @@ def test_020_cross_entropy_log_loss_1d(h: float = 1e-5, e=OFFSET_FOR_LOG):
             f"Delta expected to be < {h} but \n{np.abs(E1-G1)}"
 
         A1 = np.zeros_like(P1)
-        A1[index] = -1 / (1+e)
+        A1[index] = -1 / (1.0+e)
         check.equal(np.all(np.abs(A1 - G1) < 0.01), True, "A1-G1 %s\n" % np.abs(A1-G1))
 
         # --------------------------------------------------------------------------------
