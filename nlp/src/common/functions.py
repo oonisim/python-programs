@@ -66,9 +66,10 @@ def softmax(X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
             N: Batch size
             M: Number of nodes
     Returns:
-        Probability P of shape (N,M)
+        P: Probability of shape (N,M)
     """
-    assert X.dtype == float
+    assert isinstance(X, float) or (isinstance(X, np.ndarray) and X.dtype == float), \
+        "X must be float or ndarray(dtype=float)"
 
     # --------------------------------------------------------------------------------
     # exp(x-c) to prevent the infinite exp(x) for a large value x, with c = max(x).
@@ -76,7 +77,10 @@ def softmax(X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
     # --------------------------------------------------------------------------------
     C = np.max(X, axis=-1, keepdims=True)   # オーバーフロー対策
     exp = np.exp(X - C)
-    return exp / np.sum(exp, axis=-1, keepdims=True)
+    P = exp / np.sum(exp, axis=-1, keepdims=True)
+    Logger.debug("softmax(): X %s exp %s P %s", X, exp, P)
+
+    return P
 
 
 def cross_entropy_log_loss(
@@ -136,7 +140,7 @@ def cross_entropy_log_loss(
     # T.reshape(-1) because np.argmax(ndim=1) results in ().
     # --------------------------------------------------------------------------------
     if P.ndim == 1:
-        assert T.ndim in {1, 2}, \
+        assert T.ndim in {0,1}, \
             "For P.ndim=1, T.ndim is 0 or 1 but %s" % T.ndim
         P = P.reshape(1, -1)
         T = T.reshape(-1) if T.ndim == 0 else np.argmax(T).reshape(-1)
@@ -187,10 +191,10 @@ def cross_entropy_log_loss(
     Logger.debug("cross_entropy_log_loss(): P[rows, cols] is %s" % _P)
 
     # --------------------------------------------------------------------------------
-    # Log loss per batch. Log(0+e) prevents the infinitive value log(0).
+    # Log loss per batch. Log(0+k) prevents the infinitive value log(0).
     # NOTE:
     #   Numerical gradient calculate f(x+/-h) with a small h e.g. 1e-5.
-    #   When x=0 and h >> e, f(0-h)=log(e-h) is nan as x in log(x) cannot be < 0.
+    #   When x=0 and h >> k, f(0-h)=log(k-h) is nan as x in log(x) cannot be < 0.
     # --------------------------------------------------------------------------------
     assert np.all((_P + offset) > 0), \
         "x for log(x) needs to be > 0 but %s." % (_P + offset)
@@ -227,8 +231,8 @@ def numerical_jacobian(
 
     # --------------------------------------------------------------------------------
     # (x+h) or (x-h) may cause an invalid value area for the function f.
-    # e.g log loss tries to offset x=0 by adding a small value e as log(0+e).
-    # However because e=1e-7 << h=1e-5, f(x-h) causes nan due to log(x < 0)
+    # e.g log loss tries to offset x=0 by adding a small value k as log(0+k).
+    # However because k=1e-7 << h=1e-5, f(x-h) causes nan due to log(x < 0)
     # as x needs to be > 0 for log.
     #
     # X and tmp must be float, or it will be int causing float calculation fail.
@@ -244,12 +248,20 @@ def numerical_jacobian(
 
         X[idx] = tmp + delta
         fx1: float = f(X)  # f(x+h)
+        Logger.debug(
+            "numerical_jacobian(): idx[%s] x[%s] (x+h)[%s] fx1=[%s]",
+            idx, tmp, tmp+delta, fx1
+        )
         assert not np.isnan(fx1), \
             "numerical delta f(x+h) caused nan for f %s for X %s" \
             % (f, (tmp + delta))
 
         X[idx] = tmp - delta
         fx2: float = f(X)  # f(x-h)
+        Logger.debug(
+            "numerical_jacobian(): idx[%s] x[%s] (x-h)[%s] fx2=[%s]",
+            idx, tmp, tmp-delta, fx2
+        )
         assert not np.isnan(fx2), \
             "numerical delta f(x-h) caused nan for f %s for X %s" \
             % (f, (tmp - delta))
@@ -260,6 +272,8 @@ def numerical_jacobian(
         g = (fx1 - fx2) / (2 * delta)
         assert g.size == 1, "The f function needs to return scalar or shape ()"
         J[idx] = g
+
+        Logger.debug("numerical_jacobian(): idx[%s] j=[%s]", idx, g)
 
         X[idx] = tmp
         it.iternext()

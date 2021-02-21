@@ -7,6 +7,8 @@ WARNING:
 
 """
 import random
+import copy
+from math import e
 from functools import partial
 import numpy as np
 import pytest_check as check    # https://pypi.org/project/pytest-check/
@@ -19,8 +21,9 @@ from common import (
     OFFSET_FOR_DELTA
 )
 
-NUM_MAX_BATCH_SIZE: int = 20 + 1
-NUM_MAX_NODES: int = 20 + 1
+NUM_MAX_BATCH_SIZE: int = 10 + 1
+NUM_MAX_NODES: int = 10 + 1
+MAX_ACTIVATION_VALUE = 5       # max output from an activation function
 
 
 def test_020_numerical_jacobian_avg(h:float = 1e-5):
@@ -59,20 +62,20 @@ def test_020_numerical_jacobian_sigmoid(h:float = 1e-5):
         assert np.all((t - z) < h), f"delta (t-x) is expected < {h} but {x-t}"
 
 
-def test_020_cross_entropy_log_loss_scalar(h: float = 1e-5, e=OFFSET_FOR_LOG):
+def test_020_cross_entropy_log_loss_scalar(h: float = 1e-5, k=OFFSET_FOR_LOG):
     """Test case for cross_entropy_log_loss
     Args:
-        h: threshold value above which the delte between Expectation E and Actual A
+        h: threshold value above which the delta between Expectation E and Actual A
            is regarded as an error.
-        e: A small value to add as log(x+e) to avoid log(0) -> -inf.
+        k: A small value to add as log(x+k) to avoid log(0) -> -inf.
            The value must match with the one used in the cross_entropy_log_loss.
     -dlog(x)/dx = -1/x
     """
     # --------------------------------------------------------------------------------
     # [Scalar test case]
-    # 1. For scalar P=1, T=1 for -t * log(1+e) -> log(1+e) : dlog(P+e)/dP -> 1 / (1+e)
-    # 2. For scalar P=0, T=1 for -t * log(e) -> log(e)     : dlog(P+e)/dP -> 1 / (e)
-    # 3. For scalar P=1, T=0 for -t * log(e) -> 0: loss = log(e) -> dlog(e)/dP -> 0
+    # 1. For scalar P=1, T=1 for -t * log(1+k) -> log(1+k) : dlog(P+k)/dP -> 1 / (1+k)
+    # 2. For scalar P=0, T=1 for -t * log(k) -> log(k)     : dlog(P+k)/dP -> 1 / (k)
+    # 3. For scalar P=1, T=0 for -t * log(k) -> 0          : df/dP -> 0
     # --------------------------------------------------------------------------------
     def f(P: np.ndarray, T: np.ndarray):
         return np.sum(cross_entropy_log_loss(P, T))
@@ -81,44 +84,44 @@ def test_020_cross_entropy_log_loss_scalar(h: float = 1e-5, e=OFFSET_FOR_LOG):
     t1 = int(1)
     g1 = numerical_jacobian(partial(f, T=1), p1)
     # Expected numerical gradient
-    e1 = (-t1 * np.log(p1+h+e) + t1 * np.log(p1-h+e)) / (2 * h)
+    e1 = (-t1 * np.log(p1+h+k) + t1 * np.log(p1-h+k)) / (2 * h)
 
     assert np.abs(e1 - g1) < h, \
         f"Delta expected to be < {h} but {np.abs(e1 - g1)}"
 
     # Analytical gradient that E1 needs to be close to.
-    a1 = - 1 / (p1 + e)
+    a1 = - 1 / (p1 + k)
     check.less(np.abs(a1 - g1), 0.001, "a1-g1 %s\n" % np.abs(a1-g1))
 
     # --------------------------------------------------------------------------------
-    # Not test P=0 because the gradient log(e +/- h) in numerical gradient value is
+    # Not test P=0 because the gradient log(k +/- h) in numerical gradient value is
     # too large for h=1e-7 because log(1e-5)=-11.512925464970229, causing the gradient
     # to explode.
     # --------------------------------------------------------------------------------
     # p2 = 0.0
     # g2 = numerical_jacobian(partial(f, T=1), p2)
-    # E2 = - 1 / e
+    # E2 = - 1 / k
     # assert np.abs(E2 - g2) < h, \
     #    f"Delta expected to be < {h} but {np.abs(E2 - g2)}"
 
     p3 = 1.0
     g3 = numerical_jacobian(partial(f, T=0), p3)
-    E3 = 0      # dlog(e)/dP = 0 (derivative of constant is 0)
+    E3 = 0      # dlog(k)/dP = 0 (derivative of constant is 0)
     assert np.abs(E3 - g3) < h, \
         f"Delta expected to be < {h} but {np.abs(E3 - g3)}"
 
     for _ in range(100):
-        p = np.random.uniform(0.5,1)
+        p = np.random.uniform(0.2, 1)
         g = numerical_jacobian(partial(f, T=1), p)
-        ex = (-t1 * np.log(p+h+e) + t1 * np.log(p-h+e)) / (2 * h)
+        ex = (-t1 * np.log(p+h+k) + t1 * np.log(p-h+k)) / (2 * h)
         assert np.abs(ex-g) < h, \
             f"Delta expected to be < {h} but {np.abs(ex-g)}"
 
-        a = - 1 / (p+e)
+        a = - 1 / (p+k)
         check.less(np.abs(a-g), 0.001, "ex-a %s\n" % np.abs(a-g))
 
 
-def test_020_cross_entropy_log_loss_1d(h: float = 1e-5, e=OFFSET_FOR_LOG):
+def test_020_cross_entropy_log_loss_1d(h: float = 1e-5, k=OFFSET_FOR_LOG):
     """Test case for cross_entropy_log_loss for 1D
     log(P=1) -> 0
     dlog(x)/dx = 1/x
@@ -127,28 +130,43 @@ def test_020_cross_entropy_log_loss_1d(h: float = 1e-5, e=OFFSET_FOR_LOG):
     def f(P: np.ndarray, T: np.ndarray):
         return np.sum(cross_entropy_log_loss(P, T))
 
-    for _ in range(100):
-        # --------------------------------------------------------------------------------
-        # [1D test case]
-        # P:[0, 0, ..., 1, 0, ...] where Pi = 1
-        # T:[0, 0, ..., 1, 0, ...] is OHE label where Ti=1
-        # sum(-t * log(p+e)) -> log(1+e)
-        # dlog(P+e)/dP -> -1 / (1+e)
-        # --------------------------------------------------------------------------------
-        length = np.random.randint(2, NUM_MAX_NODES)    # length > 1
-        index = np.random.randint(0, length)            # location of the truth
+    # --------------------------------------------------------------------------------
+    # p = 1
+    # --------------------------------------------------------------------------------
+    P1 = np.zeros(10)
+    P1[5] = 1.0
+    T1 = np.zeros(10).astype(int)
+    T1[5] = 1
 
+    E1 = np.zeros_like(P1)
+    E1[5] = (-1 * np.log(1.0 + h + k) + 1 * np.log(1.0 - h + k)) / (2 * h)
+
+    G1 = numerical_jacobian(partial(f, T=T1), P1)
+    assert G1.shape == E1.shape
+    assert np.all(np.abs(E1 - G1) < h), \
+        f"Delta expected to be < {h} but \n{np.abs(E1 - G1)}"
+
+    A1 = np.zeros_like(P1)
+    A1[5] = -1 / (1.0 + k)
+    check.equal(np.all(np.abs(A1 - G1) < 0.001), True, "A1-G1 %s\n" % np.abs(A1 - G1))
+
+    # --------------------------------------------------------------------------------
+    # p = np uniform()
+    # --------------------------------------------------------------------------------
+    for _ in range(100):
+        M = length = np.random.randint(2, NUM_MAX_NODES)    # length > 1
+        T1 = np.random.randint(0, length)            # location of the truth
+
+        p = np.random.uniform(0.2, 1.0)
         P1 = np.zeros(length)
-        P1[index] = 1.0
-        T1 = np.zeros(length).astype(int)
-        T1[index] = 1
+        P1[T1] = p
 
         # --------------------------------------------------------------------------------
         # The Jacobian G shape is the same with P.shape.
-        # G:[0, 0, ...,g, 0, ...] where Gi is numerical gradient close to -1/(1+e).
+        # G:[0, 0, ...,g, 0, ...] where Gi is numerical gradient close to -1/(1+k).
         # --------------------------------------------------------------------------------
         E1 = np.zeros_like(P1)
-        E1[index] = (-1 * np.log(1.0 + h + e) + 1 * np.log(1.0 - h + e)) / (2 * h)
+        E1[T1] = (-1 * np.log(p + h + k) + 1 * np.log(p - h + k)) / (2 * h)
 
         G1 = numerical_jacobian(partial(f, T=T1), P1)
         assert G1.shape == E1.shape
@@ -156,18 +174,51 @@ def test_020_cross_entropy_log_loss_1d(h: float = 1e-5, e=OFFSET_FOR_LOG):
             f"Delta expected to be < {h} but \n{np.abs(E1-G1)}"
 
         A1 = np.zeros_like(P1)
-        A1[index] = -1 / (1.0+e)
-        check.equal(np.all(np.abs(A1 - G1) < 0.01), True, "A1-G1 %s\n" % np.abs(A1-G1))
+        A1[T1] = -1 / (p+k)
+        check.equal(np.all(np.abs(A1 - G1) < 0.001), True, "A1-G1 %s\n" % np.abs(A1-G1))
+
+    for _ in range(100):
+        # --------------------------------------------------------------------------------
+        # [1D test case]
+        # P:[0, 0, ..., 1, 0, ...] where Pi = 1
+        # T:[0, 0, ..., 1, 0, ...] is OHE label where Ti=1
+        # sum(-t * log(p+k)) -> log(1+k)
+        # dlog(P+k)/dP -> -1 / (1+k)
+        # --------------------------------------------------------------------------------
+        length = np.random.randint(2, NUM_MAX_NODES)    # length > 1
+        index = np.random.randint(0, length)            # location of the truth
+
+        p = np.random.uniform(0.2, 1.0)
+        P1 = np.zeros(length)
+        P1[index] = p
+        T1 = np.zeros(length).astype(int)   # OHE index
+        T1[index] = int(1)
+
+        # --------------------------------------------------------------------------------
+        # The Jacobian G shape is the same with P.shape.
+        # G:[0, 0, ...,g, 0, ...] where Gi is numerical gradient close to -1/(1+k).
+        # --------------------------------------------------------------------------------
+        E1 = np.zeros_like(P1)
+        E1[index] = (-1 * np.log(p + h + k) + 1 * np.log(p - h + k)) / (2 * h)
+
+        G1 = numerical_jacobian(partial(f, T=T1), P1)
+        assert G1.shape == E1.shape
+        assert np.all(np.abs(E1-G1) < h), \
+            f"Delta expected to be < {h} but \n{np.abs(E1-G1)}"
+
+        A1 = np.zeros_like(P1)
+        A1[index] = -1 / (p+k)
+        check.equal(np.all(np.abs(A1 - G1) < 0.001), True, "A1-G1 %s\n" % np.abs(A1-G1))
 
         # --------------------------------------------------------------------------------
         # [1D test case]
         # For 1D OHE array P [0, 0, ..., 1, 0, ...] where Pi = 1.
         # For 1D OHE array T [0, 0, ..., 0, 1, ...] where Tj = 1 and i != j
-        # sum(-t * log(0+e)) -> log(+e)
-        # dlog(P)/dP -> -1 / e
+        # sum(-t * log(0+k)) -> log(+k)
+        # dlog(P)/dP -> -1 / k
         # --------------------------------------------------------------------------------
         # --------------------------------------------------------------------------------
-        # Not test P=0 because the gradient log(e +/- h) in numerical gradient value is
+        # Not test P=0 because the gradient log(k +/- h) in numerical gradient value is
         # too large for h=1e-7 because log(1e-5)=-11.512925464970229, causing the gradient
         # to explode.
         # --------------------------------------------------------------------------------
@@ -177,7 +228,7 @@ def test_020_cross_entropy_log_loss_1d(h: float = 1e-5, e=OFFSET_FOR_LOG):
         # P2[index] = 1
         # while (position:= np.random.randint(0, length)) == index: pass
         # T2[position] = 1
-        # E2 = np.full(P2.shape, -1 / e)
+        # E2 = np.full(P2.shape, -1 / k)
         # G2 = numerical_jacobian(partial(f, T=T2), P2)
 
         # assert E2.shape == G2.shape, \
@@ -186,7 +237,7 @@ def test_020_cross_entropy_log_loss_1d(h: float = 1e-5, e=OFFSET_FOR_LOG):
         #     f"Delta expected to be < {h} but \n{np.abs(E2-G2)}"
 
 
-def test_020_cross_entropy_log_loss_2d(h: float = 1e-5, e=OFFSET_FOR_LOG):
+def test_020_cross_entropy_log_loss_2d(h: float = 1e-5, k=OFFSET_FOR_LOG):
     """Test case for cross_entropy_log_loss for 2D
     log(P=1) -> 0
     dlog(x)/dx = 1/x
@@ -205,16 +256,17 @@ def test_020_cross_entropy_log_loss_2d(h: float = 1e-5, e=OFFSET_FOR_LOG):
         # --------------------------------------------------------------------------------
         # [2D test case]
         # P:(N, M) is probability matrix where Pnm = p, 0 <=n<N-1, 0<=m<M-1
-        # T:(N,)   is index label where Tn=m is label as integer e.g. m=3 for 3rd label.
-        # Pnm = log(P[i][j] + e)
-        # L = -log(p + e), -> dlog(P)/dP -> -1 / (p+e)
+        # T:(N,)   is index label where Tn=m is label as integer k.g. m=3 for 3rd label.
+        # Pnm = log(P[i][j] + k)
+        # L = -log(p + k), -> dlog(P)/dP -> -1 / (p+k)
         #
         # Keep p value away from 0. As p gets close to 0, the log(p+/-h) gets large e.g
         # -11.512925464970229, hence log(p+/-h) / 2h explodes.
         # --------------------------------------------------------------------------------
-        p = np.random.uniform(0.5, 0.9)
+        p = np.random.uniform(0.2, 1)
         N = np.random.randint(2, NUM_MAX_BATCH_SIZE)
         M = np.random.randint(2, NUM_MAX_NODES)
+        # label index, not OHE
         T = np.random.randint(0, M, N)  # N rows of labels, max label value is M-1
         P = np.zeros((N, M))
         P[
@@ -225,7 +277,7 @@ def test_020_cross_entropy_log_loss_2d(h: float = 1e-5, e=OFFSET_FOR_LOG):
         E[
             range(N),                    # Set p at random row position
             T
-        ] = (-1 * np.log(p + h + e) + 1 * np.log(p - h + e)) / (2 * h)
+        ] = (-1 * np.log(p + h + k) + 1 * np.log(p - h + k)) / (2 * h)
 
         G = numerical_jacobian(partial(f, T=T), P)
         assert E.shape == G.shape, \
@@ -237,6 +289,88 @@ def test_020_cross_entropy_log_loss_2d(h: float = 1e-5, e=OFFSET_FOR_LOG):
         A[
             range(N),                    # Set p at random row position
             T
-        ] = -1 / (p+e)
+        ] = -1 / (p+k)
 
         check.equal(np.all(np.abs(A-G) < 0.001), True, "A-G %s\n" % np.abs(A-G))
+
+
+# ================================================================================
+# Softmax + log loss
+# ================================================================================
+def test_020_softmax_scalar(h: float = 1e-5, k=OFFSET_FOR_LOG):
+    """Test case for softmax plus log loss with a scalar input
+    Analytica gradient dj/dx -> softmax(x) - t
+    j = cross_entropy_log_loss(softmax(x), T)
+    dlog(x)/dx -> 1/x, dexp(x)/dx -> exp(x)
+
+    Args:
+        h: threshold value above which the delta between Expectation E and Actual A
+           is regarded as an error.
+        k: A small value to add as log(x+k) to avoid log(0) -> -inf.
+           The value must match with the one used in the cross_entropy_log_loss.
+    """
+    # --------------------------------------------------------------------------------
+    # [Scalar test case]
+    # p = softmax(a)
+    # 1. For scalar a, T=1 for -t * log(p+k)           : df/da
+    # 3. For scalar a, T=0 for -t * log(p+k) -> 0      : df/da -> 0
+    # --------------------------------------------------------------------------------
+    def L(X: np.ndarray, T: np.ndarray):
+        """Loss function"""
+        return np.sum(cross_entropy_log_loss(softmax(X), T))
+
+    def gn(a, t):
+        """Expected numerical gradient"""
+        if t == 0: return 0
+        return (-np.log(softmax(a) + h + k) + np.log(softmax(a) - h + k)) / (2*h)
+
+    for _ in range(100):
+        # activation value from an activation function (ReLU, etc)
+        T = np.random.randint(0, 1)
+        A = np.random.uniform(float(-MAX_ACTIVATION_VALUE), float(MAX_ACTIVATION_VALUE))
+        G = numerical_jacobian(partial(L, T=T), A)
+        E = gn(A, T)
+        assert np.abs(E - G) < h, \
+            f"Delta expected to be < {h} but {np.abs(E - G)}"
+
+        # --------------------------------------------------------------------------------
+        # Analytical gradient dL/dA = dL/dJ * dJ/dA. dJ/dA = -T/P at the log loss.
+        # For one input A, dJ/dA is always 0 when T = 0.
+        # --------------------------------------------------------------------------------
+        dA = softmax(A) - T if T == 1 else 0
+        check.less(
+            np.abs(dA-G), 0.001,
+            "T %s A % s dA %s G %s dA-G %s \n" % (T, A, dA, G, np.abs(dA-G))
+        )
+
+
+def test_020_softmax_1d(h: float = 1e-5, k=OFFSET_FOR_LOG):
+    """Test case for softmax for 1D
+    Verify the delta between the analytical and numerical gradient is small (<h).
+    """
+    def L(X: np.ndarray, T: np.ndarray):
+        """Loss function for the softmax input A (activations)
+        Args:
+            X: Softmax input A
+            T: Labels
+        Returns:
+            L: Loss value of from the softmax with log loss.
+        """
+        return np.sum(cross_entropy_log_loss(softmax(X), T))
+
+    for _ in range(100):
+        N: int = np.random.randint(2, NUM_MAX_BATCH_SIZE)   # Batch size
+        M: int = np.random.randint(2, NUM_MAX_NODES)        # Number of activations
+        T = np.random.randint(0, M, N)  # N rows of labels, max label value is M-1
+        A = np.random.uniform(-float(MAX_ACTIVATION_VALUE), float(MAX_ACTIVATION_VALUE), (N, M))
+        G = numerical_jacobian(partial(L, T=np.array(T)), A)
+
+        # Analytical gradient P-T
+        dA = softmax(A)
+        dA[
+            np.arange(N),
+            T
+        ] -= 1
+
+        assert np.all(np.abs(dA - G) < h), \
+            f"Delta for A{A} T {T} dA{dA} G{G} expected to be < {h} but {np.abs(dA - G)}"

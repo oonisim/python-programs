@@ -22,7 +22,15 @@ def test_010_sigmoid(h:float = 1e-5):
     assert np.all(np.abs(t - sigmoid(x)) < h), f"delta (t-x) is expected < {h} but {x-t}"
 
 
-def test_010_cross_entropy_log_loss(h: float = 1e-5, e=OFFSET_FOR_LOG):
+def test_010_softmax(h:float = 1e-5):
+    """Test Case for sigmoid
+    """
+    P = softmax(np.array([2.44756739, 2.13945115]))
+    E = np.array([0.57642539, 0.42357461])
+    assert np.all(np.abs(P-E) < h)
+
+
+def test_010_cross_entropy_log_loss(h: float = 1e-5, k=OFFSET_FOR_LOG):
     """Test case for cross_entropy_log_loss
     log(P=1) -> 0
     """
