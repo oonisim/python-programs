@@ -107,6 +107,7 @@ from typing import (
     NoReturn,
     Final
 )
+import inspect
 import logging
 import numpy as np
 from common.functions import (
@@ -137,12 +138,25 @@ class Layer:
         self._num_nodes = num_nodes
         self._M: int = num_nodes
 
+        # --------------------------------------------------------------------------------
         # X: batch input of shape(N, D)
-        self._X: np.ndarray = np.empty((0, num_nodes), dtype=float)
+        # Gradient dL/dX of has the same shape(N,D) with X because L is scalar.
+        # --------------------------------------------------------------------------------
+        self._X: np.ndarray = np.empty(0, dtype=float)
         self._N: int = -1
+        self._dX: np.ndarray = np.empty(0, dtype=float)
+        self._D: int = -1
 
         # Labels of shape(N, M) for OHE or (N,) for index.
-        self._T: np.ndarray = np.empty((), dtype=int)
+        self._T: np.ndarray = np.empty(0, dtype=int)
+
+        # --------------------------------------------------------------------------------
+        # layer output Y of shape(N, M)
+        # Gradient dL/dY has the same shape (N, M) with Y because the L is scalar.
+        # dL/dY is the sum of all the impact on L by dY.
+        # --------------------------------------------------------------------------------
+        self._Y: np.ndarray = np.empty(0, dtype=float)
+        self._dY: np.ndarray = np.empty(0, dtype=float)
 
         # Objective Li function for the layer. L = Li o fi
         self._objective: Union[Callable[[np.ndarray], np.ndarray], None] = None
@@ -164,44 +178,90 @@ class Layer:
         return self._num_nodes
 
     @property
+    def M(self) -> int:
+        """Number of nodes in a layer"""
+        return self.num_nodes
+
+    @property
+    def D(self) -> int:
+        """Number of feature of a node in a layer"""
+        assert self._D > 0
+        return self._D
+
+    @property
     def X(self) -> np.ndarray:
         """Latest batch input to the layer"""
-        assert self._X and self._X.size, "X is not initialized"
+        assert isinstance(self._X, np.ndarray) and self._X.dtype == float \
+            and self._X.size > 0, "X is not initialized or invalid"
         return self._X
 
     @X.setter
-    def X(self, X: np.ndarray):
-        assert X
-        self._X = X
-        self._N = X.shape[0]
+    def X(self, X: Union[float, np.ndarray]):
+        assert X is not None and \
+               ((isinstance(X, np.ndarray) and X.dtype == float) or isinstance(X, float))
+        self._X = np.array(X).reshape(1, -1) if isinstance(X, float) or X.ndim < 2 else X
+
+        assert self.X.size > 0
+        self._N = self.X.shape[0]
+
+        # Allocate the storage for np.func(out=dX).
+        if self._dX.shape != X.shape:
+            self._dX = np.empty(X.shape, dtype=float)
 
     @property
     def N(self) -> int:
         """Batch size"""
-        assert self._N > 0, "N is not initialized"
+        assert self._N >= 0, "N is not initialized"
         return self._N
+
+    @property
+    def dX(self) -> np.ndarray:
+        """Gradient dL/dX"""
+        assert isinstance(self._dX, np.ndarray) and self._dX.size > 0, \
+            "dX is not initialized"
+        return self._dX
 
     @property
     def T(self) -> np.ndarray:
         """Label in OHE or index format"""
-        assert self._T and self.T.size > 0, "T is not initialized"
+        assert self._T is not None and self._T.size > 0, "T is not initialized"
         return self._T
 
     @T.setter
-    def T(self, T: np.ndarray):
-        assert T and T.shape[0] == self.N, \
-            f"The batch size of T should be {self.N} but {T.shape[0]}"
+    def T(self, T: Union[np.ndarray, int]):
+        assert T is not None and \
+               (isinstance(T, np.ndarray) and T.dtype==int) or (isinstance(T, int))
+        T = np.array(T) if isinstance(T, int) else T
+
+        assert T.shape[0] == self.N, \
+            f"Set X first and the batch size of T should be {self.N} but {T.shape[0]}"
         self._T = T.astype(int)
+
+    @property
+    def Y(self) -> np.ndarray:
+        """Latest layer output
+        No need to allocate a storage for dY as it is allocated by the post layer.
+        """
+        assert isinstance(self._Y, np.ndarray) and self._Y.dtype == float \
+            and self._Y.size > 0, "Y is not initialized or invalid"
+        return self._Y
+
+    @property
+    def dY(self) -> np.ndarray:
+        """Latest gradient dL/dY (impact on L by dY) given from the post layer(s)"""
+        assert isinstance(self._dY, np.ndarray) and self._dY.dtype == float \
+            and self._dY.size > 0, "dY is not initialized or invalid"
+        return self._dY
 
     @property
     def objective(self) -> Callable[[np.ndarray], np.ndarray]:
         """Objective function L=fn-1 o fn-2 o ... o fi"""
-        assert self._objective, "Objective function L has not been initialized."
+        assert callable(self._objective), "Objective function L has not been initialized."
         return self._objective
 
     @objective.setter
     def objective(self, Li: Callable[[np.ndarray], np.ndarray]) -> NoReturn:
-        assert Li
+        assert Li is not None and callable(Li)
         self._objective = Li
 
     @property
@@ -220,6 +280,12 @@ class Layer:
         Returns:
             Y: Layer output
         """
+        assert isinstance(X, float) or (isinstance(X, np.ndarray) and X.dtype == float)
+        self.logger.warning(
+            "Layer base method %s not overridden but called by %s.",
+            inspect.stack()[0][3], inspect.stack()[1][3]
+        )
+
         # In case for the layer is a repeater, pass X through as the default behavior.
         X = np.array(X).reshape((1, -1)) if isinstance(X, float) else X
         return X
@@ -232,6 +298,12 @@ class Layer:
             Y: layer output
         """
         # In case for the layer is a repeater, pass X through as the default behavior.
+        self.logger.warning(
+            "Layer base method %s not overridden but called by %s.",
+            inspect.stack()[0][3], inspect.stack()[1][3]
+        )
+        X = np.array(X) if isinstance(X, float) else X
+        assert isinstance(X, np.ndarray) and X.dtype == float
         return X
 
     def gradient(self, dY: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
@@ -244,12 +316,22 @@ class Layer:
         Returns:
             dL/dX: impact on L by the layer input X
         """
+        assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == float)
+
         # In case the layer is a repeater or no gradient, pass dY through.
-        dY = np.array(dY).reshape((1, -1)) if isinstance(dY, float) else dY
+        self.logger.warning(
+            "Layer base method %s not overridden but called by %s.",
+            inspect.stack()[0][3], inspect.stack()[1][3]
+        )
+        assert isinstance(dY, np.ndarray) and dY.dtype == float
         return dY
 
     def backward(self) -> Union[np.ndarray, float]:
         """Calculate and back-propagate the gradient dL/dX"""
+        self.logger.warning(
+            "Layer base method %s not overridden but called by %s.",
+            inspect.stack()[0][3], inspect.stack()[1][3]
+        )
         assert False, "Need to override"
         return np.array(-np.inf)
 
@@ -262,6 +344,11 @@ class Layer:
         Returns:
             dX: [L(f(X+h) - L(f(X-h)] / 2h
         """
+        self.logger.warning(
+            "Layer base method %s not overridden but called by %s.",
+            inspect.stack()[0][3], inspect.stack()[1][3]
+        )
+
         # L = Li(f(arg))
         def L(X: np.ndarray):
             return self.objective(self.function(X))
@@ -274,6 +361,10 @@ class Layer:
         Returns:
             dL/dS: Gradient(s) on state S. There may be multiple dL/dS.
         """
+        self.logger.warning(
+            "Layer base method %s not overridden but called by %s.",
+            inspect.stack()[0][3], inspect.stack()[1][3]
+        )
         # Return 0 as the default for dL/dS to mark no change in case there is none
         # to update in a layer.
         return [0.0]

@@ -42,7 +42,7 @@ class Matmul(Layer):
             name: str,
             num_nodes: int,
             W: np.ndarray,
-            posteriors: Optional[List[Layer]],
+            posteriors: Optional[List[Layer]] = None,
             optimizer: Optimizer = SGD(),
             log_level: int = logging.ERROR
     ):
@@ -80,35 +80,19 @@ class Matmul(Layer):
             name, W.shape, num_nodes
         )
         assert W.shape[0] == num_nodes, \
-            f"W shape needs to be (N, {num_nodes}) but (M, {W.shape[0]})."
+            "W shape needs to be (%s, D) but %s." % (num_nodes, W.shape)
 
         # --------------------------------------------------------------------------------
         # W: weight matrix of shape(M,D) where M=num_nodes
         # Gradient dL/dW has the same shape shape(M, D) with W because L is scalar.
         # --------------------------------------------------------------------------------
+        self._D = W.shape[1]                # number of features in x
         self._W: np.ndarray = W             # node weight vectors
-        self._M: int = num_nodes            # number of nodes in the layer
-        self._D: int = W.shape[1]           # number of features in x
         self._dW: np.ndarray = np.empty((num_nodes, W.shape[1]), dtype=float)
-
-        # --------------------------------------------------------------------------------
-        # X: batch input of shape(N, D)
-        # Gradient dL/dX of has the same shape(N,D) with X because L is scalar.
-        # --------------------------------------------------------------------------------
-        self._X: np.ndarray = np.empty((0, num_nodes), dtype=float)
-        self._dX: np.ndarray = np.empty((0, num_nodes), dtype=float)
-
-        # --------------------------------------------------------------------------------
-        # Matmul layer output Y of shape(N, M) as per X:shape(N, D) @ W.T:shape(D, M)
-        # Gradient dL/dY has the same shape (N, M) with Y because the L is scalar.
-        # dL/dY is the sum of all the impact on L by dY.
-        # --------------------------------------------------------------------------------
-        self._Y: np.ndarray = np.empty((0, num_nodes), dtype=float)
-        self._dY: np.ndarray = np.empty((0, num_nodes), dtype=float)
 
         # Layers to which forward the matmul output
         self._posteriors: List[Layer] = posteriors
-        self._num_posteriors: int = len(posteriors)
+        self._num_posteriors: int = len(posteriors) if posteriors else -1
 
         # --------------------------------------------------------------------------------
         # Optimizer for gradient descent
@@ -126,56 +110,22 @@ class Matmul(Layer):
         return self._W
 
     @property
-    def M(self) -> int:
-        """Number of nodes in the matmul layer"""
-        return self._M
-
-    @property
-    def D(self) -> int:
-        """Number of feature of a node in the matmul layer"""
-        return self._D
-
-    @property
     def dW(self) -> np.ndarray:
         """Layer weight gradients dW"""
-        assert self._dW.size, "dW is not initialized"
+        assert self._dW.size > 0, "dW is not initialized"
         return self._dW
 
     @property
     def X(self) -> np.ndarray:
         """Latest batch input to the layer"""
-        assert self._X and self._X.size, "X is not initialized"
-        return self._X
+        return super().X
 
     @X.setter
     def X(self, X: np.ndarray):
         """Set X"""
-        assert X and X.shape[0] > 0 and X.shape[1] == self.D, \
-            f"X shape needs (N, {self.D}) but ({X.shape})"
-        self._X = X
-        self._N = X.shape[0]
-
-        # Allocate the storage for np.func(out=dX).
-        self._dX = np.empty(X.shape, dtype=float) \
-            if self.dX.shape[0] != X.shape[0] else self.dX
-
-    @property
-    def dX(self) -> np.ndarray:
-        """Gradient dL/dX"""
-        assert self._dX and self._dX.size, "dX is not initialized"
-        return self._dX
-
-    @property
-    def Y(self) -> np.ndarray:
-        """Latest matmul layer output"""
-        assert self._Y and self._Y.size, "Y is not initialized"
-        return self._Y
-
-    @property
-    def dY(self) -> np.ndarray:
-        """Latest gradient dL/dY (impact on L by dY) given from the post layer(s)"""
-        assert self._dY and self._dY.size, "dY is not initialized"
-        return self._dY
+        super(Matmul, type(self)).X.fset(self, X)
+        assert self.X.shape[1] == self.D, \
+            "X shape needs (%s, %s) but %s" % (self.N, self.D, self.X.shape)
 
     @property
     def optimizer(self) -> Optimizer:
@@ -186,28 +136,29 @@ class Matmul(Layer):
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
-    def function(self, X: np.ndarray) -> Union[np.ndarray, float]:
+    def function(self, X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
         """Calculate the layer output Y = X@W.T
         Args:
             X: Batch input data from the input layer.
         Returns:
             Y: Layer value of X@W.T
         """
+        assert isinstance(X, float) or (isinstance(X, np.ndarray) and X.dtype == float)
+        X = np.array(X).reshape((1, -1)) if isinstance(X, float) else X
         self.logger.debug(
             "layer[%s] function(): X.shape %s W.shape %s", self.name, X.shape, self.W.shape
         )
-
-        X = np.array(X).reshape((1, -1)) if isinstance(X, float) else X
         self.X = X
-        assert self.W and self.W.shape == (self.M, self.D), \
+
+        assert self.W.shape == (self.M, self.D), \
             f"W shape needs {(self.M, self.D)} but ({self.W.shape})"
 
         # --------------------------------------------------------------------------------
-        # Allocate array for np.func(out=) for Y but not dY.
+        # Allocate array storge for np.func(out=) for Y but not dY.
         # Y:(N,M) = [ X:(N,D) @ W.T:(D,M) ]
         # gradient() need to validate the dY shape is (N,M)
         # --------------------------------------------------------------------------------
-        if self.Y.shape[0] != self.N:
+        if self._Y.size <= 0 or self.Y.shape[0] != self.N:
             self._Y = np.empty((self.N, self.M), dtype=float)
             # --------------------------------------------------------------------------------
             # DO NOT allocate memory area for the gradient that has already been calculated.
@@ -244,11 +195,13 @@ class Matmul(Layer):
         Returns:
             dL/dX of shape (N,D):  [ dL/dY:(N,M) @ W:(M,D)) ]
         """
-        self.logger.debug("layer[%s] gradient(): dY.shape %s", self.name, dY.shape)
+        assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == float)
 
-        dY = np.array(dY).reshape((1, -1)) if isinstance(dY, float) else dY
-        assert self.dY.shape == (self.N, self.M), \
-            f"Gradient dL/dY shape needs {(self.N, self.M)} but ({self.dY.shape}))"
+        dY = np.array(dY).reshape((1, -1)) if isinstance(dY, float) or dY.ndim < 2 else dY
+        assert dY.shape == (self.N, self.M), \
+            "dL/dY shape needs (%s, %s) but %s" % (self.N, self.M, dY.shape)
+
+        self.logger.debug("layer[%s] gradient(): dY.shape %s", self.name, dY.shape)
         self._dY = dY
 
         # --------------------------------------------------------------------------------
@@ -256,7 +209,7 @@ class Matmul(Layer):
         # --------------------------------------------------------------------------------
         np.matmul(self.dY, self.W, out=self._dX)
         assert self.dX.shape == (self.N, self.D), \
-            f"Gradient dL/dX shape needs {(self.N, self.D)} but ({self.dX.shape}))"
+            "dL/dX shape needs (%s, %s) but %s" % (self.N, self.D, self.dX.shape)
 
         return self.dX
 
