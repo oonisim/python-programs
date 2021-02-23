@@ -143,13 +143,10 @@ class Matmul(Layer):
         Returns:
             Y: Layer value of X@W.T
         """
-        assert isinstance(X, float) or (isinstance(X, np.ndarray) and X.dtype == float)
-        X = np.array(X).reshape((1, -1)) if isinstance(X, float) else X
+        self.X = X
         self.logger.debug(
             "layer[%s] function(): X.shape %s W.shape %s", self.name, X.shape, self.W.shape
         )
-        self.X = X
-
         assert self.W.shape == (self.M, self.D), \
             f"W shape needs {(self.M, self.D)} but ({self.W.shape})"
 

@@ -197,6 +197,9 @@ class Layer:
 
     @X.setter
     def X(self, X: Union[float, np.ndarray]):
+        """Layer input X
+        Convert into 2D array if X is scalar or X.ndim < 2.
+        """
         assert X is not None and \
                ((isinstance(X, np.ndarray) and X.dtype == float) or isinstance(X, float))
         self._X = np.array(X).reshape(1, -1) if isinstance(X, float) or X.ndim < 2 else X
@@ -230,11 +233,11 @@ class Layer:
     @T.setter
     def T(self, T: Union[np.ndarray, int]):
         assert T is not None and \
-               (isinstance(T, np.ndarray) and T.dtype==int) or (isinstance(T, int))
+               (isinstance(T, np.ndarray) and T.dtype == int) or (isinstance(T, int))
         T = np.array(T) if isinstance(T, int) else T
-
-        assert T.shape[0] == self.N, \
-            f"Set X first and the batch size of T should be {self.N} but {T.shape[0]}"
+        # T can be set after X, hence not possible to verify.
+        # assert T.shape[0] == self.N, \
+        #     f"Set X first and the batch size of T should be {self.N} but {T.shape[0]}"
         self._T = T.astype(int)
 
     @property

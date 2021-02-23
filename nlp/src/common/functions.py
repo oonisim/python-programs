@@ -134,13 +134,13 @@ def cross_entropy_log_loss(
     T = np.array(T, dtype=int) if isinstance(T, int) else T
 
     # --------------------------------------------------------------------------------
-    # P is 1D array, then T dim should be in (1,2)
+    # P is 1D array, then T dim should be in Set{0, 1}.
     # Convert T.ndim==0 scalar index label into single element 1D index label T.
     # Convert T.ndim==1 OHE labels into a 1D index labels T.
     # T.reshape(-1) because np.argmax(ndim=1) results in ().
     # --------------------------------------------------------------------------------
     if P.ndim == 1:
-        assert T.ndim in {0,1}, \
+        assert T.ndim in {0, 1}, \
             "For P.ndim=1, T.ndim is 0 or 1 but %s" % T.ndim
         P = P.reshape(1, -1)
         T = T.reshape(-1) if T.ndim == 0 else np.argmax(T).reshape(-1)

@@ -40,8 +40,6 @@ class SoftmaxWithLogLoss(Layer):
         """
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
 
-        self._N: int = -1                   # Batch size of X
-        self._M: int = -1                   # Number of nodes
         self._P: np.ndarray = np.empty(())  # Probabilities of shape (N, M)
         self._J: np.ndarray = np.empty(())  # Cross entropy log loss of shape (N,).
         self._L: np.ndarray = -np.inf       # Objective value of shape ()
@@ -50,34 +48,29 @@ class SoftmaxWithLogLoss(Layer):
     # Instance properties
     # --------------------------------------------------------------------------------
     @property
-    def M(self) -> int:
-        """Number of nodes"""
-        assert self._M > 0, "M is not initialized"
-        return self._M
-
-    @property
     def P(self) -> np.ndarray:
         """Softmax probabilities of shape (N,M)"""
-        assert self._P and self.P.size > 0, "P is not initialized"
-        assert self._P.shape == (self.N, self.M)
+        assert \
+            isinstance(self._P, np.ndarray) and self.P.size > 0 and \
+            self._P.shape == (self.N, self.M), "P is not initialized"
         return self._P
 
     @property
     def J(self) -> np.ndarray:
         """Cross entropy log loss of shape(N,)"""
-        assert self._J and self.J.size == self.N, "J is not initialized"
+        assert isinstance(self._J) and self.J.size == self.N, "J is not initialized"
         return self._J
 
     @property
     def L(self) -> np.ndarray:
         """Cross entropy log loss of shape()"""
-        assert self._L and self.L.size == 1, "L is not initialized"
+        assert isinstance(self._L) and self.L.size == 1, "L is not initialized"
         return self._L
 
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
-    def function(self, X: np.ndarray) -> Union[np.ndarray, float]:
+    def function(self, X: Union[np.ndarray, float]) -> np.ndarray:
         """Layer output
         Args:
             X: Input of shape (N,M) to calculate the probabilities for the M nodes.
@@ -85,14 +78,12 @@ class SoftmaxWithLogLoss(Layer):
         Returns:
             L: Objective value of shape ()
         """
-        assert X and X.shape[0] == self.T.shape[0], \
-            f"Batch size of X {X.shape[0]} and T {self.T.shape[0]} needs to be the same."
 
-        # DO NOT reshape for numpy tuple indexing to work.
-        # self._X = X.reshape(1, X.size) if X.ndim == 1 else X
-        # self.T = T.reshape(1, T.size) if T.ndim == 1 else T
+
         self.X = X
-        self._N, self._M = X.shape
+        self.logger.debug(
+            "layer[%s] function(): X.shape %s T.shape %s", self.name, X.shape, self.T.shape
+        )
 
         self._P = softmax(self.X)
         self._J = cross_entropy_log_loss(self.P, self.T)    # dJ/dP -> -T/P
@@ -100,37 +91,47 @@ class SoftmaxWithLogLoss(Layer):
 
         return self.L
 
-    def gradient(self, dL: Union[np.ndarray, float] = 1.0) -> Union[np.ndarray, float]:
-        """Calculate the gradient dL/dX, the impact on L by the input dX (NOT dL)
-        dL: dF/dL is the impact on F by dL when the output L has a post layer F.
-        dJ: dL/dJ is the impact on L by dJ where J = cross_entropy_log_loss(P,T) = 1/N
-        dJ/dP: impact on J by the softmax output dP = -T/P.
+    def gradient(self, dY: Union[np.ndarray, float] = 1.0) -> Union[np.ndarray, float]:
+        """Calculate the gradient dL/dX, the impact on F by the input dX.
+        F: Objective function of the layer.
+        Y: Output of the layer
+        J = cross_entropy_log_loss(P,T)
+        dY: dF/dY is the the impact on the objective F by dY.
+        dJ: dY/dJ = 1/N is the impact on Y by dJ where .
+        dP: dJ/dP = -T/P is the impact on J by the softmax output dP.
         dP/dX: impact on P by the softmax input dX
-        dL/dX = dF/dL * dL/dJ * (dJ/dP * dP/dX) where (dJ/dP * dP/dX) = P - T
+        dF/dX = dF/dY * dY/dJ * (dJ/dP * dP/dX) where (dJ/dP * dP/dX) = (P - T)/N
 
         Args:
-            dL: Gradient, impact by the loss dL, given from the post layer.
+            dY: Gradient, impact by the loss dY, given from the post layer.
         Returns:
-            dL/dX: (P-T)/N of shape (N, M)
+            dF/dX: (P-T)/N of shape (N, M)
         """
+        assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == float)
+
+        dY = np.array(dY).reshape((1, -1)) if isinstance(dY, float) or dY.ndim < 2 else dY
+        assert dY.shape == (self.N, self.M), \
+            "dY/dY shape needs (%s, %s) but %s" % (self.N, self.M, dY.shape)
+
         # --------------------------------------------------------------------------------
-        # dL/dX = dL/dJ * dJ/dX. dJ/dX = -T/P is the gradient at cross-entropy log loss.
-        # If the input X is a scalar and T=0, then dJ/dA is always 0 (-T/P = 0/P).
+        # dY/dX = dY/dJ * dJ/dX. dJ/dX = -T/P is the gradient at cross-entropy log loss.
+        # If the input X is a scalar and T = 0, then dJ/dA is always 0 (-T/P = 0/P).
         # --------------------------------------------------------------------------------
         if (isinstance(self.X, float) or self.X.ndim == 0) and self.T == 0:
-            return 0    # -0 / P
+            return np.array(0.0, dtype=float)    # -0 / P
 
-        # Gradient dJ:(N,) = dL/dJ is 1/N for each node.
+        # Gradient dJ:(N,) = dY/dJ is 1/N.
         dJ: np.ndarray = np.ones(self.N, dtype=float) / self.N
 
         # --------------------------------------------------------------------------------
-        # Calculate the gradient at the layer
+        # Calculate the layer gradient
         # --------------------------------------------------------------------------------
         if self.T.size == self.P.size:  # Label is in OHE format.
             assert self.T.shape == self.P.shape, \
-                f"T.shape {self.T.shape} and P.shape {self.P.shape} should be the same."
+                "T.shape %s and P.shape %s should be the same for the OHE labels." \
+                % (self.T.shape, self.P.shape)
+            dX = dY * dJ * (self.P - self.T)
 
-            dX = dL * dJ * (self.P - self.T)
         else:
             # --------------------------------------------------------------------------------
             # np.copy() is a shallow copy and will not copy object elements within arrays.
@@ -149,7 +150,6 @@ class SoftmaxWithLogLoss(Layer):
             # --------------------------------------------------------------------------------
             rows = np.arange(self.N)    # tuple index for rows
             cols = self.T               # tuple index for columns
-            # assert rows.ndim == cols.ndim and len(rows) == len(cols), \
             assert rows.shape == cols.shape, \
                 f"numpy tuple indices {rows.shape} and {cols.shape} need to be the same."
 
@@ -157,8 +157,8 @@ class SoftmaxWithLogLoss(Layer):
             dX[
                 rows,
                 cols
-            ] -= 1
-            # dF/dL * dL/dJ * (P-T) = dF/dL * (P-T) / N
-            np.multiply((dL * dJ), dX, out=dX)
+            ] -= 1.0
+            # dF/dY * dY/dJ * (P-T) = dF/dY * (P-T) / N
+            np.multiply((dY * dJ), dX, out=dX)
 
         return dX
