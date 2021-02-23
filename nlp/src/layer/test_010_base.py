@@ -12,8 +12,11 @@ from layer import (
     Layer
 )
 
-NUM_MAX_NODES: int = 1000
-NUM_MAX_BATCH_SIZE: int = 1000
+from test_config import (
+    NUM_MAX_NODES,
+    NUM_MAX_BATCH_SIZE,
+    NUM_MAX_FEATURES
+)
 
 
 # ================================================================================

@@ -242,26 +242,6 @@ class Matmul(Layer):
         dY = np.add.reduce(map(_backward, self._posteriors))
         return self.gradient(dY)
 
-    def _gradient_descent(self) -> Union[np.ndarray, float]:
-        """Gradient descent
-        Directly update matrices to avoid the temporary copies
-        """
-        if self.logger.level == logging.DEBUG:
-            # np.copy() is a shallow copy and will not copy object elements within arrays.
-            # To ensure all elements within an object array are copied, use copy.deepcopy().
-            backup = copy.deepcopy(self.W)
-            W = self.optimizer.update(self._W, self.dW, out=self._W)
-            assert not np.array_equal(backup, self.W), \
-                "W is not updated by the gradient descent"
-        else:
-            W = self.optimizer.update(self._W, self.dW, out=self._W)
-
-        assert W == self._W
-        assert np.array_equal(self.W.shape, (self.M, self.D)), \
-            f"Updated W shape needs {(self.M, self.D)} but ({self.W.shape}))"
-
-        return W
-
     def gradient_numerical(self, h: float = 1e-5) -> List[Union[float, np.ndarray]]:
         """Calculate numerical gradients
         Args:
@@ -282,6 +262,12 @@ class Matmul(Layer):
         dW = numerical_jacobian(objective_W, self.W)
         return [dX, dW]
 
+    def _gradient_descent(self, W, dW, out=None) -> Union[np.ndarray, float]:
+        """Gradient descent
+        Directly update matrices to avoid the temporary copies
+        """
+        return self.optimizer.update(W, dW, out=out)
+
     def update(self) -> List[Union[float, np.ndarray]]:
         """Calculate dL/dW = dL/dY * dY/dW and update W with gradient descent
         dL/dW.T = X.T @ dL/dY is shape (D,M) as  [ X.T:(D, N)  @ dL/dY:(N,M) ].
@@ -297,6 +283,11 @@ class Matmul(Layer):
         assert np.array_equal(dW.shape, (self.M, self.D)), \
             f"Gradient dL/dW shape needs {(self.M, self.D)} but ({dW.shape}))"
 
+        if self.logger.level in (logging.DEBUG, logging.WARNING) and np.all(dW < dW / 100):
+            self.logger.warning(
+                "update(): Gradient descent potentially stalling with dW < 1% of W."
+            )
+
         self._dW = dW
-        self._gradient_descent()
+        self._gradient_descent(self.W, self.dW, out=self._W)
         return [self.dX, self.dW]

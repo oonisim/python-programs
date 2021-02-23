@@ -1,4 +1,5 @@
 """Gradient descent algorithm implementations"""
+import logging
 import numpy as np
 from . base import Optimizer
 
@@ -13,7 +14,7 @@ class SGD(Optimizer):
     # Instance initialization
     # ================================================================================
     def __init__(self):
-        super().__init__()
+        super().__init__(name="SGD")
 
     # --------------------------------------------------------------------------------
     # Instance properties
@@ -27,5 +28,10 @@ class SGD(Optimizer):
         Return:
             W: A reference to out if specified or a np array allocated.
         """
+        if self.logger.level == logging.WARNING and np.all(dW < dW / 100.0):
+            self.logger.warning(
+                "update(): Gradient descent potentially stalling with dW < 1% of W."
+            )
+
         regularization = dW * self.l2
         return np.subtract(W, self.lr * (dW + regularization), out=out)
