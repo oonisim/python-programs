@@ -81,24 +81,6 @@ def test_020_matmul_instantiation_to_fail():
     except AssertionError as e:
         pass
 
-    # Matmul instance creation fails as X.shape[0] != T.shape[0]
-    try:
-        N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
-        M: int = np.random.randint(1, NUM_MAX_NODES)
-        layer: Matmul = Matmul(
-            name="test_020_matmul",
-            num_nodes=M,
-            W=weights.xavier(M, D),
-            log_level=logging.DEBUG
-        )
-        X = np.random.randn(N, M)
-        layer.X = X
-        T = np.random.randint(0, M, N+1)
-        layer.T = T
-        raise RuntimeError("Matmul initialization different batch size between X and T must fail")
-    except AssertionError as e:
-        pass
-
 
 def test_020_matmul_instance_properties():
     """Test for the matmul class validates non initialized properties"""
@@ -183,13 +165,25 @@ def test_020_matmul_instance_properties():
     assert layer.num_nodes == M
 
     try:
+        layer = Matmul(
+            name=name,
+            num_nodes=M,
+            W=weights.uniform(M, D),
+            log_level=logging.DEBUG
+        )
         layer.function(int(1))
         raise RuntimeError("Invoke layer.function(int(1)) must fail.")
     except AssertionError as e:
         pass
 
     try:
-        layer.function(1.0)
+        layer = Matmul(
+            name=name,
+            num_nodes=M,
+            W=weights.uniform(M, D),
+            log_level=logging.DEBUG
+        )
+        layer.function(int(1))
         layer.gradient(int(1))
         raise RuntimeError("Invoke layer.gradient(int(1)) must fail.")
     except AssertionError as e:
@@ -310,7 +304,7 @@ def test_020_matmul_methods():
     expected_dX = np.matmul(dY, W)
     assert np.array_equal(dX, expected_dX)
 
-    # Matmul gradient dL/dX should be close to the numerical gradient GN.
+    # Matmul analytical gradient dL/dX should be close to the numerical gradient GN.
     assert np.all(np.abs(dX - GN[0]) < OFFSET_FOR_DELTA)
 
     # --------------------------------------------------------------------------------

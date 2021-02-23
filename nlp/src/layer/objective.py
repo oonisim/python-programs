@@ -15,6 +15,7 @@ import logging
 import numpy as np
 from . base import Layer
 from common.functions import (
+    transform_X_T,
     cross_entropy_log_loss,
     softmax,
     numerical_jacobian
@@ -51,47 +52,75 @@ class SoftmaxWithLogLoss(Layer):
     def P(self) -> np.ndarray:
         """Softmax probabilities of shape (N,M)"""
         assert \
-            isinstance(self._P, np.ndarray) and self.P.size > 0 and \
+            isinstance(self._P, np.ndarray) and self._P.size > 0 and \
             self._P.shape == (self.N, self.M), "P is not initialized"
         return self._P
 
     @property
     def J(self) -> np.ndarray:
         """Cross entropy log loss of shape(N,)"""
-        assert isinstance(self._J) and self.J.size == self.N, "J is not initialized"
+        assert isinstance(self._J, np.ndarray) and self._J.size == self.N, \
+            "J is not initialized"
         return self._J
 
     @property
     def L(self) -> np.ndarray:
         """Cross entropy log loss of shape()"""
-        assert isinstance(self._L) and self.L.size == 1, "L is not initialized"
+        assert isinstance(self._L, np.ndarray) and self._L.size == 1, \
+            "L is not initialized"
         return self._L
 
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
+
     def function(self, X: Union[np.ndarray, float]) -> np.ndarray:
-        """Layer output
+        """Softmax wth Log Loss layer output L
+        Note:
+            The Softmax Log Loss output is normalized by the batch size N.
+            Otherwise the NN loss is dependent on the batch size.
+
+            For instance, with a MNIST image, the loss or NN performance should be
+            per-image, so that the loss can be a universal unit to compare.
+            It should NOT be dependent on what batch size was used.
+
+            L = cross_entropy_log_loss(softmax(X), T)) / N
+
         Args:
             X: Input of shape (N,M) to calculate the probabilities for the M nodes.
             T: Labels for input X. Shape(N,M) for OHE label and shape(N,) for index label.
         Returns:
             L: Objective value of shape ()
         """
-
-
-        self.X = X
+        self.X, self.T = transform_X_T(X, self.T)
         self.logger.debug(
-            "layer[%s] function(): X.shape %s T.shape %s", self.name, X.shape, self.T.shape
+            "layer[%s] function(): X.shape %s T.shape %s", self.name, self.X.shape, self.T.shape
         )
 
         self._P = softmax(self.X)
         self._J = cross_entropy_log_loss(self.P, self.T)    # dJ/dP -> -T/P
-        self._L = np.sum(self.J)                            # dL/dJ ->  1/N
 
-        return self.L
+        # --------------------------------------------------------------------------------
+        # Calculate the sum and convert scalar back to np.ndarray
+        # If a for sum(a) is 0-d array or axis is None, a scalar is returned.
+        # https://numpy.org/doc/stable/reference/generated/numpy.sum.html
+        # --------------------------------------------------------------------------------
+        # dL/dJ = 1 at this point because dsum(J)/dJ = 1
+        L = np.array(np.sum(self.J, axis=-1))
 
-    def gradient(self, dY: Union[np.ndarray, float] = 1.0) -> Union[np.ndarray, float]:
+        # --------------------------------------------------------------------------------
+        # Normalize with the batch size N.
+        # Here, dL/dJ = 1/N because f(X)=X/N -> df(X)/dX = 1/N
+        # --------------------------------------------------------------------------------
+        L = L / self.N
+
+        self._L = np.array(L) if isinstance(L, (float, int)) else L
+        self._Y = self.L
+
+        self.logger.debug("function() L = %s", self.Y)
+        return self.Y
+
+    def gradient(self, dY: Union[np.ndarray, float] = float(1)) -> Union[np.ndarray, float]:
         """Calculate the gradient dL/dX, the impact on F by the input dX.
         F: Objective function of the layer.
         Y: Output of the layer
@@ -108,31 +137,32 @@ class SoftmaxWithLogLoss(Layer):
             dF/dX: (P-T)/N of shape (N, M)
         """
         assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == float)
-
-        dY = np.array(dY).reshape((1, -1)) if isinstance(dY, float) or dY.ndim < 2 else dY
-        assert dY.shape == (self.N, self.M), \
-            "dY/dY shape needs (%s, %s) but %s" % (self.N, self.M, dY.shape)
+        dY = np.array(dY) if isinstance(dY, float) else dY
+        assert dY.shape == self.Y.shape, \
+            "dY/dY shape needs %s but %s" % (self.Y.shape, dY.shape)
 
         # --------------------------------------------------------------------------------
         # dY/dX = dY/dJ * dJ/dX. dJ/dX = -T/P is the gradient at cross-entropy log loss.
         # If the input X is a scalar and T = 0, then dJ/dA is always 0 (-T/P = 0/P).
         # --------------------------------------------------------------------------------
         if (isinstance(self.X, float) or self.X.ndim == 0) and self.T == 0:
-            return np.array(0.0, dtype=float)    # -0 / P
+            return np.array(float(0), dtype=float)    # -0 / P
 
         # Gradient dJ:(N,) = dY/dJ is 1/N.
-        dJ: np.ndarray = np.ones(self.N, dtype=float) / self.N
+        dJ: np.ndarray = np.ones(self.N, dtype=float) / float(self.N)
 
         # --------------------------------------------------------------------------------
         # Calculate the layer gradient
         # --------------------------------------------------------------------------------
-        if self.T.size == self.P.size:  # Label is in OHE format.
-            assert self.T.shape == self.P.shape, \
+        if self.T.ndim == self.P.ndim:
+            self.logger.debug("gradient(): Label is in OHE format or scalar index")
+            assert (self.T.size == self.P.size) and (self.T.shape == self.P.shape), \
                 "T.shape %s and P.shape %s should be the same for the OHE labels." \
                 % (self.T.shape, self.P.shape)
             dX = dY * dJ * (self.P - self.T)
 
         else:
+            self.logger.debug("gradient(): Label is index format")
             # --------------------------------------------------------------------------------
             # np.copy() is a shallow copy and will not copy object elements within arrays.
             # To ensure all elements within an object array are copied, use copy.deepcopy().
@@ -158,7 +188,15 @@ class SoftmaxWithLogLoss(Layer):
                 rows,
                 cols
             ] -= 1.0
+            dF = (dJ * dY)
+            dF = dF[::, np.newaxis]
             # dF/dY * dY/dJ * (P-T) = dF/dY * (P-T) / N
-            np.multiply((dY * dJ), dX, out=dX)
+            self.logger.debug("dF.shape is %s dF is \n%s.\n", dF.shape, dF)
+            self.logger.debug("T is %s dX.shape %s.\n", self.T, dX.shape)
+            self.logger.debug(
+                "gradient(): dX[rows, T] = %s,\ndX is \n%s.\n", dX[rows, cols], dX
+            )
+            np.multiply(dF, dX, out=dX)
 
+        self.logger.debug("gradient(): dL/dX is \n%s.\n", dX)
         return dX

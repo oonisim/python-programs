@@ -145,13 +145,13 @@ class Matmul(Layer):
         """
         self.X = X
         self.logger.debug(
-            "layer[%s] function(): X.shape %s W.shape %s", self.name, X.shape, self.W.shape
+            "layer[%s] function(): X.shape %s W.shape %s", self.name, self.X.shape, self.W.shape
         )
         assert self.W.shape == (self.M, self.D), \
             f"W shape needs {(self.M, self.D)} but ({self.W.shape})"
 
         # --------------------------------------------------------------------------------
-        # Allocate array storge for np.func(out=) for Y but not dY.
+        # Allocate array storage for np.func(out=) for Y but not dY.
         # Y:(N,M) = [ X:(N,D) @ W.T:(D,M) ]
         # gradient() need to validate the dY shape is (N,M)
         # --------------------------------------------------------------------------------
@@ -195,8 +195,8 @@ class Matmul(Layer):
         assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == float)
 
         dY = np.array(dY).reshape((1, -1)) if isinstance(dY, float) or dY.ndim < 2 else dY
-        assert dY.shape == (self.N, self.M), \
-            "dL/dY shape needs (%s, %s) but %s" % (self.N, self.M, dY.shape)
+        assert dY.shape == self.Y.shape, \
+            "dL/dY shape needs %s but %s" % (self.Y.shape, dY.shape)
 
         self.logger.debug("layer[%s] gradient(): dY.shape %s", self.name, dY.shape)
         self._dY = dY

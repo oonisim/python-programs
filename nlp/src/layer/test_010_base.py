@@ -58,25 +58,26 @@ def test_010_base_instantiation_to_fail():
             log_level=-1
         )
         raise RuntimeError("Layer initialization with invalid log level must fail")
-    except AssertionError as e:
+    except (AssertionError, KeyError) as e:
         pass
 
     # Layer instance creation fails as X.shape[0] != T.shape[0]
-    try:
-        N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
-        M: int = np.random.randint(1, NUM_MAX_NODES)
-        layer: Layer = Layer(
-            name="test_010_base",
-            num_nodes=M,
-            log_level=logging.DEBUG
-        )
-        X = np.random.randn(N, M)
-        layer.X = X
-        T = np.random.randint(0, M, N+1)
-        layer.T = T
-        raise RuntimeError("Layer initialization different batch size between X and T must fail")
-    except AssertionError as e:
-        pass
+    # X can be set later than T, hence this cannot be tested.
+    # try:
+    #     N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
+    #     M: int = np.random.randint(1, NUM_MAX_NODES)
+    #     layer: Layer = Layer(
+    #         name="test_010_base",
+    #         num_nodes=M,
+    #         log_level=logging.DEBUG
+    #     )
+    #     X = np.random.randn(N, M)
+    #     layer.X = X
+    #     T = np.random.randint(0, M, N+1)
+    #     layer.T = T
+    #     raise RuntimeError("Layer initialization different batch size between X and T must fail")
+    # except AssertionError as e:
+    #     pass
 
 
 def test_010_base_instance_properties():

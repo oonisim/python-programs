@@ -202,14 +202,20 @@ class Layer:
         """
         assert X is not None and \
                ((isinstance(X, np.ndarray) and X.dtype == float) or isinstance(X, float))
-        self._X = np.array(X).reshape(1, -1) if isinstance(X, float) or X.ndim < 2 else X
+
+        if isinstance(X, float):
+            self._X = np.array(X)
+        elif X.ndim == 1:
+            self._X = np.array(X).reshape(1, -1)
+        else:
+            self._X = X
 
         assert self.X.size > 0
         self._N = self.X.shape[0]
 
         # Allocate the storage for np.func(out=dX).
-        if self._dX.shape != X.shape:
-            self._dX = np.empty(X.shape, dtype=float)
+        if self._dX.shape != self.X.shape:
+            self._dX = np.empty(self.X.shape, dtype=float)
 
     @property
     def N(self) -> int:
@@ -234,11 +240,10 @@ class Layer:
     def T(self, T: Union[np.ndarray, int]):
         assert T is not None and \
                (isinstance(T, np.ndarray) and T.dtype == int) or (isinstance(T, int))
-        T = np.array(T) if isinstance(T, int) else T
+        self._T = np.array(T, dtype=int) if isinstance(T, int) else T.astype(int)
         # T can be set after X, hence not possible to verify.
         # assert T.shape[0] == self.N, \
         #     f"Set X first and the batch size of T should be {self.N} but {T.shape[0]}"
-        self._T = T.astype(int)
 
     @property
     def Y(self) -> np.ndarray:

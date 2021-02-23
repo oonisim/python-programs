@@ -7,6 +7,7 @@ from typing import (
     Union,
     List,
     Dict,
+    Tuple,
     Callable,
     NoReturn,
     Final
@@ -83,6 +84,84 @@ def softmax(X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
     return P
 
 
+def transform_X_T(
+        X: Union[np.ndarray, float], T: Union[np.ndarray, int]
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Validate acceptable (X, T) conditions and reshape into P:(N, M), T:(M,).
+    Args:
+        X: Input
+        T: Labels
+    Returns:
+        (X, T): reshaped X of shape(N,M), T of shape(M,)
+    """
+    assert (isinstance(X, np.ndarray) and X.dtype == float) or isinstance(X, float), \
+        "Type of P must be float"
+    assert (isinstance(T, np.ndarray) and T.dtype == int) or isinstance(T, int), \
+        "Type of T must be integer"
+
+    if isinstance(X, float) or X.ndim == 0:
+        # --------------------------------------------------------------------------------
+        # When X is scalar, T must be a scalar
+        # --------------------------------------------------------------------------------
+        assert isinstance(T, int) or T.ndim == 0
+        X = np.array(X, dtype=float)
+        T = np.array(T, dtype=int)
+    else:
+        # ================================================================================
+        # Hereafter, X and T need be np arrays.
+        # Convert int T into ndarray.
+        # Convert T in OHE format into index format with T = np.argmax(T). If X is in 1D,
+        # convert it into 2D so as to get the log loss with numpy tuple- like indices
+        # X[
+        #   range(N),
+        #   T
+        # ]
+        # ================================================================================
+        assert isinstance(X, np.ndarray)
+        T = np.array(T, dtype=int) if isinstance(T, int) else T
+
+        if X.ndim == 1:
+            # --------------------------------------------------------------------------------
+            # X is 1D array, then T dim should be in Set{0, 1}.
+            # Convert T.ndim==0 scalar index label into single element 1D index label T.
+            # Convert T.ndim==1 OHE labels into a 1D index labels T.
+            # T.reshape(-1) because np.argmax(ndim=1) results in ().
+            # --------------------------------------------------------------------------------
+            assert T.ndim in {0, 1}, \
+                "When X.ndim=1, T.ndim should be 0 or 1 but %s" % T.ndim
+
+            X = X.reshape(1, -1)
+            Logger.debug("X.shape (%s,) has been converted into %s", X.size, X.shape)
+
+            _shape = T.shape
+            T = T.reshape(-1) if T.ndim == 0 else np.argmax(T).reshape(-1)
+            Logger.debug("T.shape %s has been converted into %s",_shape, T.shape)
+
+        else:
+            # --------------------------------------------------------------------------------
+            # X is ND array, then:
+            # Convert the OHE labels into index labels when T.ndim==2.
+            # Otherwise T should be index labels when T.ndim==1.
+            # --------------------------------------------------------------------------------
+            if 1 < X.ndim == T.ndim:
+                _shape = T.shape
+                T = T.argmax(axis=-1)
+                Logger.debug("T.shape %s has been converted into %s", _shape, T.shape)
+            elif T.ndim == 1:
+                pass
+            else:
+                msg = "transform_X_T(): Invalid state."
+                Logger.error(
+                    "transform_X_T(): Invalid state X.shape %s X \n%s \nT.shape %s T %s",
+                    X.shape, X, T.shape, T
+                )
+                raise RuntimeError(msg)
+
+        assert X.shape[0] == T.shape[0]
+
+    return X, T
+
+
 def cross_entropy_log_loss(
         P: Union[np.ndarray, float],
         T: Union[np.ndarray, int],
@@ -106,55 +185,13 @@ def cross_entropy_log_loss(
     Returns:
         J: Loss value of shape (N,), a loss value per batch.
     """
-    # --------------------------------------------------------------------------------
-    # P must be float, T must be integer.
-    # --------------------------------------------------------------------------------
-    assert (isinstance(P, np.ndarray) and P.dtype == float) or isinstance(P, float), \
-        "Type of P must be float"
-    assert (isinstance(T, np.ndarray) and T.dtype == int) or isinstance(T, int), \
-        "Type of T must be integer"
+    P, T = transform_X_T(P, T)
 
     # --------------------------------------------------------------------------------
     # P is scalar, then return -t * log(p).
     # --------------------------------------------------------------------------------
-    if isinstance(P, float) or P.ndim == 0:
-        assert isinstance(T, int) or T.ndim == 0
+    if P.ndim == 0:
         return -T * np.log(P+offset)
-
-    # ================================================================================
-    # Hereafter, P and T are np arrays.
-    # Convert T in OHE format into index format with T = np.argmax(T). If P is in 1D,
-    # convert it into 2D so as to get the log loss with numpy tuple- like indices
-    # P[
-    #   rangee(N),
-    #   T
-    # ]
-    # ================================================================================
-    assert isinstance(P, np.ndarray)
-    T = np.array(T, dtype=int) if isinstance(T, int) else T
-
-    # --------------------------------------------------------------------------------
-    # P is 1D array, then T dim should be in Set{0, 1}.
-    # Convert T.ndim==0 scalar index label into single element 1D index label T.
-    # Convert T.ndim==1 OHE labels into a 1D index labels T.
-    # T.reshape(-1) because np.argmax(ndim=1) results in ().
-    # --------------------------------------------------------------------------------
-    if P.ndim == 1:
-        assert T.ndim in {0, 1}, \
-            "For P.ndim=1, T.ndim is 0 or 1 but %s" % T.ndim
-        P = P.reshape(1, -1)
-        T = T.reshape(-1) if T.ndim == 0 else np.argmax(T).reshape(-1)
-
-    # --------------------------------------------------------------------------------
-    # P is 2D array, then
-    # Convert the OHE labels into index labels when T.ndim==2.
-    # Otherwise T should be index labels when T.ndim==1.
-    # --------------------------------------------------------------------------------
-    if P.ndim == T.ndim == 2:
-        T = T.argmax(axis=-1)
-
-    assert P.ndim == 2 and T.ndim == 1, \
-        "P.ndim==2 and T.ndim==1 are expected but P %s T %s" % (P.shape, T.shape)
 
     # ================================================================================
     # Calculate Cross entropy log loss -t * log(p).

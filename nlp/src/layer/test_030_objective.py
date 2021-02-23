@@ -10,9 +10,9 @@ import copy
 import logging
 import numpy as np
 from common import (
-    OFFSET_FOR_DELTA,
+    cross_entropy_log_loss,
+    softmax,
     numerical_jacobian,
-    weights
 )
 from layer import (
     SoftmaxWithLogLoss
@@ -20,7 +20,8 @@ from layer import (
 from common.test_config import (
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,
-    NUM_MAX_FEATURES
+    NUM_MAX_FEATURES,
+    GRADIENT_DIFF_ACCEPTANCE_RATIO
 )
 
 
@@ -35,7 +36,6 @@ def test_030_objective_instantiation_to_fail():
     # Expected the layer instance initialization fails.
     # --------------------------------------------------------------------------------
     M: int = np.random.randint(1, NUM_MAX_NODES)
-    D = 1
     # SoftmaxWithLogLoss instance creation fails due to the invalid name.
     try:
         SoftmaxWithLogLoss(
@@ -43,7 +43,7 @@ def test_030_objective_instantiation_to_fail():
             num_nodes=1
         )
         raise RuntimeError("SoftmaxWithLogLoss initialization with invalid name must fail")
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     # SoftmaxWithLogLoss instance creation fails due to num_nodes = M < 1
@@ -53,7 +53,7 @@ def test_030_objective_instantiation_to_fail():
             num_nodes=0
         )
         raise RuntimeError("SoftmaxWithLogLoss(num_nodes<1) must fail.")
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     # SoftmaxWithLogLoss instance creation fails due to the invalid log level.
@@ -64,7 +64,7 @@ def test_030_objective_instantiation_to_fail():
             log_level=-1
         )
         raise RuntimeError("SoftmaxWithLogLoss initialization with invalid log level must fail")
-    except (AssertionError, KeyError) as e:
+    except (AssertionError, KeyError):
         pass
 
     # SoftmaxWithLogLoss instance creation fails as W.shape[1] != num_nodes
@@ -74,24 +74,7 @@ def test_030_objective_instantiation_to_fail():
             num_nodes=1
         )
         raise RuntimeError("SoftmaxWithLogLoss initialization with invalid name must fail")
-    except AssertionError as e:
-        pass
-
-    # SoftmaxWithLogLoss instance creation fails as A.shape[0] != T.shape[0]
-    try:
-        N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
-        M: int = np.random.randint(1, NUM_MAX_NODES)
-        layer: SoftmaxWithLogLoss = SoftmaxWithLogLoss(
-            name="test_030_objective",
-            num_nodes=M,
-            log_level=logging.DEBUG
-        )
-        X = np.random.randn(N, M)
-        layer.X = X
-        T = np.random.randint(0, M, N+1)
-        layer.T = T
-        raise RuntimeError("SoftmaxWithLogLoss initialization different batch size between X and T must fail")
-    except AssertionError as e:
+    except AssertionError:
         pass
 
 
@@ -99,7 +82,6 @@ def test_030_objective_instance_properties():
     """Test for the objective class validates non initialized properties"""
     msg = "Accessing uninitialized property of the layer must fail."
     M: int = np.random.randint(1, NUM_MAX_NODES)
-    D: int = np.random.randint(1, NUM_MAX_FEATURES)
     name = "test_030_objective"
     layer = SoftmaxWithLogLoss(
         name=name,
@@ -110,67 +92,67 @@ def test_030_objective_instance_properties():
     try:
         print(layer.X)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         layer.X = int(1)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         print(layer.dX)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         print(layer.Y)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
     try:
         layer._Y = int(1)
         print(layer.Y)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         print(layer.dY)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
     try:
         layer._dY = int(1)
         print(layer.dY)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         print(layer.T)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         layer.T = float(1)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         layer.objective(np.array(1.0))
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         print(layer.N)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     assert layer.name == name
@@ -179,14 +161,14 @@ def test_030_objective_instance_properties():
     try:
         layer.function(int(1))
         raise RuntimeError("Invoke layer.function(int(1)) must fail.")
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         layer.function(1.0)
         layer.gradient(int(1))
         raise RuntimeError("Invoke layer.gradient(int(1)) must fail.")
-    except AssertionError as e:
+    except AssertionError:
         pass
 
 
@@ -257,14 +239,16 @@ def test_030_objective_methods_2d_ohe():
     """
     def objective(X: np.ndarray) -> Union[float, np.ndarray]:
         """Dummy objective function to calculate the loss L"""
-        assert X.ndim == 0, "The output of the log loss should be scalar"
+        assert X.ndim == 0, "The output of the log loss should be of shape ()"
         return X
 
     # --------------------------------------------------------------------------------
     # Instantiate a SoftmaxWithLogLoss layer
     # --------------------------------------------------------------------------------
     N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
+    N = 2
     M: int = np.random.randint(1, NUM_MAX_NODES)
+    M = 2
     name = "test_030_objective"
 
     layer = SoftmaxWithLogLoss(
@@ -280,55 +264,42 @@ def test_030_objective_methods_2d_ohe():
     # Test the numerical gradient dL/dX=layer.gradient_numerical().
     # --------------------------------------------------------------------------------
     X = np.random.randn(N, M)
-    T = np.random.randint(0, 2, (N, M))     # OHE labels.
+    T = np.zeros_like(X, dtype=int)     # OHE labels.
+    T[
+        np.arange(N),
+        np.random.randint(0, M, N)
+    ] = int(1)
+    P = softmax(X)
+    expected_dX = (P - T) / N
 
     layer.T = T
     Y = layer.function(X)
     L = layer.objective(Y)
-    # SoftmaxWithLogLoss outputs Y should be X@W.T
-    assert np.array_equal(Y, np.objective(X, W.T))
+
+    # Output of
+    Z = np.array(np.sum(cross_entropy_log_loss(softmax(X), T))) / N
+    # SoftmaxWithLogLoss outputs Y should be the same with L and Z
+    assert np.array_equal(Y, L), f"SoftmaxLogLoss output should be {L} but {Y}."
+    assert np.array_equal(Y, Z), f"SoftmaxLogLoss output should be {Z} but {Y}."
 
     # Numerical gradient should be the same with numerical Jacobian
-    GN = layer.gradient_numerical()         # [dL/dX, dL/dW]
+    GN = layer.gradient_numerical()         # [dL/dX]
     LX = lambda x: layer.objective(layer.function(x))
     JX = numerical_jacobian(LX, X)           # Numerical dL/dX
     assert np.array_equal(GN[0], JX)
 
-    LW = lambda w: layer.objective(np.objective(X, w.T))
-    JW = numerical_jacobian(LW, W)           # Numerical dL/dX
-    assert np.array_equal(GN[1], JW)
-
     # --------------------------------------------------------------------------------
     # Layer backward path
-    # Calculate the analytical gradient dL/dX=layer.gradient(dL/dY) with a dummy dL/dY.
-    # Confirm the numerical gradient (dL/dX, dL/dW) are closer to the analytical ones.
+    # Calculate the analytical gradient dL/dX=layer.gradient(dL/dY=1)
+    # Confirm the numerical gradient dL/dX is closer to the analytical one.
     # --------------------------------------------------------------------------------
-    # SoftmaxWithLogLoss gradient dL/dX should be dL/dY @ W. Use a dummy dL/dY = 1.0.
-    dY = np.ones_like(Y)
+    # SoftmaxWithLogLoss gradient dL/dX should be (P-T)/N.
+    dY = float(1)
     dX = layer.gradient(dY)
-    expected_dX = np.objective(dY, W)
-    assert np.array_equal(dX, expected_dX)
+    assert np.all(np.abs(dX-expected_dX) < 1e-6), \
+        f"Layer gradient dL/dX \n{dX} \nneeds to be \n{expected_dX}."
 
     # SoftmaxWithLogLoss gradient dL/dX should be close to the numerical gradient GN.
-    assert np.all(np.abs(dX - GN[0]) < OFFSET_FOR_DELTA)
-
-    # --------------------------------------------------------------------------------
-    # Gradient update.
-    # Run the gradient descent to update Wn+1 = Wn - lr * dL/dX.
-    # Confirm the new objective L(Yn+1) < L(Yn) with the Wn+1.
-    # Confirm W in the layer has been updated by the gradient descent.
-    # --------------------------------------------------------------------------------
-
-    # Note Python pass the reference to W, and W will be directly updated by
-    # the gradient descent to avoid a temporary copy.
-    # Hence need to backup W before being changed to compare before/after.
-    backup = copy.deepcopy(W)
-
-    dS = layer.update()         # Analytical dL/dX, dL/dW
-    assert np.all(np.abs(dS[0] - GN[0]) < OFFSET_FOR_DELTA) # dL/dX
-    assert np.all(np.abs(dS[1] - GN[1]) < OFFSET_FOR_DELTA) # dL/dW
-
-    # Objective L with the updated W should be smaller than previous L
-    assert np.all(np.abs(objective(layer.function(X)) < L))
-    assert np.any(backup != layer.W), "W has not been updated "
-
+    assert \
+        np.all(np.abs(dX - GN[0]) < np.abs(GRADIENT_DIFF_ACCEPTANCE_RATIO * GN[0])), \
+        f"dX is \n{dX}\nGN[0] is \n{GN[0]}\nRatio * GN[0] is \n{GRADIENT_DIFF_ACCEPTANCE_RATIO * GN[0]}.\n"
