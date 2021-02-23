@@ -21,9 +21,13 @@ from common import (
     OFFSET_FOR_DELTA
 )
 
-NUM_MAX_BATCH_SIZE: int = 10 + 1
-NUM_MAX_NODES: int = 10 + 1
-MAX_ACTIVATION_VALUE = 5       # max output from an activation function
+from common.test_config import (
+    NUM_MAX_TEST_TIMES,
+    NUM_MAX_NODES,
+    NUM_MAX_BATCH_SIZE,
+    MAX_ACTIVATION_VALUE,
+    GRADIENT_DIFF_ACCEPTANCE_RATIO
+)
 
 
 def test_020_numerical_jacobian_avg(h:float = 1e-5):
@@ -33,7 +37,7 @@ def test_020_numerical_jacobian_avg(h:float = 1e-5):
     def f(X: np.ndarray):
         return np.average(X)
 
-    for _ in range(100):
+    for _ in range(NUM_MAX_TEST_TIMES):
         # Batch input X of shape (N, M)
         n = np.random.randint(low=1, high=NUM_MAX_BATCH_SIZE)
         m = np.random.randint(low=1, high=NUM_MAX_NODES)
@@ -53,7 +57,7 @@ def test_020_numerical_jacobian_sigmoid(h:float = 1e-5):
     """
     # y=sigmoid(x) -> dy/dx = y(1-y)
     # 0.5 = sigmoid(0) -> dy/dx = 0.25
-    for _ in range(100):
+    for _ in range(NUM_MAX_TEST_TIMES):
         x = np.random.uniform(low=-10, high=10, size=1)
         y = sigmoid(x)
         t = np.multiply(y, (1-y))
@@ -91,7 +95,7 @@ def test_020_cross_entropy_log_loss_scalar(h: float = 1e-5, k=OFFSET_FOR_LOG):
 
     # Analytical gradient that E1 needs to be close to.
     a1 = - 1 / (p1 + k)
-    check.less(np.abs(a1 - g1), 0.001, "a1-g1 %s\n" % np.abs(a1-g1))
+    check.less_equal(np.abs(a1 - g1), 0.001, "a1-g1 %s\n" % np.abs(a1-g1))
 
     # --------------------------------------------------------------------------------
     # Not test P=0 because the gradient log(k +/- h) in numerical gradient value is
@@ -110,7 +114,7 @@ def test_020_cross_entropy_log_loss_scalar(h: float = 1e-5, k=OFFSET_FOR_LOG):
     assert np.abs(E3 - g3) < h, \
         f"Delta expected to be < {h} but {np.abs(E3 - g3)}"
 
-    for _ in range(100):
+    for _ in range(NUM_MAX_TEST_TIMES):
         p = np.random.uniform(0.2, 1)
         g = numerical_jacobian(partial(f, T=1), p)
         ex = (-t1 * np.log(p+h+k) + t1 * np.log(p-h+k)) / (2 * h)
@@ -118,7 +122,7 @@ def test_020_cross_entropy_log_loss_scalar(h: float = 1e-5, k=OFFSET_FOR_LOG):
             f"Delta expected to be < {h} but {np.abs(ex-g)}"
 
         a = - 1 / (p+k)
-        check.less(np.abs(a-g), 0.001, "ex-a %s\n" % np.abs(a-g))
+        check.less_equal(np.abs(a-g), 0.001, "ex-a %s\n" % np.abs(a-g))
 
 
 def test_020_cross_entropy_log_loss_1d(h: float = 1e-5, k=OFFSET_FOR_LOG):
@@ -153,7 +157,7 @@ def test_020_cross_entropy_log_loss_1d(h: float = 1e-5, k=OFFSET_FOR_LOG):
     # --------------------------------------------------------------------------------
     # p = np uniform()
     # --------------------------------------------------------------------------------
-    for _ in range(100):
+    for _ in range(NUM_MAX_TEST_TIMES):
         M = length = np.random.randint(2, NUM_MAX_NODES)    # length > 1
         T1 = np.random.randint(0, length)            # location of the truth
 
@@ -177,7 +181,7 @@ def test_020_cross_entropy_log_loss_1d(h: float = 1e-5, k=OFFSET_FOR_LOG):
         A1[T1] = -1 / (p+k)
         check.equal(np.all(np.abs(A1 - G1) < 0.001), True, "A1-G1 %s\n" % np.abs(A1-G1))
 
-    for _ in range(100):
+    for _ in range(NUM_MAX_TEST_TIMES):
         # --------------------------------------------------------------------------------
         # [1D test case]
         # P:[0, 0, ..., 1, 0, ...] where Pi = 1
@@ -252,7 +256,7 @@ def test_020_cross_entropy_log_loss_2d(h: float = 1e-5, k=OFFSET_FOR_LOG):
 
         return np.sum(cross_entropy_log_loss(P, T))
 
-    for _ in range(100):
+    for _ in range(NUM_MAX_TEST_TIMES):
         # --------------------------------------------------------------------------------
         # [2D test case]
         # P:(N, M) is probability matrix where Pnm = p, 0 <=n<N-1, 0<=m<M-1
@@ -264,7 +268,7 @@ def test_020_cross_entropy_log_loss_2d(h: float = 1e-5, k=OFFSET_FOR_LOG):
         # -11.512925464970229, hence log(p+/-h) / 2h explodes.
         # --------------------------------------------------------------------------------
         p = np.random.uniform(0.2, 1)
-        N = np.random.randint(2, NUM_MAX_BATCH_SIZE)
+        N = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M = np.random.randint(2, NUM_MAX_NODES)
         # label index, not OHE
         T = np.random.randint(0, M, N)  # N rows of labels, max label value is M-1
@@ -297,7 +301,7 @@ def test_020_cross_entropy_log_loss_2d(h: float = 1e-5, k=OFFSET_FOR_LOG):
 # ================================================================================
 # Softmax + log loss
 # ================================================================================
-def test_020_softmax_scalar(h: float = 1e-5, k=OFFSET_FOR_LOG):
+def test_020_softmax_scalar(h=OFFSET_FOR_DELTA, k=OFFSET_FOR_LOG, r=GRADIENT_DIFF_ACCEPTANCE_RATIO):
     """Test case for softmax plus log loss with a scalar input
     Analytica gradient dj/dx -> softmax(x) - t
     j = cross_entropy_log_loss(softmax(x), T)
@@ -324,27 +328,27 @@ def test_020_softmax_scalar(h: float = 1e-5, k=OFFSET_FOR_LOG):
         if t == 0: return 0
         return (-np.log(softmax(a) + h + k) + np.log(softmax(a) - h + k)) / (2*h)
 
-    for _ in range(100):
+    for _ in range(NUM_MAX_TEST_TIMES):
         # activation value from an activation function (ReLU, etc)
         T = np.random.randint(0, 1)
         A = np.random.uniform(float(-MAX_ACTIVATION_VALUE), float(MAX_ACTIVATION_VALUE))
         G = numerical_jacobian(partial(L, T=T), A)
         E = gn(A, T)
-        assert np.abs(E - G) < h, \
-            f"Delta expected to be < {h} but {np.abs(E - G)}"
+        assert np.abs(E - G) <= np.abs(r * E), \
+            f"Delta expected to be < {np.abs(r * E)} ratio of E but {np.abs((E - G))}"
 
         # --------------------------------------------------------------------------------
         # Analytical gradient dL/dA = dL/dJ * dJ/dA. dJ/dA = -T/P at the log loss.
         # For one input A, dJ/dA is always 0 when T = 0.
         # --------------------------------------------------------------------------------
         dA = softmax(A) - T if T == 1 else 0
-        check.less(
-            np.abs(dA-G), 0.001,
+        check.less_equal(
+            np.abs(dA-G), np.abs(dA * r),
             "T %s A % s dA %s G %s dA-G %s \n" % (T, A, dA, G, np.abs(dA-G))
         )
 
 
-def test_020_softmax_1d(h: float = 1e-5, k=OFFSET_FOR_LOG):
+def test_020_softmax_1d(r: float = GRADIENT_DIFF_ACCEPTANCE_RATIO, k=OFFSET_FOR_LOG):
     """Test case for softmax for 1D
     Verify the delta between the analytical and numerical gradient is small (<h).
     """
@@ -358,12 +362,12 @@ def test_020_softmax_1d(h: float = 1e-5, k=OFFSET_FOR_LOG):
         """
         return np.sum(cross_entropy_log_loss(softmax(X), T))
 
-    for _ in range(100):
-        N: int = np.random.randint(2, NUM_MAX_BATCH_SIZE)   # Batch size
+    for _ in range(NUM_MAX_TEST_TIMES):
+        N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)   # Batch size
         M: int = np.random.randint(2, NUM_MAX_NODES)        # Number of activations
         T = np.random.randint(0, M, N)  # N rows of labels, max label value is M-1
         A = np.random.uniform(-float(MAX_ACTIVATION_VALUE), float(MAX_ACTIVATION_VALUE), (N, M))
-        G = numerical_jacobian(partial(L, T=np.array(T)), A)
+        G = numerical_jacobian(partial(L, T=T), A)
 
         # Analytical gradient P-T
         dA = softmax(A)
@@ -372,5 +376,6 @@ def test_020_softmax_1d(h: float = 1e-5, k=OFFSET_FOR_LOG):
             T
         ] -= 1
 
-        assert np.all(np.abs(dA - G) < h), \
-            f"Delta for A{A} T {T} dA{dA} G{G} expected to be < {h} but {np.abs(dA - G)}"
+        threshold = r * dA   # With 5 % difference of dL/dA
+        assert np.all(np.abs(dA - G) <= np.abs(threshold)), \
+            f"For T {T} and A: \n{A}\n the delta between G{G} and dA: \n{dA}\nwas expected to be < {threshold} but \n{np.abs(dA-G)}"

@@ -12,7 +12,7 @@ from layer import (
     Layer
 )
 
-from test_config import (
+from common.test_config import (
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,
     NUM_MAX_FEATURES

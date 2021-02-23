@@ -1,4 +1,4 @@
-"""Network matmul layer test cases"""
+"""Network objective layer test cases"""
 from typing import (
     Optional,
     Union,
@@ -15,7 +15,7 @@ from common import (
     weights
 )
 from layer import (
-    Matmul
+    SoftmaxWithLogLoss
 )
 from common.test_config import (
     NUM_MAX_NODES,
@@ -27,8 +27,8 @@ from common.test_config import (
 # ================================================================================
 # Base layer
 # ================================================================================
-def test_020_matmul_instantiation_to_fail():
-    """Test case for layer matmul class instantiation with wrong parameters.
+def test_030_objective_instantiation_to_fail():
+    """Test case for layer objective class instantiation with wrong parameters.
     """
     # --------------------------------------------------------------------------------
     # Test initialization validation logic:
@@ -36,80 +36,74 @@ def test_020_matmul_instantiation_to_fail():
     # --------------------------------------------------------------------------------
     M: int = np.random.randint(1, NUM_MAX_NODES)
     D = 1
-    # Matmul instance creation fails due to the invalid name.
+    # SoftmaxWithLogLoss instance creation fails due to the invalid name.
     try:
-        Matmul(
+        SoftmaxWithLogLoss(
             name="",
-            num_nodes=1,
-            W=weights.xavier(M, D)
+            num_nodes=1
         )
-        raise RuntimeError("Matmul initialization with invalid name must fail")
+        raise RuntimeError("SoftmaxWithLogLoss initialization with invalid name must fail")
     except AssertionError as e:
         pass
 
-    # Matmul instance creation fails due to num_nodes = M < 1
+    # SoftmaxWithLogLoss instance creation fails due to num_nodes = M < 1
     try:
-        Matmul(
-            name="test_020_matmul",
-            num_nodes=0,
-            W=weights.xavier(M, D)
+        SoftmaxWithLogLoss(
+            name="test_030_objective",
+            num_nodes=0
         )
-        raise RuntimeError("Matmul(num_nodes<1) must fail.")
+        raise RuntimeError("SoftmaxWithLogLoss(num_nodes<1) must fail.")
     except AssertionError as e:
         pass
 
-    # Matmul instance creation fails due to the invalid log level.
+    # SoftmaxWithLogLoss instance creation fails due to the invalid log level.
     try:
-        Matmul(
-            name="test_020_matmul",
+        SoftmaxWithLogLoss(
+            name="test_030_objective",
             num_nodes=M,
-            W=weights.xavier(M, D),
             log_level=-1
         )
-        raise RuntimeError("Matmul initialization with invalid log level must fail")
+        raise RuntimeError("SoftmaxWithLogLoss initialization with invalid log level must fail")
     except (AssertionError, KeyError) as e:
         pass
 
-    # Matmul instance creation fails as W.shape[1] != num_nodes
+    # SoftmaxWithLogLoss instance creation fails as W.shape[1] != num_nodes
     try:
-        Matmul(
+        SoftmaxWithLogLoss(
             name="",
-            num_nodes=1,
-            W=weights.xavier(2, D)
+            num_nodes=1
         )
-        raise RuntimeError("Matmul initialization with invalid name must fail")
+        raise RuntimeError("SoftmaxWithLogLoss initialization with invalid name must fail")
     except AssertionError as e:
         pass
 
-    # Matmul instance creation fails as X.shape[0] != T.shape[0]
+    # SoftmaxWithLogLoss instance creation fails as A.shape[0] != T.shape[0]
     try:
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(1, NUM_MAX_NODES)
-        layer: Matmul = Matmul(
-            name="test_020_matmul",
+        layer: SoftmaxWithLogLoss = SoftmaxWithLogLoss(
+            name="test_030_objective",
             num_nodes=M,
-            W=weights.xavier(M, D),
             log_level=logging.DEBUG
         )
         X = np.random.randn(N, M)
         layer.X = X
         T = np.random.randint(0, M, N+1)
         layer.T = T
-        raise RuntimeError("Matmul initialization different batch size between X and T must fail")
+        raise RuntimeError("SoftmaxWithLogLoss initialization different batch size between X and T must fail")
     except AssertionError as e:
         pass
 
 
-def test_020_matmul_instance_properties():
-    """Test for the matmul class validates non initialized properties"""
+def test_030_objective_instance_properties():
+    """Test for the objective class validates non initialized properties"""
     msg = "Accessing uninitialized property of the layer must fail."
     M: int = np.random.randint(1, NUM_MAX_NODES)
     D: int = np.random.randint(1, NUM_MAX_FEATURES)
-    name = "test_020_matmul"
-    layer = Matmul(
+    name = "test_030_objective"
+    layer = SoftmaxWithLogLoss(
         name=name,
         num_nodes=M,
-        W=weights.uniform(M, D),
         log_level=logging.DEBUG
     )
 
@@ -196,8 +190,8 @@ def test_020_matmul_instance_properties():
         pass
 
 
-def test_020_matmul_instantiation():
-    """Test case for layer matmul class
+def test_030_objective_instantiation():
+    """Test case for layer objective class
     """
     # --------------------------------------------------------------------------------
     # name, num_nodes, log_level _init_ properties.
@@ -216,11 +210,10 @@ def test_020_matmul_instantiation():
     N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
     M: int = np.random.randint(1, NUM_MAX_NODES)
     D: int = np.random.randint(1, NUM_MAX_FEATURES)
-    name = "test_020_matmul"
-    layer = Matmul(
+    name = "test_030_objective"
+    layer = SoftmaxWithLogLoss(
         name=name,
         num_nodes=M,
-        W=weights.he(M, D),
         log_level=logging.DEBUG
     )
 
@@ -254,26 +247,29 @@ def test_020_matmul_instantiation():
     layer.logger.debug("This is a pytest")
 
 
-def test_020_matmul_methods():
-    """Test case for layer matmul class
+def test_030_objective_methods_1d():
+    """To be implemented"""
+    pass
+
+
+def test_030_objective_methods_2d_ohe():
+    """Test case for layer objective class with 2D input with OHE labels.
     """
     def objective(X: np.ndarray) -> Union[float, np.ndarray]:
         """Dummy objective function to calculate the loss L"""
-        return np.sum(X)
+        assert X.ndim == 0, "The output of the log loss should be scalar"
+        return X
 
     # --------------------------------------------------------------------------------
-    # Instantiate a Matmul layer
+    # Instantiate a SoftmaxWithLogLoss layer
     # --------------------------------------------------------------------------------
     N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
     M: int = np.random.randint(1, NUM_MAX_NODES)
-    D: int = np.random.randint(1, NUM_MAX_FEATURES)
-    W = weights.he(M, D)
-    name = "test_020_matmul"
+    name = "test_030_objective"
 
-    layer = Matmul(
+    layer = SoftmaxWithLogLoss(
         name=name,
         num_nodes=M,
-        W=W,
         log_level=logging.DEBUG
     )
     layer.objective = objective
@@ -283,11 +279,14 @@ def test_020_matmul_methods():
     # Calculate the layer output Y=f(X), and get the loss L = objective(Y)
     # Test the numerical gradient dL/dX=layer.gradient_numerical().
     # --------------------------------------------------------------------------------
-    X = np.random.randn(N, D)
+    X = np.random.randn(N, M)
+    T = np.random.randint(0, 2, (N, M))     # OHE labels.
+
+    layer.T = T
     Y = layer.function(X)
     L = layer.objective(Y)
-    # Matmul outputs Y should be X@W.T
-    assert np.array_equal(Y, np.matmul(X, W.T))
+    # SoftmaxWithLogLoss outputs Y should be X@W.T
+    assert np.array_equal(Y, np.objective(X, W.T))
 
     # Numerical gradient should be the same with numerical Jacobian
     GN = layer.gradient_numerical()         # [dL/dX, dL/dW]
@@ -295,7 +294,7 @@ def test_020_matmul_methods():
     JX = numerical_jacobian(LX, X)           # Numerical dL/dX
     assert np.array_equal(GN[0], JX)
 
-    LW = lambda w: layer.objective(np.matmul(X, w.T))
+    LW = lambda w: layer.objective(np.objective(X, w.T))
     JW = numerical_jacobian(LW, W)           # Numerical dL/dX
     assert np.array_equal(GN[1], JW)
 
@@ -304,13 +303,13 @@ def test_020_matmul_methods():
     # Calculate the analytical gradient dL/dX=layer.gradient(dL/dY) with a dummy dL/dY.
     # Confirm the numerical gradient (dL/dX, dL/dW) are closer to the analytical ones.
     # --------------------------------------------------------------------------------
-    # Matmul gradient dL/dX should be dL/dY @ W. Use a dummy dL/dY = 1.0.
+    # SoftmaxWithLogLoss gradient dL/dX should be dL/dY @ W. Use a dummy dL/dY = 1.0.
     dY = np.ones_like(Y)
     dX = layer.gradient(dY)
-    expected_dX = np.matmul(dY, W)
+    expected_dX = np.objective(dY, W)
     assert np.array_equal(dX, expected_dX)
 
-    # Matmul gradient dL/dX should be close to the numerical gradient GN.
+    # SoftmaxWithLogLoss gradient dL/dX should be close to the numerical gradient GN.
     assert np.all(np.abs(dX - GN[0]) < OFFSET_FOR_DELTA)
 
     # --------------------------------------------------------------------------------
