@@ -34,7 +34,7 @@ class Optimizer:
         self._l2: Union[float, np.ndarray] = l2
 
         self._logger = logging.getLogger(name)
-        self._logger.setLevel(log_level)
+        self._logger.setLevel(logging._levelToName[log_level])
 
     # --------------------------------------------------------------------------------
     # Instance properties

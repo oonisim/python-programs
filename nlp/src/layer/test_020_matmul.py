@@ -67,7 +67,7 @@ def test_020_matmul_instantiation_to_fail():
             log_level=-1
         )
         raise RuntimeError("Matmul initialization with invalid log level must fail")
-    except AssertionError as e:
+    except (AssertionError, KeyError) as e:
         pass
 
     # Matmul instance creation fails as W.shape[1] != num_nodes

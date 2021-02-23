@@ -124,7 +124,7 @@ class Layer:
     # ================================================================================
     # Instance initialization
     # ================================================================================
-    def __init__(self, name: str, num_nodes: int, log_level: int = logging.ERROR):
+    def __init__(self, name: str, num_nodes: int, log_level: int = logging.WARNING):
         """
         Args:
             name: layer ID name
@@ -162,7 +162,7 @@ class Layer:
         self._objective: Union[Callable[[np.ndarray], np.ndarray], None] = None
 
         self._logger = logging.getLogger(name)
-        self._logger.setLevel(log_level)
+        self._logger.setLevel(logging._levelToName[log_level])
 
     # --------------------------------------------------------------------------------
     # Instance properties

@@ -105,7 +105,7 @@ class Base:
             compose(*[layer.gradient for layer in self._layers_all[::-1]])
 
         self._logger = logging.getLogger(name)
-        self._logger.setLevel(log_level)
+        self._logger.setLevel(logging._levelToName[log_level])
 
     # --------------------------------------------------------------------------------
     # Instance properties
