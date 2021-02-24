@@ -87,7 +87,29 @@ def softmax(X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
 def transform_X_T(
         X: Union[np.ndarray, float], T: Union[np.ndarray, int]
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Validate acceptable (X, T) conditions and reshape into P:(N, M), T:(M,).
+    """Validate acceptable (X, T) conditions and reshape into X:(N, M), T:(M,) when M > 1.
+    Note:
+        M == 1 for X: Always binary OHE label (Binary is OHE).
+            X=0.9, T=1: Scalar OHE.
+            X[0.9], T[0]: Same with scalar OHE X=0.9, T=1.
+            X[[0.9], [0.7], [0.2]], T [[1], [1], [0]]: 2D OHE
+            X[[0.9], [0.7], [0.2]], T [1, 1, 0]: transform into 2D OHE
+
+        M > 1 for X and X.ndim == T.ndim: OHE labels.
+            X[0,9, 0.1], T[1, 0]: Into X[[0,9, 0.1]], T[1, 0]
+            X[                     T[
+                [0,9, 0.1, 0.3]        [1, 0, 0],
+                [0,2, 0.1, 0.7]        [0, 0, 1]
+            ]                      ]
+            transform into
+            X[                     T[
+                [0,9, 0.1, 0.3]        0,
+                [0,2, 0.1, 0.7]        2
+            ]                      ]
+
+        M > 1 for X and X.ndim == T.ndim:
+            Transform into index label with T = T.argmax()
+
     Args:
         X: Input
         T: Labels
@@ -101,7 +123,7 @@ def transform_X_T(
 
     if isinstance(X, float) or X.ndim == 0:
         # --------------------------------------------------------------------------------
-        # When X is scalar, T must be a scalar
+        # When X is scalar, T must be a scalar. This is a binary (0/1) label.
         # --------------------------------------------------------------------------------
         assert isinstance(T, int) or T.ndim == 0
         X = np.array(X, dtype=float)
@@ -135,12 +157,12 @@ def transform_X_T(
             elif T.ndim == 1:    # T is OHE label
                 # --------------------------------------------------------------------------------
                 # T[0,...1,...0] is OHE where T[i]==1 to select X[i] from X[x0, ..., Xi, ..., xd-1].
-                # The T.shape == X.shape must be true when T is OHE labels.
+                # Then T.shape == X.shape must be true when T is OHE labels.
                 # Convert the OHE labels into a 1D index labels T with np.argmax(T).reshape(-1)
                 # because np.argmax(ndim=1) results in ().
                 # --------------------------------------------------------------------------------
                 assert T.shape == X.shape, \
-                    "For (T.ndim == X.ndim==1), T is OHE and T.shape %s == X.shape %s needs True" \
+                    "For (T.ndim == X.ndim == 1), T is OHE and T.shape %s == X.shape %s needs True" \
                     % (T.shape, X.shape)
                 T = np.argmax(T).reshape(-1)
 

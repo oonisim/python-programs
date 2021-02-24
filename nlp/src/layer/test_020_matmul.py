@@ -299,10 +299,6 @@ def test_020_matmul_instantiation():
 def test_020_matmul_methods():
     """Test case for layer matmul class
     """
-    def objective(X: np.ndarray) -> Union[float, np.ndarray]:
-        """Dummy objective function to calculate the loss L"""
-        return np.sum(X)
-
     # --------------------------------------------------------------------------------
     # Instantiate a Matmul layer
     # --------------------------------------------------------------------------------
@@ -311,6 +307,10 @@ def test_020_matmul_methods():
     D: int = np.random.randint(1, NUM_MAX_FEATURES)
     W = weights.he(M, D)
     name = "test_020_matmul"
+
+    def objective(X: np.ndarray) -> Union[float, np.ndarray]:
+        """Dummy objective function to calculate the loss L"""
+        return np.sum(X) / N
 
     layer = Matmul(
         name=name,
