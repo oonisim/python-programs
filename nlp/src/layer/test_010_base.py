@@ -34,7 +34,7 @@ def test_010_base_instantiation_to_fail():
             num_nodes=1
         )
         raise RuntimeError("Layer initialization with invalid name must fail")
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     # Constraint: num_nodes > 1
@@ -44,7 +44,7 @@ def test_010_base_instantiation_to_fail():
             num_nodes=0
         )
         raise RuntimeError("Layer(num_nodes<1) must fail.")
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     # Constraint: logging level is correct.
@@ -73,7 +73,7 @@ def test_010_base_instantiation_to_fail():
     #     T = np.random.randint(0, M, N+1)
     #     layer.T = T
     #     raise RuntimeError("Layer initialization different batch size between X and T must fail")
-    # except AssertionError as e:
+    # except AssertionError:
     #     pass
 
 
@@ -96,18 +96,19 @@ def test_010_base_instance_properties():
     # To pass
     # --------------------------------------------------------------------------------
     try:
-        print(layer.name)
-    except AssertionError as e:
+        if not layer.name == name: raise RuntimeError("layer.name == name should be true")
+    except AssertionError:
         raise RuntimeError("Access to name should be allowed as already initialized.")
 
     try:
-        print(layer.M)
-    except AssertionError as e:
+        if not layer.M == M: raise RuntimeError("layer.M == M should be true")
+    except AssertionError:
         raise RuntimeError("Access to M should be allowed as already initialized.")
 
     try:
-        print(layer.logger)
-    except AssertionError as e:
+        if not isinstance(layer.logger, logging.Logger):
+            raise RuntimeError("isinstance(layer.logger, logging.Logger) should be true")
+    except AssertionError:
         raise RuntimeError("Access to logger should be allowed as already initialized.")
 
     # --------------------------------------------------------------------------------
@@ -117,73 +118,73 @@ def test_010_base_instance_properties():
     try:
         print(layer.D)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         print(layer.X)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         layer.X = int(1)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         print(layer.dX)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         print(layer.Y)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
     try:
         layer._Y = int(1)
         print(layer.Y)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         print(layer.dY)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
     try:
         layer._dY = int(1)
         print(layer.dY)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         print(layer.T)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         layer.T = float(1)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         layer.objective(np.array(1.0))
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         print(layer.N)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     assert layer.name == name
@@ -251,7 +252,7 @@ def test_010_base_instantiation():
     try:
         layer.function(int(1))
         raise RuntimeError("Invoke layer.function(int(1)) must fail.")
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     x = np.array(1.0)
@@ -260,7 +261,7 @@ def test_010_base_instantiation():
     try:
         layer.gradient(int(1))
         raise RuntimeError("Invoke layer.gradient(int(1)) must fail.")
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     dY = np.array([1.0, 2.0])

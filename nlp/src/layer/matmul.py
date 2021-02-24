@@ -88,7 +88,7 @@ class Matmul(Layer):
         # --------------------------------------------------------------------------------
         self._D = W.shape[1]                # number of features in x
         self._W: np.ndarray = W             # node weight vectors
-        self._dW: np.ndarray = np.empty((num_nodes, W.shape[1]), dtype=float)
+        self._dW: np.ndarray = np.empty(0, dtype=float)
 
         # Layers to which forward the matmul output
         self._posteriors: List[Layer] = posteriors

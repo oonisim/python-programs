@@ -120,11 +120,21 @@ class SoftmaxWithLogLoss(Layer):
         )
 
         assert \
-            (X.ndim == 0 and self.T.ndim == 0 and X.size == self.T.size == self.M == 1) or \
-            (X.ndim == 1 and self.T.ndim in {0, 1} and X.size == self.T.size == self.M) or \
-            (X.ndim >= 2 and self.T.ndim in {1, 2} and X.shape[1] == self.M and X.shape[0] == self.T.shape[0]), \
-            "X shape %s does not match with the Layer node number M[%s]" \
-            % (X.shape, self.M)
+            (
+                self.X.ndim == 0 and self.T.ndim == 0 and
+                self.X.size == self.T.size == self.M == 1
+            ) or \
+            (
+                self.X.ndim == 1 and self.T.ndim in {0, 1} and
+                self.X.size == self.T.size == self.M
+            ) or \
+            (
+                self.X.ndim >= 2 and self.T.ndim in {1, 2} and
+                self.X.shape[0] == self.T.shape[0] and
+                self.X.shape[1] == self.M
+            ), \
+            "X shape %s with T.shape %s does not match with the Layer node number M[%s]" \
+            % (self.X.shape, self.T.shape, self.M)
 
         # --------------------------------------------------------------------------------
         # Softmax probabilities P:(N, M) for each label m in each batch n.

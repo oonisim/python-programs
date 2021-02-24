@@ -19,6 +19,7 @@ from layer import (
     Matmul
 )
 from common.test_config import (
+    NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,
     NUM_MAX_FEATURES
@@ -42,7 +43,7 @@ def test_020_matmul_instantiation_to_fail():
             W=weights.xavier(M, D)
         )
         raise RuntimeError("Matmul initialization with invalid name must fail")
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     # Constraint: num_nodes > 1
@@ -53,7 +54,7 @@ def test_020_matmul_instantiation_to_fail():
             W=weights.xavier(M, D)
         )
         raise RuntimeError("Matmul(num_nodes<1) must fail.")
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     # Constraint: logging level is correct.
@@ -76,7 +77,7 @@ def test_020_matmul_instantiation_to_fail():
             W=weights.xavier(2, D)
         )
         raise RuntimeError("Matmul initialization with invalid name must fail")
-    except AssertionError as e:
+    except AssertionError:
         pass
 
 
@@ -102,28 +103,35 @@ def test_020_matmul_instance_properties():
     # To pass
     # --------------------------------------------------------------------------------
     try:
-        print(layer.name)
-    except AssertionError as e:
+        if not layer.name == name: raise RuntimeError("layer.name == name should be true")
+    except AssertionError:
         raise RuntimeError("Access to name should be allowed as already initialized.")
 
     try:
-        print(layer.M)
-    except AssertionError as e:
+        if not layer.M == M: raise RuntimeError("layer.M == M should be true")
+    except AssertionError:
         raise RuntimeError("Access to M should be allowed as already initialized.")
 
     try:
-        print(layer.D)
-    except AssertionError as e:
-        raise RuntimeError("Access to D should be allowed as already initialized.")
-
-    try:
-        print(layer.logger)
-    except AssertionError as e:
+        if not isinstance(layer.logger, logging.Logger):
+            raise RuntimeError("isinstance(layer.logger, logging.Logger) should be true")
+    except AssertionError:
         raise RuntimeError("Access to logger should be allowed as already initialized.")
 
     try:
-        print(layer.optimizer)
-    except AssertionError as e:
+        a = layer.D
+    except AssertionError:
+        raise RuntimeError("Access to D should be allowed as already initialized.")
+
+    try:
+        layer.W is not None
+    except AssertionError:
+        raise RuntimeError("Access to W should be allowed as already initialized.")
+        pass
+
+    try:
+        layer.optimizer is not None
+    except AssertionError:
         raise RuntimeError("Access to optimizer should be allowed as already initialized.")
 
     # --------------------------------------------------------------------------------
@@ -132,78 +140,73 @@ def test_020_matmul_instance_properties():
     try:
         print(layer.X)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         layer.X = int(1)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         print(layer.dX)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
-        print(layer.W)
-        raise RuntimeError(msg)
-    except AssertionError as e:
-        pass
-    try:
         print(layer.dW)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         print(layer.Y)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
     try:
         layer._Y = int(1)
         print(layer.Y)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         print(layer.dY)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
     try:
         layer._dY = int(1)
         print(layer.dY)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         print(layer.T)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         layer.T = float(1)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         layer.objective(np.array(1.0))
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
         print(layer.N)
         raise RuntimeError(msg)
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     assert layer.name == name
@@ -218,7 +221,7 @@ def test_020_matmul_instance_properties():
         )
         layer.function(int(1))
         raise RuntimeError("Invoke layer.function(int(1)) must fail.")
-    except AssertionError as e:
+    except AssertionError:
         pass
 
     try:
@@ -231,7 +234,7 @@ def test_020_matmul_instance_properties():
         layer.function(int(1))
         layer.gradient(int(1))
         raise RuntimeError("Invoke layer.gradient(int(1)) must fail.")
-    except AssertionError as e:
+    except AssertionError:
         pass
 
 
@@ -275,7 +278,7 @@ def test_020_matmul_instantiation():
     X = np.random.randn(N, D)
     layer.X = X
     assert np.array_equal(layer.X, X)
-    assert layer.N == N
+    assert layer.N == N == X.shape[0]
 
     layer._dX = X
     assert np.array_equal(layer.dX, X)

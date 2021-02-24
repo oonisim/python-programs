@@ -123,18 +123,33 @@ def transform_X_T(
         if X.ndim == 1:
             # --------------------------------------------------------------------------------
             # X is 1D array, then T dim should be in Set{0, 1}.
-            # Convert T.ndim==0 scalar index label into single element 1D index label T.
-            # Convert T.ndim==1 OHE labels into a 1D index labels T.
-            # T.reshape(-1) because np.argmax(ndim=1) results in ().
             # --------------------------------------------------------------------------------
-            assert T.ndim in {0, 1}, \
-                "When X.ndim=1, T.ndim should be 0 or 1 but %s" % T.ndim
+            _shape = T.shape
+            if T.ndim == 0:     # T is a scalar index label
+                # --------------------------------------------------------------------------------
+                # T=i is a scalar index label for a 1D X[x0, x1, ..., xd-1] to select Xi.
+                # Convert the scalar index label into single element 1D index label T.
+                # --------------------------------------------------------------------------------
+                T = T.reshape(-1)
+
+            elif T.ndim == 1:    # T is OHE label
+                # --------------------------------------------------------------------------------
+                # T[0,...1,...0] is OHE where T[i]==1 to select X[i] from X[x0, ..., Xi, ..., xd-1].
+                # The T.shape == X.shape must be true when T is OHE labels.
+                # Convert the OHE labels into a 1D index labels T with np.argmax(T).reshape(-1)
+                # because np.argmax(ndim=1) results in ().
+                # --------------------------------------------------------------------------------
+                assert T.shape == X.shape, \
+                    "For (T.ndim == X.ndim==1), T is OHE and T.shape %s == X.shape %s needs True" \
+                    % (T.shape, X.shape)
+                T = np.argmax(T).reshape(-1)
+
+            else:
+                assert False, \
+                    "When X.ndim=1, T.ndim should be 0 or 1 but %s" % T.ndim
 
             X = X.reshape(1, -1)
             Logger.debug("X.shape (%s,) has been converted into %s", X.size, X.shape)
-
-            _shape = T.shape
-            T = T.reshape(-1) if T.ndim == 0 else np.argmax(T).reshape(-1)
             Logger.debug("T.shape %s has been converted into %s",_shape, T.shape)
 
         else:
