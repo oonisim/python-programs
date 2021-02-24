@@ -19,18 +19,15 @@ from common.test_config import (
 )
 
 
-# ================================================================================
-# Base layer
-# ================================================================================
 def test_010_base_instantiation_to_fail():
-    """Test case for layer base class instantiation with wrong parameters.
     """
-    # --------------------------------------------------------------------------------
-    # Test initialization validation logic:
-    # Expected the layer instance initialization fails.
-    # --------------------------------------------------------------------------------
+    Objective:
+        Verify the layer class validates the initialization parameter constraints.
+    Expected:
+        Initialization detects parameter constraints not meet and fails.
+    """
     M: int = np.random.randint(1, NUM_MAX_NODES)
-    # Layer instance creation fails due to the invalid name.
+    # Constraint: Name is string with length > 0.
     try:
         Layer(
             name="",
@@ -40,7 +37,7 @@ def test_010_base_instantiation_to_fail():
     except AssertionError as e:
         pass
 
-    # Layer instance creation fails due to num_nodes = M < 1
+    # Constraint: num_nodes > 1
     try:
         Layer(
             name="test_010_base",
@@ -50,7 +47,7 @@ def test_010_base_instantiation_to_fail():
     except AssertionError as e:
         pass
 
-    # Layer instance creation fails due to the invalid log level.
+    # Constraint: logging level is correct.
     try:
         Layer(
             name="test_010_base",
@@ -81,7 +78,12 @@ def test_010_base_instantiation_to_fail():
 
 
 def test_010_base_instance_properties():
-    """Test for the base class validates non initialized properties"""
+    """
+    Objective:
+        Verify the layer class validates the parameters have been initialized before accessed.
+    Expected:
+        Initialization detects the access to the non-initialized parameters and fails.
+    """
     msg = "Accessing uninitialized property of the layer must fail."
     M: int = np.random.randint(1, NUM_MAX_NODES)
     name = "test_010_base"
@@ -90,6 +92,28 @@ def test_010_base_instance_properties():
         num_nodes=M,
         log_level=logging.DEBUG
     )
+    # --------------------------------------------------------------------------------
+    # To pass
+    # --------------------------------------------------------------------------------
+    try:
+        print(layer.name)
+    except AssertionError as e:
+        raise RuntimeError("Access to name should be allowed as already initialized.")
+
+    try:
+        print(layer.M)
+    except AssertionError as e:
+        raise RuntimeError("Access to M should be allowed as already initialized.")
+
+    try:
+        print(layer.logger)
+    except AssertionError as e:
+        raise RuntimeError("Access to logger should be allowed as already initialized.")
+
+    # --------------------------------------------------------------------------------
+    # To fail
+    # --------------------------------------------------------------------------------
+
     try:
         print(layer.D)
         raise RuntimeError(msg)

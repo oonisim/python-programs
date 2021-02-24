@@ -26,6 +26,11 @@ class SoftmaxWithLogLoss(Layer):
     """Softmax cross entropy log loss class
     Combined with the log loss because calculating gradients separately is not simple.
     When combined, the dL/dX, impact on L by input delta dX, is (P - T)/N.
+
+    Note:
+        Number of nodes M == number of feature D at the softmax with log loss layer.
+        T has either in the OHE (One Hot Encoder) label format or index label format.
+        For OHE T.shape[0] == N and T.shape[1] == M == D. For index, T.size == N.
     """
     # ================================================================================
     # Class initialization
@@ -41,19 +46,23 @@ class SoftmaxWithLogLoss(Layer):
         """
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
 
+        # At softmax loss layer, features in X is the same with num nodes (1:1)
+        self._D = num_nodes
+
         self._P: np.ndarray = np.empty(())  # Probabilities of shape (N, M)
         self._J: np.ndarray = np.empty(())  # Cross entropy log loss of shape (N,).
-        self._L: np.ndarray = -np.inf       # Objective value of shape ()
+        # Use Y for output in the consistent manner.
+        # self._L: np.ndarray = -np.inf       # Objective value of shape ()
 
     # --------------------------------------------------------------------------------
     # Instance properties
     # --------------------------------------------------------------------------------
     @property
     def P(self) -> np.ndarray:
-        """Softmax probabilities of shape (N,M)"""
+        """Softmax outputs probabilities of shape (N,M)"""
         assert \
             isinstance(self._P, np.ndarray) and self._P.size > 0 and \
-            self._P.shape == (self.N, self.M), "P is not initialized"
+            self._P.shape == (self.N, self.M), "Y is not initialized"
         return self._P
 
     @property
@@ -65,17 +74,20 @@ class SoftmaxWithLogLoss(Layer):
 
     @property
     def L(self) -> np.ndarray:
-        """Cross entropy log loss of shape()"""
-        assert isinstance(self._L, np.ndarray) and self._L.size == 1, \
-            "L is not initialized"
-        return self._L
+        """Cross entropy log loss of shape()
+        Alias of the layer output Y
+        """
+        assert isinstance(self._Y, np.ndarray) and self._Y.size == 1, \
+            "Y is not initialized"
+        return self._Y
 
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
-
     def function(self, X: Union[np.ndarray, float]) -> np.ndarray:
         """Softmax wth Log Loss layer output L
+        Pre-requisite:
+            T has been set before calling.
         Note:
             The Softmax Log Loss output is normalized by the batch size N.
             Otherwise the NN loss is dependent on the batch size.
@@ -92,30 +104,53 @@ class SoftmaxWithLogLoss(Layer):
         Returns:
             L: Objective value of shape ()
         """
+        # Pre-requisite: T has been set before calling.
+        assert self.T.size > 0 and self.M == self.D
+
+        # --------------------------------------------------------------------------------
+        # Validate X, T and transform them to be able to use numpy tuple-like indexing.
+        # P[
+        #   (0,3),
+        #   (1,5)
+        # ]
+        # --------------------------------------------------------------------------------
         self.X, self.T = transform_X_T(X, self.T)
         self.logger.debug(
             "layer[%s] function(): X.shape %s T.shape %s", self.name, self.X.shape, self.T.shape
         )
 
-        self._P = softmax(self.X)
-        self._J = cross_entropy_log_loss(self.P, self.T)    # dJ/dP -> -T/P
+        assert \
+            (X.ndim == 0 and self.T.ndim == 0 and X.size == self.T.size == self.M == 1) or \
+            (X.ndim == 1 and self.T.ndim in {0, 1} and X.size == self.T.size == self.M) or \
+            (X.ndim >= 2 and self.T.ndim in {1, 2} and X.shape[1] == self.M and X.shape[0] == self.T.shape[0]), \
+            "X shape %s does not match with the Layer node number M[%s]" \
+            % (X.shape, self.M)
 
         # --------------------------------------------------------------------------------
-        # Calculate the sum and convert scalar back to np.ndarray
+        # Softmax probabilities P:(N, M) for each label m in each batch n.
+        # --------------------------------------------------------------------------------
+        self._P = softmax(self.X)
+
+        # --------------------------------------------------------------------------------
+        # Cross entropy log loss J:(N,) where j(n) for each batch n (n: 0, ..., N-1).
+        # Gradient dJ/dP -> -T/P
+        # --------------------------------------------------------------------------------
+        self._J = cross_entropy_log_loss(self.P, self.T)
+
+        # --------------------------------------------------------------------------------
+        # Total loss L. Calculate the sum and convert scalar back to np.ndarray
         # If a for sum(a) is 0-d array or axis is None, a scalar is returned.
         # https://numpy.org/doc/stable/reference/generated/numpy.sum.html
-        # --------------------------------------------------------------------------------
         # dL/dJ = 1 at this point because dsum(J)/dJ = 1
-        L = np.array(np.sum(self.J, axis=-1))
+        # --------------------------------------------------------------------------------
+        _L = np.array(np.sum(self.J, axis=-1))
 
         # --------------------------------------------------------------------------------
-        # Normalize with the batch size N.
-        # Here, dL/dJ = 1/N because f(X)=X/N -> df(X)/dX = 1/N
+        # Normalize L with the batch size N to be dependent from the batch size.
+        # dL/dJ = 1/N because f(X)=X/N -> df(X)/dX = 1/N
         # --------------------------------------------------------------------------------
-        L = L / self.N
-
-        self._L = np.array(L) if isinstance(L, (float, int)) else L
-        self._Y = self.L
+        L = np.array(_L / self.N, dtype=float)
+        self._Y = L # L is alias of Y.
 
         self.logger.debug("function() L = %s", self.Y)
         return self.Y

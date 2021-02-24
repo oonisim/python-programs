@@ -1,4 +1,4 @@
-"""Network matmul layer test cases"""
+"""Matmul layer test cases"""
 from typing import (
     Optional,
     Union,
@@ -12,7 +12,8 @@ import numpy as np
 from common import (
     OFFSET_FOR_DELTA,
     numerical_jacobian,
-    weights
+    weights,
+    random_string
 )
 from layer import (
     Matmul
@@ -24,19 +25,16 @@ from common.test_config import (
 )
 
 
-# ================================================================================
-# Base layer
-# ================================================================================
 def test_020_matmul_instantiation_to_fail():
-    """Test case for layer matmul class instantiation with wrong parameters.
     """
-    # --------------------------------------------------------------------------------
-    # Test initialization validation logic:
-    # Expected the layer instance initialization fails.
-    # --------------------------------------------------------------------------------
+    Objective:
+        Verify the layer class validates the initialization parameter constraints.
+    Expected:
+        Initialization detects parameter constraints not meet and fails.
+    """
     M: int = np.random.randint(1, NUM_MAX_NODES)
     D = 1
-    # Matmul instance creation fails due to the invalid name.
+    # Constraint: Name is string with length > 0.
     try:
         Matmul(
             name="",
@@ -47,7 +45,7 @@ def test_020_matmul_instantiation_to_fail():
     except AssertionError as e:
         pass
 
-    # Matmul instance creation fails due to num_nodes = M < 1
+    # Constraint: num_nodes > 1
     try:
         Matmul(
             name="test_020_matmul",
@@ -58,7 +56,7 @@ def test_020_matmul_instantiation_to_fail():
     except AssertionError as e:
         pass
 
-    # Matmul instance creation fails due to the invalid log level.
+    # Constraint: logging level is correct.
     try:
         Matmul(
             name="test_020_matmul",
@@ -83,11 +81,16 @@ def test_020_matmul_instantiation_to_fail():
 
 
 def test_020_matmul_instance_properties():
-    """Test for the matmul class validates non initialized properties"""
+    """
+    Objective:
+        Verify the layer class validates the parameters have been initialized before accessed.
+    Expected:
+        Initialization detects the access to the non-initialized parameters and fails.
+    """
     msg = "Accessing uninitialized property of the layer must fail."
+    name = random_string(np.random.randint(0, 10))
     M: int = np.random.randint(1, NUM_MAX_NODES)
     D: int = np.random.randint(1, NUM_MAX_FEATURES)
-    name = "test_020_matmul"
     layer = Matmul(
         name=name,
         num_nodes=M,
@@ -95,6 +98,37 @@ def test_020_matmul_instance_properties():
         log_level=logging.DEBUG
     )
 
+    # --------------------------------------------------------------------------------
+    # To pass
+    # --------------------------------------------------------------------------------
+    try:
+        print(layer.name)
+    except AssertionError as e:
+        raise RuntimeError("Access to name should be allowed as already initialized.")
+
+    try:
+        print(layer.M)
+    except AssertionError as e:
+        raise RuntimeError("Access to M should be allowed as already initialized.")
+
+    try:
+        print(layer.D)
+    except AssertionError as e:
+        raise RuntimeError("Access to D should be allowed as already initialized.")
+
+    try:
+        print(layer.logger)
+    except AssertionError as e:
+        raise RuntimeError("Access to logger should be allowed as already initialized.")
+
+    try:
+        print(layer.optimizer)
+    except AssertionError as e:
+        raise RuntimeError("Access to optimizer should be allowed as already initialized.")
+
+    # --------------------------------------------------------------------------------
+    # To fail
+    # --------------------------------------------------------------------------------
     try:
         print(layer.X)
         raise RuntimeError(msg)
@@ -109,6 +143,17 @@ def test_020_matmul_instance_properties():
 
     try:
         print(layer.dX)
+        raise RuntimeError(msg)
+    except AssertionError as e:
+        pass
+
+    try:
+        print(layer.W)
+        raise RuntimeError(msg)
+    except AssertionError as e:
+        pass
+    try:
+        print(layer.dW)
         raise RuntimeError(msg)
     except AssertionError as e:
         pass
