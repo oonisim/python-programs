@@ -154,7 +154,7 @@ def transform_X_T(
                     # Transfer result is (T.ndim == P.ndim == 0).
                     # --------------------------------------------------------------------------------
                     assert np.all(np.isin(T, [0, 1])), "Binary label must be 0/1"
-                    X.reshape(())
+                    X= X.reshape(())
                 else:                       # M>1
                     # --------------------------------------------------------------------------------
                     # T=i is a scalar index label for a 1D X[x0, x1, ..., xd-1] to select Xi.
@@ -162,7 +162,7 @@ def transform_X_T(
                     # Transfer results in (P.ndim==T.ndim+1 > 1) and (P.shape[0]==T.shape[0]==N).
                     # --------------------------------------------------------------------------------
                     T = T.reshape(-1)
-                    X = X.reshape(1, -1)
+                    X = X.reshape((1, -1))
 
             elif T.ndim == 1:    # T is OHE label
                 if T.size == X.size == 1:   # M==1
@@ -171,8 +171,8 @@ def transform_X_T(
                     # Result is (T.ndim == P.ndim == 0) after transformation.
                     # --------------------------------------------------------------------------------
                     assert np.all(np.isin(T, [0, 1])), "Binary label must be 0/1"
-                    T.reshape(())
-                    X.reshape(())
+                    T = T.reshape(())
+                    X = X.reshape(())
 
                 else:
                     # --------------------------------------------------------------------------------
@@ -186,7 +186,7 @@ def transform_X_T(
                         "For (T.ndim == X.ndim == 1), T is OHE and T.shape %s == X.shape %s needs True" \
                         % (T.shape, X.shape)
                     T = np.argmax(T).reshape(-1)
-                    X = X.reshape(1, -1)
+                    X = X.reshape((1, -1))
 
             else:
                 assert False, \
@@ -205,7 +205,7 @@ def transform_X_T(
                     # This condition X:(N,1), T(N,1) are in the 2D binary OHE labels.
                     # --------------------------------------------------------------------------------
                     assert np.all(np.isin(T, [0, 1])), "Binary label must be 0/1"
-                    T.reshape(-1, 1)    # Convert into T(N,1) 2D OHE Binary
+                    T = T.reshape((-1, 1))    # Convert into T(N,1) 2D OHE Binary
                     Logger.debug("T.shape %s has been converted into %s", _shape, T.shape)
 
                 elif X.shape[1] > 1:
@@ -260,11 +260,19 @@ def cross_entropy_log_loss(
     """
     P, T = transform_X_T(P, T)
 
-    # --------------------------------------------------------------------------------
-    # P is scalar, then return -t * log(p).
-    # --------------------------------------------------------------------------------
     if P.ndim == 0:
+        # --------------------------------------------------------------------------------
+        # P is scalar, T is a scalar binary OHE label. Return -t * log(p).
+        # --------------------------------------------------------------------------------
+        assert T.ndim == 0, "P.ndim==0 requires T.ndim==0 but %s" % T.shape
         return -T * np.log(P+offset)
+
+    if 1 < P.ndim == T.ndim:
+        # --------------------------------------------------------------------------------
+        # T is 2D binary OHE labels e.g. T[[0],[1],[0]], P[[0.9],[0.1],[0.3]].
+        # Return -T * log(P)
+        # --------------------------------------------------------------------------------
+        return -np.sum(np.multiply(T, np.log(P+offset)), axis=-1)
 
     # ================================================================================
     # Calculate Cross entropy log loss -t * log(p).
