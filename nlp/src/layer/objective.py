@@ -127,13 +127,7 @@ class SoftmaxWithLogLoss(Layer):
             "layer[%s] function(): X.shape %s T.shape %s", self.name, self.X.shape, self.T.shape
         )
 
-        assert \
-            (
-                # Scalar binary OHE e.g. T=0, P=0.9
-                self.X.ndim == 0 and self.T.ndim == 0 and
-                self.X.size == self.T.size == self.M == 1
-            ) or \
-            (
+        assert (
                 # Index labels P:(N,M), T:(N,) e.g. T[0,4,2] P[[1.,0.,...],[...],[...]] or
                 # Binary oHE labels P(N,M), T(N,M) e.g T[[0],[1],[0]], P[[0,1],[0.9],[0.]]
                 self.X.ndim >= 2 and self.T.ndim in {1, 2} and
@@ -207,7 +201,7 @@ class SoftmaxWithLogLoss(Layer):
         # Calculate the layer gradient
         # --------------------------------------------------------------------------------
         if self.T.ndim == self.P.ndim:
-            self.logger.debug("gradient(): Label is in OHE format or scalar index")
+            self.logger.debug("gradient(): Label is in OHE format")
             assert (self.T.size == self.P.size) and (self.T.shape == self.P.shape), \
                 "T.shape %s and P.shape %s should be the same for the OHE labels." \
                 % (self.T.shape, self.P.shape)
