@@ -5,5 +5,5 @@ from . activation import (
     Relu
 )
 from . objective import (
-    SoftmaxWithLogLoss
+    CrossEntropyLogLoss
 )

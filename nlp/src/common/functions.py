@@ -244,9 +244,35 @@ def transform_X_T(
     return X, T
 
 
+def categorical_log_loss(P: np.ndarray, T: np.ndarray, offset: float) ->np.ndarray:
+    """Cross entropy log loss function for multi class classification.
+    Args:
+        P: Probabilities e.g. from Softmax
+        T: Labels
+        offset: small number to avoid np.inf by log(0) by log(0+offset)
+    Returns:
+        J: Loss value.
+    """
+    J: np.ndarray = -T * np.log(P + offset)
+    return J
+
+
+def logistic_log_loss_for(A: np.ndarray, T: np.ndarray, offset: float) ->np.ndarray:
+    """Cross entropy log loss function for binary classification.
+    Args:
+        A: Activations e.g. from Sigmoid
+        T: Labels
+        offset: small number to avoid np.inf by log(0) by log(0+offset)
+    Returns:
+        J: Loss value.
+    """
+    J: np.ndarray = -( T * np.log(A+offset) + (1-T) * np.log(1-A+offset) )
+
+
 def cross_entropy_log_loss(
         P: Union[np.ndarray, float],
         T: Union[np.ndarray, int],
+        f: Callable = categorical_log_loss,
         offset: float = OFFSET_FOR_LOG
 ) -> np.ndarray:
     """Cross entropy log loss [ -t(n)(m) * log(p(n)(m)) ] for multi labels.
@@ -263,6 +289,7 @@ def cross_entropy_log_loss(
             M is Number of nodes
         T: label either in OHE format of shape (N,M) or index format of shape (N,).
            OHE: One Hot Encoding
+        f: Cross entropy log loss function
         offset: small number to avoid np.inf by log(0) by log(0+offset)
     Returns:
         J: Loss value of shape (N,), a loss value per batch.
@@ -274,15 +301,15 @@ def cross_entropy_log_loss(
         # P is scalar, T is a scalar binary OHE label. Return -t * log(p).
         # --------------------------------------------------------------------------------
         assert T.ndim == 0, "P.ndim==0 requires T.ndim==0 but %s" % T.shape
-        return -T * np.log(P+offset)
+        return f(P, T, offset)
 
-    if 1 < P.ndim == T.ndim:
+    if (1 < P.ndim == T.ndim) and (P.shape[1] == T.shape[1] == 1):
         # --------------------------------------------------------------------------------
+        # This condition X:(N,1), T(N,1) tells T is the 2D binary OHE labels.
         # T is 2D binary OHE labels e.g. T[[0],[1],[0]], P[[0.9],[0.1],[0.3]].
         # Return -T * log(P)
         # --------------------------------------------------------------------------------
-        # return -np.sum(np.multiply(T, np.log(P+offset)), axis=-1)
-        return np.squeeze(-np.multiply(T, np.log(P + offset)), axis=-1)
+        return np.squeeze(f(T, P + offset), axis=-1)
 
     # ================================================================================
     # Calculate Cross entropy log loss -t * log(p).
@@ -327,7 +354,8 @@ def cross_entropy_log_loss(
     assert np.all((_P + offset) > 0), \
         "x for log(x) needs to be > 0 but %s." % (_P + offset)
 
-    J = -np.log(_P + offset)
+    # J = -np.log(_P + offset)
+    J = f(P=_P, T=int(1), offset=offset)
 
     assert not np.all(np.isnan(J)), "log(x) caused nan for P \n%s." % P
     Logger.debug("J is [%s]", J)

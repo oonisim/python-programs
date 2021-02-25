@@ -16,9 +16,9 @@ from common import (
     random_string
 )
 from layer import (
-    SoftmaxWithLogLoss
+    CrossEntropyLogLoss
 )
-from common.test_config import (
+from layer.test_config import (
     NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,
@@ -42,32 +42,41 @@ def test_030_objective_instantiation_to_fail():
         M: int = np.random.randint(1, NUM_MAX_NODES)
         # Constraint: Name is string with length > 0.
         try:
-            SoftmaxWithLogLoss(
+            CrossEntropyLogLoss(
                 name="",
                 num_nodes=1
             )
-            raise RuntimeError("SoftmaxWithLogLoss initialization with invalid name must fail")
+            raise RuntimeError("CrossEntropyLogLoss initialization with invalid name must fail")
         except AssertionError:
             pass
 
         # Constraint: num_nodes > 1
         try:
-            SoftmaxWithLogLoss(
+            CrossEntropyLogLoss(
                 name="test_030_objective",
                 num_nodes=0
             )
-            raise RuntimeError("SoftmaxWithLogLoss(num_nodes<1) must fail.")
+            raise RuntimeError("CrossEntropyLogLoss(num_nodes<1) must fail.")
+        except AssertionError:
+            pass
+
+        try:
+            CrossEntropyLogLoss(
+                name="test_030_objective",
+                num_nodes=1
+            )
+            raise RuntimeError("CrossEntropyLogLoss(num_nodes<2) must fail.")
         except AssertionError:
             pass
 
         # Constraint: logging level is correct.
         try:
-            SoftmaxWithLogLoss(
+            CrossEntropyLogLoss(
                 name="test_030_objective",
                 num_nodes=M,
                 log_level=-1
             )
-            raise RuntimeError("SoftmaxWithLogLoss initialization with invalid log level must fail")
+            raise RuntimeError("CrossEntropyLogLoss initialization with invalid log level must fail")
         except (AssertionError, KeyError):
             pass
 
@@ -82,8 +91,8 @@ def test_030_objective_instance_properties():
     msg = "Accessing uninitialized property of the layer must fail."
     name = random_string(np.random.randint(1, 10))
     for _ in range(NUM_MAX_TEST_TIMES):
-        M: int = np.random.randint(1, NUM_MAX_NODES)
-        layer = SoftmaxWithLogLoss(
+        M: int = np.random.randint(2, NUM_MAX_NODES)
+        layer = CrossEntropyLogLoss(
             name=name,
             num_nodes=M,
             log_level=logging.DEBUG
@@ -228,10 +237,13 @@ def test_030_objective_instantiation():
 
     for _ in range(NUM_MAX_TEST_TIMES):
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
-        M: int = np.random.randint(1, NUM_MAX_NODES)
+        M: int = np.random.randint(2, NUM_MAX_NODES)
+        assert M >= 2, "Softmax is for multi label classification. "\
+                       " Use Sigmoid for binary classification."
+
         # For softmax log loss layer, the number of features N in X is the same with node number.
         D: int = M
-        layer = SoftmaxWithLogLoss(
+        layer = CrossEntropyLogLoss(
             name=name,
             num_nodes=M,
             log_level=logging.DEBUG
@@ -299,14 +311,17 @@ def test_030_objective_methods_1d_ohe():
         return X
 
     # --------------------------------------------------------------------------------
-    # Instantiate a SoftmaxWithLogLoss layer
+    # Instantiate a CrossEntropyLogLoss layer
     # --------------------------------------------------------------------------------
     name = "test_030_objective_methods_1d_ohe"
     N = 1
 
     for _ in range(NUM_MAX_TEST_TIMES):
-        M: int = np.random.randint(1, NUM_MAX_NODES)
-        layer = SoftmaxWithLogLoss(
+        M: int = np.random.randint(2, NUM_MAX_NODES)
+        assert M >= 2, "Softmax is for multi label classification. "\
+                       " Use Sigmoid for binary classification."
+
+        layer = CrossEntropyLogLoss(
             name=name,
             num_nodes=M,
             log_level=logging.DEBUG
@@ -343,7 +358,7 @@ def test_030_objective_methods_1d_ohe():
         GN = layer.gradient_numerical()                     # [dL/dX] from the layer
 
         # --------------------------------------------------------------------------------
-        # Cannot use SoftmaxWithLogLoss.function() to simulate the objective function L.
+        # Cannot use CrossEntropyLogLoss.function() to simulate the objective function L.
         # because it causes applying transform_X_T multiple times.
         # Because internally transform_X_T(X, T) has transformed T into the index label
         # in 1D with with length 1 by "T = T.reshape(-1)".
@@ -354,7 +369,7 @@ def test_030_objective_methods_1d_ohe():
         # (applying transform_X_T multiple times) and (T.shape=(1,1), X.shape=(1, > 1)
         # that violates the (X.shape == T.shape) constraint.
         # --------------------------------------------------------------------------------
-        # dummy = SoftmaxWithLogLoss(
+        # dummy = CrossEntropyLogLoss(
         #     name="dummy",
         #     num_nodes=M,
         #     log_level=logging.DEBUG
@@ -408,13 +423,16 @@ def test_030_objective_methods_2d_ohe():
         return X
 
     # --------------------------------------------------------------------------------
-    # Instantiate a SoftmaxWithLogLoss layer
+    # Instantiate a CrossEntropyLogLoss layer
     # --------------------------------------------------------------------------------
     name = "test_030_objective_methods_2d_ohe"
     for _ in range(NUM_MAX_TEST_TIMES):
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
-        M: int = np.random.randint(1, NUM_MAX_NODES)
-        layer = SoftmaxWithLogLoss(
+        M: int = np.random.randint(2, NUM_MAX_NODES)
+        assert M >= 2, "Softmax is for multi label classification. "\
+                       " Use Sigmoid for binary classification."
+
+        layer = CrossEntropyLogLoss(
             name=name,
             num_nodes=M,
             log_level=logging.DEBUG
@@ -450,10 +468,10 @@ def test_030_objective_methods_2d_ohe():
         GN = layer.gradient_numerical()                     # [dL/dX] from the layer
 
         # --------------------------------------------------------------------------------
-        # DO not use SoftmaxWithLogLoss.function() to simulate the objective function for
+        # DO not use CrossEntropyLogLoss.function() to simulate the objective function for
         # the expected GN. See the same part in test_030_objective_methods_1d_ohe().
         # --------------------------------------------------------------------------------
-        # dummy= SoftmaxWithLogLoss(
+        # dummy= CrossEntropyLogLoss(
         #     name=name,
         #     num_nodes=M,
         #     log_level=logging.DEBUG

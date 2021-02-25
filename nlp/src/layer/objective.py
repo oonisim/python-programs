@@ -26,8 +26,8 @@ from common.functions import (
 # class SigmoidWithLogLoss(Layer):
 
 
-class SoftmaxWithLogLoss(Layer):
-    """Softmax cross entropy log loss class
+class CrossEntropyLogLoss(Layer):
+    """Cross entropy log loss class
     Combined with the log loss because calculating gradients separately is not simple.
     When combined, the dL/dX, impact on L by input delta dX, is (P - T)/N.
 
@@ -47,12 +47,22 @@ class SoftmaxWithLogLoss(Layer):
     # ================================================================================
     # Instance initialization
     # ================================================================================
-    def __init__(self, name: str, num_nodes: int, log_level: int = logging.ERROR):
+    def __init__(
+            self, name:
+            str, num_nodes: int,
+            activation: Callable = softmax,
+            log_level: int = logging.ERROR
+    ):
         """Initialize a softmax layer
         Args
             name: Instance ID
+            num_nodes: Number of nodes in the layer
+            activation: Activation function, softmax by default
+            log_level: Logging level
         """
+        assert num_nodes >= 2, "Softmax log loss output is for multi label classification."
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
+        self._activation = activation
 
         # At softmax loss layer, features in X is the same with num nodes (1:1)
         self._D = num_nodes
@@ -89,6 +99,14 @@ class SoftmaxWithLogLoss(Layer):
             "Y is not initialized"
         return self._Y
 
+    @property
+    def activation(self) -> Callable:
+        """Activation function of the layer
+        """
+        assert isinstance(self._activation, Callable), \
+            "activation is not initialized"
+        return self._activation
+
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
@@ -109,6 +127,7 @@ class SoftmaxWithLogLoss(Layer):
         Args:
             X: Input of shape (N,M) to calculate the probabilities for the M nodes.
             T: Labels for input X. Shape(N,M) for OHE label and shape(N,) for index label.
+            f: Activation function, e.g. softmax, sigmoid
         Returns:
             L: Objective value of shape ()
         """
@@ -140,7 +159,7 @@ class SoftmaxWithLogLoss(Layer):
         # --------------------------------------------------------------------------------
         # Softmax probabilities P:(N, M) for each label m in each batch n.
         # --------------------------------------------------------------------------------
-        self._P = softmax(self.X)
+        self._P = self.activation(self.X)
 
         # --------------------------------------------------------------------------------
         # Cross entropy log loss J:(N,) where j(n) for each batch n (n: 0, ..., N-1).

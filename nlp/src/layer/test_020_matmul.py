@@ -18,7 +18,7 @@ from common import (
 from layer import (
     Matmul
 )
-from common.test_config import (
+from layer.test_config import (
     NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,
