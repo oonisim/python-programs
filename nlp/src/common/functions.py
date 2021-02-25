@@ -147,45 +147,83 @@ def transform_X_T(
             # X is 1D array, then T dim should be in Set{0, 1}.
             # --------------------------------------------------------------------------------
             _shape = T.shape
-            if T.ndim == 0:     # T is a scalar index label
-                # --------------------------------------------------------------------------------
-                # T=i is a scalar index label for a 1D X[x0, x1, ..., xd-1] to select Xi.
-                # Convert the scalar index label into single element 1D index label T.
-                # --------------------------------------------------------------------------------
-                T = T.reshape(-1)
+            if T.ndim == 0:
+                if T.size == X.size == 1:   # M==1
+                    # --------------------------------------------------------------------------------
+                    # Binary OHE label e.g. T=0, P=[0.94]. Reshape into scalar T=0, P=0.94.
+                    # Transfer result is (T.ndim == P.ndim == 0).
+                    # --------------------------------------------------------------------------------
+                    assert np.all(np.isin(T, [0, 1])), "Binary label must be 0/1"
+                    X.reshape(())
+                else:                       # M>1
+                    # --------------------------------------------------------------------------------
+                    # T=i is a scalar index label for a 1D X[x0, x1, ..., xd-1] to select Xi.
+                    # Convert the scalar index label into single element 1D index label T.
+                    # Transfer results in (P.ndim==T.ndim+1 > 1) and (P.shape[0]==T.shape[0]==N).
+                    # --------------------------------------------------------------------------------
+                    T = T.reshape(-1)
+                    X = X.reshape(1, -1)
 
             elif T.ndim == 1:    # T is OHE label
-                # --------------------------------------------------------------------------------
-                # T[0,...1,...0] is OHE where T[i]==1 to select X[i] from X[x0, ..., Xi, ..., xd-1].
-                # Then T.shape == X.shape must be true when T is OHE labels.
-                # Convert the OHE labels into a 1D index labels T with np.argmax(T).reshape(-1)
-                # because np.argmax(ndim=1) results in ().
-                # --------------------------------------------------------------------------------
-                assert T.shape == X.shape, \
-                    "For (T.ndim == X.ndim == 1), T is OHE and T.shape %s == X.shape %s needs True" \
-                    % (T.shape, X.shape)
-                T = np.argmax(T).reshape(-1)
+                if T.size == X.size == 1:   # M==1
+                    # --------------------------------------------------------------------------------
+                    # Binary OHE label e.g. T=[0], P=[0.94]. Reshape into scalar T=0, P=0.94.
+                    # Result is (T.ndim == P.ndim == 0) after transformation.
+                    # --------------------------------------------------------------------------------
+                    assert np.all(np.isin(T, [0, 1])), "Binary label must be 0/1"
+                    T.reshape(())
+                    X.reshape(())
+
+                else:
+                    # --------------------------------------------------------------------------------
+                    # T[0,...1,...0] is OHE where T[i]==1 to select X[i] from X[x0, ..., Xi, ..., xd-1].
+                    # Then T.shape == X.shape must be true when T is OHE labels.
+                    # Convert the OHE labels into a 1D index labels T with np.argmax(T).reshape(-1)
+                    # because np.argmax(ndim=1) results in ().
+                    # Transfer results in (P.ndim==T.ndim+1 > 1) and (P.shape[0]==T.shape[0]==N).
+                    # --------------------------------------------------------------------------------
+                    assert T.shape == X.shape and np.all(np.isin(T, [0, 1])), \
+                        "For (T.ndim == X.ndim == 1), T is OHE and T.shape %s == X.shape %s needs True" \
+                        % (T.shape, X.shape)
+                    T = np.argmax(T).reshape(-1)
+                    X = X.reshape(1, -1)
 
             else:
                 assert False, \
                     "When X.ndim=1, T.ndim should be 0 or 1 but %s" % T.ndim
 
-            X = X.reshape(1, -1)
             Logger.debug("X.shape (%s,) has been converted into %s", X.size, X.shape)
             Logger.debug("T.shape %s has been converted into %s",_shape, T.shape)
 
-        else:
-            # --------------------------------------------------------------------------------
-            # X is ND array, then:
-            # Convert the OHE labels into index labels when T.ndim==2.
-            # Otherwise T should be index labels when T.ndim==1.
-            # --------------------------------------------------------------------------------
-            if 1 < X.ndim == T.ndim:
-                _shape = T.shape
+        else:   # X.ndim > 1
+            _shape = T.shape
+            if T.ndim == 1:
+                if X.shape[1] == 1:
+                    # --------------------------------------------------------------------------------
+                    # M (X.shape[1]==1) then T is binary OHE labels. Convert T into T(N, 1) shape.
+                    # Transfer results in (P.ndim==T.ndim+1 > 1) and (P.shape[1]==T.shape[1]==1).
+                    # This condition X:(N,1), T(N,1) are in the 2D binary OHE labels.
+                    # --------------------------------------------------------------------------------
+                    assert np.all(np.isin(T, [0, 1])), "Binary label must be 0/1"
+                    T.reshape(-1, 1)    # Convert into T(N,1) 2D OHE Binary
+                    Logger.debug("T.shape %s has been converted into %s", _shape, T.shape)
+
+                elif X.shape[1] > 1:
+                    # --------------------------------------------------------------------------------
+                    # M (X.shape[1]>1) then T is index labels. (X, T) are in X(N,M), T(N,)
+                    # No conversion required.
+                    # --------------------------------------------------------------------------------
+                    assert X.shape[0] == T.shape[0], \
+                        "Index format X(N,M), T(N,) expected but X %s T %s" % (X.shape, T.shape)
+                    pass
+
+            elif T.ndim > 1:
+                # --------------------------------------------------------------------------------
+                # T is OHE labels. Convert into index labels
+                # Transfer results in (P.ndim==T.ndim+1 > 1) and (P.shape[0]==T.shape[0]==N).
+                # --------------------------------------------------------------------------------
                 T = T.argmax(axis=-1)
                 Logger.debug("T.shape %s has been converted into %s", _shape, T.shape)
-            elif T.ndim == 1:
-                pass
             else:
                 msg = "transform_X_T(): Invalid state."
                 Logger.error(
@@ -193,8 +231,6 @@ def transform_X_T(
                     X.shape, X, T.shape, T
                 )
                 raise RuntimeError(msg)
-
-        assert X.shape[0] == T.shape[0]
 
     return X, T
 
