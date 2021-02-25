@@ -22,6 +22,10 @@ from common.functions import (
 )
 
 
+# TODO
+# class SigmoidWithLogLoss(Layer):
+
+
 class SoftmaxWithLogLoss(Layer):
     """Softmax cross entropy log loss class
     Combined with the log loss because calculating gradients separately is not simple.
@@ -31,6 +35,10 @@ class SoftmaxWithLogLoss(Layer):
         Number of nodes M == number of feature D at the softmax with log loss layer.
         T has either in the OHE (One Hot Encoder) label format or index label format.
         For OHE T.shape[0] == N and T.shape[1] == M == D. For index, T.size == N.
+
+    TODO:
+        Add regularization cost 0.5 * l2 * np.sum(W ** 2) to L. Need a way to access
+        W in each matmul layer.
     """
     # ================================================================================
     # Class initialization

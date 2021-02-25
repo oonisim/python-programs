@@ -33,5 +33,12 @@ class SGD(Optimizer):
                 "update(): Gradient descent potentially stalling with dW < 1% of W."
             )
 
+        # --------------------------------------------------------------------------------
+        # Why excluding the bias weight from the regularization?
+        # TODO: Remove w0 from the regularization (not include bias weight)
+        # --------------------------------------------------------------------------------
+        # Overfitting is when the model is sensitive to changes in the input.
+        # Bias is fixed (x0=1), hence no change, hence no point to include it
+        # --------------------------------------------------------------------------------
         regularization = dW * self.l2
         return np.subtract(W, self.lr * (dW + regularization), out=out)
