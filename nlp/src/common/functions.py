@@ -218,12 +218,19 @@ def transform_X_T(
                     pass
 
             elif T.ndim > 1:
-                # --------------------------------------------------------------------------------
-                # T is OHE labels. Convert into index labels
-                # Transfer results in (P.ndim==T.ndim+1 > 1) and (P.shape[0]==T.shape[0]==N).
-                # --------------------------------------------------------------------------------
-                T = T.argmax(axis=-1)
-                Logger.debug("T.shape %s has been converted into %s", _shape, T.shape)
+                if T.shape[1] == X.shape[1] == 1:
+                    # --------------------------------------------------------------------------------
+                    # T is binary OHE labels e.g. T[[0]], P[[0.9]] or T[[0],[1],[0]], P[[0.],[0.9],[0.]]
+                    # No conversion
+                    # --------------------------------------------------------------------------------
+                    pass
+                else:
+                    # --------------------------------------------------------------------------------
+                    # T is OHE labels. Convert into index labels
+                    # Transfer results in (P.ndim==T.ndim+1 > 1) and (P.shape[0]==T.shape[0]==N).
+                    # --------------------------------------------------------------------------------
+                    T = T.argmax(axis=-1)
+                    Logger.debug("T.shape %s has been converted into %s", _shape, T.shape)
             else:
                 msg = "transform_X_T(): Invalid state."
                 Logger.error(
@@ -272,7 +279,8 @@ def cross_entropy_log_loss(
         # T is 2D binary OHE labels e.g. T[[0],[1],[0]], P[[0.9],[0.1],[0.3]].
         # Return -T * log(P)
         # --------------------------------------------------------------------------------
-        return -np.sum(np.multiply(T, np.log(P+offset)), axis=-1)
+        # return -np.sum(np.multiply(T, np.log(P+offset)), axis=-1)
+        return np.squeeze(-np.multiply(T, np.log(P + offset)), axis=-1)
 
     # ================================================================================
     # Calculate Cross entropy log loss -t * log(p).

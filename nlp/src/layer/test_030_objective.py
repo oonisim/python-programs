@@ -417,7 +417,6 @@ def test_030_objective_methods_2d_ohe():
     for _ in range(NUM_MAX_TEST_TIMES):
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(1, NUM_MAX_NODES)
-
         layer = SoftmaxWithLogLoss(
             name=name,
             num_nodes=M,
@@ -435,6 +434,7 @@ def test_030_objective_methods_2d_ohe():
             np.random.randint(0, M, N)
         ] = int(1)
         layer.T = T
+        Logger.debug("test_030_objective_methods_2d_ohe(): X is \n%s\nT is \n%s" % (X, T))
 
         P = softmax(X)
         EG = (P - T) / N       # Expected analytical gradient dL/dX = (P-T)/N
