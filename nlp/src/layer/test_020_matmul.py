@@ -26,6 +26,10 @@ from common.test_config import (
 )
 
 
+Logger = logging.getLogger("test_030_objective")
+Logger.setLevel(logging.DEBUG)
+
+
 def test_020_matmul_instantiation_to_fail():
     """
     Objective:
@@ -310,7 +314,7 @@ def test_020_matmul_methods():
 
     def objective(X: np.ndarray) -> Union[float, np.ndarray]:
         """Dummy objective function to calculate the loss L"""
-        return np.sum(X) / N
+        return np.sum(X)
 
     layer = Matmul(
         name=name,
@@ -326,6 +330,8 @@ def test_020_matmul_methods():
     # Test the numerical gradient dL/dX=layer.gradient_numerical().
     # --------------------------------------------------------------------------------
     X = np.random.randn(N, D)
+    Logger.debug("test_020_matmul_methods(): X is \n%s" % X)
+
     Y = layer.function(X)
     L = layer.objective(Y)
     # Matmul outputs Y should be X@W.T
@@ -353,7 +359,8 @@ def test_020_matmul_methods():
     assert np.array_equal(dX, expected_dX)
 
     # Matmul analytical gradient dL/dX should be close to the numerical gradient GN.
-    assert np.all(np.abs(dX - GN[0]) < OFFSET_FOR_DELTA)
+    assert np.all(np.abs(dX - GN[0]) < OFFSET_FOR_DELTA), \
+        f"dX need close to GN[0] but dX \n%s\n GN[0] \n%s\n" % (dX, GN[0])
 
     # --------------------------------------------------------------------------------
     # Gradient update.

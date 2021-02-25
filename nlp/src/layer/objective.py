@@ -129,14 +129,13 @@ class SoftmaxWithLogLoss(Layer):
 
         assert \
             (
+                # Scalar binary OHE e.g. T=0, P=0.9
                 self.X.ndim == 0 and self.T.ndim == 0 and
                 self.X.size == self.T.size == self.M == 1
             ) or \
             (
-                self.X.ndim == 1 and self.T.ndim in {0, 1} and
-                self.X.size == self.T.size == self.M
-            ) or \
-            (
+                # Index labels P:(N,M), T:(N,) e.g. T[0,4,2] P[[1.,0.,...],[...],[...]] or
+                # Binary oHE labels P(N,M), T(N,M) e.g T[[0],[1],[0]], P[[0,1],[0.9],[0.]]
                 self.X.ndim >= 2 and self.T.ndim in {1, 2} and
                 self.X.shape[0] == self.T.shape[0] and
                 self.X.shape[1] == self.M

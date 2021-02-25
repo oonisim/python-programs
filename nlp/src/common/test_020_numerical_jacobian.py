@@ -84,8 +84,8 @@ def test_020_cross_entropy_log_loss_scalar(h: float = 1e-5, k=OFFSET_FOR_LOG):
     def f(P: np.ndarray, T: np.ndarray):
         return np.sum(cross_entropy_log_loss(P, T))
 
-    p1 = 1.0
-    t1 = int(1)
+    p1 = np.array(1.0, dtype=float)
+    t1 = np.array(1, dtype=int)
     g1 = numerical_jacobian(partial(f, T=1), p1)
     # Expected numerical gradient
     e1 = (-t1 * np.log(p1+h+k) + t1 * np.log(p1-h+k)) / (2 * h)

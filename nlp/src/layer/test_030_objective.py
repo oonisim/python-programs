@@ -306,7 +306,6 @@ def test_030_objective_methods_1d_ohe():
 
     for _ in range(NUM_MAX_TEST_TIMES):
         M: int = np.random.randint(1, NUM_MAX_NODES)
-        M = 2
         layer = SoftmaxWithLogLoss(
             name=name,
             num_nodes=M,
@@ -318,12 +317,10 @@ def test_030_objective_methods_1d_ohe():
         # Layer forward path
         # ================================================================================
         X = np.random.randn(M)
-        X = np.array([-1.01277135, 0.5444011])
         T = np.zeros_like(X, dtype=int)     # OHE labels.
         T[
             np.random.randint(0, M)
         ] = int(1)
-        T = np.array([0, 1])
         layer.T = T
 
         P = softmax(X)
@@ -367,7 +364,7 @@ def test_030_objective_methods_1d_ohe():
         # dummy.function(X)
         # --------------------------------------------------------------------------------
         # O = lambda x: dummy.objective(dummy.function(x))    # Objective function
-        O = lambda x: cross_entropy_log_loss(softmax(x), T)
+        O = lambda x: np.sum(cross_entropy_log_loss(softmax(x), T)) / N
         # --------------------------------------------------------------------------------
         EGN = numerical_jacobian(O, X).reshape(1, -1) # Expected numerical dL/dX
         assert np.array_equal(GN[0], EGN), \
@@ -434,6 +431,7 @@ def test_030_objective_methods_2d_ohe():
             np.random.randint(0, M, N)
         ] = int(1)
         layer.T = T
+
         Logger.debug("test_030_objective_methods_2d_ohe(): X is \n%s\nT is \n%s" % (X, T))
 
         P = softmax(X)
@@ -463,10 +461,11 @@ def test_030_objective_methods_2d_ohe():
         # dummy.T = T
         # dummy.objective = objective
         # O = lambda x: dummy.objective(dummy.function(x))    # Objective function
-        O = lambda x: cross_entropy_log_loss(softmax(x), T)
+        O = lambda x: np.sum(cross_entropy_log_loss(softmax(x), T)) / N
         # --------------------------------------------------------------------------------
         EGN = numerical_jacobian(O, X)                      # Expected numerical dL/dX
-        assert np.array_equal(GN[0], EGN)
+        assert np.array_equal(GN[0], EGN), \
+            f"GN[0]==EGN expected but GN[0] is \n%s\n EGN is \n%s\n" % (GN[0], EGN)
 
         # ================================================================================
         # Layer backward path

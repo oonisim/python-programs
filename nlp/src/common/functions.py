@@ -126,8 +126,9 @@ def transform_X_T(
         # When X is scalar, T must be a scalar. This is a binary (0/1) label.
         # --------------------------------------------------------------------------------
         assert isinstance(T, int) or T.ndim == 0
-        X = np.array(X, dtype=float)
-        T = np.array(T, dtype=int)
+        X = np.array(X).reshape((-1, 1))
+        T = np.array(T).reshape((-1, 1))              # Convert into T(N,1) 2D OHE Binary
+
     else:
         # ================================================================================
         # Hereafter, X and T need be np arrays.
@@ -150,11 +151,12 @@ def transform_X_T(
             if T.ndim == 0:
                 if T.size == X.size == 1:   # M==1
                     # --------------------------------------------------------------------------------
-                    # Binary OHE label e.g. T=0, P=[0.94]. Reshape into scalar T=0, P=0.94.
-                    # Transfer result is (T.ndim == P.ndim == 0).
+                    # Binary OHE label e.g. T=0, P=[0.94]. Reshape into 2D OHE format
+                    # (T.ndim == P.ndim == 2) after transformation.
                     # --------------------------------------------------------------------------------
                     assert np.all(np.isin(T, [0, 1])), "Binary label must be 0/1"
-                    X= X.reshape(())
+                    X = np.array(X).reshape((-1, 1))
+                    T = T.reshape((-1, 1))  # Convert into T(N,1) 2D OHE Binary
                 else:                       # M>1
                     # --------------------------------------------------------------------------------
                     # T=i is a scalar index label for a 1D X[x0, x1, ..., xd-1] to select Xi.
@@ -167,12 +169,12 @@ def transform_X_T(
             elif T.ndim == 1:    # T is OHE label
                 if T.size == X.size == 1:   # M==1
                     # --------------------------------------------------------------------------------
-                    # Binary OHE label e.g. T=[0], P=[0.94]. Reshape into scalar T=0, P=0.94.
-                    # Result is (T.ndim == P.ndim == 0) after transformation.
+                    # Binary OHE label e.g. T=[0], P=[0.94]. Reshape into 2D OHE format
+                    # (T.ndim == P.ndim == 2) after transformation.
                     # --------------------------------------------------------------------------------
                     assert np.all(np.isin(T, [0, 1])), "Binary label must be 0/1"
-                    T = T.reshape(())
-                    X = X.reshape(())
+                    X = np.array(X).reshape((-1, 1))
+                    T = T.reshape((-1, 1))  # Convert into T(N,1) 2D OHE Binary
 
                 else:
                     # --------------------------------------------------------------------------------
@@ -378,7 +380,7 @@ def numerical_jacobian(
             "numerical_jacobian(): idx[%s] x[%s] (x+h)[%s] fx1=[%s]",
             idx, tmp, tmp+delta, fx1
         )
-        assert not np.isnan(fx1), \
+        assert not np.all(np.isnan(fx1)), \
             "numerical delta f(x+h) caused nan for f %s for X %s" \
             % (f, (tmp + delta))
 
@@ -388,7 +390,7 @@ def numerical_jacobian(
             "numerical_jacobian(): idx[%s] x[%s] (x-h)[%s] fx2=[%s]",
             idx, tmp, tmp-delta, fx2
         )
-        assert not np.isnan(fx2), \
+        assert not np.all(np.isnan(fx2)), \
             "numerical delta f(x-h) caused nan for f %s for X %s" \
             % (f, (tmp - delta))
 
@@ -396,7 +398,7 @@ def numerical_jacobian(
         # Set the gradient element scalar value or shape()
         # --------------------------------------------------------------------------------
         g = (fx1 - fx2) / (2 * delta)
-        assert g.size == 1, "The f function needs to return scalar or shape ()"
+        assert g.size == 1, "The f function needs to return scalar or shape () but %s" % g.shape
         J[idx] = g
 
         Logger.debug("numerical_jacobian(): idx[%s] j=[%s]", idx, g)
