@@ -72,7 +72,7 @@ class CrossEntropyLogLoss(Layer):
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
         self._activation = activation
         self._log_loss_function = logistic_log_loss \
-            if activation == sigmoid else softmax
+            if activation == sigmoid else categorical_log_loss
 
         # At the objective layer, features in X is the same with num nodes.
         self._D = num_nodes
