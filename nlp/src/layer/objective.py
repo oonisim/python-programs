@@ -13,9 +13,11 @@ from typing import (
 )
 import logging
 import numpy as np
-from . base import Layer
+from layer import Layer
 from common.functions import (
     transform_X_T,
+    logistic_log_loss,
+    categorical_log_loss,
     cross_entropy_log_loss,
     numerical_jacobian,
     softmax,
@@ -69,6 +71,8 @@ class CrossEntropyLogLoss(Layer):
 
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
         self._activation = activation
+        self._log_loss_function = logistic_log_loss \
+            if activation == sigmoid else softmax
 
         # At the objective layer, features in X is the same with num nodes.
         self._D = num_nodes
@@ -113,6 +117,14 @@ class CrossEntropyLogLoss(Layer):
             "activation is not initialized"
         return self._activation
 
+    @property
+    def log_loss_function(self) -> Callable:
+        """Cross entropy log loss function for the activation function
+        """
+        assert isinstance(self._log_loss_function, Callable), \
+            "log_loss_function is not initialized"
+        return self._log_loss_function
+
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
@@ -128,7 +140,7 @@ class CrossEntropyLogLoss(Layer):
             per-image, so that the loss can be a universal unit to compare.
             It should NOT be dependent on what batch size was used.
 
-            L = cross_entropy_log_loss(activation(X), T)) / N
+            L = cross_entropy_log_loss(activation(X), T, log_loss_function)) / N
 
         Args:
             X: Input of shape (N,M) to calculate the probabilities for the M nodes.
@@ -172,7 +184,7 @@ class CrossEntropyLogLoss(Layer):
         # Cross entropy log loss J:(N,) where j(n) for each batch n (n: 0, ..., N-1).
         # Gradient dJ/dP -> -T/P
         # --------------------------------------------------------------------------------
-        self._J = cross_entropy_log_loss(self.P, self.T)
+        self._J = cross_entropy_log_loss(P=self.P, T=self.T, f=self.log_loss_function)
 
         # --------------------------------------------------------------------------------
         # Total batch loss _L.
@@ -212,6 +224,10 @@ class CrossEntropyLogLoss(Layer):
             dF/dX: (P-T)/N of shape (N, M)
         """
         dY = np.array(dY) if isinstance(dY, float) else dY
+
+        # --------------------------------------------------------------------------------
+        # Shapes of dL/dY and Y are the same because L is scalar.
+        # --------------------------------------------------------------------------------
         assert \
             (isinstance(dY, np.ndarray) and dY.dtype == float) and \
             (dY.shape == self.Y.shape), \
@@ -245,7 +261,9 @@ class CrossEntropyLogLoss(Layer):
             # needs to be 2 to be able to use t=1 as index such as P[::, 1], which causes
             # index out of bound.
             # --------------------------------------------------------------------------------
-            dX = dY * dJ * (self.P - self.T)
+            dF = (dJ * dY)                  # dJ/dX is shape (N,).
+            dF = dF[::, np.newaxis]         # Transform into shape (N,1) to np broadcast.
+            dX = dF * (self.P - self.T)     # (N,M) * (N,M)
 
         else:
             self.logger.debug("gradient(): Label is index format")
@@ -274,8 +292,8 @@ class CrossEntropyLogLoss(Layer):
                 rows,
                 cols
             ] -= 1.0
-            dF = (dJ * dY)
-            dF = dF[::, np.newaxis]
+            dF = (dJ * dY)                  # dJ/dX is shape (N,).
+            dF = dF[::, np.newaxis]         # Transform into shape (N,1) to np broadcast.
             # dF/dY * dY/dJ * (P-T) = dF/dY * (P-T) / N
             self.logger.debug("dF.shape is %s dF is \n%s.\n", dF.shape, dF)
             self.logger.debug("T is %s dX.shape %s.\n", self.T, dX.shape)

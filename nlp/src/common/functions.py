@@ -28,7 +28,7 @@ def sigmoid(X: Union[float, np.ndarray]) -> Union[int, float, np.ndarray]:
     Args:
         X:
     """
-    assert X.dtype == float
+    assert (isinstance(X, np.ndarray) and X.dtype == float) or isinstance(X, float)
     return 1 / (1 + np.exp(-X))
 
 
@@ -38,13 +38,13 @@ def sigmoid_gradient(X: Union[int, float, np.ndarray]) -> Union[int, float, np.n
         X:
     Returns: gradient
     """
-    assert X.dtype == float
+    assert (isinstance(X, np.ndarray) and X.dtype == float) or isinstance(X, float)
     return (1.0 - sigmoid(X)) * sigmoid(X)
 
 
 def relu(X: Union[int, float, np.ndarray]) -> Union[int, float, np.ndarray]:
     """ReLU activation function"""
-    assert X.dtype == float
+    assert (isinstance(X, np.ndarray) and X.dtype == float) or isinstance(X, float)
     return np.maximum(0, X)
 
 
@@ -54,7 +54,7 @@ def relu_gradient(X: Union[int, float, np.ndarray]) -> Union[int, float, np.ndar
         X:
     Returns: gradient
     """
-    assert X.dtype == float
+    assert (isinstance(X, np.ndarray) and X.dtype == float) or isinstance(X, float)
     grad = np.zeros_like(X)
     grad[X >= 0] = 1
     return grad
@@ -264,10 +264,13 @@ def transform_X_T(
     return X, T
 
 
-def categorical_log_loss(P: np.ndarray, T: np.ndarray, offset: float) ->np.ndarray:
+def categorical_log_loss(
+        P: np.ndarray, T: np.ndarray, offset: float = OFFSET_FOR_LOG
+) ->np.ndarray:
     """Cross entropy log loss function for multi class classification.
     Args:
         P: Probabilities e.g. from Softmax
+           arg name must be P to be consistent with other log function.
         T: Labels
         offset: small number to avoid np.inf by log(0) by log(0+offset)
     Returns:
@@ -278,17 +281,20 @@ def categorical_log_loss(P: np.ndarray, T: np.ndarray, offset: float) ->np.ndarr
     return J
 
 
-def logistic_log_loss_for(A: np.ndarray, T: np.ndarray, offset: float) -> np.ndarray:
+def logistic_log_loss(
+        P: np.ndarray, T: np.ndarray, offset: float = OFFSET_FOR_LOG
+) -> np.ndarray:
     """Cross entropy log loss function for binary classification.
     Args:
-        A: Activations e.g. from Sigmoid
+        P: Activations e.g. from Sigmoid
+           arg name must be P to be consistent with other log function.
         T: Labels
         offset: small number to avoid np.inf from log(0) by log(0+offset)
     Returns:
         J: Loss value.
     """
-    assert np.all((A+offset) > 0) and np.all((1-A+offset) > 0)
-    J: np.ndarray = -(T * np.log(A+offset) + (1-T) * np.log(1-A+offset))
+    assert np.all((P+offset) > 0) and np.all((1-P+offset) > 0)
+    J: np.ndarray = -(T * np.log(P+offset) + (1-T) * np.log(1-P+offset))
     return J
 
 
@@ -368,7 +374,7 @@ def cross_entropy_log_loss(
     Logger.debug("cross_entropy_log_loss(): N is [%s]", N)
     Logger.debug("cross_entropy_log_loss(): P.shape %s", P.shape)
     Logger.debug("cross_entropy_log_loss(): P[rows, cols].shape %s", _P.shape)
-    Logger.debug("cross_entropy_log_loss(): P[rows, cols] is %s" % _P)
+    Logger.debug("cross_entropy_log_loss(): P[rows, cols] is %s", _P)
 
     # --------------------------------------------------------------------------------
     # Log loss per batch. Log(0+k) prevents the infinitive value log(0).

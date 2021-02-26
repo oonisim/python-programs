@@ -10,13 +10,16 @@ import copy
 import logging
 import numpy as np
 from common import (
+    logistic_log_loss,
+    categorical_log_loss,
     cross_entropy_log_loss,
-    softmax,
+    sigmoid,
     numerical_jacobian,
     random_string
 )
 from layer import (
-    CrossEntropyLogLoss
+    CrossEntropyLogLoss,
+    Matmul
 )
 from layer.test_config import (
     NUM_MAX_TEST_TIMES,
@@ -27,11 +30,11 @@ from layer.test_config import (
 )
 
 
-Logger = logging.getLogger("test_030_objective")
+Logger = logging.getLogger("test_040_objective")
 Logger.setLevel(logging.DEBUG)
 
 
-def test_030_objective_instantiation_to_fail():
+def test_040_objective_instantiation_to_fail():
     """
     Objective:
         Verify the layer class validates the initialization parameter constraints.
@@ -44,27 +47,39 @@ def test_030_objective_instantiation_to_fail():
         try:
             CrossEntropyLogLoss(
                 name="",
-                num_nodes=1
+                num_nodes=1,
+                activation=sigmoid
             )
             raise RuntimeError("CrossEntropyLogLoss initialization with invalid name must fail")
         except AssertionError:
             pass
 
-        # Constraint: num_nodes > 1
+        # Constraint: num_nodes == 1
         try:
             CrossEntropyLogLoss(
-                name="test_030_objective",
-                num_nodes=0
+                name="test_040_objective",
+                num_nodes=0,
+                activation=sigmoid
             )
             raise RuntimeError("CrossEntropyLogLoss(num_nodes<1) must fail.")
+        except AssertionError:
+            pass
+        try:
+            CrossEntropyLogLoss(
+                name="test_040_objective",
+                num_nodes=np.random.randint(2, NUM_MAX_NODES),
+                activation=sigmoid
+            )
+            raise RuntimeError("CrossEntropyLogLoss(num_nodes>1) must fail.")
         except AssertionError:
             pass
 
         # Constraint: logging level is correct.
         try:
             CrossEntropyLogLoss(
-                name="test_030_objective",
+                name="test_040_objective",
                 num_nodes=M,
+                activation=sigmoid,
                 log_level=-1
             )
             raise RuntimeError("CrossEntropyLogLoss initialization with invalid log level must fail")
@@ -72,7 +87,7 @@ def test_030_objective_instantiation_to_fail():
             pass
 
 
-def test_030_objective_instance_properties():
+def test_040_objective_instance_properties():
     """
     Objective:
         Verify the layer class validates the parameters have been initialized before accessed.
@@ -82,10 +97,11 @@ def test_030_objective_instance_properties():
     msg = "Accessing uninitialized property of the layer must fail."
     name = random_string(np.random.randint(1, 10))
     for _ in range(NUM_MAX_TEST_TIMES):
-        M: int = np.random.randint(1, NUM_MAX_NODES)
+        M: int = 1
         layer = CrossEntropyLogLoss(
             name=name,
-            num_nodes=M,
+            num_nodes=1,
+            activation=sigmoid,
             log_level=logging.DEBUG
         )
 
@@ -208,7 +224,7 @@ def test_030_objective_instance_properties():
             pass
 
 
-def test_030_objective_instantiation():
+def test_040_objective_instantiation():
     """
     Objective:
         Verify the initialized layer instance provides its properties.
@@ -224,16 +240,17 @@ def test_030_objective_instantiation():
         """Dummy objective function"""
         return np.sum(X)
 
-    name = "test_030_objective_instantiation"
+    name = "test_040_objective_instantiation"
 
     for _ in range(NUM_MAX_TEST_TIMES):
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
-        M: int = np.random.randint(1, NUM_MAX_NODES)
-        # For softmax log loss layer, the number of features N in X is the same with node number.
+        M: int = 1
+        # For sigmoid log loss layer, the number of features N in X is the same with node number.
         D: int = M
         layer = CrossEntropyLogLoss(
             name=name,
             num_nodes=M,
+            activation=sigmoid,
             log_level=logging.DEBUG
         )
         layer.objective = objective
@@ -251,7 +268,7 @@ def test_030_objective_instantiation():
         layer.X = X
         assert np.array_equal(layer.X, X)
         assert layer.N == N == X.shape[0]
-        # For softmax log loss layer, the number of features N in X is the same with node number.
+        # For sigmoid log loss layer, the number of features N in X is the same with node number.
         assert layer.M == X.shape[1]
 
         layer._dX = X
@@ -272,11 +289,11 @@ def test_030_objective_instantiation():
         assert layer.objective == objective
 
 
-def test_030_objective_methods_1d_ohe():
+def test_040_objective_methods_1d_ohe():
     """
     Objective:
         Verify the forward path constraints:
-        1. Layer output L/loss is np.sum(cross_entropy_log_loss(softmax(X), T)) / N.
+        1. Layer output L/loss is np.sum(cross_entropy_log_loss(sigmoid(X), T)) / N.
         2. gradient_numerical() == numerical Jacobian numerical_jacobian(O, X).
 
         Verify the backward path constraints:
@@ -301,14 +318,14 @@ def test_030_objective_methods_1d_ohe():
     # --------------------------------------------------------------------------------
     # Instantiate a CrossEntropyLogLoss layer
     # --------------------------------------------------------------------------------
-    name = "test_030_objective_methods_1d_ohe"
+    name = "test_040_objective_methods_1d_ohe"
     N = 1
 
     for _ in range(NUM_MAX_TEST_TIMES):
-        M: int = np.random.randint(1, NUM_MAX_NODES)
         layer = CrossEntropyLogLoss(
             name=name,
-            num_nodes=M,
+            num_nodes=1,
+            activation=sigmoid,
             log_level=logging.DEBUG
         )
         layer.objective = objective
@@ -316,24 +333,24 @@ def test_030_objective_methods_1d_ohe():
         # ================================================================================
         # Layer forward path
         # ================================================================================
-        X = np.random.randn(M)
-        T = np.zeros_like(X, dtype=int)     # OHE labels.
-        T[
-            np.random.randint(0, M)
-        ] = int(1)
+        X = np.random.uniform(-100, 100)    # Sigmoid input X
+        X = 91.95936196593914
+        T = np.random.randint(0, 2)                # OHE labels.
+        T = 0
         layer.T = T
 
-        P = softmax(X)
-        EG = ((P - T) / N).reshape(1, -1)     # Expected analytical gradient dL/dX = (P-T)/N
+        # Expected analytical gradient dL/dX = (P-T)/N of shape (N,M)
+        A = sigmoid(X)
+        EG = ((A - T) / N).reshape(1, -1)
 
-        Logger.debug("X is \n%s\nT is %s\nP is %s\nEG is %s\n", X, T, P, EG)
+        Logger.debug("X is \n%s\nT is %s\nP is %s\nEG is %s\n", X, T, A, EG)
 
         # --------------------------------------------------------------------------------
-        # constraint: L/loss == np.sum(cross_entropy_log_loss(softmax(X), T)) / N.
+        # constraint: L/loss == np.sum(cross_entropy_log_loss(sigmoid(X), T)) / N.
         # --------------------------------------------------------------------------------
-        L = layer.function(X)
-        Z = np.array(np.sum(cross_entropy_log_loss(softmax(X), T))) / N
-        assert np.array_equal(L, Z), f"SoftmaxLogLoss output should be {L} but {Z}."
+        L = layer.function(X)       # L is shape ()
+        Z = np.array(np.sum(cross_entropy_log_loss(P=sigmoid(X), T=T, f=logistic_log_loss))) / N
+        assert np.array_equal(L, Z), f"LogLoss output should be {L} but {Z}."
 
         # --------------------------------------------------------------------------------
         # constraint: gradient_numerical() == numerical Jacobian numerical_jacobian(O, X)
@@ -363,10 +380,8 @@ def test_030_objective_methods_1d_ohe():
         # dummy.objective = objective
         # dummy.function(X)
         # --------------------------------------------------------------------------------
-        # O = lambda x: dummy.objective(dummy.function(x))    # Objective function
-        O = lambda x: np.sum(cross_entropy_log_loss(softmax(x), T)) / N
-        # --------------------------------------------------------------------------------
-        EGN = numerical_jacobian(O, X).reshape(1, -1) # Expected numerical dL/dX
+        O = lambda x: np.sum(cross_entropy_log_loss(P=sigmoid(x), T=T, f=logistic_log_loss)) / N
+        EGN = numerical_jacobian(O, X).reshape(1, -1)   # Expected numerical dL/dX
         assert np.array_equal(GN[0], EGN), \
             f"Layer gradient_numerical GN \n{GN} \nneeds to be \n{EGN}."
 
@@ -389,11 +404,11 @@ def test_030_objective_methods_1d_ohe():
             f"dX is \n{G}\nGN[0] is \n{GN[0]}\nRatio * GN[0] is \n{GRADIENT_DIFF_ACCEPTANCE_RATIO * GN[0]}.\n"
 
 
-def test_030_objective_methods_2d_ohe():
+def test_040_objective_methods_2d_ohe():
     """
     Objective:
         Verify the forward path constraints:
-        1. Layer output L/loss is np.sum(cross_entropy_log_loss(softmax(X), T)) / N.
+        1. Layer output L/loss is np.sum(cross_entropy_log_loss(sigmoid(X), T)) / N.
         2. gradient_numerical() == numerical Jacobian numerical_jacobian(O, X).
 
         Verify the backward path constraints:
@@ -410,13 +425,14 @@ def test_030_objective_methods_2d_ohe():
     # --------------------------------------------------------------------------------
     # Instantiate a CrossEntropyLogLoss layer
     # --------------------------------------------------------------------------------
-    name = "test_030_objective_methods_2d_ohe"
+    name = "test_040_objective_methods_2d_ohe"
     for _ in range(NUM_MAX_TEST_TIMES):
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
-        M: int = np.random.randint(1, NUM_MAX_NODES)
+        M: int = 1
         layer = CrossEntropyLogLoss(
             name=name,
             num_nodes=M,
+            activation=sigmoid,
             log_level=logging.DEBUG
         )
         layer.objective = objective
@@ -432,16 +448,16 @@ def test_030_objective_methods_2d_ohe():
         ] = int(1)
         layer.T = T
 
-        Logger.debug("test_030_objective_methods_2d_ohe(): X is \n%s\nT is \n%s" % (X, T))
+        Logger.debug("test_040_objective_methods_2d_ohe(): X is \n%s\nT is \n%s" % (X, T))
 
-        P = softmax(X)
+        P = sigmoid(X)
         EG = (P - T) / N       # Expected analytical gradient dL/dX = (P-T)/N
 
         # --------------------------------------------------------------------------------
-        # constraint: L/loss == np.sum(cross_entropy_log_loss(softmax(X), T)) / N.
+        # constraint: L/loss == np.sum(cross_entropy_log_loss(sigmoid(X), T)) / N.
         # --------------------------------------------------------------------------------
         L = layer.function(X)
-        Z = np.array(np.sum(cross_entropy_log_loss(softmax(X), T))) / N
+        Z = np.array(np.sum(cross_entropy_log_loss(sigmoid(X), T))) / N
         assert np.array_equal(L, Z), f"SoftmaxLogLoss output should be {L} but {Z}."
 
         # --------------------------------------------------------------------------------
@@ -451,7 +467,7 @@ def test_030_objective_methods_2d_ohe():
 
         # --------------------------------------------------------------------------------
         # DO not use CrossEntropyLogLoss.function() to simulate the objective function for
-        # the expected GN. See the same part in test_030_objective_methods_1d_ohe().
+        # the expected GN. See the same part in test_040_objective_methods_1d_ohe().
         # --------------------------------------------------------------------------------
         # dummy= CrossEntropyLogLoss(
         #     name=name,
@@ -460,9 +476,8 @@ def test_030_objective_methods_2d_ohe():
         # )
         # dummy.T = T
         # dummy.objective = objective
-        # O = lambda x: dummy.objective(dummy.function(x))    # Objective function
-        O = lambda x: np.sum(cross_entropy_log_loss(softmax(x), T)) / N
         # --------------------------------------------------------------------------------
+        O = lambda x: np.sum(cross_entropy_log_loss(P=sigmoid(x), T=T, f=logistic_log_loss)) / N
         EGN = numerical_jacobian(O, X)                      # Expected numerical dL/dX
         assert np.array_equal(GN[0], EGN), \
             f"GN[0]==EGN expected but GN[0] is \n%s\n EGN is \n%s\n" % (GN[0], EGN)
