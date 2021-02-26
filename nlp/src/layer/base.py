@@ -250,8 +250,11 @@ class Layer:
         """Latest layer output
         No need to allocate a storage for dY as it is allocated by the post layer.
         """
-        assert isinstance(self._Y, np.ndarray) and self._Y.dtype == float \
-            and self._Y.size > 0, "Y is not initialized or invalid"
+        assert \
+            (isinstance(self._Y, np.ndarray) and self._Y.dtype == float) and \
+            self._Y.size > 0, \
+            "Y %s of type %s is not initialized or invalid." % \
+            (self._Y, type(self._Y))
         return self._Y
 
     @property

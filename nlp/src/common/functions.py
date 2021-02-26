@@ -87,7 +87,27 @@ def softmax(X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
 def transform_X_T(
         X: Union[np.ndarray, float], T: Union[np.ndarray, int]
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Validate acceptable (X, T) conditions and reshape into X:(N, M), T:(M,) when M > 1.
+    """Validate acceptable (X, T) conditions. Identify if T is in OHE or index
+    format and transform them accordingly into X:(N,M), T:(N) shapes for T in
+    index format or X:(N,M), T(N, M) shapes for T in OHE format.
+
+    Background:
+        For T,
+            - both the OHE (One Hot Encoding) and the index format are accepted.
+            - both binary label for logistic regression, and multi categorical
+              labels for the multi label classification are accepted.
+
+        This function identifies:
+        1. If the format is OHE or Index
+        2. If the label is binary or multi labels.
+
+        And transform X, T into:
+        1. X:(N,M), T:(N) shapes for T in index format.
+        2. X:(N,M), T(N, M) shapes for T in OHE format.
+
+        Then X shape is always in 2D, hence always be able to use X[0], X[1],
+        and T shape tells its format.
+
     Note:
         M == 1 for X: Always binary OHE label (Binary is OHE).
             X=0.9, T=1: Scalar OHE.
@@ -253,20 +273,23 @@ def categorical_log_loss(P: np.ndarray, T: np.ndarray, offset: float) ->np.ndarr
     Returns:
         J: Loss value.
     """
+    assert np.all((P+offset) > 0)
     J: np.ndarray = -T * np.log(P + offset)
     return J
 
 
-def logistic_log_loss_for(A: np.ndarray, T: np.ndarray, offset: float) ->np.ndarray:
+def logistic_log_loss_for(A: np.ndarray, T: np.ndarray, offset: float) -> np.ndarray:
     """Cross entropy log loss function for binary classification.
     Args:
         A: Activations e.g. from Sigmoid
         T: Labels
-        offset: small number to avoid np.inf by log(0) by log(0+offset)
+        offset: small number to avoid np.inf from log(0) by log(0+offset)
     Returns:
         J: Loss value.
     """
-    J: np.ndarray = -( T * np.log(A+offset) + (1-T) * np.log(1-A+offset) )
+    assert np.all((A+offset) > 0) and np.all((1-A+offset) > 0)
+    J: np.ndarray = -(T * np.log(A+offset) + (1-T) * np.log(1-A+offset))
+    return J
 
 
 def cross_entropy_log_loss(
@@ -291,17 +314,19 @@ def cross_entropy_log_loss(
            OHE: One Hot Encoding
         f: Cross entropy log loss function
         offset: small number to avoid np.inf by log(0) by log(0+offset)
+
     Returns:
         J: Loss value of shape (N,), a loss value per batch.
     """
     P, T = transform_X_T(P, T)
 
     if P.ndim == 0:
+        assert False, "P.ndim needs (N,M) after transform_X_T(P, T)"
         # --------------------------------------------------------------------------------
         # P is scalar, T is a scalar binary OHE label. Return -t * log(p).
         # --------------------------------------------------------------------------------
-        assert T.ndim == 0, "P.ndim==0 requires T.ndim==0 but %s" % T.shape
-        return f(P, T, offset)
+        # assert T.ndim == 0, "P.ndim==0 requires T.ndim==0 but %s" % T.shape
+        # return f(P, T, offset)
 
     if (1 < P.ndim == T.ndim) and (P.shape[1] == T.shape[1] == 1):
         # --------------------------------------------------------------------------------
@@ -309,7 +334,7 @@ def cross_entropy_log_loss(
         # T is 2D binary OHE labels e.g. T[[0],[1],[0]], P[[0.9],[0.1],[0.3]].
         # Return -T * log(P)
         # --------------------------------------------------------------------------------
-        return np.squeeze(f(T, P + offset), axis=-1)
+        return np.squeeze(f(P=P, T=T, offset=offset), axis=-1)    # Shape from (N,M) to (N,)
 
     # ================================================================================
     # Calculate Cross entropy log loss -t * log(p).
@@ -361,7 +386,7 @@ def cross_entropy_log_loss(
     Logger.debug("J is [%s]", J)
     Logger.debug("J.shape %s\n", J.shape)
 
-    assert 0 < N == J.shape[0], \
+    assert (J.ndim > 0) and (0 < N == J.shape[0]), \
         "Loss J.shape is expected to be (%s,) but %s" % (N, J.shape)
     return J
 
@@ -403,7 +428,7 @@ def numerical_jacobian(
         tmp: float = X[idx]
 
         X[idx] = tmp + delta
-        fx1: float = f(X)  # f(x+h)
+        fx1: Union[np.ndarray, float] = f(X)  # f(x+h)
         Logger.debug(
             "numerical_jacobian(): idx[%s] x[%s] (x+h)[%s] fx1=[%s]",
             idx, tmp, tmp+delta, fx1
@@ -413,7 +438,7 @@ def numerical_jacobian(
             % (f, (tmp + delta))
 
         X[idx] = tmp - delta
-        fx2: float = f(X)  # f(x-h)
+        fx2: Union[np.ndarray, float] = f(X)  # f(x-h)
         Logger.debug(
             "numerical_jacobian(): idx[%s] x[%s] (x-h)[%s] fx2=[%s]",
             idx, tmp, tmp-delta, fx2
@@ -425,8 +450,9 @@ def numerical_jacobian(
         # --------------------------------------------------------------------------------
         # Set the gradient element scalar value or shape()
         # --------------------------------------------------------------------------------
-        g = (fx1 - fx2) / (2 * delta)
-        assert g.size == 1, "The f function needs to return scalar or shape () but %s" % g.shape
+        g: Union[np.ndarray, float] = (fx1 - fx2) / (2 * delta)
+        assert (isinstance(g, np.ndarray) and g.size == 1) or isinstance(g, float), \
+            "The f function needs to return scalar or shape () but %s" % g
         J[idx] = g
 
         Logger.debug("numerical_jacobian(): idx[%s] j=[%s]", idx, g)

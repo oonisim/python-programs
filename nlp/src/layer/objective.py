@@ -17,8 +17,9 @@ from . base import Layer
 from common.functions import (
     transform_X_T,
     cross_entropy_log_loss,
+    numerical_jacobian,
     softmax,
-    numerical_jacobian
+    sigmoid
 )
 
 
@@ -32,7 +33,7 @@ class CrossEntropyLogLoss(Layer):
     When combined, the dL/dX, impact on L by input delta dX, is (P - T)/N.
 
     Note:
-        Number of nodes M == number of feature D at the softmax with log loss layer.
+        Number of nodes M == number of feature D at the objective/loss layer.
         T has either in the OHE (One Hot Encoder) label format or index label format.
         For OHE T.shape[0] == N and T.shape[1] == M == D. For index, T.size == N.
 
@@ -53,18 +54,23 @@ class CrossEntropyLogLoss(Layer):
             activation: Callable = softmax,
             log_level: int = logging.ERROR
     ):
-        """Initialize a softmax layer
+        """Initialize the layer
         Args
             name: Instance ID
             num_nodes: Number of nodes in the layer
             activation: Activation function, softmax by default
             log_level: Logging level
         """
-        assert num_nodes >= 2, "Softmax log loss output is for multi label classification."
+        assert \
+            (activation == softmax and num_nodes >= 2) or \
+            (activation == sigmoid and num_nodes == 1), \
+            "Number of nodes > 1 for Softmax multi-label classification " \
+            "or == 1 for Logistic binary classification."
+
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
         self._activation = activation
 
-        # At softmax loss layer, features in X is the same with num nodes (1:1)
+        # At the objective layer, features in X is the same with num nodes.
         self._D = num_nodes
 
         self._P: np.ndarray = np.empty(())  # Probabilities of shape (N, M)
@@ -77,7 +83,7 @@ class CrossEntropyLogLoss(Layer):
     # --------------------------------------------------------------------------------
     @property
     def P(self) -> np.ndarray:
-        """Softmax outputs probabilities of shape (N,M)"""
+        """Activation outputs of shape (N,M). Probabilities when activation=softmax"""
         assert \
             isinstance(self._P, np.ndarray) and self._P.size > 0 and \
             self._P.shape == (self.N, self.M), "Y is not initialized"
@@ -111,18 +117,18 @@ class CrossEntropyLogLoss(Layer):
     # Instance methods
     # --------------------------------------------------------------------------------
     def function(self, X: Union[np.ndarray, float]) -> np.ndarray:
-        """Softmax wth Log Loss layer output L
+        """Log Loss layer output L
         Pre-requisite:
             T has been set before calling.
         Note:
-            The Softmax Log Loss output is normalized by the batch size N.
+            The Log Loss output is normalized by the batch size N.
             Otherwise the NN loss is dependent on the batch size.
 
             For instance, with a MNIST image, the loss or NN performance should be
             per-image, so that the loss can be a universal unit to compare.
             It should NOT be dependent on what batch size was used.
 
-            L = cross_entropy_log_loss(softmax(X), T)) / N
+            L = cross_entropy_log_loss(activation(X), T)) / N
 
         Args:
             X: Input of shape (N,M) to calculate the probabilities for the M nodes.
@@ -143,7 +149,8 @@ class CrossEntropyLogLoss(Layer):
         # --------------------------------------------------------------------------------
         self.X, self.T = transform_X_T(X, self.T)
         self.logger.debug(
-            "layer[%s] function(): X.shape %s T.shape %s", self.name, self.X.shape, self.T.shape
+            "layer[%s].function(): After transform_X_T, X.shape %s T.shape %s",
+            self.name, self.X.shape, self.T.shape
         )
 
         assert (
@@ -151,13 +158,13 @@ class CrossEntropyLogLoss(Layer):
                 # Binary oHE labels P(N,M), T(N,M) e.g T[[0],[1],[0]], P[[0,1],[0.9],[0.]]
                 self.X.ndim >= 2 and self.T.ndim in {1, 2} and
                 self.X.shape[0] == self.T.shape[0] and
-                self.X.shape[1] == self.M
+                self.X.shape[1] == self.M       # M=1 for logistic binary
             ), \
             "X shape %s with T.shape %s does not match with the Layer node number M[%s]" \
             % (self.X.shape, self.T.shape, self.M)
 
         # --------------------------------------------------------------------------------
-        # Softmax probabilities P:(N, M) for each label m in each batch n.
+        # Activations P:(N, M) for each label m in each batch n.
         # --------------------------------------------------------------------------------
         self._P = self.activation(self.X)
 
@@ -168,21 +175,21 @@ class CrossEntropyLogLoss(Layer):
         self._J = cross_entropy_log_loss(self.P, self.T)
 
         # --------------------------------------------------------------------------------
-        # Total loss L. Calculate the sum and convert scalar back to np.ndarray
-        # If a for sum(a) is 0-d array or axis is None, a scalar is returned.
-        # https://numpy.org/doc/stable/reference/generated/numpy.sum.html
-        # dL/dJ = 1 at this point because dsum(J)/dJ = 1
+        # Total batch loss _L.
+        # d_L/dJ = 1 at this point because dsum(J)/dJ = 1
         # --------------------------------------------------------------------------------
-        _L = np.array(np.sum(self.J, axis=-1))
+        _L = np.sum(self.J, axis=-1)
 
         # --------------------------------------------------------------------------------
-        # Normalize L with the batch size N to be dependent from the batch size.
+        # Normalize L with the batch size N to be independent from the batch size.
         # dL/dJ = 1/N because f(X)=X/N -> df(X)/dX = 1/N
+        # Convert scalar back to np.ndarray as np.sum() gives scalar.
+        # https://numpy.org/doc/stable/reference/generated/numpy.sum.html
         # --------------------------------------------------------------------------------
         L = np.array(_L / self.N, dtype=float)
-        self._Y = L # L is alias of Y.
+        self._Y = L         # L is alias of Y.
 
-        self.logger.debug("function() L = %s", self.Y)
+        self.logger.debug("Layer[%s].function(): L = %s", self.name, self.Y)
         return self.Y
 
     def gradient(self, dY: Union[np.ndarray, float] = float(1)) -> Union[np.ndarray, float]:
@@ -192,26 +199,24 @@ class CrossEntropyLogLoss(Layer):
         J = cross_entropy_log_loss(P,T)
         dY: dF/dY is the the impact on the objective F by dY.
         dJ: dY/dJ = 1/N is the impact on Y by dJ where .
-        dP: dJ/dP = -T/P is the impact on J by the softmax output dP.
-        dP/dX: impact on P by the softmax input dX
+        dP: dJ/dP = -T/P is the impact on J by the activation output dP.
+        dP/dX: impact on P by the activation input dX
         dF/dX = dF/dY * dY/dJ * (dJ/dP * dP/dX) where (dJ/dP * dP/dX) = (P - T)/N
+
+        Note:
+            For both softmax and sigmoid, dL/dX is (P-T)/N, so designed.
 
         Args:
             dY: Gradient, impact by the loss dY, given from the post layer.
         Returns:
             dF/dX: (P-T)/N of shape (N, M)
         """
-        assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == float)
         dY = np.array(dY) if isinstance(dY, float) else dY
-        assert dY.shape == self.Y.shape, \
-            "dY/dY shape needs %s but %s" % (self.Y.shape, dY.shape)
-
-        # --------------------------------------------------------------------------------
-        # dY/dX = dY/dJ * dJ/dX. dJ/dX = -T/P is the gradient at cross-entropy log loss.
-        # If the input X is a scalar and T = 0, then dJ/dA is always 0 (-T/P = 0/P).
-        # --------------------------------------------------------------------------------
-        if (isinstance(self.X, float) or self.X.ndim == 0) and self.T == 0:
-            return np.array(float(0), dtype=float)    # -0 / P
+        assert \
+            (isinstance(dY, np.ndarray) and dY.dtype == float) and \
+            (dY.shape == self.Y.shape), \
+            "dY/dY shape needs %s of type float but %s of type %s" % \
+            (self.Y.shape, dY.shape, dY.dtype)
 
         # Gradient dJ:(N,) = dY/dJ is 1/N.
         dJ: np.ndarray = np.ones(self.N, dtype=float) / float(self.N)
@@ -220,10 +225,26 @@ class CrossEntropyLogLoss(Layer):
         # Calculate the layer gradient
         # --------------------------------------------------------------------------------
         if self.T.ndim == self.P.ndim:
-            self.logger.debug("gradient(): Label is in OHE format")
+            # --------------------------------------------------------------------------------
+            # T is OHE if T.ndim==2 else index with T.ndim==1
+            # --------------------------------------------------------------------------------
+            self.logger.debug("Layer[%s].gradient(): Label is in OHE format", self.name)
             assert (self.T.size == self.P.size) and (self.T.shape == self.P.shape), \
                 "T.shape %s and P.shape %s should be the same for the OHE labels." \
                 % (self.T.shape, self.P.shape)
+
+            # --------------------------------------------------------------------------------
+            # Is this correct?
+            # For T in index label, pick up P elements p for which t is 1, hence not using
+            # p for which t is 0, ignoring the impact from t=0 elements.
+            #
+            # [Q] Probably it is correct for Softmax only?
+            # [A] It is correct here because for sigmoid/binary classification, T is
+            # always OHE and P.shape[1]==T.shape[1]==1. It cannot be index label.
+            # e.g. For T[[0],[1],[0]], P[[0,2],[0,9],[0.0]], if T is index label, P.shape[1]
+            # needs to be 2 to be able to use t=1 as index such as P[::, 1], which causes
+            # index out of bound.
+            # --------------------------------------------------------------------------------
             dX = dY * dJ * (self.P - self.T)
 
         else:

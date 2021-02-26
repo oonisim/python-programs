@@ -95,7 +95,7 @@ def test_020_cross_entropy_log_loss_scalar(h: float = 1e-5, k=OFFSET_FOR_LOG):
 
     # Analytical gradient that E1 needs to be close to.
     a1 = - 1 / (p1 + k)
-    check.less_equal(np.abs(a1 - g1), 0.001, "a1-g1 %s\n" % np.abs(a1-g1))
+    check.less_equal(np.abs(a1 - g1), 0.0001, "a1-g1 %s\n" % np.abs(a1-g1))
 
     # --------------------------------------------------------------------------------
     # Not test P=0 because the gradient log(k +/- h) in numerical gradient value is
@@ -137,13 +137,15 @@ def test_020_cross_entropy_log_loss_1d(h: float = 1e-5, k=OFFSET_FOR_LOG):
     # --------------------------------------------------------------------------------
     # p = 1
     # --------------------------------------------------------------------------------
-    P1 = np.zeros(10)
-    P1[5] = 1.0
-    T1 = np.zeros(10).astype(int)
-    T1[5] = 1
+    length: int = np.random.randint(2, NUM_MAX_NODES)
+    index: int = np.random.randint(0, length)
+    P1 = np.zeros(length)
+    P1[index] = float(1.0)
+    T1 = np.zeros(length, dtype=int)
+    T1[index] = int(1)
 
     E1 = np.zeros_like(P1)
-    E1[5] = (-1 * np.log(1.0 + h + k) + 1 * np.log(1.0 - h + k)) / (2 * h)
+    E1[index] = (-1 * np.log(1.0 + h + k) + 1 * np.log(1.0 - h + k)) / (2 * h)
 
     G1 = numerical_jacobian(partial(f, T=T1), P1)
     assert G1.shape == E1.shape
@@ -151,8 +153,8 @@ def test_020_cross_entropy_log_loss_1d(h: float = 1e-5, k=OFFSET_FOR_LOG):
         f"Delta expected to be < {h} but \n{np.abs(E1 - G1)}"
 
     A1 = np.zeros_like(P1)
-    A1[5] = -1 / (1.0 + k)
-    check.equal(np.all(np.abs(A1 - G1) < 0.001), True, "A1-G1 %s\n" % np.abs(A1 - G1))
+    A1[index] = -1 / (1.0 + k)
+    check.equal(np.all(np.abs(A1 - G1) < 0.0001), True, "A1-G1 %s\n" % np.abs(A1 - G1))
 
     # --------------------------------------------------------------------------------
     # p = np uniform()
@@ -179,7 +181,7 @@ def test_020_cross_entropy_log_loss_1d(h: float = 1e-5, k=OFFSET_FOR_LOG):
 
         A1 = np.zeros_like(P1)
         A1[T1] = -1 / (p+k)
-        check.equal(np.all(np.abs(A1 - G1) < 0.001), True, "A1-G1 %s\n" % np.abs(A1-G1))
+        check.equal(np.all(np.abs(A1 - G1) < 0.0001), True, "A1-G1 %s\n" % np.abs(A1-G1))
 
     for _ in range(NUM_MAX_TEST_TIMES):
         # --------------------------------------------------------------------------------
@@ -212,7 +214,7 @@ def test_020_cross_entropy_log_loss_1d(h: float = 1e-5, k=OFFSET_FOR_LOG):
 
         A1 = np.zeros_like(P1)
         A1[index] = -1 / (p+k)
-        check.equal(np.all(np.abs(A1 - G1) < 0.001), True, "A1-G1 %s\n" % np.abs(A1-G1))
+        check.equal(np.all(np.abs(A1 - G1) < 0.0001), True, "A1-G1 %s\n" % np.abs(A1-G1))
 
         # --------------------------------------------------------------------------------
         # [1D test case]
@@ -295,7 +297,7 @@ def test_020_cross_entropy_log_loss_2d(h: float = 1e-5, k=OFFSET_FOR_LOG):
             T
         ] = -1 / (p+k)
 
-        check.equal(np.all(np.abs(A-G) < 0.001), True, "A-G %s\n" % np.abs(A-G))
+        check.equal(np.all(np.abs(A-G) < 0.0001), True, "A-G %s\n" % np.abs(A-G))
 
 
 # ================================================================================
