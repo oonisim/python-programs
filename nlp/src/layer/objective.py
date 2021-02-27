@@ -1,28 +1,22 @@
 """Objective function layer implementations
 """
+import logging
 from typing import (
-    Tuple,
-    List,
-    Dict,
-    Optional,
     Union,
-    Final,
-    Generator,
-    Iterator,
     Callable
 )
-import logging
+
 import numpy as np
-from layer import Layer
+
 from common.functions import (
     transform_X_T,
     logistic_log_loss,
     categorical_log_loss,
     cross_entropy_log_loss,
-    numerical_jacobian,
     softmax,
     sigmoid
 )
+from layer import Layer
 
 
 # TODO
@@ -144,8 +138,6 @@ class CrossEntropyLogLoss(Layer):
 
         Args:
             X: Input of shape (N,M) to calculate the probabilities for the M nodes.
-            T: Labels for input X. Shape(N,M) for OHE label and shape(N,) for index label.
-            f: Activation function, e.g. softmax, sigmoid
         Returns:
             L: Objective value of shape ()
         """

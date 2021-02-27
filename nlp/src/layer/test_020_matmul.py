@@ -10,7 +10,7 @@ import copy
 import logging
 import numpy as np
 from common import (
-    OFFSET_FOR_DELTA,
+    OFFSET_DELTA,
     numerical_jacobian,
     weights,
     random_string
@@ -359,7 +359,7 @@ def test_020_matmul_methods():
     assert np.array_equal(dX, expected_dX)
 
     # Matmul analytical gradient dL/dX should be close to the numerical gradient GN.
-    assert np.all(np.abs(dX - GN[0]) < OFFSET_FOR_DELTA), \
+    assert np.all(np.abs(dX - GN[0]) < OFFSET_DELTA), \
         f"dX need close to GN[0] but dX \n%s\n GN[0] \n%s\n" % (dX, GN[0])
 
     # --------------------------------------------------------------------------------
@@ -375,8 +375,8 @@ def test_020_matmul_methods():
     backup = copy.deepcopy(W)
 
     dS = layer.update()         # Analytical dL/dX, dL/dW
-    assert np.all(np.abs(dS[0] - GN[0]) < OFFSET_FOR_DELTA) # dL/dX
-    assert np.all(np.abs(dS[1] - GN[1]) < OFFSET_FOR_DELTA) # dL/dW
+    assert np.all(np.abs(dS[0] - GN[0]) < OFFSET_DELTA) # dL/dX
+    assert np.all(np.abs(dS[1] - GN[1]) < OFFSET_DELTA) # dL/dW
 
     # Objective L with the updated W should be smaller than previous L
     assert np.all(np.abs(objective(layer.function(X)) < L))

@@ -2,11 +2,12 @@ import random
 import numpy as np
 from common import (
     numerical_jacobian,
+    logarithm,
     sigmoid,
     softmax,
     cross_entropy_log_loss,
-    OFFSET_FOR_LOG,
-    OFFSET_FOR_DELTA
+    OFFSET_LOG,
+    OFFSET_DELTA
 )
 
 from layer.test_config import (
@@ -33,7 +34,7 @@ def test_010_softmax(h:float = 1e-5):
     assert np.all(np.abs(P-E) < h)
 
 
-def test_010_cross_entropy_log_loss(h: float = 1e-5, k=OFFSET_FOR_LOG):
+def test_010_cross_entropy_log_loss(h: float = 1e-5):
     """Test case for cross_entropy_log_loss
     log(P=1) -> 0
     """
@@ -43,8 +44,8 @@ def test_010_cross_entropy_log_loss(h: float = 1e-5, k=OFFSET_FOR_LOG):
     # For scalar P=0, T=1 for -t * log(k) -> log(k)
     # For scalar P=1, T=0 for -t * log(k) -> 0
     # --------------------------------------------------------------------------------
-    assert np.abs(cross_entropy_log_loss(P=1.0, T=1) - np.log(1+k)) < h
-    assert np.abs(cross_entropy_log_loss(P=0.0, T=1) - (-1 * np.log(k))) < h
+    assert np.abs(cross_entropy_log_loss(P=1.0, T=1) - logarithm(1)) < h
+    assert np.abs(cross_entropy_log_loss(P=0.0, T=1) - (-1 * logarithm(0))) < h
     assert cross_entropy_log_loss(P=1.0, T=0) < h
 
     for _ in range(NUM_MAX_TEST_TIMES):
@@ -57,7 +58,7 @@ def test_010_cross_entropy_log_loss(h: float = 1e-5, k=OFFSET_FOR_LOG):
         P[index] = 1.0
         T = index
         Z = cross_entropy_log_loss(P, T)    # log(P=1+k) -> log(k)
-        assert np.all(np.abs(Z - np.log(1+k)) < h), \
+        assert np.all(np.abs(Z - logarithm(1)) < h), \
             f"cross_entropy_log_loss(1,1) is expected to be 0 but {Z}"
 
         # --------------------------------------------------------------------------------
@@ -75,7 +76,7 @@ def test_010_cross_entropy_log_loss(h: float = 1e-5, k=OFFSET_FOR_LOG):
 
         # Z will not get to np.inf as the function avoid it by adding a small number k
         # log(+k)
-        E = -1 * np.log(k)
+        E = -1 * logarithm(0)
         Z = cross_entropy_log_loss(P, T)
         assert (Z -E) < h, \
             f"cross_entropy_log_loss(1=0,T=0) is expected to be inf but {Z}"
@@ -96,7 +97,7 @@ def test_010_cross_entropy_log_loss(h: float = 1e-5, k=OFFSET_FOR_LOG):
             T
         ] = p
 
-        E = np.full(T.shape, -np.log(p+k))
+        E = np.full(T.shape, -logarithm(p))
         L = cross_entropy_log_loss(P, T)
         assert np.all(np.abs(E-L) < h), \
             f"Loss deviation (E-L) is expected to be < {h} but {np.abs(E-L)}"
