@@ -18,7 +18,7 @@ from common import (
     cross_entropy_log_loss,
     OFFSET_LOG,
     OFFSET_DELTA,
-    OFFSET_SIGMOID
+    BOUNDARY_SIGMOID
 )
 
 from layer.test_config import (
@@ -58,7 +58,7 @@ def test_020_numerical_jacobian_avg(h:float = 1e-5):
 
 def test_020_numerical_jacobian_sigmoid(u: float = 1e-4):
     """Test Case for numerical gradient calculation
-    The domain of X is -OFFSET_SIGMOID < x < OFFSET_SIGMOID
+    The domain of X is -BOUNDARY_SIGMOID < x < BOUNDARY_SIGMOID
 
     Args:
           u: Acceptable threshold value
@@ -66,7 +66,7 @@ def test_020_numerical_jacobian_sigmoid(u: float = 1e-4):
     # y=sigmoid(x) -> dy/dx = y(1-y)
     # 0.5 = sigmoid(0) -> dy/dx = 0.25
     for _ in range(NUM_MAX_TEST_TIMES):
-        x = np.random.uniform(low=-OFFSET_SIGMOID, high=OFFSET_SIGMOID, size=1)
+        x = np.random.uniform(low=-BOUNDARY_SIGMOID, high=BOUNDARY_SIGMOID, size=1)
         y = sigmoid(x)
         analytical = np.multiply(y, (1-y))
         numerical = numerical_jacobian(sigmoid, x)
@@ -137,7 +137,7 @@ def test_020_cross_entropy_log_loss_scalar(h: float = OFFSET_DELTA, u: float = 1
         f"Delta expected to be < {h} but {np.abs(g3 - gn3)}"
 
     for _ in range(NUM_MAX_TEST_TIMES):
-        x = np.random.uniform(low=-OFFSET_SIGMOID, high=OFFSET_SIGMOID)
+        x = np.random.uniform(low=-BOUNDARY_SIGMOID, high=BOUNDARY_SIGMOID)
         p = softmax(x)
         gn = numerical_jacobian(partial(f, T=1), p)
         ex = (-t1 * logarithm(p+h) + t1 * logarithm(p-h)) / (2 * h)
@@ -203,7 +203,7 @@ def test_020_cross_entropy_log_loss_1d(h: float = OFFSET_DELTA, u: float = 1e-4)
         M = np.random.randint(2, NUM_MAX_NODES)    # M > 1
         T1 = np.random.randint(0, M)            # location of the truth
         P1 = np.zeros(M)
-        while not (x := np.random.uniform(low=-OFFSET_SIGMOID, high=OFFSET_SIGMOID)): pass
+        while not (x := np.random.uniform(low=-BOUNDARY_SIGMOID, high=BOUNDARY_SIGMOID)): pass
         p = softmax(x)
         P1[T1] = p
 
@@ -236,7 +236,7 @@ def test_020_cross_entropy_log_loss_1d(h: float = OFFSET_DELTA, u: float = 1e-4)
         # --------------------------------------------------------------------------------
         M = np.random.randint(2, NUM_MAX_NODES)    # M > 1
         index = np.random.randint(0, M)            # location of the truth
-        while not (x := np.random.uniform(low=-OFFSET_SIGMOID, high=OFFSET_SIGMOID)): pass
+        while not (x := np.random.uniform(low=-BOUNDARY_SIGMOID, high=BOUNDARY_SIGMOID)): pass
         p = softmax(x)
         P1 = np.zeros(M)
         P1[index] = p
@@ -310,7 +310,7 @@ def test_020_cross_entropy_log_loss_2d(h: float = OFFSET_DELTA):
         # Keep p value away from 0. As p gets close to 0, the log(p+/-h) gets large e.g
         # -11.512925464970229, hence log(p+/-h) / 2h explodes.
         # --------------------------------------------------------------------------------
-        while not (x := np.random.uniform(low=-OFFSET_SIGMOID, high=OFFSET_SIGMOID)): pass
+        while not (x := np.random.uniform(low=-BOUNDARY_SIGMOID, high=BOUNDARY_SIGMOID)): pass
         p = softmax(x)
         N = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M = np.random.randint(2, NUM_MAX_NODES)

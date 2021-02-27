@@ -6,6 +6,7 @@ from common import (
     sigmoid,
     softmax,
     cross_entropy_log_loss,
+    gn,
     OFFSET_LOG,
     OFFSET_DELTA
 )
@@ -101,3 +102,14 @@ def test_010_cross_entropy_log_loss(h: float = 1e-5):
         L = cross_entropy_log_loss(P, T)
         assert np.all(np.abs(E-L) < h), \
             f"Loss deviation (E-L) is expected to be < {h} but {np.abs(E-L)}"
+
+
+def test_gn(X, T):
+    N = 1000
+    left = 5
+    right = 10
+
+    X = np.linspace(left, right, N)
+    T0 = np.zeros(N)
+    T1 = np.ones(N)
+    gn(X, 0)

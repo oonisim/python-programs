@@ -9,8 +9,8 @@ import numpy as np
 # --------------------------------------------------------------------------------
 # OFFSET_DELTA = 1e-10
 # OFFSET_LOG = (OFFSET_DELTA + 1e-7)  # Avoid log(0) -> inf by log(0+offset)
-# OFFSET_SIGMOID = np.log(OFFSET_LOG)
+# BOUNDARY_SIGMOID = np.log(OFFSET_LOG)
 
-OFFSET_DELTA = 1e-10
-OFFSET_LOG = 1e-8      # Avoid log(0) -> inf by log(x) where x > offset
-OFFSET_SIGMOID = -np.log(OFFSET_LOG)
+OFFSET_DELTA = 1e-9
+OFFSET_LOG = 1e-7      # Avoid log(0) -> inf by log(x) where x > offset
+BOUNDARY_SIGMOID = -np.log(OFFSET_LOG)

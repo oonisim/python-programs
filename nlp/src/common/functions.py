@@ -14,7 +14,7 @@ import numpy as np
 from common import (
     OFFSET_DELTA,
     OFFSET_LOG,
-    OFFSET_SIGMOID
+    BOUNDARY_SIGMOID
 )
 Logger = logging.getLogger("functions")
 Logger.setLevel(logging.DEBUG)
@@ -60,26 +60,25 @@ def sigmoid_reverse(y):
 
 def sigmoid(
     X: Union[float, np.ndarray],
-    offset: Optional[Union[np.ndarray, float]] = OFFSET_SIGMOID
+    boundary: Optional[Union[np.ndarray, float]] = BOUNDARY_SIGMOID
 ) -> Union[int, float, np.ndarray]:
     """Sigmoid activate function
     Args:
         X: > domain value for log
-        offset: The lower boundary of acceptable X value.
+        boundary: The lower boundary of acceptable X value.
     """
     assert (isinstance(X, np.ndarray) and X.dtype == float) or isinstance(X, float)
+    boundary = BOUNDARY_SIGMOID if (boundary is None or boundary <= float(0)) else boundary
+    assert boundary > 0
 
-    offset = OFFSET_SIGMOID if not offset else offset
-    assert offset > 0
-
-    if np.all(np.abs(X) < offset):
+    if np.all(np.abs(X) <= boundary):
         _X = X
     elif isinstance(X, np.ndarray):
         _X = copy.deepcopy(X)
-        _X[X > offset] = offset
-        _X[X < -offset] = -offset
+        _X[X > boundary] = boundary
+        _X[X < -boundary] = -boundary
     else:
-        _X = np.sign(X) * offset
+        _X = np.sign(X) * boundary
 
     return 1 / (1 + np.exp(-1 * _X))
 
@@ -184,7 +183,7 @@ def logistic_log_loss(
     return J
 
 
-def logistic_log_loss_gradient(X, T, offset: float = OFFSET_SIGMOID):
+def logistic_log_loss_gradient(X, T, offset: float = BOUNDARY_SIGMOID):
     """Derivative of
     Z = sigmoid(X), dZ/dX = Z(1-Z)
     L = -( T*log(Z) + (1-T) * log(1-Z) ) dL/dZ = -T(1-T)/Z + (1-T)/(1-Z)
@@ -561,6 +560,14 @@ def numerical_jacobian(
         it.iternext()
 
     return J
+
+
+def gn(X, t):
+    """Numerical gradient for logistic log loss"""
+    return [
+        numerical_jacobian(lambda _x: logistic_log_loss(P=sigmoid(_x), T=t), x)
+        for x in X
+    ]
 
 
 def compose(*args):
