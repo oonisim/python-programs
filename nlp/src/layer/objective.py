@@ -5,9 +5,8 @@ from typing import (
     Union,
     Callable
 )
-
+import inspect
 import numpy as np
-
 from common.functions import (
     transform_X_T,
     logistic_log_loss,
@@ -141,8 +140,9 @@ class CrossEntropyLogLoss(Layer):
         Returns:
             L: Objective value of shape ()
         """
-        # Pre-requisite: T has been set before calling.
-        assert self.T.size > 0 and self.M == self.D
+        name = inspect.stack()[0][3]
+        assert self.T.size > 0 and self.M == self.D, \
+            "Pre-requisite: T has been set before calling."
 
         # --------------------------------------------------------------------------------
         # Validate X, T and transform them to be able to use numpy tuple-like indexing.
@@ -153,8 +153,8 @@ class CrossEntropyLogLoss(Layer):
         # --------------------------------------------------------------------------------
         self.X, self.T = transform_X_T(X, self.T)
         self.logger.debug(
-            "layer[%s].function(): After transform_X_T, X.shape %s T.shape %s",
-            self.name, self.X.shape, self.T.shape
+            "layer[%s].%s: After transform_X_T, X.shape %s T.shape %s",
+            self.name, name, self.X.shape, self.T.shape
         )
 
         assert (
@@ -193,7 +193,7 @@ class CrossEntropyLogLoss(Layer):
         L = np.array(_L / self.N, dtype=float)
         self._Y = L         # L is alias of Y.
 
-        self.logger.debug("Layer[%s].function(): L = %s", self.name, self.Y)
+        self.logger.debug("Layer[%s].%s: L = %s", self.name, name, self.Y)
         return self.Y
 
     def gradient(self, dY: Union[np.ndarray, float] = float(1)) -> Union[np.ndarray, float]:
@@ -215,6 +215,7 @@ class CrossEntropyLogLoss(Layer):
         Returns:
             dF/dX: (P-T)/N of shape (N, M)
         """
+        name = inspect.stack()[0][3]
         dY = np.array(dY) if isinstance(dY, float) else dY
 
         # --------------------------------------------------------------------------------
@@ -236,7 +237,7 @@ class CrossEntropyLogLoss(Layer):
             # --------------------------------------------------------------------------------
             # T is OHE if T.ndim==2 else index with T.ndim==1
             # --------------------------------------------------------------------------------
-            self.logger.debug("Layer[%s].gradient(): Label is in OHE format", self.name)
+            self.logger.debug("Layer[%s].%s: Label is in OHE format", self.name, name)
             assert (self.T.size == self.P.size) and (self.T.shape == self.P.shape), \
                 "T.shape %s and P.shape %s should be the same for the OHE labels." \
                 % (self.T.shape, self.P.shape)
@@ -258,7 +259,7 @@ class CrossEntropyLogLoss(Layer):
             dX = dF * (self.P - self.T)     # (N,M) * (N,M)
 
         else:
-            self.logger.debug("gradient(): Label is index format")
+            self.logger.debug("%s: Label is index format", name)
             # --------------------------------------------------------------------------------
             # np.copy() is a shallow copy and will not copy object elements within arrays.
             # To ensure all elements within an object array are copied, use copy.deepcopy().
@@ -287,12 +288,12 @@ class CrossEntropyLogLoss(Layer):
             dF = (dJ * dY)                  # dJ/dX is shape (N,).
             dF = dF[::, np.newaxis]         # Transform into shape (N,1) to np broadcast.
             # dF/dY * dY/dJ * (P-T) = dF/dY * (P-T) / N
-            self.logger.debug("dF.shape is %s dF is \n%s.\n", dF.shape, dF)
-            self.logger.debug("T is %s dX.shape %s.\n", self.T, dX.shape)
+            self.logger.debug("%s: dF.shape is %s dF is \n%s.\n", name, dF.shape, dF)
+            self.logger.debug("%s: T is %s dX.shape %s.\n", name, self.T, dX.shape)
             self.logger.debug(
-                "gradient(): dX[rows, T] = %s,\ndX is \n%s.\n", dX[rows, cols], dX
+                "%s: dX[rows, T] = %s,\ndX is \n%s.\n", name, dX[rows, cols], dX
             )
             np.multiply(dF, dX, out=dX)
 
-        self.logger.debug("gradient(): dL/dX is \n%s.\n", dX)
+        self.logger.debug("%s: dL/dX is \n%s.\n", name, dX)
         return dX

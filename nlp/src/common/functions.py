@@ -2,6 +2,7 @@
 Those marked as "From deep-learning-from-scratch" is copied from the github.
 https://github.com/oreilly-japan/deep-learning-from-scratch
 """
+import inspect
 import logging
 import copy
 from typing import (
@@ -14,7 +15,8 @@ import numpy as np
 from common import (
     OFFSET_DELTA,
     OFFSET_LOG,
-    BOUNDARY_SIGMOID
+    BOUNDARY_SIGMOID,
+    MIN_DIFF_AT_GN
 )
 Logger = logging.getLogger("functions")
 Logger.setLevel(logging.DEBUG)
@@ -129,6 +131,7 @@ def softmax(X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
     Returns:
         P: Probability of shape (N,M)
     """
+    name = inspect.stack()[0][3]
     assert isinstance(X, float) or (isinstance(X, np.ndarray) and X.dtype == float), \
         "X must be float or ndarray(dtype=float)"
 
@@ -139,7 +142,7 @@ def softmax(X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
     C = np.max(X, axis=-1, keepdims=True)   # オーバーフロー対策
     exp = np.exp(X - C)
     P = exp / np.sum(exp, axis=-1, keepdims=True)
-    Logger.debug("softmax(): X %s exp %s P %s", X, exp, P)
+    Logger.debug("%s: X %s exp %s P %s", name, X, exp, P)
 
     return P
 
@@ -253,6 +256,7 @@ def transform_X_T(
     Returns:
         (X, T): reshaped X of shape(N,M), T of shape(M,)
     """
+    name = inspect.stack()[0][3]
     assert (isinstance(X, np.ndarray) and X.dtype == float) or isinstance(X, float), \
         "Type of P must be float"
     assert (isinstance(T, np.ndarray) and T.dtype == int) or isinstance(T, int), \
@@ -351,8 +355,8 @@ def transform_X_T(
                 assert False, \
                     "When X.ndim=1, T.ndim should be 0 or 1 but %s" % T.ndim
 
-            Logger.debug("X.shape (%s,) has been converted into %s", X.size, X.shape)
-            Logger.debug("T.shape %s has been converted into %s", _shape, T.shape)
+            Logger.debug("%s: X.shape (%s,) has been converted into %s", name, X.size, X.shape)
+            Logger.debug("%s: T.shape %s has been converted into %s", name, _shape, T.shape)
 
         else:  # X.ndim > 1
             _shape = T.shape
@@ -365,7 +369,7 @@ def transform_X_T(
                     # --------------------------------------------------------------------------------
                     assert np.all(np.isin(T, [0, 1])), "Binary label must be 0/1"
                     T = T.reshape((-1, 1))  # Convert into T(N,1) 2D OHE Binary
-                    Logger.debug("T.shape %s has been converted into %s", _shape, T.shape)
+                    Logger.debug("%s: T.shape %s has been converted into %s", name, _shape, T.shape)
 
                 elif X.shape[1] > 1:
                     # --------------------------------------------------------------------------------
@@ -373,7 +377,8 @@ def transform_X_T(
                     # No conversion required.
                     # --------------------------------------------------------------------------------
                     assert X.shape[0] == T.shape[0], \
-                        "Index format X(N,M), T(N,) expected but X %s T %s" % (X.shape, T.shape)
+                        "%s: Index format X(N,M), T(N,) expected but X %s T %s" \
+                        % (name, X.shape, T.shape)
                     pass
 
             elif T.ndim > 1:
@@ -389,7 +394,7 @@ def transform_X_T(
                     # Transfer results in (P.ndim==T.ndim+1 > 1) and (P.shape[0]==T.shape[0]==N).
                     # --------------------------------------------------------------------------------
                     T = T.argmax(axis=-1)
-                    Logger.debug("T.shape %s has been converted into %s", _shape, T.shape)
+                    Logger.debug("%s: T.shape %s has been converted into %s", name, _shape, T.shape)
             else:
                 msg = "transform_X_T(): Invalid state."
                 Logger.error(
@@ -427,6 +432,7 @@ def cross_entropy_log_loss(
     Returns:
         J: Loss value of shape (N,), a loss value per batch.
     """
+    name = inspect.stack()[0][3]
     P, T = transform_X_T(P, T)
 
     if P.ndim == 0:
@@ -474,16 +480,16 @@ def cross_entropy_log_loss(
         f"np P indices need the same shape but rows {rows.shape} cols {cols.shape}."
 
     _P = P[rows, cols]
-    Logger.debug("cross_entropy_log_loss(): N is [%s]", N)
-    Logger.debug("cross_entropy_log_loss(): P.shape %s", P.shape)
-    Logger.debug("cross_entropy_log_loss(): P[rows, cols].shape %s", _P.shape)
-    Logger.debug("cross_entropy_log_loss(): P[rows, cols] is %s", _P)
+    Logger.debug("%s: N is [%s]", name, N)
+    Logger.debug("%s: P.shape %s", name, P.shape)
+    Logger.debug("%s: P[rows, cols].shape %s", name, _P.shape)
+    Logger.debug("%s: P[rows, cols] is %s", name, _P)
 
     J = f(P=_P, T=int(1), offset=offset)
 
     assert not np.all(np.isnan(J)), "log(x) caused nan for P \n%s." % P
-    Logger.debug("J is [%s]", J)
-    Logger.debug("J.shape %s\n", J.shape)
+    Logger.debug("%s: J is [%s]", name, J)
+    Logger.debug("%s: J.shape %s\n", name, J.shape)
 
     assert (J.ndim > 0) and (0 < N == J.shape[0]), \
         "Loss J.shape is expected to be (%s,) but %s" % (N, J.shape)
@@ -506,6 +512,7 @@ def numerical_jacobian(
     Returns:
         J: Jacobian matrix that has the same shape of X.
     """
+    name = inspect.stack()[0][3]
     X = np.array(X, dtype=float) if isinstance(X, (float, int)) else X
     J = np.zeros_like(X, dtype=float)
 
@@ -526,35 +533,59 @@ def numerical_jacobian(
         idx = it.multi_index
         tmp: float = X[idx]
 
+        # --------------------------------------------------------------------------------
+        # f(x+h)
+        # --------------------------------------------------------------------------------
         X[idx] = tmp + delta
         fx1: Union[np.ndarray, float] = f(X)  # f(x+h)
         Logger.debug(
-            "numerical_jacobian(): idx[%s] x[%s] (x+h)[%s] fx1=[%s]",
-            idx, tmp, tmp+delta, fx1
+            "%s: idx[%s] x[%s] (x+h)[%s] fx1=[%s]",
+            name, idx, tmp, tmp+delta, fx1
         )
-        assert not np.all(np.isnan(fx1)), \
-            "numerical delta f(x+h) caused nan for f %s for X %s" \
-            % (f, (tmp + delta))
 
+        assert \
+            ((isinstance(fx1, np.ndarray) and fx1.size == 1) or isinstance(fx1, float)), \
+            "The f function needs to return scalar or shape () but %s" % fx1
+        assert np.all(np.isfinite(fx1)), \
+            "f(x+h) caused nan for f %s for X %s" % (f, (tmp + delta))
+
+        # --------------------------------------------------------------------------------
+        # f(x-h)
+        # --------------------------------------------------------------------------------
         X[idx] = tmp - delta
-        fx2: Union[np.ndarray, float] = f(X)  # f(x-h)
+        fx2: Union[np.ndarray, float] = f(X)
         Logger.debug(
-            "numerical_jacobian(): idx[%s] x[%s] (x-h)[%s] fx2=[%s]",
-            idx, tmp, tmp-delta, fx2
+            "%s: idx[%s] x[%s] (x-h)[%s] fx2=[%s]",
+            name, idx, tmp, tmp-delta, fx2
         )
-        assert not np.all(np.isnan(fx2)), \
-            "numerical delta f(x-h) caused nan for f %s for X %s" \
-            % (f, (tmp - delta))
+        assert \
+            ((isinstance(fx2, np.ndarray) and fx2.size == 1) or isinstance(fx2, float)), \
+            "The f function needs to return scalar or shape () but %s" % fx2
+        assert np.all(np.isfinite(fx2)), \
+            "f(x-h) caused nan for f %s for X %s" % (f, (tmp - delta))
+
+        # --------------------------------------------------------------------------------
+        # Subtraction between f(x+k) f(x-k) when they are very close is too small to f(x)
+        # Then the error of 1/P relative to f(x+k) and f(x-k) is much larger relative to
+        # f(x+k)-f(x-k), and the result is unstable/unreliable.
+        # See https://stackoverflow.com/a/66399722/4281353
+        #
+        # If the gradient of f(x) at x is nearly zero, or saturation, then reconsider
+        # if using the numerical gradient is fit for the purpose.
+        # --------------------------------------------------------------------------------
+        Logger.debug("%s: (fx1-fx2)=[%s]", name, (fx1-fx2))
+        assert np.abs(fx1 - fx2) > MIN_DIFF_AT_GN, \
+            "Need (fx1 - fx2) > %s to avoid float error but %s." \
+            % (MIN_DIFF_AT_GN, np.abs(fx1 - fx2))
 
         # --------------------------------------------------------------------------------
         # Set the gradient element scalar value or shape()
         # --------------------------------------------------------------------------------
         g: Union[np.ndarray, float] = (fx1 - fx2) / (2 * delta)
-        assert (isinstance(g, np.ndarray) and g.size == 1) or isinstance(g, float), \
-            "The f function needs to return scalar or shape () but %s" % g
+        assert np.all(np.isfinite(g))
         J[idx] = g
 
-        Logger.debug("numerical_jacobian(): idx[%s] j=[%s]", idx, g)
+        Logger.debug("%s: idx[%s] j=[%s]", name, idx, g)
 
         X[idx] = tmp
         it.iternext()

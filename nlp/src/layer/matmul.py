@@ -15,6 +15,7 @@ from typing import (
     Iterator,
     Callable
 )
+import inspect
 import logging
 import copy
 import numpy as np
@@ -76,7 +77,7 @@ class Matmul(Layer):
         # `W` has `M` nodes (nodes)
         # --------------------------------------------------------------------------------
         self.logger.debug(
-            "Matmul name [%s] W.shape is [%s], numer of nodes is [%s]",
+            "Matmul[%s] W.shape is [%s], number of nodes is [%s]",
             name, W.shape, num_nodes
         )
         assert W.shape[0] == num_nodes, \
@@ -143,9 +144,11 @@ class Matmul(Layer):
         Returns:
             Y: Layer value of X@W.T
         """
+        name = inspect.stack()[0][3]
         self.X = X
         self.logger.debug(
-            "layer[%s] function(): X.shape %s W.shape %s", self.name, self.X.shape, self.W.shape
+            "layer[%s].%s: X.shape %s W.shape %s",
+            self.name, name, self.X.shape, self.W.shape
         )
         assert self.W.shape == (self.M, self.D), \
             f"W shape needs {(self.M, self.D)} but ({self.W.shape})"
@@ -192,13 +195,14 @@ class Matmul(Layer):
         Returns:
             dL/dX of shape (N,D):  [ dL/dY:(N,M) @ W:(M,D)) ]
         """
+        name = inspect.stack()[0][3]
         assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == float)
 
         dY = np.array(dY).reshape((1, -1)) if isinstance(dY, float) or dY.ndim < 2 else dY
         assert dY.shape == self.Y.shape, \
             "dL/dY shape needs %s but %s" % (self.Y.shape, dY.shape)
 
-        self.logger.debug("layer[%s] gradient(): dY.shape %s", self.name, dY.shape)
+        self.logger.debug("layer[%s].%s: dY.shape %s", self.name, name, dY.shape)
         self._dY = dY
 
         # --------------------------------------------------------------------------------
@@ -246,7 +250,8 @@ class Matmul(Layer):
         Returns:
             [dX, dW]: Numerical gradients for X and W
         """
-        self.logger.debug("layer[%s] gradient_numerical()", self.name)
+        name = inspect.stack()[0][3]
+        self.logger.debug("layer[%s].%s", self.name, name)
         L = self.objective
 
         def objective_X(X: np.ndarray):

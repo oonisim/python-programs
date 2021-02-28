@@ -6,6 +6,7 @@ from typing import (
     Dict,
     Tuple
 )
+import inspect
 import copy
 import logging
 import numpy as np
@@ -18,11 +19,12 @@ from common import (
 from layer import (
     CrossEntropyLogLoss
 )
-from layer.test_config import (
+from common.test_config import (
     NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,
     NUM_MAX_FEATURES,
+    GRADIENT_DIFF_ACCEPTANCE_VALUE,
     GRADIENT_DIFF_ACCEPTANCE_RATIO
 )
 
@@ -38,6 +40,7 @@ def test_030_objective_instantiation_to_fail():
     Expected:
         Initialization detects parameter constraints not meet and fails.
     """
+    name = inspect.stack()[0][3]
     for _ in range(NUM_MAX_TEST_TIMES):
         M: int = np.random.randint(1, NUM_MAX_NODES)
         # Constraint: Name is string with length > 0.
@@ -233,8 +236,7 @@ def test_030_objective_instantiation():
         """Dummy objective function"""
         return np.sum(X)
 
-    name = "test_030_objective_instantiation"
-
+    name = inspect.stack()[0][3]
     for _ in range(NUM_MAX_TEST_TIMES):
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)
@@ -313,7 +315,7 @@ def test_030_objective_methods_1d_ohe():
     # --------------------------------------------------------------------------------
     # Instantiate a CrossEntropyLogLoss layer
     # --------------------------------------------------------------------------------
-    name = "test_030_objective_methods_1d_ohe"
+    name = inspect.stack()[0][3]
     N = 1
 
     for _ in range(NUM_MAX_TEST_TIMES):
@@ -341,7 +343,10 @@ def test_030_objective_methods_1d_ohe():
         P = softmax(X)
         EG = ((P - T) / N).reshape(1, -1)     # Expected analytical gradient dL/dX = (P-T)/N
 
-        Logger.debug("X is \n%s\nT is %s\nP is %s\nEG is %s\n", X, T, P, EG)
+        Logger.debug(
+            "%s: X is \n%s\nT is %s\nP is %s\nEG is %s\n",
+            name, X, T, P, EG
+        )
 
         # --------------------------------------------------------------------------------
         # constraint: L/loss == np.sum(cross_entropy_log_loss(softmax(X), T)) / N.
@@ -393,14 +398,15 @@ def test_030_objective_methods_1d_ohe():
         # --------------------------------------------------------------------------------
         dY = float(1)
         G = layer.gradient(dY)
-        assert np.all(np.abs(G-EG) <= 1e-6), \
-            f"Layer gradient dL/dX \n{G} \nneeds to be \n{EG}."
+        assert np.all(np.abs(G-EG) <= GRADIENT_DIFF_ACCEPTANCE_VALUE), \
+            f"Layer gradient dL/dX \n{G} \nneeds to be \n{EG} but G-EG \n{np.abs(G-EG)}\n"
 
         # --------------------------------------------------------------------------------
         # constraint: Analytical gradient G is close to GN: gradient_numerical().
         # --------------------------------------------------------------------------------
         assert \
-            np.all(np.abs(G - GN[0]) <= np.abs(GRADIENT_DIFF_ACCEPTANCE_RATIO * GN[0])), \
+            np.all(np.abs(G - GN[0]) <= GRADIENT_DIFF_ACCEPTANCE_VALUE) or \
+            np.all(np.abs(G-GN[0]) <= np.abs(GRADIENT_DIFF_ACCEPTANCE_RATIO * GN[0])), \
             f"dX is \n{G}\nGN[0] is \n{GN[0]}\nRatio * GN[0] is \n{GRADIENT_DIFF_ACCEPTANCE_RATIO * GN[0]}.\n"
 
 
@@ -425,7 +431,7 @@ def test_030_objective_methods_2d_ohe():
     # --------------------------------------------------------------------------------
     # Instantiate a CrossEntropyLogLoss layer
     # --------------------------------------------------------------------------------
-    name = "test_030_objective_methods_2d_ohe"
+    name = inspect.stack()[0][3]
     for _ in range(NUM_MAX_TEST_TIMES):
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)
@@ -450,7 +456,7 @@ def test_030_objective_methods_2d_ohe():
         ] = int(1)
         layer.T = T
 
-        Logger.debug("test_030_objective_methods_2d_ohe(): X is \n%s\nT is \n%s" % (X, T))
+        Logger.debug("%s: X is \n%s\nT is \n%s" % (name, X, T))
 
         P = softmax(X)
         EG = (P - T) / N       # Expected analytical gradient dL/dX = (P-T)/N
@@ -493,12 +499,13 @@ def test_030_objective_methods_2d_ohe():
         # --------------------------------------------------------------------------------
         dY = float(1)
         G = layer.gradient(dY)
-        assert np.all(np.abs(G-EG) <= 1e-6), \
+        assert np.all(abs(G-EG) <= GRADIENT_DIFF_ACCEPTANCE_VALUE), \
             f"Layer gradient dL/dX \n{G} \nneeds to be \n{EG}."
 
         # --------------------------------------------------------------------------------
         # constraint: Analytical gradient G is close to GN: gradient_numerical().
         # --------------------------------------------------------------------------------
         assert \
+            np.all(np.abs(G - GN[0]) <= GRADIENT_DIFF_ACCEPTANCE_VALUE) or \
             np.all(np.abs(G - GN[0]) <= np.abs(GRADIENT_DIFF_ACCEPTANCE_RATIO * GN[0])), \
             f"dX is \n{G}\nGN[0] is \n{GN[0]}\nRatio * GN[0] is \n{GRADIENT_DIFF_ACCEPTANCE_RATIO * GN[0]}.\n"

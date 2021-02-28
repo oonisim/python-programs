@@ -9,8 +9,21 @@ import numpy as np
 # --------------------------------------------------------------------------------
 # OFFSET_DELTA = 1e-10
 # OFFSET_LOG = (OFFSET_DELTA + 1e-7)  # Avoid log(0) -> inf by log(0+offset)
-# BOUNDARY_SIGMOID = np.log(OFFSET_LOG)
-
-OFFSET_DELTA = 1e-9
+# --------------------------------------------------------------------------------
+OFFSET_DELTA = 1e-8
 OFFSET_LOG = 1e-7      # Avoid log(0) -> inf by log(x) where x > offset
-BOUNDARY_SIGMOID = -np.log(OFFSET_LOG)
+
+# --------------------------------------------------------------------------------
+# BOUNDARY_SIGMOID = -np.log(OFFSET_LOG) * safe_margin_ratio
+# Because of the impact by adding k/OFFSET_LOG, the logistic log loss L=-T*log(Z+k)
+# is ceiled by -np.log(OFFSET_LOG) where Z=sigmoid(X). As Z gets closer to k, that-
+# is, X gets **similar** to log(k), dL/dX starts getting flatten eventually gets 0.
+# Before it starts, need to stop X from getting closer to log(k).
+# Hence X < -np.log(OFFSET_LOG) * safety_margin_ratio.
+# --------------------------------------------------------------------------------
+BOUNDARY_SIGMOID = -np.log(OFFSET_LOG) * 0.8    # give 10% slack
+
+# Min difference between f(x+h) and f(x-h) at numerical gradient to avoid
+# floating precision error. If f(x+h) - f(x-h) is small
+MIN_DIFF_AT_GN = OFFSET_DELTA ** 2
+assert np.isfinite(MIN_DIFF_AT_GN)

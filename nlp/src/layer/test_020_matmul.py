@@ -6,11 +6,11 @@ from typing import (
     Dict,
     Tuple
 )
+import inspect
 import copy
 import logging
 import numpy as np
 from common import (
-    OFFSET_DELTA,
     numerical_jacobian,
     weights,
     random_string
@@ -18,11 +18,12 @@ from common import (
 from layer import (
     Matmul
 )
-from layer.test_config import (
+from common.test_config import (
     NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,
-    NUM_MAX_FEATURES
+    NUM_MAX_FEATURES,
+    GRADIENT_DIFF_ACCEPTANCE_VALUE
 )
 
 
@@ -37,6 +38,7 @@ def test_020_matmul_instantiation_to_fail():
     Expected:
         Initialization detects parameter constraints not meet and fails.
     """
+    name = inspect.stack()[0][3]
     M: int = np.random.randint(1, NUM_MAX_NODES)
     D = 1
     # Constraint: Name is string with length > 0.
@@ -262,7 +264,7 @@ def test_020_matmul_instantiation():
     N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
     M: int = np.random.randint(1, NUM_MAX_NODES)
     D: int = np.random.randint(1, NUM_MAX_FEATURES)
-    name = "test_020_matmul"
+    name = inspect.stack()[0][3]
     layer = Matmul(
         name=name,
         num_nodes=M,
@@ -310,7 +312,7 @@ def test_020_matmul_methods():
     M: int = np.random.randint(1, NUM_MAX_NODES)
     D: int = np.random.randint(1, NUM_MAX_FEATURES)
     W = weights.he(M, D)
-    name = "test_020_matmul"
+    name = inspect.stack()[0][3]
 
     def objective(X: np.ndarray) -> Union[float, np.ndarray]:
         """Dummy objective function to calculate the loss L"""
@@ -330,7 +332,7 @@ def test_020_matmul_methods():
     # Test the numerical gradient dL/dX=layer.gradient_numerical().
     # --------------------------------------------------------------------------------
     X = np.random.randn(N, D)
-    Logger.debug("test_020_matmul_methods(): X is \n%s" % X)
+    Logger.debug("%s: X is \n%s" % (name, X))
 
     Y = layer.function(X)
     L = layer.objective(Y)
@@ -359,7 +361,7 @@ def test_020_matmul_methods():
     assert np.array_equal(dX, expected_dX)
 
     # Matmul analytical gradient dL/dX should be close to the numerical gradient GN.
-    assert np.all(np.abs(dX - GN[0]) < OFFSET_DELTA), \
+    assert np.all(np.abs(dX - GN[0]) < GRADIENT_DIFF_ACCEPTANCE_VALUE), \
         f"dX need close to GN[0] but dX \n%s\n GN[0] \n%s\n" % (dX, GN[0])
 
     # --------------------------------------------------------------------------------
@@ -375,8 +377,8 @@ def test_020_matmul_methods():
     backup = copy.deepcopy(W)
 
     dS = layer.update()         # Analytical dL/dX, dL/dW
-    assert np.all(np.abs(dS[0] - GN[0]) < OFFSET_DELTA) # dL/dX
-    assert np.all(np.abs(dS[1] - GN[1]) < OFFSET_DELTA) # dL/dW
+    assert np.all(np.abs(dS[0] - GN[0]) < GRADIENT_DIFF_ACCEPTANCE_VALUE) # dL/dX
+    assert np.all(np.abs(dS[1] - GN[1]) < GRADIENT_DIFF_ACCEPTANCE_VALUE) # dL/dW
 
     # Objective L with the updated W should be smaller than previous L
     assert np.all(np.abs(objective(layer.function(X)) < L))

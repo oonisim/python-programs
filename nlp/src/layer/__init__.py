@@ -1,9 +1,9 @@
-from . base import Layer
-from . matmul import Matmul
-from . activation import (
+from layer.base import Layer
+from layer.matmul import Matmul
+from layer.activation import (
     Sigmoid,
     Relu
 )
-from . objective import (
+from layer.objective import (
     CrossEntropyLogLoss
 )

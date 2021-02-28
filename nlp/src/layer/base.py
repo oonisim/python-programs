@@ -159,7 +159,7 @@ class Layer:
         self._dY: np.ndarray = np.empty(0, dtype=float)
 
         # Objective Li function for the layer. L = Li o fi
-        self._objective: Union[Callable[[np.ndarray], np.ndarray], None] = None
+        self._objective: Callable[[np.ndarray], np.ndarray] = None
 
         self._logger = logging.getLogger(name)
         self._logger.setLevel(logging._levelToName[log_level])

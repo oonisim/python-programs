@@ -8,3 +8,4 @@ MAX_ACTIVATION_VALUE = 5.0  # max output value from an activation function
 # when it is less than the ratio of G, e.g for ratio=0.05, abd(G-GN) < (0.05 * GN)
 # is acceptable.
 GRADIENT_DIFF_ACCEPTANCE_RATIO = 0.05
+GRADIENT_DIFF_ACCEPTANCE_VALUE = 1e-5
