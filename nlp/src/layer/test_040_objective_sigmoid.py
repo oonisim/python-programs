@@ -401,9 +401,10 @@ def test_040_objective_methods_1d_ohe():
         # constraint: Analytical gradient G is close to GN: gradient_numerical().
         # --------------------------------------------------------------------------------
         assert \
-            np.all(np.abs(G - GN[0]) <= GRADIENT_DIFF_ACCEPTANCE_VALUE) or \
-            np.all(np.abs(G - GN[0]) <= np.abs(GRADIENT_DIFF_ACCEPTANCE_RATIO * GN[0])), \
-            f"dX is \n{G}\nGN[0] is \n{GN[0]}\nRatio * GN[0] is \n{GRADIENT_DIFF_ACCEPTANCE_RATIO * GN[0]}.\n"
+            np.all(np.abs(G-GN[0]) <= GRADIENT_DIFF_ACCEPTANCE_VALUE) or \
+            np.all(np.abs(G-GN[0]) <= np.abs(GRADIENT_DIFF_ACCEPTANCE_RATIO * GN[0])), \
+            "dX is \n%s\nGN is \n%s\nG-GN is \n%s\n Ratio * GN[0] is \n%s.\n" \
+            % (G, GN[0], G-GN[0], GRADIENT_DIFF_ACCEPTANCE_RATIO * GN[0])
 
 
 def test_040_objective_methods_2d_ohe():

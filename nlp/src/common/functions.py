@@ -16,7 +16,8 @@ from common import (
     OFFSET_DELTA,
     OFFSET_LOG,
     BOUNDARY_SIGMOID,
-    MIN_DIFF_AT_GN
+    GN_DIFF_ACCEPTANCE_VALUE,
+    GN_DIFF_ACCEPTANCE_RATIO
 )
 Logger = logging.getLogger("functions")
 Logger.setLevel(logging.DEBUG)
@@ -505,6 +506,13 @@ def numerical_jacobian(
     Jacobian matrix element Jpq = df/dXpq, the impact on J by the
     small difference to Xpq where p is row index and q is col index of J.
 
+    Note:
+        Beware limitations by the float storage size, e.g. loss of significance.
+        https://docs.oracle.com/cd/E19957-01/806-3568/ncg_goldberg.html
+        https://ece.uwaterloo.ca/~dwharder/NumericalAnalysis/Contents/
+        https://ece.uwaterloo.ca/~dwharder/NumericalAnalysis/02Numerics/Weaknesses/
+        https://www.cise.ufl.edu/~mssz/CompOrg/CDA-arith.html
+
     Args:
         f: Y=f(X) where Y is a scalar or shape() array.
         X: input of shame (N, M), or (N,) or ()
@@ -546,7 +554,7 @@ def numerical_jacobian(
         assert \
             ((isinstance(fx1, np.ndarray) and fx1.size == 1) or isinstance(fx1, float)), \
             "The f function needs to return scalar or shape () but %s" % fx1
-        assert np.all(np.isfinite(fx1)), \
+        assert np.isfinite(fx1), \
             "f(x+h) caused nan for f %s for X %s" % (f, (tmp + delta))
 
         # --------------------------------------------------------------------------------
@@ -561,28 +569,41 @@ def numerical_jacobian(
         assert \
             ((isinstance(fx2, np.ndarray) and fx2.size == 1) or isinstance(fx2, float)), \
             "The f function needs to return scalar or shape () but %s" % fx2
-        assert np.all(np.isfinite(fx2)), \
+        assert np.isfinite(fx2), \
             "f(x-h) caused nan for f %s for X %s" % (f, (tmp - delta))
 
         # --------------------------------------------------------------------------------
-        # Subtraction between f(x+k) f(x-k) when they are very close is too small to f(x)
-        # Then the error of 1/P relative to f(x+k) and f(x-k) is much larger relative to
-        # f(x+k)-f(x-k), and the result is unstable/unreliable.
-        # See https://stackoverflow.com/a/66399722/4281353
+        # When f(x+k) and f(x-k) are relatively too close, subtract between them can ben
+        # too small, and the precision error 1/f(x) relative to f(x+k) and f(x-k) is much
+        # larger relative to that of f(x+k) or f(x-k), hence the result can be unstable.
+        # Prevent the subtract df(x) from being too small to f(x) by assuring df(x)/dx is
+        # greater than GN_DIFF_ACCEPTANCE_RATIO.
+        #
+        # e.g. For logistic log loss function f(x) with log(+1e-7) to avoid log(0)/inf.
+        # x[14.708627877981929] (x+h)[14.708627878981929] fx1=[14.708628288297405]
+        # x[14.708627877981929] (x-h)[14.708627876981929] fx2=[14.708628286670217]
+        # (fx1-fx2)=[1.6271872738116144e-09]
+        # (fx1-fx2) / fxn < 1e-10. The difference is relatively too small to f(x).
+        #
         #
         # If the gradient of f(x) at x is nearly zero, or saturation, then reconsider
-        # if using the numerical gradient is fit for the purpose.
+        # if using the numerical gradient is fit for the purpose. Prevent the gradient
+        # from being too close to zero by f(x+k)-f(x-k) > GN_DIFF_ACCEPTANCE_VALUE
         # --------------------------------------------------------------------------------
         Logger.debug("%s: (fx1-fx2)=[%s]", name, (fx1-fx2))
-        assert np.abs(fx1 - fx2) > MIN_DIFF_AT_GN, \
-            "Need (fx1 - fx2) > %s to avoid float error but %s." \
-            % (MIN_DIFF_AT_GN, np.abs(fx1 - fx2))
+        difference = (fx1 - fx2)
+        assert \
+            (np.abs(difference) > GN_DIFF_ACCEPTANCE_VALUE) and \
+            (np.abs(difference) > (fx1 * GN_DIFF_ACCEPTANCE_RATIO)) and \
+            (np.abs(difference) > (fx2 * GN_DIFF_ACCEPTANCE_RATIO)), \
+            "Need (fx1-fx2) / fxn > %s to avoid float error but %s. GN is %s" \
+            % (GN_DIFF_ACCEPTANCE_RATIO, np.abs(difference), (fx1-fx2) / (2 * delta))
 
         # --------------------------------------------------------------------------------
         # Set the gradient element scalar value or shape()
         # --------------------------------------------------------------------------------
-        g: Union[np.ndarray, float] = (fx1 - fx2) / (2 * delta)
-        assert np.all(np.isfinite(g))
+        g: Union[np.ndarray, float] = np.subtract(fx1, fx2) / (2 * delta)
+        assert np.isfinite(g)
         J[idx] = g
 
         Logger.debug("%s: idx[%s] j=[%s]", name, idx, g)
