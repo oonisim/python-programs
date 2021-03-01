@@ -17,7 +17,8 @@ from common import (
     OFFSET_LOG,
     BOUNDARY_SIGMOID,
     GN_DIFF_ACCEPTANCE_VALUE,
-    GN_DIFF_ACCEPTANCE_RATIO
+    GN_DIFF_ACCEPTANCE_RATIO,
+    GRADIENT_SATURATION_THRESHOLD
 )
 Logger = logging.getLogger("functions")
 Logger.setLevel(logging.DEBUG)
@@ -593,7 +594,6 @@ def numerical_jacobian(
         Logger.debug("%s: (fx1-fx2)=[%s]", name, (fx1-fx2))
         difference = (fx1 - fx2)
         assert \
-            (np.abs(difference) > GN_DIFF_ACCEPTANCE_VALUE) and \
             (np.abs(difference) > (fx1 * GN_DIFF_ACCEPTANCE_RATIO)) and \
             (np.abs(difference) > (fx2 * GN_DIFF_ACCEPTANCE_RATIO)), \
             "Need (fx1-fx2) / fxn > %s to avoid float error but %s. GN is %s" \
@@ -604,6 +604,10 @@ def numerical_jacobian(
         # --------------------------------------------------------------------------------
         g: Union[np.ndarray, float] = np.subtract(fx1, fx2) / (2 * delta)
         assert np.isfinite(g)
+        assert \
+            np.abs(g) > GRADIENT_SATURATION_THRESHOLD, \
+            "The gradient [%s] may have been saturated." % g
+
         J[idx] = g
 
         Logger.debug("%s: idx[%s] j=[%s]", name, idx, g)

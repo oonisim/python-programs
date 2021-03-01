@@ -110,7 +110,8 @@ from typing import (
 import inspect
 import logging
 import numpy as np
-from common.functions import (
+from common import (
+    GRADIENT_SATURATION_THRESHOLD,
     numerical_jacobian
 )
 
@@ -203,6 +204,9 @@ class Layer:
         assert X is not None and \
                ((isinstance(X, np.ndarray) and X.dtype == float) or isinstance(X, float))
 
+        if np.all(np.abs(X) > 1.0):
+            self.logger.warning("Input data X has not been standardized.")
+
         if isinstance(X, float):
             self._X = np.array(X)
         elif X.ndim == 1:
@@ -228,6 +232,12 @@ class Layer:
         """Gradient dL/dX"""
         assert isinstance(self._dX, np.ndarray) and self._dX.size > 0, \
             "dX is not initialized"
+
+        if np.all(np.abs(self._dX) < GRADIENT_SATURATION_THRESHOLD):
+            self.logger.warning(
+                "Gradient dL/dX \n[%s] may have been saturated." % self._dX
+            )
+
         return self._dX
 
     @property
@@ -262,6 +272,11 @@ class Layer:
         """Latest gradient dL/dY (impact on L by dY) given from the post layer(s)"""
         assert isinstance(self._dY, np.ndarray) and self._dY.dtype == float \
             and self._dY.size > 0, "dY is not initialized or invalid"
+
+        if np.all(np.abs(self._dY) < GRADIENT_SATURATION_THRESHOLD):
+            self.logger.warning(
+                "Gradient dY/dX \n[%s] may have been saturated." % self._dY
+            )
         return self._dY
 
     @property

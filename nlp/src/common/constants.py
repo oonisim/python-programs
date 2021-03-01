@@ -23,9 +23,10 @@ OFFSET_LOG = 1e-7      # Avoid log(0) -> inf by log(x) where x > offset
 # --------------------------------------------------------------------------------
 BOUNDARY_SIGMOID = -np.log(OFFSET_LOG) * 0.5
 
+# Threshold below which the gradient is regarded as saturated.
+GRADIENT_SATURATION_THRESHOLD = (10 ** -4)     # 1/10000
+
 # Min difference between f(x+h) and f(x-h) at numerical gradient to avoid
 # floating precision error. If f(x+h) - f(x-h) is small
-MIN_DIFF_AT_GN = np.power(OFFSET_DELTA, 2)
-GN_DIFF_ACCEPTANCE_VALUE = OFFSET_DELTA / (10 ** 4)     # 1/10000
+GN_DIFF_ACCEPTANCE_VALUE = 2 * OFFSET_DELTA * GRADIENT_SATURATION_THRESHOLD
 GN_DIFF_ACCEPTANCE_RATIO = 1e-12
-assert np.isfinite(MIN_DIFF_AT_GN)
