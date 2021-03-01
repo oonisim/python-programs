@@ -125,7 +125,13 @@ class Layer:
     # ================================================================================
     # Instance initialization
     # ================================================================================
-    def __init__(self, name: str, num_nodes: int, log_level: int = logging.WARNING):
+    def __init__(
+            self,
+            name: str,
+            num_nodes: int,
+            posteriors: Optional[List] = None,
+            log_level: int = logging.WARNING
+    ):
         """
         Args:
             name: layer ID name
@@ -158,6 +164,10 @@ class Layer:
         # --------------------------------------------------------------------------------
         self._Y: np.ndarray = np.empty(0, dtype=float)
         self._dY: np.ndarray = np.empty(0, dtype=float)
+
+        # Layers to which forward the matmul output
+        self._posteriors: List[Layer] = posteriors
+        self._num_posteriors: int = len(posteriors) if posteriors else -1
 
         # Objective Li function for the layer. L = Li o fi
         self._objective: Callable[[np.ndarray], np.ndarray] = None
@@ -316,21 +326,38 @@ class Layer:
         X = np.array(X).reshape((1, -1)) if isinstance(X, float) else X
         return X
 
-    def forward(self, X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
-        """Forward the layer output to the post layers
+    # def forward(self, X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
+    #     # In case for the layer is a repeater, pass X through as the default behavior.
+    #     self.logger.warning(
+    #         "Layer base method %s not overridden but called by %s.",
+    #         inspect.stack()[0][3], inspect.stack()[1][3]
+    #     )
+    #     X = np.array(X) if isinstance(X, float) else X
+    #     assert isinstance(X, np.ndarray) and X.dtype == float
+    #     return X
+
+    def forward(self, X: np.ndarray) -> Union[np.ndarray, float]:
+        """Calculate and forward-propagate the matmul output Y to post layers if exist.
         Args:
             X: input to the layer
         Returns:
             Y: layer output
         """
-        # In case for the layer is a repeater, pass X through as the default behavior.
-        self.logger.warning(
-            "Layer base method %s not overridden but called by %s.",
-            inspect.stack()[0][3], inspect.stack()[1][3]
-        )
-        X = np.array(X) if isinstance(X, float) else X
-        assert isinstance(X, np.ndarray) and X.dtype == float
-        return X
+        assert self._posteriors, "forward(): No post layer exists."
+
+        def _forward(Y: np.ndarray, layer: Layer) -> None:
+            """Forward the matmul output Y to a post layer
+            Args:
+                Y: Standardization output
+                layer: Layer where to propagate Y.
+            Returns:
+                Z: Return value from the post layer.
+            """
+            layer.forward(Y)
+
+        Y: np.ndarray = self.function(X)
+        list(map(_forward, Y, self._posteriors))
+        return Y
 
     def gradient(self, dY: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
         """Calculate the gradient dL/dX, the impact on L by the input dX
@@ -352,14 +379,42 @@ class Layer:
         assert isinstance(dY, np.ndarray) and dY.dtype == float
         return dY
 
+    # def backward(self) -> Union[np.ndarray, float]:
+    #     """Calculate and back-propagate the gradient dL/dX"""
+    #     self.logger.warning(
+    #         "Layer base method %s not overridden but called by %s.",
+    #         inspect.stack()[0][3], inspect.stack()[1][3]
+    #     )
+    #     assert False, "Need to override"
+    #     return np.array(-np.inf)
     def backward(self) -> Union[np.ndarray, float]:
-        """Calculate and back-propagate the gradient dL/dX"""
-        self.logger.warning(
-            "Layer base method %s not overridden but called by %s.",
-            inspect.stack()[0][3], inspect.stack()[1][3]
-        )
-        assert False, "Need to override"
-        return np.array(-np.inf)
+        """Calculate the gradient dL/dX to back-propagate
+        """
+        assert self._posteriors, "backward() called when no post layer exist."
+
+        def _backward(layer: Layer) -> np.ndarray:
+            """Get gradient dL/dY from a post layer
+            Args:
+                layer: a post layer
+            Returns:
+                dL/dY: the impact on L by the layer output dY
+            """
+            # --------------------------------------------------------------------------------
+            # Back propagation from the post layer(s)
+            # dL/dY has the same shape with Y:shape(N, M) as L and dL are scalar.
+            # --------------------------------------------------------------------------------
+            dY: np.ndarray = layer.backward()
+            assert np.array_equal(dY.shape, (self.N, self.M)), \
+                f"dY.shape needs {(self.N, self.M)} but ({dY.shape}))"
+
+            return dY
+
+        # --------------------------------------------------------------------------------
+        # Gradient dL/dY, the total impact on L by dY, from post layer(s) if exist.
+        # np.add.reduce() is faster than np.sum() as sum() calls it internally.
+        # --------------------------------------------------------------------------------
+        dY = np.add.reduce(map(_backward, self._posteriors))
+        return self.gradient(dY)
 
     def gradient_numerical(
             self, h: float = 1e-5

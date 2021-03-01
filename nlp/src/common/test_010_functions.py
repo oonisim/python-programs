@@ -76,8 +76,8 @@ def test_010_cross_entropy_log_loss(h: float = 1e-5):
     # For scalar P=0, T=1 for -t * log(k) -> log(k)
     # For scalar P=1, T=0 for -t * log(k) -> 0
     # --------------------------------------------------------------------------------
-    assert np.abs(cross_entropy_log_loss(P=1.0, T=1) - logarithm(1)) < h
-    assert np.abs(cross_entropy_log_loss(P=0.0, T=1) - (-1 * logarithm(0))) < h
+    assert np.abs(cross_entropy_log_loss(P=1.0, T=1) - logarithm(1.0)) < h
+    assert np.abs(cross_entropy_log_loss(P=0.0, T=1) - (-1 * logarithm(0.0))) < h
     assert cross_entropy_log_loss(P=1.0, T=0) < h
 
     for _ in range(NUM_MAX_TEST_TIMES):
@@ -90,7 +90,7 @@ def test_010_cross_entropy_log_loss(h: float = 1e-5):
         P[index] = 1.0
         T = index
         Z = cross_entropy_log_loss(P, T)    # log(P=1+k) -> log(k)
-        assert np.all(np.abs(Z - logarithm(1)) < h), \
+        assert np.all(np.abs(Z - logarithm(float(1))) < h), \
             f"cross_entropy_log_loss(1,1) is expected to be 0 but {Z}"
 
         # --------------------------------------------------------------------------------
@@ -108,7 +108,7 @@ def test_010_cross_entropy_log_loss(h: float = 1e-5):
 
         # Z will not get to np.inf as the function avoid it by adding a small number k
         # log(+k)
-        E = -1 * logarithm(0)
+        E = -1 * logarithm(float(0))
         Z = cross_entropy_log_loss(P, T)
         assert (Z -E) < h, \
             f"cross_entropy_log_loss(1=0,T=0) is expected to be inf but {Z}"
@@ -134,13 +134,3 @@ def test_010_cross_entropy_log_loss(h: float = 1e-5):
         assert np.all(np.abs(E-L) < h), \
             f"Loss deviation (E-L) is expected to be < {h} but {np.abs(E-L)}"
 
-
-def test_gn(X, T):
-    N = 1000
-    left = 5
-    right = 10
-
-    X = np.linspace(left, right, N)
-    T0 = np.zeros(N)
-    T1 = np.ones(N)
-    gn(X, 0)

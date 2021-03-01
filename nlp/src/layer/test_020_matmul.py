@@ -95,7 +95,7 @@ def test_020_matmul_instance_properties():
         Initialization detects the access to the non-initialized parameters and fails.
     """
     msg = "Accessing uninitialized property of the layer must fail."
-    name = random_string(np.random.randint(0, 10))
+    name = random_string(np.random.randint(1, 10))
     M: int = np.random.randint(1, NUM_MAX_NODES)
     D: int = np.random.randint(1, NUM_MAX_FEATURES)
     layer = Matmul(

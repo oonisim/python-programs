@@ -27,7 +27,7 @@ Logger = logging.getLogger("functions")
 Logger.setLevel(logging.DEBUG)
 
 
-def standardize(X: Union[np.ndarray, float], eps: float = OFFSET_STD):
+def standardize(X: Union[np.ndarray, float], out=None, eps: float = OFFSET_STD):
     """Standardize X per-feature basis.
     Each feature is independent from other features, hence standardize per feature.
     1. Calculate the mean per each column, not entire matrix.
@@ -36,6 +36,7 @@ def standardize(X: Union[np.ndarray, float], eps: float = OFFSET_STD):
 
     Args:
         X: Input data to standardize per feature basis.
+        out: Output storage for np.divide(dividend, divisor, out)
         eps: A small positive value to assure sd > 0 for deviation/sd will not be div-by-zero.
              Allow eps=0 to simulate or compare np.std().
     """
@@ -52,7 +53,7 @@ def standardize(X: Union[np.ndarray, float], eps: float = OFFSET_STD):
     variance = np.var(X, axis=0)
     sd = np.sqrt(variance + eps)
 
-    standardized = deviation / sd
+    standardized = np.divide(deviation, sd, out)
     assert np.all(np.isfinite(standardized))
 
     return standardized

@@ -91,10 +91,6 @@ class Matmul(Layer):
         self._W: np.ndarray = W             # node weight vectors
         self._dW: np.ndarray = np.empty(0, dtype=float)
 
-        # Layers to which forward the matmul output
-        self._posteriors: List[Layer] = posteriors
-        self._num_posteriors: int = len(posteriors) if posteriors else -1
-
         # --------------------------------------------------------------------------------
         # Optimizer for gradient descent
         # Z(n+1) = optimizer.update((Z(n), dL/dZ(n)+regularization)
@@ -169,25 +165,6 @@ class Matmul(Layer):
         np.matmul(X, self.W.T, out=self._Y)
         return self.Y
 
-    def forward(self, X: np.ndarray) -> Union[np.ndarray, float]:
-        """Calculate and forward-propagate the matmul output Y to post layers if exist.
-        """
-        assert self._posteriors, "forward(): No post layer exists."
-
-        def _forward(Y: np.ndarray, layer: Layer) -> None:
-            """Forward the matmul output Y to a post layer
-            Args:
-                Y: Matmul output
-                layer: Layer where to propagate Y.
-            Returns:
-                Z: Return value from the post layer.
-            """
-            layer.forward(Y)
-
-        Y: np.ndarray = self.function(X)
-        list(map(_forward, Y, self._posteriors))
-        return Y
-
     def gradient(self, dY: Union[np.ndarray, float] = 1.0) -> Union[np.ndarray, float]:
         """Calculate the gradients dL/dX and dL/dW.
         Args:
@@ -213,35 +190,6 @@ class Matmul(Layer):
             "dL/dX shape needs (%s, %s) but %s" % (self.N, self.D, self.dX.shape)
 
         return self.dX
-
-    def backward(self) -> Union[np.ndarray, float]:
-        """Calculate the gradient dL/dX to back-propagate
-        """
-        assert self._posteriors, "backward() called when no post layer exist."
-
-        def _backward(layer: Layer) -> np.ndarray:
-            """Get gradient dL/dY from a post layer
-            Args:
-                layer: a post layer
-            Returns:
-                dL/dY: the impact on L by the layer output dY
-            """
-            # --------------------------------------------------------------------------------
-            # Back propagation from the post layer(s)
-            # dL/dY has the same shape with Y:shape(N, M) as L and dL are scalar.
-            # --------------------------------------------------------------------------------
-            dY: np.ndarray = layer.backward()
-            assert np.array_equal(dY.shape, (self.N, self.M)), \
-                f"dY.shape needs {(self.N, self.M)} but ({dY.shape}))"
-
-            return dY
-
-        # --------------------------------------------------------------------------------
-        # Gradient dL/dY, the total impact on L by dY, from post layer(s) if exist.
-        # np.add.reduce() is faster than np.sum() as sum() calls it internally.
-        # --------------------------------------------------------------------------------
-        dY = np.add.reduce(map(_backward, self._posteriors))
-        return self.gradient(dY)
 
     def gradient_numerical(self, h: float = 1e-5) -> List[Union[float, np.ndarray]]:
         """Calculate numerical gradients
