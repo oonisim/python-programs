@@ -15,13 +15,47 @@ import numpy as np
 from common import (
     OFFSET_DELTA,
     OFFSET_LOG,
+    OFFSET_STD,
     BOUNDARY_SIGMOID,
     GN_DIFF_ACCEPTANCE_VALUE,
     GN_DIFF_ACCEPTANCE_RATIO,
     GRADIENT_SATURATION_THRESHOLD
 )
+
+
 Logger = logging.getLogger("functions")
 Logger.setLevel(logging.DEBUG)
+
+
+def standardize(X: Union[np.ndarray, float], eps: float = OFFSET_STD):
+    """Standardize X per-feature basis.
+    Each feature is independent from other features, hence standardize per feature.
+    1. Calculate the mean per each column, not entire matrix.
+    2. Calculate the variance per each column
+    3. Standardize mean/sqrt(variance+eps) where small positive eps prevents sd from being zero.
+
+    Args:
+        X: Input data to standardize per feature basis.
+        eps: A small positive value to assure sd > 0 for deviation/sd will not be div-by-zero.
+             Allow eps=0 to simulate or compare np.std().
+    """
+    name = inspect.stack()[0][3]
+    assert (isinstance(X, np.ndarray) and X.dtype == float and eps >= 0.0)
+    if isinstance(X, float):
+        X = np.array(X).reshape(1, -1)
+    if X.ndim <= 1:
+        X = X.reshape(1, -1)
+
+    N = X.shape[0]
+    mean = np.sum(X, axis=0) / N    # mean of each feature
+    deviation = X - mean
+    variance = np.var(X, axis=0)
+    sd = np.sqrt(variance + eps)
+
+    standardized = deviation / sd
+    assert np.all(np.isfinite(standardized))
+
+    return standardized
 
 
 def logarithm(

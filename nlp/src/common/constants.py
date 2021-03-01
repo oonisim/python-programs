@@ -11,7 +11,8 @@ import numpy as np
 # OFFSET_LOG = (OFFSET_DELTA + 1e-7)  # Avoid log(0) -> inf by log(0+offset)
 # --------------------------------------------------------------------------------
 OFFSET_DELTA = 1e-9
-OFFSET_LOG = 1e-7      # Avoid log(0) -> inf by log(x) where x > offset
+OFFSET_LOG = 1e-7       # Avoid log(0) -> inf by log(x) where x > offset
+OFFSET_STD = 1e-10      # Avoid div by zero at (X-u) / sqrt(variance + eps)
 
 # --------------------------------------------------------------------------------
 # BOUNDARY_SIGMOID = -np.log(OFFSET_LOG) * safe_margin_ratio

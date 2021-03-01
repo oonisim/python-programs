@@ -1,7 +1,10 @@
 import random
+import logging
+import inspect
 import numpy as np
 from common import (
     numerical_jacobian,
+    standardize,
     logarithm,
     sigmoid,
     softmax,
@@ -11,11 +14,39 @@ from common import (
     OFFSET_DELTA
 )
 
-from layer.test_config import (
+from common.test_config import (
     NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE
 )
+
+
+Logger = logging.getLogger(__name__)
+Logger.setLevel(logging.DEBUG)
+
+
+def test_010_standardize():
+    """
+    Objective:
+        Verify the standardize() function.
+    Expected:
+        (X - np.mean(A)) / np.std(X) with eps=0
+    """
+    name = inspect.stack()[0][3]
+    for _ in range(NUM_MAX_TEST_TIMES):
+        N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
+        M: int = np.random.randint(2, NUM_MAX_NODES)
+        X = np.random.randint(0, 1000, (N, M)).astype(float)
+        Logger.debug("%s: X \n%s\n", name, X)
+
+        mean = X - np.mean(X, axis=0)
+        sd = np.std(X, axis=0)
+        if np.all(sd > 0):
+            # Expected
+            E = mean / sd
+            # Actual
+            A = standardize(X, eps=0.0)
+            assert np.all(E == A), "X \n%s\n, standardized \n%s\n needs \n%s\n" % (X, E, A)
 
 
 def test_010_sigmoid(h:float = 1e-5):
