@@ -632,7 +632,7 @@ def numerical_jacobian(
                 (difference < (fx2 * GN_DIFF_ACCEPTANCE_RATIO))
         )
         if subtract_cancellation_condition:
-            fmt = "%s; (fx1-fx2) / fxn > %s to avoid subtract cancellation but %s. GN is %s"
+            fmt = "%s: subtract cancellation ((fx1-fx2)/fx) < %s detected. gn %s."
             args = tuple([
                 name,
                 GN_DIFF_ACCEPTANCE_RATIO,
@@ -640,9 +640,7 @@ def numerical_jacobian(
                 (fx1-fx2) / (2 * delta)
             ])
             Logger.warning(fmt, *args)
-            assert \
-                ENFORCE_STRICT_ASSERT and subtract_cancellation_condition, \
-                fmt % args
+            assert ENFORCE_STRICT_ASSERT, fmt % args
 
         # --------------------------------------------------------------------------------
         # Set the gradient element scalar value or shape()
@@ -650,17 +648,17 @@ def numerical_jacobian(
         g: Union[np.ndarray, float] = np.subtract(fx1, fx2) / (2 * delta)
         assert np.isfinite(g)
 
-        gradient_saturation_condition = (np.abs(g) < GRADIENT_SATURATION_THRESHOLD)
-        if gradient_saturation_condition:
-            msg = "%s: The gradient [%s] should be saturated."
-            Logger.warning(msg, name, g)
-            assert ENFORCE_STRICT_ASSERT, msg % (name, g)
-
         J[idx] = g
         Logger.debug("%s: idx[%s] j=[%s]", name, idx, g)
 
         X[idx] = tmp
         it.iternext()
+
+    gradient_saturation_condition = np.all(np.abs(J) < GRADIENT_SATURATION_THRESHOLD)
+    if gradient_saturation_condition:
+        msg = "%s: The gradient [%s] should be saturated."
+        Logger.warning(msg, name, g)
+        assert ENFORCE_STRICT_ASSERT, msg % (name, g)
 
     return J
 

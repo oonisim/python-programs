@@ -33,8 +33,8 @@ GRADIENT_SATURATION_THRESHOLD = (10 ** -5)
 # floating precision error. If f(x+h) - f(x-h) is small
 GN_DIFF_ACCEPTANCE_VALUE = 2 * OFFSET_DELTA * GRADIENT_SATURATION_THRESHOLD
 # TODO restore the original
-# GN_DIFF_ACCEPTANCE_RATIO = 1e-10
-GN_DIFF_ACCEPTANCE_RATIO = 0.0
+GN_DIFF_ACCEPTANCE_RATIO = 1e-15
+# GN_DIFF_ACCEPTANCE_RATIO = 0.0
 
 # To enforce assertion failure, set False (True -> assert True)
 ENFORCE_STRICT_ASSERT = (not False)

@@ -2,12 +2,12 @@
 import numpy as np
 
 
-def linear_separable(d: int = 2, n: int = 10000):
+def linear_separable(d: int = 3, n: int = 10000):
     """Generate a data set X to linearly separate.
     Bias x0 is added to create n+1 dimensional data
 
     Args:
-        d: number of dimension of the data
+        d: number of dimension of the data including the bias
         n: number of data to generate
     Returns:
            X dot W > 0 is True and < 0 for False.
@@ -15,8 +15,6 @@ def linear_separable(d: int = 2, n: int = 10000):
         T: labels. If Xi dot W > 0, then 1 else 0
         W: Vector orthogonal to the linear hyper plane that separates the data.
     """
-    d = d + 1   # add bias
-
     # Unit vector w of dimension d, dividing by its magnitude
     W = np.random.randn(d)
     W = W / np.linalg.norm(W)
