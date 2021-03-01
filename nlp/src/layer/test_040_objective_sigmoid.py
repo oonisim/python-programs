@@ -6,8 +6,6 @@ from typing import (
     Dict,
     Tuple
 )
-import inspect
-import copy
 import logging
 import numpy as np
 from common import (
@@ -243,7 +241,7 @@ def test_040_objective_instantiation():
         """Dummy objective function"""
         return np.sum(X)
 
-    name = inspect.stack()[0][3]
+    name = "test_040_objective_instantiation"
     for _ in range(NUM_MAX_TEST_TIMES):
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = 1
@@ -295,7 +293,7 @@ def test_040_objective_methods_1d_ohe():
     """
     Objective:
         Verify the forward path constraints:
-        1. Layer output L/loss is np.sum(cross_entropy_log_loss(sigmoid(X), T)) / N.
+        1. Layer output L/loss is np.sum(cross_entropy_log_loss(sigmoid(X), T, f=logistic_log_loss))) / N.
         2. gradient_numerical() == numerical Jacobian numerical_jacobian(O, X).
 
         Verify the backward path constraints:
@@ -320,7 +318,7 @@ def test_040_objective_methods_1d_ohe():
     # --------------------------------------------------------------------------------
     # Instantiate a CrossEntropyLogLoss layer
     # --------------------------------------------------------------------------------
-    name = inspect.stack()[0][3]
+    name = "test_040_objective_methods_1d_ohe"
     N = 1
 
     for _ in range(NUM_MAX_TEST_TIMES):
@@ -347,7 +345,7 @@ def test_040_objective_methods_1d_ohe():
         Logger.debug("%s: X is \n%s\nT is %s\nP is %s\nEG is %s\n", name, X, T, A, EG)
 
         # --------------------------------------------------------------------------------
-        # constraint: L/loss == np.sum(cross_entropy_log_loss(sigmoid(X), T)) / N.
+        # constraint: L/loss == np.sum(cross_entropy_log_loss(sigmoid(X), T, f=logistic_log_loss))) / N.
         # --------------------------------------------------------------------------------
         L = layer.function(X)       # L is shape ()
         Z = np.array(np.sum(cross_entropy_log_loss(P=sigmoid(X), T=T, f=logistic_log_loss))) / N
@@ -411,7 +409,7 @@ def test_040_objective_methods_2d_ohe():
     """
     Objective:
         Verify the forward path constraints:
-        1. Layer output L/loss is np.sum(cross_entropy_log_loss(sigmoid(X), T)) / N.
+        1. Layer output L/loss is np.sum(cross_entropy_log_loss(sigmoid(X), T, f=logistic_log_loss))) / N.
         2. gradient_numerical() == numerical Jacobian numerical_jacobian(O, X).
 
         Verify the backward path constraints:
@@ -428,7 +426,7 @@ def test_040_objective_methods_2d_ohe():
     # --------------------------------------------------------------------------------
     # Instantiate a CrossEntropyLogLoss layer
     # --------------------------------------------------------------------------------
-    name = inspect.stack()[0][3]
+    name = "test_040_objective_methods_2d_ohe"
     for _ in range(NUM_MAX_TEST_TIMES):
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = 1
@@ -460,7 +458,7 @@ def test_040_objective_methods_2d_ohe():
         # constraint: L/loss == np.sum(cross_entropy_log_loss(sigmoid(X), T)) / N.
         # --------------------------------------------------------------------------------
         L = layer.function(X)
-        Z = np.array(np.sum(cross_entropy_log_loss(sigmoid(X), T))) / N
+        Z = np.array(np.sum(cross_entropy_log_loss(P=sigmoid(X), T=T, f=logistic_log_loss))) / N
         assert np.array_equal(L, Z), f"SoftmaxLogLoss output should be {L} but {Z}."
 
         # --------------------------------------------------------------------------------

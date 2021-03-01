@@ -2,7 +2,6 @@
 Those marked as "From deep-learning-from-scratch" is copied from the github.
 https://github.com/oreilly-japan/deep-learning-from-scratch
 """
-import inspect
 import logging
 import copy
 from typing import (
@@ -19,12 +18,13 @@ from common import (
     BOUNDARY_SIGMOID,
     GN_DIFF_ACCEPTANCE_VALUE,
     GN_DIFF_ACCEPTANCE_RATIO,
-    GRADIENT_SATURATION_THRESHOLD
+    GRADIENT_SATURATION_THRESHOLD,
+    ENFORCE_STRICT_ASSERT
 )
 
 
 Logger = logging.getLogger("functions")
-Logger.setLevel(logging.DEBUG)
+# Logger.setLevel(logging.DEBUG)
 
 
 def standardize(X: Union[np.ndarray, float], out=None, eps: float = OFFSET_STD):
@@ -40,7 +40,6 @@ def standardize(X: Union[np.ndarray, float], out=None, eps: float = OFFSET_STD):
         eps: A small positive value to assure sd > 0 for deviation/sd will not be div-by-zero.
              Allow eps=0 to simulate or compare np.std().
     """
-    name = inspect.stack()[0][3]
     assert (isinstance(X, np.ndarray) and X.dtype == float and eps >= 0.0)
     if isinstance(X, float):
         X = np.array(X).reshape(1, -1)
@@ -168,7 +167,7 @@ def softmax(X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
     Returns:
         P: Probability of shape (N,M)
     """
-    name = inspect.stack()[0][3]
+    name = "softmax"
     assert isinstance(X, float) or (isinstance(X, np.ndarray) and X.dtype == float), \
         "X must be float or ndarray(dtype=float)"
 
@@ -293,7 +292,7 @@ def transform_X_T(
     Returns:
         (X, T): reshaped X of shape(N,M), T of shape(M,)
     """
-    name = inspect.stack()[0][3]
+    name = "transform_X_T"
     assert (isinstance(X, np.ndarray) and X.dtype == float) or isinstance(X, float), \
         "Type of P must be float"
     assert (isinstance(T, np.ndarray) and T.dtype == int) or isinstance(T, int), \
@@ -469,7 +468,7 @@ def cross_entropy_log_loss(
     Returns:
         J: Loss value of shape (N,), a loss value per batch.
     """
-    name = inspect.stack()[0][3]
+    name = "cross_entropy_log_loss"
     P, T = transform_X_T(P, T)
 
     if P.ndim == 0:
@@ -556,7 +555,7 @@ def numerical_jacobian(
     Returns:
         J: Jacobian matrix that has the same shape of X.
     """
-    name = inspect.stack()[0][3]
+    name = "numerical_jacobian"
     X = np.array(X, dtype=float) if isinstance(X, (float, int)) else X
     J = np.zeros_like(X, dtype=float)
 
@@ -627,24 +626,37 @@ def numerical_jacobian(
         # from being too close to zero by f(x+k)-f(x-k) > GN_DIFF_ACCEPTANCE_VALUE
         # --------------------------------------------------------------------------------
         Logger.debug("%s: (fx1-fx2)=[%s]", name, (fx1-fx2))
-        difference = (fx1 - fx2)
-        assert \
-            (np.abs(difference) > (fx1 * GN_DIFF_ACCEPTANCE_RATIO)) and \
-            (np.abs(difference) > (fx2 * GN_DIFF_ACCEPTANCE_RATIO)), \
-            "Need (fx1-fx2) / fxn > %s to avoid float error but %s. GN is %s" \
-            % (GN_DIFF_ACCEPTANCE_RATIO, np.abs(difference), (fx1-fx2) / (2 * delta))
+        difference = np.abs(fx1 - fx2)
+        subtract_cancellation_condition = (
+                (difference < (fx1 * GN_DIFF_ACCEPTANCE_RATIO)) or
+                (difference < (fx2 * GN_DIFF_ACCEPTANCE_RATIO))
+        )
+        if subtract_cancellation_condition:
+            fmt = "%s; (fx1-fx2) / fxn > %s to avoid subtract cancellation but %s. GN is %s"
+            args = tuple([
+                name,
+                GN_DIFF_ACCEPTANCE_RATIO,
+                difference,
+                (fx1-fx2) / (2 * delta)
+            ])
+            Logger.warning(fmt, *args)
+            assert \
+                ENFORCE_STRICT_ASSERT and subtract_cancellation_condition, \
+                fmt % args
 
         # --------------------------------------------------------------------------------
         # Set the gradient element scalar value or shape()
         # --------------------------------------------------------------------------------
         g: Union[np.ndarray, float] = np.subtract(fx1, fx2) / (2 * delta)
         assert np.isfinite(g)
-        assert \
-            np.abs(g) > GRADIENT_SATURATION_THRESHOLD, \
-            "The gradient [%s] may have been saturated." % g
+
+        gradient_saturation_condition = (np.abs(g) < GRADIENT_SATURATION_THRESHOLD)
+        if gradient_saturation_condition:
+            msg = "%s: The gradient [%s] should be saturated."
+            Logger.warning(msg, name, g)
+            assert ENFORCE_STRICT_ASSERT, msg % (name, g)
 
         J[idx] = g
-
         Logger.debug("%s: idx[%s] j=[%s]", name, idx, g)
 
         X[idx] = tmp

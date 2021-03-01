@@ -5,7 +5,6 @@ from typing import (
     Union,
     Callable
 )
-import inspect
 import numpy as np
 from common.functions import (
     transform_X_T,
@@ -140,7 +139,7 @@ class CrossEntropyLogLoss(Layer):
         Returns:
             L: Objective value of shape ()
         """
-        name = inspect.stack()[0][3]
+        name = "function"
         assert self.T.size > 0 and self.M == self.D, \
             "Pre-requisite: T has been set before calling."
 
@@ -215,7 +214,7 @@ class CrossEntropyLogLoss(Layer):
         Returns:
             dF/dX: (P-T)/N of shape (N, M)
         """
-        name = inspect.stack()[0][3]
+        name = "gradient"
         dY = np.array(dY) if isinstance(dY, float) else dY
 
         # --------------------------------------------------------------------------------

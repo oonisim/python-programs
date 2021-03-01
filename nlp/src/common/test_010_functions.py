@@ -1,17 +1,11 @@
-import random
 import logging
-import inspect
 import numpy as np
 from common import (
-    numerical_jacobian,
     standardize,
     logarithm,
     sigmoid,
     softmax,
     cross_entropy_log_loss,
-    gn,
-    OFFSET_LOG,
-    OFFSET_DELTA
 )
 
 from common.test_config import (
@@ -32,7 +26,7 @@ def test_010_standardize():
     Expected:
         (X - np.mean(A)) / np.std(X) with eps=0
     """
-    name = inspect.stack()[0][3]
+    name = "test_010_standardize"
     for _ in range(NUM_MAX_TEST_TIMES):
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)

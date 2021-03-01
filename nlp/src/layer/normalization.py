@@ -89,7 +89,7 @@ class Standardization(Layer):
         Returns:
             Y: Per-feature standardized output
         """
-        name = inspect.stack()[0][3]
+        name = "function"
         self.X = X
         self.logger.debug("layer[%s].%s: X.shape %s", self.name, name, self.X.shape)
 
@@ -116,7 +116,7 @@ class Standardization(Layer):
         Returns:
             dL/dX of shape (N,D):  [ dL/dY:(N,M) @ W:(M,D)) ]
         """
-        name = inspect.stack()[0][3]
+        name = "gradient"
         assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == float)
 
         dY = np.array(dY).reshape((1, -1)) if isinstance(dY, float) or dY.ndim < 2 else dY

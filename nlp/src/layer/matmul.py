@@ -15,7 +15,6 @@ from typing import (
     Iterator,
     Callable
 )
-import inspect
 import logging
 import copy
 import numpy as np
@@ -140,7 +139,7 @@ class Matmul(Layer):
         Returns:
             Y: Layer value of X@W.T
         """
-        name = inspect.stack()[0][3]
+        name = "function"
         self.X = X
         self.logger.debug(
             "layer[%s].%s: X.shape %s W.shape %s",
@@ -172,7 +171,7 @@ class Matmul(Layer):
         Returns:
             dL/dX of shape (N,D):  [ dL/dY:(N,M) @ W:(M,D)) ]
         """
-        name = inspect.stack()[0][3]
+        name = "gradient"
         assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == float)
 
         dY = np.array(dY).reshape((1, -1)) if isinstance(dY, float) or dY.ndim < 2 else dY
@@ -198,7 +197,7 @@ class Matmul(Layer):
         Returns:
             [dX, dW]: Numerical gradients for X and W
         """
-        name = inspect.stack()[0][3]
+        name = "gradient_numerical"
         self.logger.debug("layer[%s].%s", self.name, name)
         L = self.objective
 

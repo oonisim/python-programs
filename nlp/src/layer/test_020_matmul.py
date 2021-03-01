@@ -6,7 +6,6 @@ from typing import (
     Dict,
     Tuple
 )
-import inspect
 import copy
 import logging
 import numpy as np
@@ -38,53 +37,54 @@ def test_020_matmul_instantiation_to_fail():
     Expected:
         Initialization detects parameter constraints not meet and fails.
     """
-    name = inspect.stack()[0][3]
-    M: int = np.random.randint(1, NUM_MAX_NODES)
-    D = 1
-    # Constraint: Name is string with length > 0.
-    try:
-        Matmul(
-            name="",
-            num_nodes=1,
-            W=weights.xavier(M, D)
-        )
-        raise RuntimeError("Matmul initialization with invalid name must fail")
-    except AssertionError:
-        pass
+    name = "test_020_matmul_instantiation_to_fail"
+    for _ in range(NUM_MAX_TEST_TIMES):
+        M: int = np.random.randint(1, NUM_MAX_NODES)
+        D = 1
+        # Constraint: Name is string with length > 0.
+        try:
+            Matmul(
+                name="",
+                num_nodes=1,
+                W=weights.xavier(M, D)
+            )
+            raise RuntimeError("Matmul initialization with invalid name must fail")
+        except AssertionError:
+            pass
 
-    # Constraint: num_nodes > 1
-    try:
-        Matmul(
-            name="test_020_matmul",
-            num_nodes=0,
-            W=weights.xavier(M, D)
-        )
-        raise RuntimeError("Matmul(num_nodes<1) must fail.")
-    except AssertionError:
-        pass
+        # Constraint: num_nodes > 1
+        try:
+            Matmul(
+                name="test_020_matmul",
+                num_nodes=0,
+                W=weights.xavier(M, D)
+            )
+            raise RuntimeError("Matmul(num_nodes<1) must fail.")
+        except AssertionError:
+            pass
 
-    # Constraint: logging level is correct.
-    try:
-        Matmul(
-            name="test_020_matmul",
-            num_nodes=M,
-            W=weights.xavier(M, D),
-            log_level=-1
-        )
-        raise RuntimeError("Matmul initialization with invalid log level must fail")
-    except (AssertionError, KeyError) as e:
-        pass
+        # Constraint: logging level is correct.
+        try:
+            Matmul(
+                name="test_020_matmul",
+                num_nodes=M,
+                W=weights.xavier(M, D),
+                log_level=-1
+            )
+            raise RuntimeError("Matmul initialization with invalid log level must fail")
+        except (AssertionError, KeyError) as e:
+            pass
 
-    # Matmul instance creation fails as W.shape[1] != num_nodes
-    try:
-        Matmul(
-            name="",
-            num_nodes=1,
-            W=weights.xavier(2, D)
-        )
-        raise RuntimeError("Matmul initialization with invalid name must fail")
-    except AssertionError:
-        pass
+        # Matmul instance creation fails as W.shape[1] != num_nodes
+        try:
+            Matmul(
+                name="",
+                num_nodes=1,
+                W=weights.xavier(2, D)
+            )
+            raise RuntimeError("Matmul initialization with invalid name must fail")
+        except AssertionError:
+            pass
 
 
 def test_020_matmul_instance_properties():
@@ -95,153 +95,155 @@ def test_020_matmul_instance_properties():
         Initialization detects the access to the non-initialized parameters and fails.
     """
     msg = "Accessing uninitialized property of the layer must fail."
-    name = random_string(np.random.randint(1, 10))
-    M: int = np.random.randint(1, NUM_MAX_NODES)
-    D: int = np.random.randint(1, NUM_MAX_FEATURES)
-    layer = Matmul(
-        name=name,
-        num_nodes=M,
-        W=weights.uniform(M, D),
-        log_level=logging.DEBUG
-    )
 
-    # --------------------------------------------------------------------------------
-    # To pass
-    # --------------------------------------------------------------------------------
-    try:
-        if not layer.name == name: raise RuntimeError("layer.name == name should be true")
-    except AssertionError:
-        raise RuntimeError("Access to name should be allowed as already initialized.")
-
-    try:
-        if not layer.M == M: raise RuntimeError("layer.M == M should be true")
-    except AssertionError:
-        raise RuntimeError("Access to M should be allowed as already initialized.")
-
-    try:
-        if not isinstance(layer.logger, logging.Logger):
-            raise RuntimeError("isinstance(layer.logger, logging.Logger) should be true")
-    except AssertionError:
-        raise RuntimeError("Access to logger should be allowed as already initialized.")
-
-    try:
-        a = layer.D
-    except AssertionError:
-        raise RuntimeError("Access to D should be allowed as already initialized.")
-
-    try:
-        layer.W is not None
-    except AssertionError:
-        raise RuntimeError("Access to W should be allowed as already initialized.")
-        pass
-
-    try:
-        layer.optimizer is not None
-    except AssertionError:
-        raise RuntimeError("Access to optimizer should be allowed as already initialized.")
-
-    # --------------------------------------------------------------------------------
-    # To fail
-    # --------------------------------------------------------------------------------
-    try:
-        print(layer.X)
-        raise RuntimeError(msg)
-    except AssertionError:
-        pass
-
-    try:
-        layer.X = int(1)
-        raise RuntimeError(msg)
-    except AssertionError:
-        pass
-
-    try:
-        print(layer.dX)
-        raise RuntimeError(msg)
-    except AssertionError:
-        pass
-
-    try:
-        print(layer.dW)
-        raise RuntimeError(msg)
-    except AssertionError:
-        pass
-
-    try:
-        print(layer.Y)
-        raise RuntimeError(msg)
-    except AssertionError:
-        pass
-    try:
-        layer._Y = int(1)
-        print(layer.Y)
-        raise RuntimeError(msg)
-    except AssertionError:
-        pass
-
-    try:
-        print(layer.dY)
-        raise RuntimeError(msg)
-    except AssertionError:
-        pass
-    try:
-        layer._dY = int(1)
-        print(layer.dY)
-        raise RuntimeError(msg)
-    except AssertionError:
-        pass
-
-    try:
-        print(layer.T)
-        raise RuntimeError(msg)
-    except AssertionError:
-        pass
-
-    try:
-        layer.T = float(1)
-        raise RuntimeError(msg)
-    except AssertionError:
-        pass
-
-    try:
-        layer.objective(np.array(1.0))
-        raise RuntimeError(msg)
-    except AssertionError:
-        pass
-
-    try:
-        print(layer.N)
-        raise RuntimeError(msg)
-    except AssertionError:
-        pass
-
-    assert layer.name == name
-    assert layer.num_nodes == M
-
-    try:
+    for _ in range(NUM_MAX_TEST_TIMES):
+        name = random_string(np.random.randint(1, 10))
+        M: int = np.random.randint(1, NUM_MAX_NODES)
+        D: int = np.random.randint(1, NUM_MAX_FEATURES)
         layer = Matmul(
             name=name,
             num_nodes=M,
             W=weights.uniform(M, D),
             log_level=logging.DEBUG
         )
-        layer.function(int(1))
-        raise RuntimeError("Invoke layer.function(int(1)) must fail.")
-    except AssertionError:
-        pass
 
-    try:
-        layer = Matmul(
-            name=name,
-            num_nodes=M,
-            W=weights.uniform(M, D),
-            log_level=logging.DEBUG
-        )
-        layer.function(int(1))
-        layer.gradient(int(1))
-        raise RuntimeError("Invoke layer.gradient(int(1)) must fail.")
-    except AssertionError:
-        pass
+        # --------------------------------------------------------------------------------
+        # To pass
+        # --------------------------------------------------------------------------------
+        try:
+            if not layer.name == name: raise RuntimeError("layer.name == name should be true")
+        except AssertionError:
+            raise RuntimeError("Access to name should be allowed as already initialized.")
+
+        try:
+            if not layer.M == M: raise RuntimeError("layer.M == M should be true")
+        except AssertionError:
+            raise RuntimeError("Access to M should be allowed as already initialized.")
+
+        try:
+            if not isinstance(layer.logger, logging.Logger):
+                raise RuntimeError("isinstance(layer.logger, logging.Logger) should be true")
+        except AssertionError:
+            raise RuntimeError("Access to logger should be allowed as already initialized.")
+
+        try:
+            a = layer.D
+        except AssertionError:
+            raise RuntimeError("Access to D should be allowed as already initialized.")
+
+        try:
+            layer.W is not None
+        except AssertionError:
+            raise RuntimeError("Access to W should be allowed as already initialized.")
+            pass
+
+        try:
+            layer.optimizer is not None
+        except AssertionError:
+            raise RuntimeError("Access to optimizer should be allowed as already initialized.")
+
+        # --------------------------------------------------------------------------------
+        # To fail
+        # --------------------------------------------------------------------------------
+        try:
+            print(layer.X)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            layer.X = int(1)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            print(layer.dX)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            print(layer.dW)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            print(layer.Y)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+        try:
+            layer._Y = int(1)
+            print(layer.Y)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            print(layer.dY)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+        try:
+            layer._dY = int(1)
+            print(layer.dY)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            print(layer.T)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            layer.T = float(1)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            layer.objective(np.array(1.0))
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            print(layer.N)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        assert layer.name == name
+        assert layer.num_nodes == M
+
+        try:
+            layer = Matmul(
+                name=name,
+                num_nodes=M,
+                W=weights.uniform(M, D),
+                log_level=logging.DEBUG
+            )
+            layer.function(int(1))
+            raise RuntimeError("Invoke layer.function(int(1)) must fail.")
+        except AssertionError:
+            pass
+
+        try:
+            layer = Matmul(
+                name=name,
+                num_nodes=M,
+                W=weights.uniform(M, D),
+                log_level=logging.DEBUG
+            )
+            layer.function(int(1))
+            layer.gradient(int(1))
+            raise RuntimeError("Invoke layer.gradient(int(1)) must fail.")
+        except AssertionError:
+            pass
 
 
 def test_020_matmul_instantiation():
@@ -261,126 +263,128 @@ def test_020_matmul_instantiation():
         """Dummy objective function"""
         return np.sum(X)
 
-    N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
-    M: int = np.random.randint(1, NUM_MAX_NODES)
-    D: int = np.random.randint(1, NUM_MAX_FEATURES)
-    name = inspect.stack()[0][3]
-    layer = Matmul(
-        name=name,
-        num_nodes=M,
-        W=weights.he(M, D),
-        log_level=logging.DEBUG
-    )
+    for _ in range(NUM_MAX_TEST_TIMES):
+        N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
+        M: int = np.random.randint(1, NUM_MAX_NODES)
+        D: int = np.random.randint(1, NUM_MAX_FEATURES)
+        name = "test_020_matmul_instantiation"
+        layer = Matmul(
+            name=name,
+            num_nodes=M,
+            W=weights.he(M, D),
+            log_level=logging.DEBUG
+        )
 
-    # --------------------------------------------------------------------------------
-    # Properties
-    # --------------------------------------------------------------------------------
-    assert layer.name == name
-    assert layer.num_nodes == layer.M == M
+        # --------------------------------------------------------------------------------
+        # Properties
+        # --------------------------------------------------------------------------------
+        assert layer.name == name
+        assert layer.num_nodes == layer.M == M
 
-    layer._D = D
-    assert layer.D == D
+        layer._D = D
+        assert layer.D == D
 
-    X = np.random.randn(N, D)
-    layer.X = X
-    assert np.array_equal(layer.X, X)
-    assert layer.N == N == X.shape[0]
+        X = np.random.randn(N, D)
+        layer.X = X
+        assert np.array_equal(layer.X, X)
+        assert layer.N == N == X.shape[0]
 
-    layer._dX = X
-    assert np.array_equal(layer.dX, X)
+        layer._dX = X
+        assert np.array_equal(layer.dX, X)
 
-    T = np.random.randint(0, M, N)
-    layer.T = T
-    assert np.array_equal(layer.T, T)
+        T = np.random.randint(0, M, N)
+        layer.T = T
+        assert np.array_equal(layer.T, T)
 
-    layer._Y = np.dot(X, X.T)
-    assert np.array_equal(layer.Y, np.dot(X, X.T))
+        layer._Y = np.dot(X, X.T)
+        assert np.array_equal(layer.Y, np.dot(X, X.T))
 
-    layer._dY = np.array(0.9)
-    assert layer._dY == np.array(0.9)
+        layer._dY = np.array(0.9)
+        assert layer._dY == np.array(0.9)
 
-    layer.logger.debug("This is a pytest")
+        layer.logger.debug("This is a pytest")
 
 
 def test_020_matmul_methods():
     """Test case for layer matmul class
     """
-    # --------------------------------------------------------------------------------
-    # Instantiate a Matmul layer
-    # --------------------------------------------------------------------------------
-    N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
-    M: int = np.random.randint(1, NUM_MAX_NODES)
-    D: int = np.random.randint(1, NUM_MAX_FEATURES)
-    W = weights.he(M, D)
-    name = inspect.stack()[0][3]
+    for _ in range(NUM_MAX_TEST_TIMES):
+        # --------------------------------------------------------------------------------
+        # Instantiate a Matmul layer
+        # --------------------------------------------------------------------------------
+        N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
+        M: int = np.random.randint(1, NUM_MAX_NODES)
+        D: int = np.random.randint(1, NUM_MAX_FEATURES)
+        W = weights.he(M, D)
+        name = "test_020_matmul_methods"
 
-    def objective(X: np.ndarray) -> Union[float, np.ndarray]:
-        """Dummy objective function to calculate the loss L"""
-        return np.sum(X)
+        def objective(X: np.ndarray) -> Union[float, np.ndarray]:
+            """Dummy objective function to calculate the loss L"""
+            return np.sum(X)
 
-    layer = Matmul(
-        name=name,
-        num_nodes=M,
-        W=W,
-        log_level=logging.DEBUG
-    )
-    layer.objective = objective
+        layer = Matmul(
+            name=name,
+            num_nodes=M,
+            W=W,
+            log_level=logging.DEBUG
+        )
+        layer.objective = objective
 
-    # --------------------------------------------------------------------------------
-    # Layer forward path
-    # Calculate the layer output Y=f(X), and get the loss L = objective(Y)
-    # Test the numerical gradient dL/dX=layer.gradient_numerical().
-    # --------------------------------------------------------------------------------
-    X = np.random.randn(N, D)
-    Logger.debug("%s: X is \n%s" % (name, X))
+        # --------------------------------------------------------------------------------
+        # Layer forward path
+        # Calculate the layer output Y=f(X), and get the loss L = objective(Y)
+        # Test the numerical gradient dL/dX=layer.gradient_numerical().
+        # --------------------------------------------------------------------------------
+        X = np.random.randn(N, D)
+        Logger.debug("%s: X is \n%s" % (name, X))
 
-    Y = layer.function(X)
-    L = layer.objective(Y)
-    # Matmul outputs Y should be X@W.T
-    assert np.array_equal(Y, np.matmul(X, W.T))
+        Y = layer.function(X)
+        L = layer.objective(Y)
+        # Matmul outputs Y should be X@W.T
+        assert np.array_equal(Y, np.matmul(X, W.T))
 
-    # Numerical gradient should be the same with numerical Jacobian
-    GN = layer.gradient_numerical()         # [dL/dX, dL/dW]
-    LX = lambda x: layer.objective(layer.function(x))
-    JX = numerical_jacobian(LX, X)           # Numerical dL/dX
-    assert np.array_equal(GN[0], JX)
+        # Numerical gradient should be the same with numerical Jacobian
+        GN = layer.gradient_numerical()         # [dL/dX, dL/dW]
+        LX = lambda x: layer.objective(layer.function(x))
+        JX = numerical_jacobian(LX, X)           # Numerical dL/dX
+        assert np.array_equal(GN[0], JX)
 
-    LW = lambda w: layer.objective(np.matmul(X, w.T))
-    JW = numerical_jacobian(LW, W)           # Numerical dL/dX
-    assert np.array_equal(GN[1], JW)
+        LW = lambda w: layer.objective(np.matmul(X, w.T))
+        JW = numerical_jacobian(LW, W)           # Numerical dL/dX
+        assert np.array_equal(GN[1], JW)
 
-    # --------------------------------------------------------------------------------
-    # Layer backward path
-    # Calculate the analytical gradient dL/dX=layer.gradient(dL/dY) with a dummy dL/dY.
-    # Confirm the numerical gradient (dL/dX, dL/dW) are closer to the analytical ones.
-    # --------------------------------------------------------------------------------
-    # Matmul gradient dL/dX should be dL/dY @ W. Use a dummy dL/dY = 1.0.
-    dY = np.ones_like(Y)
-    dX = layer.gradient(dY)
-    expected_dX = np.matmul(dY, W)
-    assert np.array_equal(dX, expected_dX)
+        # --------------------------------------------------------------------------------
+        # Layer backward path
+        # Calculate the analytical gradient dL/dX=layer.gradient(dL/dY) with a dummy dL/dY.
+        # Confirm the numerical gradient (dL/dX, dL/dW) are closer to the analytical ones.
+        # --------------------------------------------------------------------------------
+        # Matmul gradient dL/dX should be dL/dY @ W. Use a dummy dL/dY = 1.0.
+        dY = np.ones_like(Y)
+        dX = layer.gradient(dY)
+        expected_dX = np.matmul(dY, W)
+        assert np.array_equal(dX, expected_dX)
 
-    # Matmul analytical gradient dL/dX should be close to the numerical gradient GN.
-    assert np.all(np.abs(dX - GN[0]) < GRADIENT_DIFF_ACCEPTANCE_VALUE), \
-        f"dX need close to GN[0] but dX \n%s\n GN[0] \n%s\n" % (dX, GN[0])
+        # Matmul analytical gradient dL/dX should be close to the numerical gradient GN.
+        assert np.all(np.abs(dX - GN[0]) < GRADIENT_DIFF_ACCEPTANCE_VALUE), \
+            f"dX need close to GN[0] but dX \n%s\n GN[0] \n%s\n" % (dX, GN[0])
 
-    # --------------------------------------------------------------------------------
-    # Gradient update.
-    # Run the gradient descent to update Wn+1 = Wn - lr * dL/dX.
-    # Confirm the new objective L(Yn+1) < L(Yn) with the Wn+1.
-    # Confirm W in the layer has been updated by the gradient descent.
-    # --------------------------------------------------------------------------------
+        # --------------------------------------------------------------------------------
+        # Gradient update.
+        # Run the gradient descent to update Wn+1 = Wn - lr * dL/dX.
+        # Confirm the new objective L(Yn+1) < L(Yn) with the Wn+1.
+        # Confirm W in the layer has been updated by the gradient descent.
+        # --------------------------------------------------------------------------------
 
-    # Note Python pass the reference to W, and W will be directly updated by
-    # the gradient descent to avoid a temporary copy.
-    # Hence need to backup W before being changed to compare before/after.
-    backup = copy.deepcopy(W)
+        # Note Python pass the reference to W, and W will be directly updated by
+        # the gradient descent to avoid a temporary copy.
+        # Hence need to backup W before being changed to compare before/after.
+        backup = copy.deepcopy(W)
 
-    dS = layer.update()         # Analytical dL/dX, dL/dW
-    assert np.all(np.abs(dS[0] - GN[0]) < GRADIENT_DIFF_ACCEPTANCE_VALUE) # dL/dX
-    assert np.all(np.abs(dS[1] - GN[1]) < GRADIENT_DIFF_ACCEPTANCE_VALUE) # dL/dW
+        dS = layer.update()         # Analytical dL/dX, dL/dW
+        assert np.all(np.abs(dS[0] - GN[0]) < GRADIENT_DIFF_ACCEPTANCE_VALUE) # dL/dX
+        assert np.all(np.abs(dS[1] - GN[1]) < GRADIENT_DIFF_ACCEPTANCE_VALUE) # dL/dW
 
-    # Objective L with the updated W should be smaller than previous L
-    assert np.all(np.abs(objective(layer.function(X)) < L))
-    assert np.any(backup != layer.W), "W has not been updated "
+        # Objective L with the updated W should be smaller than previous L
+        assert np.all(np.abs(objective(layer.function(X)) < L))
+        assert np.any(backup != layer.W), "W has not been updated "
 

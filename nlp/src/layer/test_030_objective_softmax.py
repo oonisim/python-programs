@@ -6,8 +6,6 @@ from typing import (
     Dict,
     Tuple
 )
-import inspect
-import copy
 import logging
 import numpy as np
 from common import (
@@ -40,7 +38,7 @@ def test_030_objective_instantiation_to_fail():
     Expected:
         Initialization detects parameter constraints not meet and fails.
     """
-    name = inspect.stack()[0][3]
+    name = "test_030_objective_instantiation_to_fail"
     for _ in range(NUM_MAX_TEST_TIMES):
         M: int = np.random.randint(1, NUM_MAX_NODES)
         # Constraint: Name is string with length > 0.
@@ -236,7 +234,7 @@ def test_030_objective_instantiation():
         """Dummy objective function"""
         return np.sum(X)
 
-    name = inspect.stack()[0][3]
+    name = "test_030_objective_instantiation"
     for _ in range(NUM_MAX_TEST_TIMES):
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)
@@ -315,7 +313,7 @@ def test_030_objective_methods_1d_ohe():
     # --------------------------------------------------------------------------------
     # Instantiate a CrossEntropyLogLoss layer
     # --------------------------------------------------------------------------------
-    name = inspect.stack()[0][3]
+    name = "test_030_objective_methods_1d_ohe"
     N = 1
 
     for _ in range(NUM_MAX_TEST_TIMES):
@@ -431,7 +429,7 @@ def test_030_objective_methods_2d_ohe():
     # --------------------------------------------------------------------------------
     # Instantiate a CrossEntropyLogLoss layer
     # --------------------------------------------------------------------------------
-    name = inspect.stack()[0][3]
+    name = "test_030_objective_methods_2d_ohe"
     for _ in range(NUM_MAX_TEST_TIMES):
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)
