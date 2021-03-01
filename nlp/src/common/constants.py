@@ -25,7 +25,7 @@ OFFSET_STD = 1e-10      # Avoid div by zero at (X-u) / sqrt(variance + eps)
 BOUNDARY_SIGMOID = -np.log(OFFSET_LOG) * 0.5
 
 # Threshold below which the gradient is regarded as saturated.
-GRADIENT_SATURATION_THRESHOLD = (10 ** -5)
+GRADIENT_SATURATION_THRESHOLD = 1e-10
 # TODO restore the original
 # GRADIENT_SATURATION_THRESHOLD = 0
 

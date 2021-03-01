@@ -1,37 +1,28 @@
 """Matmul layer test cases"""
+import cProfile
+import copy
+import logging
 from typing import (
-    Optional,
     Union,
     List,
-    Dict,
-    Tuple,
     Callable
 )
-import logging
-import copy
-import cProfile
+
 import numpy as np
 from common import (
-    OFFSET_LOG,
-    OFFSET_DELTA,
-    numerical_jacobian,
     weights,
-    random_string,
-    softmax,
-    sigmoid,
-    cross_entropy_log_loss,
-    logistic_log_loss
+    sigmoid
+)
+from data.classifications import (
+    linear_separable
 )
 from layer import (
     Matmul,
     CrossEntropyLogLoss
 )
-from optimizer import(
+from optimizer import (
     Optimizer,
     SGD
-)
-from data.classifications import (
-    linear_separable
 )
 
 Logger = logging.getLogger(__name__)

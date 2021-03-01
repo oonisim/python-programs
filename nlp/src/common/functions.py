@@ -632,7 +632,7 @@ def numerical_jacobian(
                 (difference < (fx2 * GN_DIFF_ACCEPTANCE_RATIO))
         )
         if subtract_cancellation_condition:
-            fmt = "%s: subtract cancellation ((fx1-fx2)/fx) < %s detected. gn %s."
+            fmt = "%s: subtract cancellation (fx1-fx2)/fx < %s detected. (fx1-fx2) is %s, gn %s."
             args = tuple([
                 name,
                 GN_DIFF_ACCEPTANCE_RATIO,
