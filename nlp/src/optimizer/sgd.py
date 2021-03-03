@@ -28,9 +28,10 @@ class SGD(Optimizer):
         Return:
             W: A reference to out if specified or a np array allocated.
         """
-        if self.logger.level == logging.WARNING and np.all(dW < dW / 100.0):
+        if np.all(np.abs(dW) < np.abs(W / 100.0)):
             self.logger.warning(
-                "update(): Gradient descent potentially stalling with dW < 1% of W."
+                "SGD[%s].update(): Gradient descent potentially stalling with dW < 1% of W.",
+                self.name
             )
 
         # --------------------------------------------------------------------------------
