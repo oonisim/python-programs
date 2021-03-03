@@ -29,7 +29,7 @@ class Optimizer:
             lr: learning rate of the gradient descent
             l2: L2 regularization hyper parameter, e.g. 1e-3, set to 0 not to use it
         """
-        self._name = "optimizer"
+        self._name = name
         self._lr: Union[float, np.ndarray] = lr
         self._l2: Union[float, np.ndarray] = l2
 
@@ -39,6 +39,12 @@ class Optimizer:
     # --------------------------------------------------------------------------------
     # Instance properties
     # --------------------------------------------------------------------------------
+    @property
+    def name(self) -> str:
+        """Learning rate of the gradient descent"""
+        assert self._name
+        return self._name
+
     @property
     def lr(self) -> Union[float, np.ndarray]:
         """Learning rate of the gradient descent"""
