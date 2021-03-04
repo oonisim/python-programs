@@ -44,4 +44,4 @@ done
 #--------------------------------------------------------------------------------
 echo "--------------------------------------------------------------------------------"
 echo "Running PyTest..."
-pytest --verbose --cache-clear -x ${DIR}
+pytest --log-level=DEBUG --log-cli=True --log-cli-level=DEBUG --verbose --cache-clear -x ${DIR}

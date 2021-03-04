@@ -18,8 +18,7 @@ from common import (
     BOUNDARY_SIGMOID
 )
 from layer import (
-    CrossEntropyLogLoss,
-    Matmul
+    CrossEntropyLogLoss
 )
 from common.test_config import (
     NUM_MAX_TEST_TIMES,
@@ -31,8 +30,7 @@ from common.test_config import (
 )
 
 
-Logger = logging.getLogger("test_040_objective")
-Logger.setLevel(logging.DEBUG)
+Logger = logging.getLogger(__name__)
 
 
 def test_040_objective_instantiation_to_fail():
@@ -405,7 +403,7 @@ def test_040_objective_methods_1d_ohe():
             % (G, GN[0], G-GN[0], GRADIENT_DIFF_ACCEPTANCE_RATIO * GN[0])
 
 
-def test_040_objective_methods_2d_ohe():
+def test_040_objective_methods_2d_ohe(caplog):
     """
     Objective:
         Verify the forward path constraints:
@@ -422,6 +420,9 @@ def test_040_objective_methods_2d_ohe():
         """Dummy objective function to calculate the loss L"""
         assert X.ndim == 0, "The output of the log loss should be of shape ()"
         return X
+
+    # caplog.set_level(logging.DEBUG, logger=__name__)
+    caplog.set_level(logging.DEBUG)
 
     # --------------------------------------------------------------------------------
     # Instantiate a CrossEntropyLogLoss layer

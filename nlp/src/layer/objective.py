@@ -2,6 +2,7 @@
 """
 import logging
 from typing import (
+    List,
     Union,
     Callable
 )
@@ -14,11 +15,10 @@ from common.functions import (
     softmax,
     sigmoid
 )
-from layer import Layer
-
-
-# TODO
-# class SigmoidWithLogLoss(Layer):
+from layer import (
+    Layer,
+    LOG_LOSS_GRADIENT_ACCEPTANCE_VALUE
+)
 
 
 class CrossEntropyLogLoss(Layer):
@@ -105,7 +105,7 @@ class CrossEntropyLogLoss(Layer):
     def activation(self) -> Callable:
         """Activation function of the layer
         """
-        assert isinstance(self._activation, Callable), \
+        assert callable(self._activation), \
             "activation is not initialized"
         return self._activation
 
@@ -113,7 +113,7 @@ class CrossEntropyLogLoss(Layer):
     def log_loss_function(self) -> Callable:
         """Cross entropy log loss function for the activation function
         """
-        assert isinstance(self._log_loss_function, Callable), \
+        assert callable(self._log_loss_function), \
             "log_loss_function is not initialized"
         return self._log_loss_function
 
@@ -197,24 +197,25 @@ class CrossEntropyLogLoss(Layer):
 
     def gradient(self, dY: Union[np.ndarray, float] = float(1)) -> Union[np.ndarray, float]:
         """Calculate the gradient dL/dX, the impact on F by the input dX.
-        F: Objective function of the layer.
-        Y: Output of the layer
+        L: Output of the layer. Alias is Y.
         J = cross_entropy_log_loss(P,T)
-        dY: dF/dY is the the impact on the objective F by dY.
-        dJ: dY/dJ = 1/N is the impact on Y by dJ where .
+        dY: dL/dL=1, impact on L by the layer output Y=L.
+        dJ: dL/dJ = 1/N is the impact on Y by dJ where .
         dP: dJ/dP = -T/P is the impact on J by the activation output dP.
         dP/dX: impact on P by the activation input dX
-        dF/dX = dF/dY * dY/dJ * (dJ/dP * dP/dX) where (dJ/dP * dP/dX) = (P - T)/N
+        dL/dX = dL/dJ * (dJ/dP * dP/dX) = 1/N * (P - T)
 
         Note:
             For both softmax and sigmoid, dL/dX is (P-T)/N, so designed.
+            P=sigmoid(X) or softmax(X). 0 <= P <=1 are the limits, T is 0 or 1.
+            Hence, -1 <= dL/dX <= 1
 
         Args:
             dY: Gradient, impact by the loss dY, given from the post layer.
         Returns:
-            dF/dX: (P-T)/N of shape (N, M)
+            dL/dX: (P-T)/N of shape (N, M)
         """
-        name = "gradient"
+        name = f"Layer[{self.name}].gradient()"
         dY = np.array(dY) if isinstance(dY, float) else dY
 
         # --------------------------------------------------------------------------------
@@ -226,8 +227,8 @@ class CrossEntropyLogLoss(Layer):
             "dY/dY shape needs %s of type float but %s of type %s" % \
             (self.Y.shape, dY.shape, dY.dtype)
 
-        # Gradient dJ:(N,) = dY/dJ is 1/N.
-        dJ: np.ndarray = np.ones(self.N, dtype=float) / float(self.N)
+        # dL/dJ is 1/N of shape (N,) but transform into shape (N,1) to np-broadcast.
+        dJ: np.ndarray = (dY * np.ones(self.N, dtype=float) / float(self.N)).reshape(-1, 1)
 
         # --------------------------------------------------------------------------------
         # Calculate the layer gradient
@@ -253,9 +254,7 @@ class CrossEntropyLogLoss(Layer):
             # needs to be 2 to be able to use t=1 as index such as P[::, 1], which causes
             # index out of bound.
             # --------------------------------------------------------------------------------
-            dF = (dJ * dY)                  # dJ/dX is shape (N,).
-            dF = dF[::, np.newaxis]         # Transform into shape (N,1) to np broadcast.
-            dX = dF * (self.P - self.T)     # (N,M) * (N,M)
+            dX = dJ * (self.P - self.T)     # (N,M) * (N,M)
 
         else:
             self.logger.debug("%s: Label is index format", name)
@@ -280,19 +279,32 @@ class CrossEntropyLogLoss(Layer):
                 f"numpy tuple indices {rows.shape} and {cols.shape} need to be the same."
 
             # Extract T=1 elements of P and calculate (P-T) = (P-1)
+            # dX shape is (N,M), not (N,)
             dX[
                 rows,
                 cols
             ] -= 1.0
             dF = (dJ * dY)                  # dJ/dX is shape (N,).
             dF = dF[::, np.newaxis]         # Transform into shape (N,1) to np broadcast.
+
             # dF/dY * dY/dJ * (P-T) = dF/dY * (P-T) / N
-            self.logger.debug("%s: dF.shape is %s dF is \n%s.\n", name, dF.shape, dF)
-            self.logger.debug("%s: T is %s dX.shape %s.\n", name, self.T, dX.shape)
-            self.logger.debug(
-                "%s: dX[rows, T] = %s,\ndX is \n%s.\n", name, dX[rows, cols], dX
-            )
             np.multiply(dF, dX, out=dX)
+
+        assert np.all(np.abs(dX) <= 1), \
+            "Gradient dL/dX needs between [-1, 1] but %s." % dX
 
         self.logger.debug("%s: dL/dX is \n%s.\n", name, dX)
         return dX
+
+    def gradient_numerical(
+            self, h: float = 1e-5
+    ) -> List[Union[float, np.ndarray]]:
+        GN: Union[float, np.ndarray] = super().gradient_numerical()[0]
+
+        # Analytical gradient dL/dX is (P-T)/N whose range is [-1,1].
+        # Numerical gradient GN should not be far away from the boundary.
+        assert np.all(np.abs(GN) < LOG_LOSS_GRADIENT_ACCEPTANCE_VALUE), \
+            "%s: numerical dL/dX needs between (-1.2, 1.2) but \n%s\n"\
+            % (f"Layer[{self.name}].gradient_numerical()", GN)
+
+        return [GN]
