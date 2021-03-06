@@ -38,7 +38,6 @@ class Board:
         # Farthest (north, east) coordinate of the self._board.
         self._tip = np.array([n - 1, m - 1])
 
-        logging.basicConfig()
         self._log_level = log_level
         self._logger = logging.getLogger(__name__)
         self._logger.setLevel(self._log_level)
