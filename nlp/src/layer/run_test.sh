@@ -44,4 +44,19 @@ done
 #--------------------------------------------------------------------------------
 echo "--------------------------------------------------------------------------------"
 echo "Running PyTest..."
-pytest --log-level=DEBUG --verbose --cache-clear -x ${DIR}
+# pytest --log-level=DEBUG -o log_cli=True -o log_cli_level=DEBUG --verbose --cache-clear -x -capture=tee-sys ${DIR} | tee pytest.log
+pytest \
+  --rootdir=${DIR} \
+  --debug \
+  -vv \
+  -capture=tee-sys  \
+  --log-level=DEBUG \
+  --log-auto-indent=on \
+  --cache-clear -x \
+  --color=yes --code-highlight=yes \
+  --full-trace \
+  --tb=long \
+  --showlocals \
+  --durations=5 \
+  --pdb \
+${DIR}

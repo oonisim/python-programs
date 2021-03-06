@@ -53,12 +53,12 @@ def test_010_sigmoid_cross_entropy_log_loss_2d(caplog):
     X, T = transform_X_T(X, T)
     E = -logarithm(np.array([0.5]))
 
-    J = sigmoid_cross_entropy_log_loss(X, T)
+    J, P = sigmoid_cross_entropy_log_loss(X, T)
     assert E.shape == J.shape
-    assert np.all(np.abs(E - J) < u), \
-        "Expected abs(E-J) < %s but \n%s\nE=\n%s\nT=%s\nX=\n%s\nJ=\n%s\n" \
-        % (u, (np.abs(E - J) < u), E, T, X, J)
-
+    assert np.all(E == J), \
+        "Expected (E==J) but \n%s\nE=\n%s\nT=%s\nX=\n%s\nJ=\n%s\n" \
+        % (np.abs(E - J), E, T, X, J)
+    assert P == 0.5
     profiler = cProfile.Profile()
     profiler.enable()
 
@@ -85,11 +85,12 @@ def test_010_sigmoid_cross_entropy_log_loss_2d(caplog):
         # ----------------------------------------------------------------------
         # Actual J should be close to E.
         # ----------------------------------------------------------------------
-        J = sigmoid_cross_entropy_log_loss(X, T)
+        J, P = sigmoid_cross_entropy_log_loss(X, T)
         assert E.shape == J.shape
         assert np.all(np.abs(E-J) < u), \
             "Expected abs(E-J) < %s but \n%s\nE=\n%s\nT=%s\nX=\n%s\nJ=\n%s\n" \
             % (u, np.abs(E-J), E, T, X, J)
+        assert np.all(np.abs(Z-P) < u)
 
         # ----------------------------------------------------------------------
         # L = cross_entropy_log_loss(P, T) should be close to J

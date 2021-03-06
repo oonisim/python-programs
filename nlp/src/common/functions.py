@@ -458,7 +458,7 @@ def softmax_cross_entropy_log_loss(
         X: Union[np.ndarray],
         T: Union[np.ndarray],
         offset: float = 0
-) -> np.ndarray:
+) -> Tuple[np.ndarray, np.ndarray]:
     """Cross entropy log loss for softmax activation -T * log(softmax(X))
     NOTE:
         Handle only the label whose value is True. The reason not to use non-labels to
@@ -473,8 +473,10 @@ def softmax_cross_entropy_log_loss(
         T in OHE format before calling this function.
 
     Formula:
-        Loss J = -log( exp(xi) / sum(exp(X)) ) is reformulated as sum(exp(X)) - xi,
-        by which division is eliminated. xi is correct input for index label i.
+        Loss J = -log( exp(xi) / sum(exp(X)) ) can be re-formulated as
+        sum(exp(X)) - xi, by which division is eliminated. However, exp(X) can be
+        a large value or inf. Need to test which is stable, softmax(X) or sum(exp(X).
+        xi is the correct input at index i.
 
     Args:
         X: Input data of shape (N,M) to go through softmax where:
@@ -485,6 +487,7 @@ def softmax_cross_entropy_log_loss(
 
     Returns:
         J: Loss value of shape (N,), a loss value per batch.
+        P: Activation value softmax(X)
     """
     name = "softmax_cross_entropy_log_loss"
 
@@ -534,14 +537,14 @@ def softmax_cross_entropy_log_loss(
         "Invalid Loss J: should be finite and shape %s be (%s,). J=\n%s\n" \
         % (J.shape, N, J)
 
-    return J
+    return J, softmax(X)
 
 
 def sigmoid_cross_entropy_log_loss(
         X: Union[np.ndarray, float],
         T: Union[np.ndarray, int],
         offset: float = 0
-) -> np.ndarray:
+) -> Tuple[np.ndarray, np.ndarray]:
     """Cross entropy log loss for sigmoid activation -( T*log(Z) + (1-T)*log(1-Z) )
     where Z = sigmoid(X).
 
@@ -564,6 +567,7 @@ def sigmoid_cross_entropy_log_loss(
 
     Returns:
         J: Loss value of shape () for scalar or (N,) a loss value per batch.
+        P: Activation value sigmoid(X)
     """
     name = "sigmoid_cross_entropy_log_loss"
     # P, T = transform_X_T(P, T)
@@ -578,11 +582,13 @@ def sigmoid_cross_entropy_log_loss(
             (X.ndim == 0 and T.ndim == 0)
         ), "Unexpected format for sigmoid/logistic log loss. X=\n%s" % X
 
-    J = np.multiply((1 - T), X) + np.log(1 + np.exp(-X))
+    Z1 = 1.0 + np.exp(-X)    # 1/Z where Z = sigmoid(X) = (1/1 + np.exp(-X))
+    P = 1.0 / Z1
+    J = np.multiply((1 - T), X) + np.log(Z1)
     J = np.squeeze(J, axis=-1)    # Shape from (N,M) to (N,)
     assert np.all(np.isfinite(J))
 
-    return J
+    return J, P
 
 
 def cross_entropy_log_loss(

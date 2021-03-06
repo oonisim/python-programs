@@ -133,6 +133,10 @@ class CrossEntropyLogLoss(Layer):
             It should NOT be dependent on what batch size was used.
 
             L = cross_entropy_log_loss(activation(X), T, log_loss_function)) / N
+            or
+            L =  softmax_cross_entropy_log_loss(X, T) / N for softmax
+            or
+            L =  sigmoid_cross_entropy_log_loss(X, T) / N for sigmoid
 
         Args:
             X: Input of shape (N,M) to calculate the probabilities for the M nodes.

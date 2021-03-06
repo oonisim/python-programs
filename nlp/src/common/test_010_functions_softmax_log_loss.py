@@ -58,11 +58,12 @@ def test_010_softmax_cross_entropy_log_loss_2d(caplog):
     P = softmax(X)
     assert np.array_equal(X, P)
 
-    J = softmax_cross_entropy_log_loss(X, T)
+    J, _ = softmax_cross_entropy_log_loss(X, T)
     assert (E.shape == J.shape)
     assert np.all(np.abs(E - J) < u), \
         "Expected abs(E-J) < %s but \n%s\nE=\n%s\nT=%s\nX=\n%s\nJ=\n%s\n" \
         % (u, np.abs(E - J), E, T, X, J)
+    assert np.all(np.abs(P-_) < u)
 
     # --------------------------------------------------------------------------------
     # [Test case 01]
@@ -94,7 +95,7 @@ def test_010_softmax_cross_entropy_log_loss_2d(caplog):
         # ----------------------------------------------------------------------
         # Actual J should be close to E.
         # ----------------------------------------------------------------------
-        J = softmax_cross_entropy_log_loss(X, T)
+        J, _ = softmax_cross_entropy_log_loss(X, T)
         assert(E.shape == J.shape)
         assert np.all(np.abs(E-J) < u), \
             "Expected abs(E-J) < %s but \n%s\nE=\n%s\nT=%s\nX=\n%s\nJ=\n%s\n" \
