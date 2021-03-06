@@ -542,10 +542,11 @@ def sigmoid_cross_entropy_log_loss(
         T: Union[np.ndarray, int],
         offset: float = 0
 ) -> np.ndarray:
-    """Cross entropy log loss for binary labels -(T*log(P) + (1-T)log(1-P))
+    """Cross entropy log loss for sigmoid activation -( T*log(Z) + (1-T)*log(1-Z) )
+    where Z = sigmoid(X).
+
     Formula:
-        To avoid rounding errors and subtract cancellation, -log(1.0 -sigmoid(x))
-        is transformed to -log(exp(-x)) + log(1+exp(-x)) as per Reza Bonyadi.
+        Solution to avoid rounding errors and subtract cancellation by Reza Bonyadi.
         -----
         Let z=1/(1+p), p= e^(-x), then log(1-z)=log(p)-log(1+p), which is more stable
         in terms of rounding errors (we got rid of division, which is the main issue
@@ -555,9 +556,9 @@ def sigmoid_cross_entropy_log_loss(
         J = (1-T)X + np.log(1 + np.exp(-X))
 
     Args:
-        X: Input data of shape (N,M) to go through softmax where:
+        X: Input data of shape (N,1) to go through sigmoid where:
             N is Batch size
-            M is Number of nodes
+            Number of nodes M is always 1 for binary 0/1 classification.
         T: label in the index format of shape (N,).
         offset: small number to avoid np.inf by log(0) by log(0+offset)
 
@@ -570,14 +571,18 @@ def sigmoid_cross_entropy_log_loss(
     # X is scalar and T is a scalar binary OHE label, or
     # T is 2D binary OHE labels e.g. T[[0],[1],[0]], X[[0.9],[0.1],[0.3]].
     # --------------------------------------------------------------------------------
+    X = np.array(X, dtype=float) if isinstance(X, float) else X
     assert \
-        ((1 < X.ndim == T.ndim) and (X.shape[1] == T.shape[1] == 1)) or \
-        (X.ndim == 0 and T.ndim == 0), \
-        "Unexpected format for sigmoid/logistic log loss"
+        (isinstance(X, np.ndarray) and X.dtype == float) and (
+            ((1 < X.ndim == T.ndim) and (X.shape[1] == T.shape[1] == 1)) or
+            (X.ndim == 0 and T.ndim == 0)
+        ), "Unexpected format for sigmoid/logistic log loss. X=\n%s" % X
 
     J = np.multiply((1 - T), X) + np.log(1 + np.exp(-X))
+    J = np.squeeze(J, axis=-1)    # Shape from (N,M) to (N,)
     assert np.all(np.isfinite(J))
-    return np.squeeze(J, axis=-1)    # Shape from (N,M) to (N,)
+
+    return J
 
 
 def cross_entropy_log_loss(

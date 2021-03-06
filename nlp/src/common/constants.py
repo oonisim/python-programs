@@ -7,11 +7,17 @@ import numpy as np
 # e.g log loss tries to avoid log(0)->np.inf by a small value k as in log(0+k).
 # However if k < h, f(x-h) causes nan due to log(x < 0) as x needs to be > 0.
 # --------------------------------------------------------------------------------
-# OFFSET_DELTA = 1e-10
-# OFFSET_LOG = (OFFSET_DELTA + 1e-7)  # Avoid log(0) -> inf by log(0+offset)
+# OFFSET_DELTA
+# OFFSET_LOG:
+#   To avoid log(0) -> inf by log(0+offset). Be as small as possible to minimize
+#   the impact by the clipping value log(OFFSET_LOG), but large enough so that the
+#   OFFSET_DELTA will not cause rounding errors due to too small delta for division.
+#   because we need OFFSET_LOG > OFFSET_DELTA to avoid the numerical gradient from
+#   causing np.nan by f(log(x + OFFSET_LOG - OFFSET_DELTA)).
 # --------------------------------------------------------------------------------
-OFFSET_DELTA = 1e-8
-OFFSET_LOG = 1e-7       # Avoid log(0) -> inf by log(x) where x > offset
+OFFSET_DELTA = 1e-10
+OFFSET_LOG = 1e-9
+assert OFFSET_LOG > OFFSET_DELTA
 OFFSET_STD = 1e-10      # Avoid div by zero at (X-u) / sqrt(variance + eps)
 
 # When True, set the element to the offset value only when it is below the offset,
