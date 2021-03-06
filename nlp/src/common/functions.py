@@ -17,7 +17,6 @@ from common import (
     OFFSET_STD,
     OFFSET_MODE_ELEMENT_WISE,
     BOUNDARY_SIGMOID,
-    GN_DIFF_ACCEPTANCE_VALUE,
     GN_DIFF_ACCEPTANCE_RATIO,
     GRADIENT_SATURATION_THRESHOLD,
     ENFORCE_STRICT_ASSERT
@@ -25,7 +24,6 @@ from common import (
 
 
 Logger = logging.getLogger("functions")
-# Logger.setLevel(logging.DEBUG)
 
 
 def standardize(X: Union[np.ndarray, float], out=None, eps: float = OFFSET_STD):
@@ -475,8 +473,8 @@ def softmax_cross_entropy_log_loss(
         T in OHE format before calling this function.
 
     Formula:
-        log( exp(x) / sum(exp(x)) ) is reformulated to X - sum(exp(x)), by which
-        division or log(exp) is eliminated for numerical stability.
+        Loss J = -log( exp(xi) / sum(exp(X)) ) is reformulated as sum(exp(X)) - xi,
+        by which division is eliminated. xi is correct input for index label i.
 
     Args:
         X: Input data of shape (N,M) to go through softmax where:
@@ -504,51 +502,34 @@ def softmax_cross_entropy_log_loss(
         "X(N, M) and T(N,) in index label format expected but X shape %s T.shape %s" \
         % (X.shape, T.shape)
 
-    # ================================================================================
-    # Calculate Cross entropy log loss -t * log(p).
-    # Select an element P[n][t] at each row n which corresponds to the true label t.
-    # Use the Numpy tuple indexing. e.g. P[n=0][t=2] and P[n=3][t=4].
-    # P[
-    #   (0, 3),
-    #   (2, 4)     # The tuple sizes must be the same at all axes
-    # ]
-    #
-    # Tuple indexing selects only one element per row.
-    # Beware the numpy behavior difference between P[(n),(m)] and P[[n],[m]].
-    # https://stackoverflow.com/questions/66269684
-    # P[1,1]  and P[(0)(0)] results in a scalar value, HOWEVER, P[[1],[1]] in array.
-    #
-    # P shape can be (1,1), (1, M), (N, 1), (N, M), hence P[rows, cols] are:
-    # P (1,1) -> P[rows, cols] results in a 1D of  (1,).
-    # P (1,M) -> P[rows, cols] results in a 1D of  (1,)
-    # P (N,1) -> P[rows, cols] results in a 1D of  (N,)
-    # P (N,M) -> P[rows, cols] results in a 1D of  (N,)
-    #
-    # J shape matches with the P[rows, cols] shape.
-    # ================================================================================
+    # --------------------------------------------------------------------------------
+    # P[                        T[
+    #   [x0,x1,...xi,...xd-1],    i,
+    #   ...                       ...
+    # ]                         ]
+    # j = -log(pi) = -log( exp(xi) / sum(exp(x0),...,exp(xd-1) )
+    #   = log(sum(exp(X))) - xi  : X=[x0,x1,...xi,...xd-1]
+    # --------------------------------------------------------------------------------
     N = batch_size = X.shape[0]
     rows = np.arange(N)     # (N,)
     cols = T                # Same shape (N,) with rows
     assert rows.shape == cols.shape, \
         f"np P indices need the same shape but rows {rows.shape} cols {cols.shape}."
 
-    # _X:shape(N,) via np tuple indexing
-    _X = X[rows, cols]
+    # --------------------------------------------------------------------------------
+    # Array of correct answers xi as _A = X[rows, cols] via numpy tuple indexing.
+    # _A:shape(N,) and J = log(sum(exp(X))) - _A
+    # --------------------------------------------------------------------------------
+    _A = X[rows, cols]
     Logger.debug("%s: N is [%s]", name, N)
     Logger.debug("%s: X.shape %s", name, X.shape)
-    Logger.debug("%s: X[rows, cols].shape %s", name, _X.shape)
-    Logger.debug("%s: X[rows, cols] is %s", name, _X)
+    Logger.debug("%s: X[rows, cols].shape %s", name, _A.shape)
+    Logger.debug("%s: X[rows, cols] is %s", name, _A)
 
-    # log(softmax(x)) = log( exp(x)/sum(exp(x)) ) = X - sum(exp(x))
-    # J = -log(softmax(_X))
-    J = logarithm(X=np.sum(np.exp(X)), offset=offset) - X
+    J = logarithm(X=np.sum(np.exp(X), axis=-1), offset=offset) - _A
     Logger.debug("%s: J is [%s]", name, J)
     Logger.debug("%s: J.shape %s\n", name, J.shape)
 
-    delta = np.abs(J + logarithm(softmax(X)))
-    assert np.all(delta < OFFSET_DELTA), \
-        "%s: re-formula log(softmax(x)) = X-sum(exp(x)) need close but delta %s" \
-        % (name, delta)
     assert np.all(np.isfinite(J)) and (J.ndim > 0) and (0 < N == J.shape[0]), \
         "Invalid Loss J: should be finite and shape %s be (%s,). J=\n%s\n" \
         % (J.shape, N, J)
@@ -556,103 +537,47 @@ def softmax_cross_entropy_log_loss(
     return J
 
 
-def sigmoid_entropy_log_loss(
-        P: Union[np.ndarray, float],
+def sigmoid_cross_entropy_log_loss(
+        X: Union[np.ndarray, float],
         T: Union[np.ndarray, int],
-        offset: float = OFFSET_LOG
+        offset: float = 0
 ) -> np.ndarray:
     """Cross entropy log loss for binary labels -(T*log(P) + (1-T)log(1-P))
+    Formula:
+        To avoid rounding errors and subtract cancellation, -log(1.0 -sigmoid(x))
+        is transformed to -log(exp(-x)) + log(1+exp(-x)) as per Reza Bonyadi.
+        -----
+        Let z=1/(1+p), p= e^(-x), then log(1-z)=log(p)-log(1+p), which is more stable
+        in terms of rounding errors (we got rid of division, which is the main issue
+        in numerical instabilities).
+        -----
 
-    To avoid rounding errors and subtract cancellation, -log(1.0 -sigmoid(x))
-    is transformed to -log(exp(-x)) + log(1+exp(-x)) as per Reza Bonyadi.
-
-    ----- By Reza.B
-    Let z=1/(1+p), p= e^(-x), then log(1-z)=log(p)-log(1+p), which is more stable
-    in terms of rounding errors (we got rid of division, which is the main issue
-    in numerical instabilities).
-    -----
-
-    Assumption:
-        Label is integer 0 or 1 for an OHE label and any integer for an index label.
-
-    NOTE:
-        Handle only the label whose value is True. The reason not to use non-labels to
-        calculate the loss is TBD.
+        J = (1-T)X + np.log(1 + np.exp(-X))
 
     Args:
-        P: probabilities of shape (N,M) from soft-max layer where:
+        X: Input data of shape (N,M) to go through softmax where:
             N is Batch size
             M is Number of nodes
-        T: label either in OHE format of shape (N,M) or index format of shape (N,).
-           OHE: One Hot Encoding
-        f: Cross entropy log loss function
+        T: label in the index format of shape (N,).
         offset: small number to avoid np.inf by log(0) by log(0+offset)
 
     Returns:
-        J: Loss value of shape (N,), a loss value per batch.
+        J: Loss value of shape () for scalar or (N,) a loss value per batch.
     """
-    name = "cross_entropy_log_loss"
-    P, T = transform_X_T(P, T)
+    name = "sigmoid_cross_entropy_log_loss"
+    # P, T = transform_X_T(P, T)
+    # --------------------------------------------------------------------------------
+    # X is scalar and T is a scalar binary OHE label, or
+    # T is 2D binary OHE labels e.g. T[[0],[1],[0]], X[[0.9],[0.1],[0.3]].
+    # --------------------------------------------------------------------------------
+    assert \
+        ((1 < X.ndim == T.ndim) and (X.shape[1] == T.shape[1] == 1)) or \
+        (X.ndim == 0 and T.ndim == 0), \
+        "Unexpected format for sigmoid/logistic log loss"
 
-    if P.ndim == 0:
-        assert False, "P.ndim needs (N,M) after transform_X_T(P, T)"
-        # --------------------------------------------------------------------------------
-        # P is scalar, T is a scalar binary OHE label. Return -t * log(p).
-        # --------------------------------------------------------------------------------
-        # assert T.ndim == 0, "P.ndim==0 requires T.ndim==0 but %s" % T.shape
-        # return f(P, T, offset)
-
-    if (1 < P.ndim == T.ndim) and (P.shape[1] == T.shape[1] == 1):
-        # --------------------------------------------------------------------------------
-        # This condition X:(N,1), T(N,1) tells T is the 2D binary OHE labels.
-        # T is 2D binary OHE labels e.g. T[[0],[1],[0]], P[[0.9],[0.1],[0.3]].
-        # Return -T * log(P)
-        # --------------------------------------------------------------------------------
-        return np.squeeze(f(P=P, T=T, offset=offset), axis=-1)    # Shape from (N,M) to (N,)
-
-    # ================================================================================
-    # Calculate Cross entropy log loss -t * log(p).
-    # Select an element P[n][t] at each row n which corresponds to the true label t.
-    # Use the Numpy tuple indexing. e.g. P[n=0][t=2] and P[n=3][t=4].
-    # P[
-    #   (0, 3),
-    #   (2, 4)     # The tuple sizes must be the same at all axes
-    # ]
-    #
-    # Tuple indexing selects only one element per row.
-    # Beware the numpy behavior difference between P[(n),(m)] and P[[n],[m]].
-    # https://stackoverflow.com/questions/66269684
-    # P[1,1]  and P[(0)(0)] results in a scalar value, HOWEVER, P[[1],[1]] in array.
-    #
-    # P shape can be (1,1), (1, M), (N, 1), (N, M), hence P[rows, cols] are:
-    # P (1,1) -> P[rows, cols] results in a 1D of  (1,).
-    # P (1,M) -> P[rows, cols] results in a 1D of  (1,)
-    # P (N,1) -> P[rows, cols] results in a 1D of  (N,)
-    # P (N,M) -> P[rows, cols] results in a 1D of  (N,)
-    #
-    # J shape matches with the P[rows, cols] shape.
-    # ================================================================================
-    N = batch_size = P.shape[0]
-    rows = np.arange(N)     # (N,)
-    cols = T                # Same shape (N,) with rows
-    assert rows.shape == cols.shape, \
-        f"np P indices need the same shape but rows {rows.shape} cols {cols.shape}."
-
-    _P = P[rows, cols]
-    Logger.debug("%s: N is [%s]", name, N)
-    Logger.debug("%s: P.shape %s", name, P.shape)
-    Logger.debug("%s: P[rows, cols].shape %s", name, _P.shape)
-    Logger.debug("%s: P[rows, cols] is %s", name, _P)
-
-    J = f(P=_P, T=int(1), offset=offset)
-
-    assert not np.all(np.isnan(J)), "log(x) caused nan for P \n%s." % P
-    Logger.debug("%s: J is [%s]", name, J)
-    Logger.debug("%s: J.shape %s\n", name, J.shape)
-
-    assert (J.ndim > 0) and (0 < N == J.shape[0]), \
-        "Loss J.shape is expected to be (%s,) but %s" % (N, J.shape)
-    return J
+    J = np.multiply((1 - T), X) + np.log(1 + np.exp(-X))
+    assert np.all(np.isfinite(J))
+    return np.squeeze(J, axis=-1)    # Shape from (N,M) to (N,)
 
 
 def cross_entropy_log_loss(

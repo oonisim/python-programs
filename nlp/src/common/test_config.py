@@ -9,3 +9,7 @@ MAX_ACTIVATION_VALUE = 5.0  # max output value from an activation function
 # is acceptable.
 GRADIENT_DIFF_ACCEPTANCE_RATIO = 0.15
 GRADIENT_DIFF_ACCEPTANCE_VALUE = 1e-5
+
+# Accept the Numerical difference between re-formulated functions, e.g.
+# log( exp(xi) / sum(exp(X)) ) = sum(exp(X)) - xi,
+REFORMULA_DIFF_ACCEPTANCE_VALUE = 1e-10
