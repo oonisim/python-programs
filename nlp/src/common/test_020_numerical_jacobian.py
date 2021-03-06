@@ -21,7 +21,7 @@ from common import (
     BOUNDARY_SIGMOID
 )
 
-from layer.test_config import (
+from common.test_config import (
     NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,
@@ -75,80 +75,6 @@ def test_020_numerical_jacobian_sigmoid(u: float = 1e-4):
         acceptance = np.abs(analytical * GRADIENT_DIFF_ACCEPTANCE_RATIO)
         assert np.all(difference < max(u, acceptance)), \
             f"Needs difference < {max(u, acceptance)} but {difference}\nx is {x}"
-
-
-def test_020_cross_entropy_log_loss_scalar(h: float = OFFSET_DELTA, u: float = 1e-4):
-    """
-    Objective:
-        Verify that the categorical log loss values
-    Expected:
-        1. The numerical gradient gn = (-t * logarithm(p+h) + t * logarithm(p-h)) / 2h.
-        2. The numerical gradient gn is within +/- u within the analytical g = -T/P.
-
-    Args:
-        h: threshold value above which the delta between Expectation E and Actual A
-           is regarded as an error.
-
-    -dlog(x)/dx = -1/x
-    """
-    # ================================================================================
-    # [Scalar test case]
-    # ================================================================================
-    def f(P: np.ndarray, T: np.ndarray):
-        return np.sum(cross_entropy_log_loss(P, T))
-
-    # --------------------------------------------------------------------------------
-    # 1. For scalar P=1, T=1 for -t * log(1) -> log(1) : dlog(P)/dP -> 1
-    # --------------------------------------------------------------------------------
-    p1 = np.array(1.0, dtype=float)     # P for -T * log(P)
-    t1 = np.array(1, dtype=int)         # T for -T * log(P)
-    gn1 = numerical_jacobian(partial(f, T=1), p1)
-    egn1 = (-t1 * logarithm(p1+h) + t1 * logarithm(p1-h)) / (2 * h)    # Expected GN
-
-    # The numerical gradient gn = (-t * logarithm(p+h) + t * logarithm(p-h)) / 2h
-    assert np.abs(egn1 - gn1) < u, \
-        f"Delta expected to be < {u} but {np.abs(egn1 - gn1)}"
-
-    # The numerical gradient gn is within +/- u within the analytical g = -T/P
-    g1 = - t1 / p1
-    check.less_equal(np.abs(g1 - gn1), u, "abs(g1-gn1) was expected < %s but \n%s\n" % (u, np.abs(g1-gn1)))
-
-    # --------------------------------------------------------------------------------
-    # 2. For scalar P=0, T=1
-    # --------------------------------------------------------------------------------
-    p2 = 0.0
-    t2 = 1
-    gn2 = numerical_jacobian(partial(f, T=t2), p2)
-    g2 = -1 * (p2/t2)
-
-    # The numerical gradient gn is within +/- u within the analytical g = -T/P
-    assert np.abs(g2 - gn2) < u, \
-       f"Delta expected to be < {u} but {np.abs(g2 - gn2)}"
-
-    # --------------------------------------------------------------------------------
-    # 3. For scalar P=1, T=0 for -t * log()          : df/dP -> 0
-    # --------------------------------------------------------------------------------
-    p3 = 1.0
-    gn3 = numerical_jacobian(partial(f, T=0), p3)
-    g3 = 0      # derivative of constant is 0
-
-    # The numerical gradient gn is within +/- u within the analytical g = -T/P = 0
-    assert np.abs(g3 - gn3) < h, \
-        f"Delta expected to be < {h} but {np.abs(g3 - gn3)}"
-
-    for _ in range(NUM_MAX_TEST_TIMES):
-        x = np.random.uniform(low=-BOUNDARY_SIGMOID, high=BOUNDARY_SIGMOID)
-        p = softmax(x)
-        gn = numerical_jacobian(partial(f, T=1), p)
-        ex = (-t1 * logarithm(p+h) + t1 * logarithm(p-h)) / (2 * h)
-
-        # The numerical gradient gn = (-t * logarithm(p+h) + t * logarithm(p-h)) / 2h
-        assert np.abs(ex-gn) < h, \
-            f"Delta expected to be < {h} but {np.abs(ex-gn)}"
-
-        # The numerical gradient gn is within +/- u within the analytical g = -T/P
-        g = - 1 / p
-        check.less_equal(np.abs(g-gn), u, "g-gn was expected < %s but \n%s\n" % (u, np.abs(g-gn)))
 
 
 def test_020_cross_entropy_log_loss_1d(h: float = OFFSET_DELTA, u: float = 1e-4):
@@ -345,51 +271,6 @@ def test_020_cross_entropy_log_loss_2d(h: float = OFFSET_DELTA):
 # ================================================================================
 # Softmax + log loss
 # ================================================================================
-def test_020_softmax_scalar(h=OFFSET_DELTA, r=GRADIENT_DIFF_ACCEPTANCE_RATIO):
-    """Test case for softmax plus log loss with a scalar input
-    Analytica gradient dj/dx -> softmax(x) - t
-    j = cross_entropy_log_loss(softmax(x), T)
-    dlog(x)/dx -> 1/x, dexp(x)/dx -> exp(x)
-
-    Args:
-        h: threshold value above which the delta between Expectation E and Actual A
-           is regarded as an error.
-    """
-    # --------------------------------------------------------------------------------
-    # [Scalar test case]
-    # p = softmax(a)
-    # 1. For scalar a, T=1 for -t * log(p)           : df/da
-    # 3. For scalar a, T=0 for -t * log(p) -> 0      : df/da -> 0
-    # --------------------------------------------------------------------------------
-    def L(X: np.ndarray, T: np.ndarray):
-        """Loss function"""
-        return np.sum(cross_entropy_log_loss(softmax(X), T))
-
-    def gn(a, t):
-        """Expected numerical gradient"""
-        if t == 0: return 0
-        return (-logarithm(softmax(a) + h) + logarithm(softmax(a) - h)) / (2*h)
-
-    for _ in range(NUM_MAX_TEST_TIMES):
-        # activation value from an activation function (ReLU, etc)
-        T = np.random.randint(0, 1)
-        A = np.random.uniform(float(-MAX_ACTIVATION_VALUE), float(MAX_ACTIVATION_VALUE))
-        G = numerical_jacobian(partial(L, T=T), A)
-        E = gn(A, T)
-        assert np.abs(E - G) <= np.abs(r * E), \
-            f"Delta expected to be < {np.abs(r * E)} ratio of E but {np.abs((E - G))}"
-
-        # --------------------------------------------------------------------------------
-        # Analytical gradient dL/dA = dL/dJ * dJ/dA. dJ/dA = -T/P at the log loss.
-        # For one input A, dJ/dA is always 0 when T = 0.
-        # --------------------------------------------------------------------------------
-        dA = softmax(A) - T if T == 1 else 0
-        check.less_equal(
-            np.abs(dA-G), np.abs(dA * r),
-            "T %s A % s dA %s G %s dA-G %s \n" % (T, A, dA, G, np.abs(dA-G))
-        )
-
-
 def test_020_softmax_1d(r: float = GRADIENT_DIFF_ACCEPTANCE_RATIO, u: float = 1e-4):
     """Test case for softmax for 1D
     Verify the delta between the analytical and numerical gradient is small (<h).
@@ -418,5 +299,7 @@ def test_020_softmax_1d(r: float = GRADIENT_DIFF_ACCEPTANCE_RATIO, u: float = 1e
             T
         ] -= 1
 
-        assert np.all(np.abs(dA - G) < u), \
-            f"For T {T} and A: \n{A}\n the delta between G{G} and dA: \n{dA}\nwas expected to be < {u} but \n{np.abs(dA-G)}"
+        assert \
+            np.all(np.abs(dA - G) < u) or \
+            (np.all(np.abs(dA - G) < np.abs(GRADIENT_DIFF_ACCEPTANCE_RATIO * G))), \
+            f"For T {T} and A: \n{A}\nthe delta between G\n{G}\n and dA: \n{dA}\nwas expected to be < {u} but \n{np.abs(dA-G)}"

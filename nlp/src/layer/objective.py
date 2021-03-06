@@ -284,11 +284,8 @@ class CrossEntropyLogLoss(Layer):
                 rows,
                 cols
             ] -= 1.0
-            dF = (dJ * dY)                  # dJ/dX is shape (N,).
-            dF = dF[::, np.newaxis]         # Transform into shape (N,1) to np broadcast.
-
             # dF/dY * dY/dJ * (P-T) = dF/dY * (P-T) / N
-            np.multiply(dF, dX, out=dX)
+            np.multiply(dJ, dX, out=dX)
 
         assert np.all(np.abs(dX) <= 1), \
             "Gradient dL/dX needs between [-1, 1] but %s." % dX

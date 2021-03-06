@@ -30,7 +30,7 @@ class SGD(Optimizer):
         """
         if np.all(np.abs(dW) < np.abs(W / 100.0)):
             self.logger.warning(
-                "SGD[%s].update(): Gradient descent potentially stalling with dW < 1% of W.",
+                "SGD[%s].update(): Gradient descent potentially stalling with dW < W/100.",
                 self.name
             )
 

@@ -10,9 +10,15 @@ import numpy as np
 # OFFSET_DELTA = 1e-10
 # OFFSET_LOG = (OFFSET_DELTA + 1e-7)  # Avoid log(0) -> inf by log(0+offset)
 # --------------------------------------------------------------------------------
-OFFSET_DELTA = 1e-9
+OFFSET_DELTA = 1e-8
 OFFSET_LOG = 1e-7       # Avoid log(0) -> inf by log(x) where x > offset
 OFFSET_STD = 1e-10      # Avoid div by zero at (X-u) / sqrt(variance + eps)
+
+# When True, set the element to the offset value only when it is below the offset,
+# clipping element values at the offset.
+# Otherwise add offset to all elements in a blanket manner shifting all values
+# by the offset.
+OFFSET_MODE_ELEMENT_WISE = True
 
 # --------------------------------------------------------------------------------
 # BOUNDARY_SIGMOID = -np.log(OFFSET_LOG) * safe_margin_ratio

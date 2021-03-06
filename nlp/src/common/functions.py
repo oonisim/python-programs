@@ -15,6 +15,7 @@ from common import (
     OFFSET_DELTA,
     OFFSET_LOG,
     OFFSET_STD,
+    OFFSET_MODE_ELEMENT_WISE,
     BOUNDARY_SIGMOID,
     GN_DIFF_ACCEPTANCE_VALUE,
     GN_DIFF_ACCEPTANCE_RATIO,
@@ -63,27 +64,40 @@ def logarithm(
         offset: Optional[Union[np.ndarray, float]] = OFFSET_LOG
 ) -> Union[np.ndarray, float]:
     """Wrapper for np.log(x) to set the hard-limit for x
-    Assure x > 0 and x is above a certain lower boundary for log(x)
-
     Args:
-        X: > domain value for log
+        X: domain value for log
         offset: The lower boundary of acceptable X value.
     Returns:
-        np.log(X) with X > offset
+        np.log(X)
     """
-    assert (isinstance(X, np.ndarray) and X.dtype == float) or isinstance(X, float)
+    if isinstance(X, float):
+        return np.log(X + offset)
 
-    offset = OFFSET_LOG if not offset else offset
-    assert offset > 0
-    if np.all(X > offset):
-        _X = X
-    elif isinstance(X, np.ndarray):
-        _X = copy.deepcopy(X)
-        _X[X <= offset] = offset
+    assert (isinstance(X, np.ndarray) and X.dtype == float)
+    offset = OFFSET_LOG if (offset is None or offset <= 0.0) else offset   # offset > 0
+    assert offset > 0.0
+    if OFFSET_MODE_ELEMENT_WISE:
+        # --------------------------------------------------------------------------------
+        # Clip the element value only when it is below the offset as log(k), not log(x+k).
+        # Note: Checking all element can take time and deepcopy everytime cost memory.
+        # --------------------------------------------------------------------------------
+        selections = (X < offset)
+        if np.any(selections):
+            # _X = copy.deepcopy(X)
+            _X = np.copy(X)
+            _X[selections] = offset
+        else:
+            _X = X
+
+        Y = np.log(_X)
     else:
-        _X = offset
+        # --------------------------------------------------------------------------------
+        # Adding the offset value to all elements as log(x+k) to avoid log(0)=-inf.
+        # --------------------------------------------------------------------------------
+        Y = np.log(X+offset)
+    assert np.all(np.isfinite(Y)), "log(X) caused nan for X \n%s." % X
 
-    return np.log(_X)
+    return Y
 
 
 def sigmoid_reverse(y):
@@ -175,7 +189,7 @@ def softmax(X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
     # exp(x-c) to prevent the infinite exp(x) for a large value x, with c = max(x).
     # keepdims=True to be able to broadcast.
     # --------------------------------------------------------------------------------
-    C = np.max(X, axis=-1, keepdims=True)   # オーバーフロー対策
+    C = np.max(X, axis=-1, keepdims=True)
     exp = np.exp(X - C)
     P = exp / np.sum(exp, axis=-1, keepdims=True)
     Logger.debug("%s: X %s exp %s P %s", name, X, exp, P)
@@ -440,6 +454,205 @@ def transform_X_T(
                 raise RuntimeError(msg)
 
     return X, T
+
+
+def softmax_cross_entropy_log_loss(
+        X: Union[np.ndarray],
+        T: Union[np.ndarray],
+        offset: float = 0
+) -> np.ndarray:
+    """Cross entropy log loss for softmax activation -T * log(softmax(X))
+    NOTE:
+        Handle only the label whose value is True. The reason not to use non-labels to
+        calculate the loss is TBD.
+
+        Do not accept binary classification data where P is scalar or P.shape[T] = 1.
+        Softmax() is for multi label classification, hence M=P.shape[1] > 1.
+
+        P.ndim == 0 or ((1 < P.ndim == T.ndim) and (P.shape[1] == T.shape[1] == 1))
+        is for binary classification.
+        Run "P, T = transform_X_T(P, T)" to transform (P, T) to transform P in 1D or
+        T in OHE format before calling this function.
+
+    Formula:
+        log( exp(x) / sum(exp(x)) ) is reformulated to X - sum(exp(x)), by which
+        division or log(exp) is eliminated for numerical stability.
+
+    Args:
+        X: Input data of shape (N,M) to go through softmax where:
+            N is Batch size
+            M is Number of nodes
+        T: label in the index format of shape (N,).
+        offset: small number to avoid np.inf by log(0) by log(0+offset)
+
+    Returns:
+        J: Loss value of shape (N,), a loss value per batch.
+    """
+    name = "softmax_cross_entropy_log_loss"
+
+    # --------------------------------------------------------------------------------
+    # P(N, M) and T(N,) in index label format are expected for softmax log loss.
+    # --------------------------------------------------------------------------------
+    assert \
+        isinstance(X, np.ndarray) and X.dtype == float and \
+        X.ndim == (T.ndim+1) and X.shape[1] > 1 and X.size > 0, \
+        "%s: needs (N,M>1) shape for multiclass (M>1) classifier loss."
+
+    assert \
+        isinstance(T, np.ndarray) and T.dtype == int and \
+        T.shape[0] == X.shape[0] and T.size > 0, \
+        "X(N, M) and T(N,) in index label format expected but X shape %s T.shape %s" \
+        % (X.shape, T.shape)
+
+    # ================================================================================
+    # Calculate Cross entropy log loss -t * log(p).
+    # Select an element P[n][t] at each row n which corresponds to the true label t.
+    # Use the Numpy tuple indexing. e.g. P[n=0][t=2] and P[n=3][t=4].
+    # P[
+    #   (0, 3),
+    #   (2, 4)     # The tuple sizes must be the same at all axes
+    # ]
+    #
+    # Tuple indexing selects only one element per row.
+    # Beware the numpy behavior difference between P[(n),(m)] and P[[n],[m]].
+    # https://stackoverflow.com/questions/66269684
+    # P[1,1]  and P[(0)(0)] results in a scalar value, HOWEVER, P[[1],[1]] in array.
+    #
+    # P shape can be (1,1), (1, M), (N, 1), (N, M), hence P[rows, cols] are:
+    # P (1,1) -> P[rows, cols] results in a 1D of  (1,).
+    # P (1,M) -> P[rows, cols] results in a 1D of  (1,)
+    # P (N,1) -> P[rows, cols] results in a 1D of  (N,)
+    # P (N,M) -> P[rows, cols] results in a 1D of  (N,)
+    #
+    # J shape matches with the P[rows, cols] shape.
+    # ================================================================================
+    N = batch_size = X.shape[0]
+    rows = np.arange(N)     # (N,)
+    cols = T                # Same shape (N,) with rows
+    assert rows.shape == cols.shape, \
+        f"np P indices need the same shape but rows {rows.shape} cols {cols.shape}."
+
+    # _X:shape(N,) via np tuple indexing
+    _X = X[rows, cols]
+    Logger.debug("%s: N is [%s]", name, N)
+    Logger.debug("%s: X.shape %s", name, X.shape)
+    Logger.debug("%s: X[rows, cols].shape %s", name, _X.shape)
+    Logger.debug("%s: X[rows, cols] is %s", name, _X)
+
+    # log(softmax(x)) = log( exp(x)/sum(exp(x)) ) = X - sum(exp(x))
+    # J = -log(softmax(_X))
+    J = logarithm(X=np.sum(np.exp(X)), offset=offset) - X
+    Logger.debug("%s: J is [%s]", name, J)
+    Logger.debug("%s: J.shape %s\n", name, J.shape)
+
+    delta = np.abs(J + logarithm(softmax(X)))
+    assert np.all(delta < OFFSET_DELTA), \
+        "%s: re-formula log(softmax(x)) = X-sum(exp(x)) need close but delta %s" \
+        % (name, delta)
+    assert np.all(np.isfinite(J)) and (J.ndim > 0) and (0 < N == J.shape[0]), \
+        "Invalid Loss J: should be finite and shape %s be (%s,). J=\n%s\n" \
+        % (J.shape, N, J)
+
+    return J
+
+
+def sigmoid_entropy_log_loss(
+        P: Union[np.ndarray, float],
+        T: Union[np.ndarray, int],
+        offset: float = OFFSET_LOG
+) -> np.ndarray:
+    """Cross entropy log loss for binary labels -(T*log(P) + (1-T)log(1-P))
+
+    To avoid rounding errors and subtract cancellation, -log(1.0 -sigmoid(x))
+    is transformed to -log(exp(-x)) + log(1+exp(-x)) as per Reza Bonyadi.
+
+    ----- By Reza.B
+    Let z=1/(1+p), p= e^(-x), then log(1-z)=log(p)-log(1+p), which is more stable
+    in terms of rounding errors (we got rid of division, which is the main issue
+    in numerical instabilities).
+    -----
+
+    Assumption:
+        Label is integer 0 or 1 for an OHE label and any integer for an index label.
+
+    NOTE:
+        Handle only the label whose value is True. The reason not to use non-labels to
+        calculate the loss is TBD.
+
+    Args:
+        P: probabilities of shape (N,M) from soft-max layer where:
+            N is Batch size
+            M is Number of nodes
+        T: label either in OHE format of shape (N,M) or index format of shape (N,).
+           OHE: One Hot Encoding
+        f: Cross entropy log loss function
+        offset: small number to avoid np.inf by log(0) by log(0+offset)
+
+    Returns:
+        J: Loss value of shape (N,), a loss value per batch.
+    """
+    name = "cross_entropy_log_loss"
+    P, T = transform_X_T(P, T)
+
+    if P.ndim == 0:
+        assert False, "P.ndim needs (N,M) after transform_X_T(P, T)"
+        # --------------------------------------------------------------------------------
+        # P is scalar, T is a scalar binary OHE label. Return -t * log(p).
+        # --------------------------------------------------------------------------------
+        # assert T.ndim == 0, "P.ndim==0 requires T.ndim==0 but %s" % T.shape
+        # return f(P, T, offset)
+
+    if (1 < P.ndim == T.ndim) and (P.shape[1] == T.shape[1] == 1):
+        # --------------------------------------------------------------------------------
+        # This condition X:(N,1), T(N,1) tells T is the 2D binary OHE labels.
+        # T is 2D binary OHE labels e.g. T[[0],[1],[0]], P[[0.9],[0.1],[0.3]].
+        # Return -T * log(P)
+        # --------------------------------------------------------------------------------
+        return np.squeeze(f(P=P, T=T, offset=offset), axis=-1)    # Shape from (N,M) to (N,)
+
+    # ================================================================================
+    # Calculate Cross entropy log loss -t * log(p).
+    # Select an element P[n][t] at each row n which corresponds to the true label t.
+    # Use the Numpy tuple indexing. e.g. P[n=0][t=2] and P[n=3][t=4].
+    # P[
+    #   (0, 3),
+    #   (2, 4)     # The tuple sizes must be the same at all axes
+    # ]
+    #
+    # Tuple indexing selects only one element per row.
+    # Beware the numpy behavior difference between P[(n),(m)] and P[[n],[m]].
+    # https://stackoverflow.com/questions/66269684
+    # P[1,1]  and P[(0)(0)] results in a scalar value, HOWEVER, P[[1],[1]] in array.
+    #
+    # P shape can be (1,1), (1, M), (N, 1), (N, M), hence P[rows, cols] are:
+    # P (1,1) -> P[rows, cols] results in a 1D of  (1,).
+    # P (1,M) -> P[rows, cols] results in a 1D of  (1,)
+    # P (N,1) -> P[rows, cols] results in a 1D of  (N,)
+    # P (N,M) -> P[rows, cols] results in a 1D of  (N,)
+    #
+    # J shape matches with the P[rows, cols] shape.
+    # ================================================================================
+    N = batch_size = P.shape[0]
+    rows = np.arange(N)     # (N,)
+    cols = T                # Same shape (N,) with rows
+    assert rows.shape == cols.shape, \
+        f"np P indices need the same shape but rows {rows.shape} cols {cols.shape}."
+
+    _P = P[rows, cols]
+    Logger.debug("%s: N is [%s]", name, N)
+    Logger.debug("%s: P.shape %s", name, P.shape)
+    Logger.debug("%s: P[rows, cols].shape %s", name, _P.shape)
+    Logger.debug("%s: P[rows, cols] is %s", name, _P)
+
+    J = f(P=_P, T=int(1), offset=offset)
+
+    assert not np.all(np.isnan(J)), "log(x) caused nan for P \n%s." % P
+    Logger.debug("%s: J is [%s]", name, J)
+    Logger.debug("%s: J.shape %s\n", name, J.shape)
+
+    assert (J.ndim > 0) and (0 < N == J.shape[0]), \
+        "Loss J.shape is expected to be (%s,) but %s" % (N, J.shape)
+    return J
 
 
 def cross_entropy_log_loss(
