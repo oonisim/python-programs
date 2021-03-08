@@ -43,7 +43,8 @@ def test_010_standardize():
             E = mean / sd
             # Actual
             A = standardize(X, eps=0.0)
-            assert np.all(E == A), "X \n%s\n, standardized \n%s\n needs \n%s\n" % (X, E, A)
+            assert np.all(E == A), \
+                f"X\n{X}\nstandardized\n{E}\nneeds\n{A}\n"
 
 
 def test_010_sigmoid():

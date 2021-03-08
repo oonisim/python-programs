@@ -82,7 +82,7 @@ def test_010_softmax_cross_entropy_log_loss_2d(caplog):
 
         X = np.random.randn(N, M)
         T = np.random.randint(0, M, N)
-        Logger.debug("T is %s\nX is \n%s\n" % (T, X))
+        Logger.debug("T is %s\nX is \n%s\n", T, X)
 
         # ----------------------------------------------------------------------
         # Expected value E = -logarithm(_P)
@@ -134,9 +134,9 @@ def test_test_010_softmax_cross_entropy_log_loss_performance():
     profiler.enable()
 
     for _ in range(10):
-        numerical_jacobian(objective, X)
+        #numerical_jacobian(objective, X)
         #softmax_cross_entropy_log_loss(X, T)
-        #softmax(X)
+        softmax(X)
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")

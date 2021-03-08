@@ -80,7 +80,7 @@ class Matmul(Layer):
             name, W.shape, num_nodes
         )
         assert W.shape[0] == num_nodes, \
-            "W shape needs to be (%s, D) but %s." % (num_nodes, W.shape)
+            f"W shape needs to be ({num_nodes}, D) but {W.shape}."
 
         # --------------------------------------------------------------------------------
         # W: weight matrix of shape(M,D) where M=num_nodes

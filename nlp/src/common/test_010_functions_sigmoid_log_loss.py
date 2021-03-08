@@ -74,7 +74,7 @@ def test_010_sigmoid_cross_entropy_log_loss_2d(caplog):
         X = np.random.randn(N, M)
         T = np.random.randint(0, M, N)
         X, T = transform_X_T(X, T)
-        Logger.debug("T is %s\nX is \n%s\n" % (T, X))
+        Logger.debug("T is %s\nX is \n%s\n", T, X)
 
         # ----------------------------------------------------------------------
         # Expected value E = -logarithm(Z)

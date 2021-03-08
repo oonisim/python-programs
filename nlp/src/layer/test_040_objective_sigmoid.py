@@ -460,7 +460,7 @@ def test_040_objective_methods_2d_ohe(caplog):
         # log_loss function require (X, T) in X(N, M), and T(N, M) in OHE label format.
         X, T = transform_X_T(X, T)
         layer.T = T
-        Logger.debug("%s: X is \n%s\nT is \n%s" % (name, X, T))
+        Logger.debug("%s: X is \n%s\nT is \n%s", name, X, T)
 
         # --------------------------------------------------------------------------------
         # Expected analytical gradient dL/dX = (P-T)/N

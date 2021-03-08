@@ -443,7 +443,7 @@ def test_030_objective_methods_2d_ohe():
         ] = int(1)
         layer.T = T
 
-        Logger.debug("%s: X is \n%s\nT is \n%s" % (name, X, T))
+        Logger.debug("%s: X is \n%s\nT is \n%s", name, X, T)
 
         P = softmax(X)
         EG = (P - T) / N       # Expected analytical gradient dL/dX = (P-T)/N

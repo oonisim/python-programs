@@ -350,7 +350,7 @@ def test_020_matmul_methods():
         # Test the numerical gradient dL/dX=layer.gradient_numerical().
         # ================================================================================
         X = np.random.randn(N, D)
-        Logger.debug("%s: X is \n%s" % (name, X))
+        Logger.debug("%s: X is \n%s", name, X)
 
         Y = layer.function(X)
         L = layer.objective(Y)

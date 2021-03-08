@@ -93,7 +93,7 @@ def logarithm(
         # Adding the offset value to all elements as log(x+k) to avoid log(0)=-inf.
         # --------------------------------------------------------------------------------
         Y = np.log(X+offset)
-    assert np.all(np.isfinite(Y)), "log(X) caused nan for X \n%s." % X
+    assert np.all(np.isfinite(Y)), f"log(X) caused nan for X \nX={X}."
 
     return Y
 
@@ -190,7 +190,7 @@ def softmax(X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
     C = np.max(X, axis=-1, keepdims=True)
     exp = np.exp(X - C)
     P = exp / np.sum(exp, axis=-1, keepdims=True)
-    Logger.debug("%s: X %s exp %s P %s" % (name, X, exp, P))
+    Logger.debug("%s: X %s exp %s P %s", name, X, exp, P)
 
     return P
 
@@ -567,7 +567,7 @@ def check_binary_classification_X_T(X, T):
         (
             (X.ndim == 0 and T.ndim == 0) or
             ((1 < X.ndim == T.ndim) and (X.shape[1] == T.shape[1] == 1))
-        ), "Unexpected format for binary classification. X=\n%s" % X
+        ), f"Unexpected format for binary classification. X=\n{X}"
 
 
 def sigmoid_cross_entropy_log_loss(
@@ -725,7 +725,7 @@ def cross_entropy_log_loss(
 
     J = f(P=_P, T=int(1), offset=offset)
 
-    assert not np.all(np.isnan(J)), "log(x) caused nan for P \n%s." % P
+    assert not np.all(np.isnan(J)), f"log(x) caused nan for P \n{P}."
     Logger.debug("%s: J is [%s]", name, J)
     Logger.debug("%s: J.shape %s\n", name, J.shape)
 
@@ -790,7 +790,7 @@ def numerical_jacobian(
 
         assert \
             ((isinstance(fx1, np.ndarray) and fx1.size == 1) or isinstance(fx1, float)), \
-            "The f function needs to return scalar or shape () but %s" % fx1
+            f"The f function needs to return scalar or shape () but {fx1}"
         assert np.isfinite(fx1), \
             "f(x+h) caused nan for f %s for X %s" % (f, (tmp + delta))
 
@@ -805,7 +805,7 @@ def numerical_jacobian(
         )
         assert \
             ((isinstance(fx2, np.ndarray) and fx2.size == 1) or isinstance(fx2, float)), \
-            "The f function needs to return scalar or shape () but %s" % fx2
+            f"The f function needs to return scalar or shape () but {fx2}"
         assert np.isfinite(fx2), \
             "f(x-h) caused nan for f %s for X %s" % (f, (tmp - delta))
 
