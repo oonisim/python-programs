@@ -247,18 +247,15 @@ def test_020_matmul_instance_properties():
 
 
 def test_020_matmul_instantiation():
-    """Test case for layer matmul class
     """
-    # --------------------------------------------------------------------------------
-    # name, num_nodes, log_level _init_ properties.
-    # Logging debug outputs.
-    # X setter/getter
-    # T setter/getter
-    # objective function setter/getter
-    # function(x) repeats x.
-    # gradient(dL/dY) repeats dL/dY,
-    # gradient_numerical() returns 1
-    # --------------------------------------------------------------------------------
+    Objective:
+        Verify the initialized layer instance provides its properties.
+    Expected:
+        * name, num_nodes, M, log_level are the same as initialized.
+        * X, T, dX, objective returns what is set.
+        * N, M property are provided after X is set.
+        * Y, dY properties are provided after they are set.
+    """
     def objective(X: np.ndarray) -> Union[float, np.ndarray]:
         """Dummy objective function"""
         return np.sum(X)
@@ -274,10 +271,8 @@ def test_020_matmul_instantiation():
             W=weights.he(M, D),
             log_level=logging.DEBUG
         )
+        layer.objective = objective
 
-        # --------------------------------------------------------------------------------
-        # Properties
-        # --------------------------------------------------------------------------------
         assert layer.name == name
         assert layer.num_nodes == layer.M == M
 
@@ -304,9 +299,28 @@ def test_020_matmul_instantiation():
 
         layer.logger.debug("This is a pytest")
 
+        assert layer.objective == objective
+
 
 def test_020_matmul_methods():
-    """Test case for layer matmul class
+    """
+    Objective:
+        Verify the initialized layer instance provides its properties.
+
+    Expected:
+        Forward path:
+        1. Matmul function(X) == X @ W.T
+        2. Numerical gradient should be the same with numerical Jacobian
+
+        Backward path:
+        3. Analytical gradient dL/dX == dY @ W
+        4. Analytical dL/dW == X.T @ dY
+        5. Analytical gradients are similar to the numerical gradient ones
+
+        Gradient descent
+        6. W is updated via the gradient descent.
+        7. Objective L is decreasing via the gradient descent.
+
     """
     for _ in range(NUM_MAX_TEST_TIMES):
         # --------------------------------------------------------------------------------
@@ -330,21 +344,23 @@ def test_020_matmul_methods():
         )
         layer.objective = objective
 
-        # --------------------------------------------------------------------------------
+        # ================================================================================
         # Layer forward path
         # Calculate the layer output Y=f(X), and get the loss L = objective(Y)
         # Test the numerical gradient dL/dX=layer.gradient_numerical().
-        # --------------------------------------------------------------------------------
+        # ================================================================================
         X = np.random.randn(N, D)
         Logger.debug("%s: X is \n%s" % (name, X))
 
         Y = layer.function(X)
         L = layer.objective(Y)
-        # Matmul outputs Y should be X@W.T
+
+        # Constraint 1 : Matmul outputs Y should be X@W.T
         assert np.array_equal(Y, np.matmul(X, W.T))
 
-        # Numerical gradient should be the same with numerical Jacobian
+        # Constraint 2: Numerical gradient should be the same with numerical Jacobian
         GN = layer.gradient_numerical()         # [dL/dX, dL/dW]
+
         LX = lambda x: layer.objective(layer.function(x))
         JX = numerical_jacobian(LX, X)           # Numerical dL/dX
         assert np.array_equal(GN[0], JX)
@@ -353,38 +369,40 @@ def test_020_matmul_methods():
         JW = numerical_jacobian(LW, W)           # Numerical dL/dX
         assert np.array_equal(GN[1], JW)
 
-        # --------------------------------------------------------------------------------
+        # ================================================================================
         # Layer backward path
         # Calculate the analytical gradient dL/dX=layer.gradient(dL/dY) with a dummy dL/dY.
-        # Confirm the numerical gradient (dL/dX, dL/dW) are closer to the analytical ones.
-        # --------------------------------------------------------------------------------
-        # Matmul gradient dL/dX should be dL/dY @ W. Use a dummy dL/dY = 1.0.
+        # ================================================================================
         dY = np.ones_like(Y)
         dX = layer.gradient(dY)
+
+        # Constraint 3: Matmul gradient dL/dX should be dL/dY @ W. Use a dummy dL/dY = 1.0.
         expected_dX = np.matmul(dY, W)
         assert np.array_equal(dX, expected_dX)
 
-        # Matmul analytical gradient dL/dX should be close to the numerical gradient GN.
+        # Constraint 5: Analytical gradient dL/dX close to the numerical gradient GN.
         assert np.all(np.abs(dX - GN[0]) < GRADIENT_DIFF_ACCEPTANCE_VALUE), \
             f"dX need close to GN[0] but dX \n%s\n GN[0] \n%s\n" % (dX, GN[0])
 
         # --------------------------------------------------------------------------------
         # Gradient update.
         # Run the gradient descent to update Wn+1 = Wn - lr * dL/dX.
-        # Confirm the new objective L(Yn+1) < L(Yn) with the Wn+1.
-        # Confirm W in the layer has been updated by the gradient descent.
         # --------------------------------------------------------------------------------
-
-        # Note Python pass the reference to W, and W will be directly updated by
-        # the gradient descent to avoid a temporary copy.
-        # Hence need to backup W before being changed to compare before/after.
+        # Python passes the reference to W, hence it is directly updated by the gradient-
+        # descent to avoid a temporary copy. Backup W before to compare before/after.
         backup = copy.deepcopy(W)
 
-        dS = layer.update()         # Analytical dL/dX, dL/dW
+        # Gradient descent and returns analytical dL/dX, dL/dW
+        dS = layer.update()
+
+        # Constraint 6.: W has been updated by the gradient descent.
+        assert np.any(backup != layer.W), "W has not been updated "
+
+        # Constraint 5: the numerical gradient (dL/dX, dL/dW) are closer to the analytical ones.
         assert np.all(np.abs(dS[0] - GN[0]) < GRADIENT_DIFF_ACCEPTANCE_VALUE) # dL/dX
         assert np.all(np.abs(dS[1] - GN[1]) < GRADIENT_DIFF_ACCEPTANCE_VALUE) # dL/dW
 
-        # Objective L with the updated W should be smaller than previous L
+        # Constraint 7: gradient descent progressing with the new objective L(Yn+1) < L(Yn)
         assert np.all(np.abs(objective(layer.function(X)) < L))
-        assert np.any(backup != layer.W), "W has not been updated "
+
 
