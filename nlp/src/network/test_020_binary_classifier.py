@@ -150,7 +150,7 @@ def train_binary_classifier(
         # --------------------------------------------------------------------------------
         #  Constraint 1. W in the matmul has been updated by the gradient descent.
         # --------------------------------------------------------------------------------
-        Logger.info("W after is \n%s", matmul.W)
+        Logger.info("W after is \n%s" % matmul.W)
         assert not np.array_equal(before, matmul.W), \
             "W has not been updated. \n%s\n"
 
@@ -193,7 +193,8 @@ def train_binary_classifier(
                 "dL/dW analytical gradient \n%s \nneed to close to numerical gradient \n%s\n" \
                 % (dS[1], gn[1])
 
-        if callback: callback(W=matmul.W[0])
+        if callback:
+            callback(W=matmul.W[0]) if W.shape[1] == 1 else callback(W=np.average(matmul.W, axis=0))
 
 
 def _test_binary_classifier(M: int = 2, log_loss_function: Callable = softmax_cross_entropy_log_loss):
