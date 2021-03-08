@@ -103,7 +103,9 @@ from typing import (
     Union,
     List,
     Dict,
+    Tuple,
     Callable,
+    Any,
     NoReturn,
     Final
 )
@@ -426,8 +428,7 @@ class Layer:
             dX: [L(f(X+h) - L(f(X-h)] / 2h
         """
         self.logger.warning(
-            "Layer base method %s not overridden but called by %s.",
-            inspect.stack()[0][3], inspect.stack()[1][3]
+            "Layer base method gradient_numerical not overridden but called by %s."
         )
 
         # L = Li(f(arg))

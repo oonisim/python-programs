@@ -9,9 +9,10 @@ from typing import (
 )
 
 import numpy as np
+import pytest_check as check    # https://pypi.org/project/pytest-check/
 from common import (
     weights,
-    sigmoid
+    sigmoid_cross_entropy_log_loss
 )
 from data.classifications import (
     linear_separable
@@ -24,6 +25,15 @@ from optimizer import (
     Optimizer,
     SGD
 )
+from common.test_config import (
+    NUM_MAX_TEST_TIMES,
+    NUM_MAX_NODES,
+    NUM_MAX_BATCH_SIZE,
+    MAX_ACTIVATION_VALUE,
+    GRADIENT_DIFF_ACCEPTANCE_RATIO,
+    GRADIENT_DIFF_ACCEPTANCE_VALUE
+)
+
 
 Logger = logging.getLogger(__name__)
 Logger.setLevel(logging.DEBUG)
@@ -68,7 +78,7 @@ def train_binary_classifier(
     loss = CrossEntropyLogLoss(
         name="loss",
         num_nodes=M,
-        activation=sigmoid,
+        log_loss_function=sigmoid_cross_entropy_log_loss,
         log_level=logging.WARNING
     )
     loss.objective = objective_logloss
@@ -85,7 +95,7 @@ def train_binary_classifier(
     )
     matmul.objective = loss.function
 
-    history: List[float] = []
+    history: List[float] = [np.finfo(float, max(float))]
     for i in range(num_epochs):
         # --------------------------------------------------------------------------------
         # Layer forward path
@@ -96,12 +106,18 @@ def train_binary_classifier(
         loss.T = T
         L = loss.function(Y)
         history.append(L)
+        print(L)
+
         Logger.info("%s: iteration[%s]. Loss is [%s]", name, i, L)
-        if L > history[-1]:
-            Logger.warning(
-                "Loss [%s] should decrease but increased from previous [%s]",
-                L, history[-1]
-            )
+
+        # --------------------------------------------------------------------------------
+        # Constraint: 1. Objective/Loss L(Yn+1) after gradient descent < L(Yn)
+        # --------------------------------------------------------------------------------
+        check.less(
+            L, history[-2],
+            "Iteration [%i]: Loss[%s] should decrease but increased from previous [%s]"
+            % (i, L, history[-1])
+        )
 
         # --------------------------------------------------------------------------------
         # Numerical gradient
@@ -110,36 +126,41 @@ def train_binary_classifier(
 
         # --------------------------------------------------------------------------------
         # Layer backward path
-        # Calculate the analytical gradient dL/dX=matmul.gradient(dL/dY) with a dummy dL/dY.
-        # Confirm the numerical gradient (dL/dX, dL/dW) are closer to the analytical ones.
+        # 1. Calculate the analytical gradient dL/dX=matmul.gradient(dL/dY) with a dL/dY.
+        # 2. Gradient descent to update Wn+1 = Wn - lr * dL/dX.
         # --------------------------------------------------------------------------------
         before = copy.deepcopy(matmul.W)
         dY = loss.gradient(float(1))
         dX = matmul.gradient(dY)
+        # gradient descent and get the analytical dL/dX, dL/dW
+        dS = matmul.update()
 
         # --------------------------------------------------------------------------------
-        # Gradient update.
-        # Run the gradient descent to update Wn+1 = Wn - lr * dL/dX.
-        # Confirm the new objective L(Yn+1) < L(Yn) with the Wn+1.
-        # Confirm W in the matmul has been updated by the gradient descent.
+        #  Constraint 1. W in the matmul has been updated by the gradient descent.
         # --------------------------------------------------------------------------------
-        dS = matmul.update()  # Analytical dL/dX, dL/dW
-        assert not np.array_equal(before, matmul.W), "W has not been updated. \n%s\n"
-        assert np.all(np.abs(dS[0] - gn[0]) < 0.0001), \
+        assert not np.array_equal(before, matmul.W), \
+            "W has not been updated. \n%s\n"
+
+        # --------------------------------------------------------------------------------
+        #  Constraint 2. Numerical gradient (dL/dX, dL/dW) are closer to the analytical ones.
+        # --------------------------------------------------------------------------------
+        assert np.all(np.abs(dS[0] - gn[0]) < GRADIENT_DIFF_ACCEPTANCE_VALUE), \
             "dL/dX analytical gradient \n%s \nneed to close to numerical gradient \n%s\n" \
             % (dS[0], gn[0])
-        assert np.all(np.abs(dS[1] - gn[1]) < 0.0001), \
+        assert np.all(np.abs(dS[1] - gn[1]) < GRADIENT_DIFF_ACCEPTANCE_VALUE), \
             "dL/dW analytical gradient \n%s \nneed to close to numerical gradient \n%s\n" \
             % (dS[1], gn[1])
 
         Logger.info("W after is \n%s", matmul.W)
-        print(L)
+
         if callback: callback(matmul.W[0])
 
 
-def test_binary_classification(graph=False):
+def test_binary_classification(caplog, graph=False):
     """Test case for layer matmul class
     """
+    caplog.set_level(logging.DEBUG)
+
     N = 50
     D = 3
     M = 1

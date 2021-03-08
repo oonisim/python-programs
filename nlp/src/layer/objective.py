@@ -1,10 +1,12 @@
 """Objective function layer implementations
 """
 import logging
+from functools import partial
 from typing import (
     List,
     Union,
-    Callable
+    Callable,
+    NoReturn
 )
 import numpy as np
 from common.functions import (
@@ -12,6 +14,9 @@ from common.functions import (
     logistic_log_loss,
     categorical_log_loss,
     cross_entropy_log_loss,
+    generic_cross_entropy_log_loss,
+    sigmoid_cross_entropy_log_loss,
+    softmax_cross_entropy_log_loss,
     softmax,
     sigmoid
 )
@@ -45,30 +50,37 @@ class CrossEntropyLogLoss(Layer):
     def __init__(
             self, name:
             str, num_nodes: int,
-            activation: Callable = softmax,
+            log_loss_function: Callable = generic_cross_entropy_log_loss,
             log_level: int = logging.ERROR
     ):
         """Initialize the layer
         Args
             name: Instance ID
             num_nodes: Number of nodes in the layer
-            activation: Activation function, softmax by default
+            f: function f(X, T) to calculate the cross entropy log loss 
             log_level: Logging level
         """
-        assert \
-            (activation == softmax and num_nodes >= 2) or \
-            (activation == sigmoid and num_nodes == 1), \
-            "Number of nodes > 1 for Softmax multi-label classification " \
-            "or == 1 for Logistic binary classification."
-
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
-        self._activation = activation
-        self._log_loss_function = logistic_log_loss \
-            if activation == sigmoid else categorical_log_loss
+
+        def _objective(X: np.ndarray) -> Union[float, np.ndarray]:
+            """Output layer objective function
+            As this is the last layer, the layer function itself is the objective function.
+            Hence the objective function of the output layer simply pass through X
+            """
+            assert X.ndim == 0, "The output of the log loss should be of shape ()"
+            return X
+
+        self.objective = _objective     # objective function f(X, T)
+
+        if log_loss_function == sigmoid_cross_entropy_log_loss:
+            assert num_nodes == 1   # binary classification
+        else:
+            assert num_nodes > 1    # multi label categorical classification.
+
+        self._log_loss_function = log_loss_function
 
         # At the objective layer, features in X is the same with num nodes.
         self._D = num_nodes
-
         self._P: np.ndarray = np.empty(())  # Probabilities of shape (N, M)
         self._J: np.ndarray = np.empty(())  # Cross entropy log loss of shape (N,).
         # Use Y for output in the consistent manner.
@@ -80,9 +92,10 @@ class CrossEntropyLogLoss(Layer):
     @property
     def P(self) -> np.ndarray:
         """Activation outputs of shape (N,M). Probabilities when activation=softmax"""
-        assert \
-            isinstance(self._P, np.ndarray) and self._P.size > 0 and \
-            self._P.shape == (self.N, self.M), "Y is not initialized"
+        assert (
+                isinstance(self._P, np.ndarray) and self._P.size > 0
+                and self._P.shape == (self.N, self.M)
+        ), "P is not initialized"
         return self._P
 
     @property
@@ -100,22 +113,6 @@ class CrossEntropyLogLoss(Layer):
         assert isinstance(self._Y, np.ndarray) and self._Y.size == 1, \
             "Y is not initialized"
         return self._Y
-
-    @property
-    def activation(self) -> Callable:
-        """Activation function of the layer
-        """
-        assert callable(self._activation), \
-            "activation is not initialized"
-        return self._activation
-
-    @property
-    def log_loss_function(self) -> Callable:
-        """Cross entropy log loss function for the activation function
-        """
-        assert callable(self._log_loss_function), \
-            "log_loss_function is not initialized"
-        return self._log_loss_function
 
     # --------------------------------------------------------------------------------
     # Instance methods
@@ -172,14 +169,10 @@ class CrossEntropyLogLoss(Layer):
 
         # --------------------------------------------------------------------------------
         # Activations P:(N, M) for each label m in each batch n.
-        # --------------------------------------------------------------------------------
-        self._P = self.activation(self.X)
-
-        # --------------------------------------------------------------------------------
         # Cross entropy log loss J:(N,) where j(n) for each batch n (n: 0, ..., N-1).
         # Gradient dJ/dP -> -T/P
         # --------------------------------------------------------------------------------
-        self._J = cross_entropy_log_loss(P=self.P, T=self.T, f=self.log_loss_function)
+        self._J, self._P = self._log_loss_function(X=self.X, T=self.T)
 
         # --------------------------------------------------------------------------------
         # Total batch loss _L.

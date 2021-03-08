@@ -151,7 +151,7 @@ def test_030_objective_instance_properties():
         except AssertionError:
             pass
         try:
-            print(layer.P)          # P is an alias for Y
+            print(layer.P)
             raise RuntimeError(msg)
         except AssertionError:
             pass
@@ -199,12 +199,6 @@ def test_030_objective_instance_properties():
             pass
 
         try:
-            layer.objective(np.array(1.0))
-            raise RuntimeError(msg)
-        except AssertionError:
-            pass
-
-        try:
             layer.function(int(1))
             raise RuntimeError("Invoke layer.function(int(1)) must fail.")
         except AssertionError:
@@ -216,6 +210,8 @@ def test_030_objective_instance_properties():
             raise RuntimeError("Invoke layer.gradient(int(1)) must fail.")
         except AssertionError:
             pass
+
+        del layer
 
 
 def test_030_objective_instantiation():
@@ -230,10 +226,6 @@ def test_030_objective_instantiation():
         * gradient(dL/dY) repeats dL/dY,
         * gradient_numerical() returns 1
     """
-    def objective(X: np.ndarray) -> Union[float, np.ndarray]:
-        """Dummy objective function"""
-        return np.sum(X)
-
     name = "test_030_objective_instantiation"
     for _ in range(NUM_MAX_TEST_TIMES):
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
@@ -248,7 +240,6 @@ def test_030_objective_instantiation():
             num_nodes=M,
             log_level=logging.DEBUG
         )
-        layer.objective = objective
 
         # --------------------------------------------------------------------------------
         # Properties
@@ -273,6 +264,9 @@ def test_030_objective_instantiation():
         layer.T = T
         assert np.array_equal(layer.T, T)
 
+        # Once T is set, objective() is available and callable
+        assert layer.objective(layer.function(X))
+
         layer._Y = np.dot(X, X.T)
         assert np.array_equal(layer.Y, np.dot(X, X.T))
 
@@ -281,7 +275,8 @@ def test_030_objective_instantiation():
 
         layer.logger.debug("This is a pytest")
 
-        assert layer.objective == objective
+
+        layer.objective(np.array(1.0)) == np.array(1.0)
 
 
 def test_030_objective_methods_1d_ohe():
@@ -305,11 +300,6 @@ def test_030_objective_methods_1d_ohe():
         ]
         Hence, the shape of GN, G are 2D.
     """
-    def objective(X: np.ndarray) -> Union[float, np.ndarray]:
-        """Dummy objective function to calculate the loss L"""
-        assert X.ndim == 0, "The output of the log loss should be of shape ()"
-        return X
-
     # --------------------------------------------------------------------------------
     # Instantiate a CrossEntropyLogLoss layer
     # --------------------------------------------------------------------------------
@@ -326,7 +316,6 @@ def test_030_objective_methods_1d_ohe():
             num_nodes=M,
             log_level=logging.DEBUG
         )
-        layer.objective = objective
 
         # ================================================================================
         # Layer forward path

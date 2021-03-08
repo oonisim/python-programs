@@ -454,6 +454,33 @@ def transform_X_T(
     return X, T
 
 
+def transform_scalar_X_T(X, T):
+    """Transform scalar X, T to np.ndarray"""
+    X = np.array(X, dtype=float) if isinstance(X, float) else X
+    T = np.array(T, dtype=int) if isinstance(T, int) else T
+    return X, T
+
+
+def check_categorical_classification_X_T(X, T):
+    """Verify if the input data is for categorical classification
+    Args:
+        X:
+        T: label
+
+    X(N, M) and T(N,) in index label format are expected.
+    """
+    assert (
+            isinstance(X, np.ndarray) and X.dtype == float and
+            X.ndim == (T.ndim+1) and X.shape[1] > 1 and X.size > 0
+    ), f"X.shape(N,M>1) expected for categorical (M>1) classification but {X.shape}"
+
+    assert \
+        isinstance(T, np.ndarray) and T.dtype == int and \
+        T.shape[0] == X.shape[0] and T.size > 0, \
+        "X:shape(N, M) and T:shape(N,) in index label format expected but X %s T %s" \
+        % (X.shape, T.shape)
+
+
 def softmax_cross_entropy_log_loss(
         X: Union[np.ndarray],
         T: Union[np.ndarray],
@@ -490,20 +517,8 @@ def softmax_cross_entropy_log_loss(
         P: Activation value softmax(X)
     """
     name = "softmax_cross_entropy_log_loss"
-
-    # --------------------------------------------------------------------------------
-    # P(N, M) and T(N,) in index label format are expected for softmax log loss.
-    # --------------------------------------------------------------------------------
-    assert \
-        isinstance(X, np.ndarray) and X.dtype == float and \
-        X.ndim == (T.ndim+1) and X.shape[1] > 1 and X.size > 0, \
-        "%s: needs (N,M>1) shape for multiclass (M>1) classifier loss."
-
-    assert \
-        isinstance(T, np.ndarray) and T.dtype == int and \
-        T.shape[0] == X.shape[0] and T.size > 0, \
-        "X(N, M) and T(N,) in index label format expected but X shape %s T.shape %s" \
-        % (X.shape, T.shape)
+    X, T = transform_scalar_X_T(X, T)
+    check_categorical_classification_X_T(X, T)
 
     # --------------------------------------------------------------------------------
     # P[                        T[
@@ -540,6 +555,21 @@ def softmax_cross_entropy_log_loss(
     return J, softmax(X)
 
 
+def check_binary_classification_X_T(X, T):
+    """Verify if the input data is for binary classification
+    Args:
+        X:
+        T: label
+    """
+    assert \
+        (isinstance(X, np.ndarray) and X.dtype == float and X.size > 0) and \
+        (isinstance(T, np.ndarray) and T.dtype == int and np.all(np.isin(T, [0, 1]))) and \
+        (
+            (X.ndim == 0 and T.ndim == 0) or
+            ((1 < X.ndim == T.ndim) and (X.shape[1] == T.shape[1] == 1))
+        ), "Unexpected format for binary classification. X=\n%s" % X
+
+
 def sigmoid_cross_entropy_log_loss(
         X: Union[np.ndarray, float],
         T: Union[np.ndarray, int],
@@ -574,13 +604,10 @@ def sigmoid_cross_entropy_log_loss(
     # --------------------------------------------------------------------------------
     # X is scalar and T is a scalar binary OHE label, or
     # T is 2D binary OHE labels e.g. T[[0],[1],[0]], X[[0.9],[0.1],[0.3]].
+    # T is binary label 0 or 1
     # --------------------------------------------------------------------------------
-    X = np.array(X, dtype=float) if isinstance(X, float) else X
-    assert \
-        (isinstance(X, np.ndarray) and X.dtype == float) and (
-            ((1 < X.ndim == T.ndim) and (X.shape[1] == T.shape[1] == 1)) or
-            (X.ndim == 0 and T.ndim == 0)
-        ), "Unexpected format for sigmoid/logistic log loss. X=\n%s" % X
+    X, T = transform_scalar_X_T(X, T)
+    check_binary_classification_X_T(X, T)
 
     Z1 = 1.0 + np.exp(-X)    # 1/Z where Z = sigmoid(X) = (1/1 + np.exp(-X))
     P = 1.0 / Z1
@@ -591,6 +618,37 @@ def sigmoid_cross_entropy_log_loss(
     return J, P
 
 
+def generic_cross_entropy_log_loss(
+        X: Union[np.ndarray, float],
+        T: Union[np.ndarray, int],
+        activation: Callable = softmax,
+        objective: Callable = categorical_log_loss,
+        offset: float = 0
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Calculate the cross entropy log loss as objective(activation(X), T)
+    Args:
+        X: input data
+        T: label
+        activation: activation function
+        objective: objective function
+        offset: small number to avoid np.inf by log(0) by log(0+offset)
+    Returns:
+        J: loss in shape (N,)
+        P: activation
+    """
+    X, T = transform_scalar_X_T(X, T)
+    if activation == sigmoid:
+        check_binary_classification_X_T(X, T)
+    elif activation == softmax:
+        check_categorical_classification_X_T(X, T)
+    else:
+        assert False, "currently only sigmoid and softmax are supported."
+
+    P = activation(X)
+    J = cross_entropy_log_loss(P, T, objective, offset)
+    return J, P
+
+
 def cross_entropy_log_loss(
         P: Union[np.ndarray, float],
         T: Union[np.ndarray, int],
@@ -598,28 +656,23 @@ def cross_entropy_log_loss(
         offset: float = OFFSET_LOG
 ) -> np.ndarray:
     """Cross entropy log loss [ -t(n)(m) * log(p(n)(m)) ] for multi labels.
-    Assumption:
-        Label is integer 0 or 1 for an OHE label and any integer for an index label.
+    Args:
+        P: activation or probabilities from an activation function.
+        T: labels
+        f: Cross entropy log loss function f(P, T) where P is activation, T is label
+        offset: small number to avoid np.inf by log(0) by log(0+offset)
+
+    Returns:
+        J: Loss value of shape (N,), a loss value per batch.
 
     NOTE:
         Handle only the label whose value is True. The reason not to use non-labels to
         calculate the loss is TBD.
 
-    Args:
-        P: probabilities of shape (N,M) from soft-max layer where:
-            N is Batch size
-            M is Number of nodes
-        T: label either in OHE format of shape (N,M) or index format of shape (N,).
-           OHE: One Hot Encoding
-        f: Cross entropy log loss function
-        offset: small number to avoid np.inf by log(0) by log(0+offset)
-
-    Returns:
-        J: Loss value of shape (N,), a loss value per batch.
+        See transform_X_T for the format and shape of P and T.
     """
     name = "cross_entropy_log_loss"
     P, T = transform_X_T(P, T)
-
     if P.ndim == 0:
         assert False, "P.ndim needs (N,M) after transform_X_T(P, T)"
         # --------------------------------------------------------------------------------

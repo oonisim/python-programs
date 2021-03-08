@@ -6,12 +6,15 @@ from common import (
     sigmoid,
     softmax,
     cross_entropy_log_loss,
+    OFFSET_DELTA
 )
 
 from common.test_config import (
     NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,
-    NUM_MAX_BATCH_SIZE
+    NUM_MAX_BATCH_SIZE,
+    ACTIVATION_DIFF_ACCEPTANCE_VALUE,
+    LOSS_DIFF_ACCEPTANCE_VALUE
 )
 
 
@@ -43,36 +46,42 @@ def test_010_standardize():
             assert np.all(E == A), "X \n%s\n, standardized \n%s\n needs \n%s\n" % (X, E, A)
 
 
-def test_010_sigmoid(h:float = 1e-5):
+def test_010_sigmoid():
     """Test Case for sigmoid
     """
+    u = ACTIVATION_DIFF_ACCEPTANCE_VALUE
     assert sigmoid(np.array(0.0)) == 0.5
     x = np.array([0.0, 0.6, 0., -0.5]).reshape((2,2))
     t = np.array([0.5, 0.6456563062257954529091, 0.5, 0.3775406687981454353611]).reshape((2,2))
-    assert np.all(np.abs(t - sigmoid(x)) < h), f"delta (t-x) is expected < {h} but {x-t}"
+    assert np.all(np.abs(t - sigmoid(x)) < u), f"delta (t-x) is expected < {u} but {x-t}"
 
 
-def test_010_softmax(h:float = 1e-5):
+def test_010_softmax():
     """Test Case for sigmoid
     """
+    u = ACTIVATION_DIFF_ACCEPTANCE_VALUE
     P = softmax(np.array([2.44756739, 2.13945115]))
     E = np.array([0.57642539, 0.42357461])
-    assert np.all(np.abs(P-E) < h)
+    assert np.all(np.abs(P-E) < u)
 
 
-def test_010_cross_entropy_log_loss(h: float = 1e-5):
-    """Test case for cross_entropy_log_loss
-    log(P=1) -> 0
+def test_010_cross_entropy_log_loss():
     """
+    Objective:
+        Verify the cross_entropy_log_loss() function.
+    Expected:
+    """
+    h: float = OFFSET_DELTA
+    u = LOSS_DIFF_ACCEPTANCE_VALUE
     # --------------------------------------------------------------------------------
     # [Scalar test case]
     # For scalar P=1, T=1 for -t * log(P) -> log(1+k)
     # For scalar P=0, T=1 for -t * log(k) -> log(k)
     # For scalar P=1, T=0 for -t * log(k) -> 0
     # --------------------------------------------------------------------------------
-    assert np.abs(cross_entropy_log_loss(P=1.0, T=1) - logarithm(1.0)) < h
-    assert np.abs(cross_entropy_log_loss(P=0.0, T=1) - (-1 * logarithm(0.0))) < h
-    assert cross_entropy_log_loss(P=1.0, T=0) < h
+    assert np.abs(cross_entropy_log_loss(P=1.0, T=1) - logarithm(1.0)) < u
+    assert np.abs(cross_entropy_log_loss(P=0.0, T=1) - (-1 * logarithm(0.0))) < u
+    assert cross_entropy_log_loss(P=1.0, T=0) < u
 
     for _ in range(NUM_MAX_TEST_TIMES):
         # For 1D OHE array P [0, 0, ..., 1, 0, ...] where Pi = 1 and 1D OHE array T = P,
@@ -84,7 +93,7 @@ def test_010_cross_entropy_log_loss(h: float = 1e-5):
         P[index] = 1.0
         T = index
         Z = cross_entropy_log_loss(P, T)    # log(P=1+k) -> log(k)
-        assert np.all(np.abs(Z - logarithm(float(1))) < h), \
+        assert np.all(np.abs(Z - logarithm(float(1))) < u), \
             f"cross_entropy_log_loss(1,1) is expected to be 0 but {Z}"
 
         # --------------------------------------------------------------------------------
@@ -104,7 +113,7 @@ def test_010_cross_entropy_log_loss(h: float = 1e-5):
         # log(+k)
         E = -1 * logarithm(float(0))
         Z = cross_entropy_log_loss(P, T)
-        assert (Z -E) < h, \
+        assert (Z -E) < u, \
             f"cross_entropy_log_loss(1=0,T=0) is expected to be inf but {Z}"
 
         # --------------------------------------------------------------------------------
@@ -125,6 +134,6 @@ def test_010_cross_entropy_log_loss(h: float = 1e-5):
 
         E = np.full(T.shape, -logarithm(p))
         L = cross_entropy_log_loss(P, T)
-        assert np.all(np.abs(E-L) < h), \
-            f"Loss deviation (E-L) is expected to be < {h} but {np.abs(E-L)}"
+        assert np.all(np.abs(E-L) < u), \
+            f"Loss deviation (E-L) is expected to be < {u} but {np.abs(E-L)}"
 

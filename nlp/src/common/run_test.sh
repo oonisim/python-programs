@@ -41,10 +41,12 @@ done
 
 #--------------------------------------------------------------------------------
 # PyTest
+#   --pdb \ to invoke pdb at failure
 #--------------------------------------------------------------------------------
 echo "--------------------------------------------------------------------------------"
 echo "Running PyTest..."
 # pytest --log-level=DEBUG -o log_cli=True -o log_cli_level=DEBUG --verbose --cache-clear -x -capture=tee-sys ${DIR} | tee pytest.log
+
 pytest \
   --rootdir=${DIR} \
   --debug \
@@ -58,5 +60,4 @@ pytest \
   --tb=long \
   --showlocals \
   --durations=5 \
-  --pdb \
 ${DIR}
