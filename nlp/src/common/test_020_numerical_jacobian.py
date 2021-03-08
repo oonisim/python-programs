@@ -8,6 +8,7 @@ WARNING:
 """
 import logging
 from functools import partial
+import cProfile
 import numpy as np
 import pytest_check as check    # https://pypi.org/project/pytest-check/
 from common import (
@@ -42,7 +43,7 @@ def test_020_numerical_jacobian_avg(caplog):
     def f(X: np.ndarray):
         return np.average(X)
 
-    caplog.set_level(logging.DEBUG, logger=Logger.name)
+    # caplog.set_level(logging.DEBUG, logger=Logger.name)
 
     u: float = GRADIENT_DIFF_ACCEPTANCE_VALUE
     for _ in range(NUM_MAX_TEST_TIMES):
@@ -103,7 +104,7 @@ def test_020_cross_entropy_log_loss_1d(caplog):
     def f(P: np.ndarray, T: np.ndarray):
         return np.sum(cross_entropy_log_loss(P, T))
 
-    caplog.set_level(logging.DEBUG, logger=Logger.name)
+    # caplog.set_level(logging.DEBUG, logger=Logger.name)
 
     h: float = OFFSET_DELTA
     u: float = GRADIENT_DIFF_ACCEPTANCE_VALUE
@@ -252,10 +253,14 @@ def test_020_cross_entropy_log_loss_2d(caplog):
 
         return np.sum(cross_entropy_log_loss(P, T))
 
-    caplog.set_level(logging.DEBUG, logger=Logger.name)
+    # caplog.set_level(logging.DEBUG, logger=Logger.name)
 
     h: float = OFFSET_DELTA
     u: float = GRADIENT_DIFF_ACCEPTANCE_VALUE
+
+    profiler = cProfile.Profile()
+    profiler.enable()
+
     for _ in range(NUM_MAX_TEST_TIMES):
         # --------------------------------------------------------------------------------
         # [2D test case]
@@ -298,6 +303,9 @@ def test_020_cross_entropy_log_loss_2d(caplog):
 
         check.equal(np.all(np.abs(A-G) < u), True, "A-G %s\n" % np.abs(A-G))
 
+    profiler.disable()
+    profiler.print_stats(sort="cumtime")
+
 
 # ================================================================================
 # Softmax + log loss
@@ -316,9 +324,13 @@ def test_020_softmax_1d(caplog):
         """
         return np.sum(cross_entropy_log_loss(softmax(X), T))
 
-    caplog.set_level(logging.DEBUG, logger=Logger.name)
+    # caplog.set_level(logging.DEBUG, logger=Logger.name)
 
     u: float = GRADIENT_DIFF_ACCEPTANCE_VALUE
+
+    profiler = cProfile.Profile()
+    profiler.enable()
+
     for _ in range(NUM_MAX_TEST_TIMES):
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)   # Batch size
         M: int = np.random.randint(2, NUM_MAX_NODES)        # Number of activations
@@ -337,3 +349,6 @@ def test_020_softmax_1d(caplog):
             np.all(np.abs(dA - G) < u) or \
             (np.all(np.abs(dA - G) < np.abs(GRADIENT_DIFF_ACCEPTANCE_RATIO * G))), \
             f"For T {T} and A: \n{A}\nthe delta between G\n{G}\n and dA: \n{dA}\nwas expected to be < {u} but \n{np.abs(dA-G)}"
+
+    profiler.disable()
+    profiler.print_stats(sort="cumtime")

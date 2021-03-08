@@ -161,6 +161,12 @@ class Matmul(Layer):
             # --------------------------------------------------------------------------------
             # self._dY = np.empty((self.N, self.M), dtype=float)
 
+        # --------------------------------------------------------------------------------
+        # TODO:
+        # Because transpose(T) is run everytime matmul is invoked, using the transposed W
+        # would save the calculation time. This is probably the reason why cs231n uses
+        # in column order format.
+        # --------------------------------------------------------------------------------
         np.matmul(X, self.W.T, out=self._Y)
         return self.Y
 

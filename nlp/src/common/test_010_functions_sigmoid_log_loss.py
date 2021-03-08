@@ -39,7 +39,7 @@ def test_010_sigmoid_cross_entropy_log_loss_2d(caplog):
         Then -log(Z) should be almost same with sigmoid_cross_entropy_log_loss(X, T).
         Almost because finite float precision always has rounding errors.
     """
-    caplog.set_level(logging.DEBUG, logger=Logger.name)
+    # caplog.set_level(logging.DEBUG, logger=Logger.name)
     u = REFORMULA_DIFF_ACCEPTANCE_VALUE
 
     # --------------------------------------------------------------------------------
@@ -103,4 +103,3 @@ def test_010_sigmoid_cross_entropy_log_loss_2d(caplog):
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")
-

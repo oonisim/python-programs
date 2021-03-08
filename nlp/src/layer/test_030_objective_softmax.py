@@ -474,6 +474,7 @@ def test_030_objective_methods_2d_ohe():
         # O = lambda x: dummy.objective(dummy.function(x))    # Objective function
         O = lambda x: np.sum(cross_entropy_log_loss(softmax(x), T)) / N
         # --------------------------------------------------------------------------------
+
         EGN = numerical_jacobian(O, X)                      # Expected numerical dL/dX
         assert np.array_equal(GN[0], EGN), \
             f"GN[0]==EGN expected but GN[0] is \n%s\n EGN is \n%s\n" % (GN[0], EGN)

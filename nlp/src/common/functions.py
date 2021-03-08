@@ -190,7 +190,7 @@ def softmax(X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
     C = np.max(X, axis=-1, keepdims=True)
     exp = np.exp(X - C)
     P = exp / np.sum(exp, axis=-1, keepdims=True)
-    Logger.debug("%s: X %s exp %s P %s", name, X, exp, P)
+    Logger.debug("%s: X %s exp %s P %s" % (name, X, exp, P))
 
     return P
 
@@ -505,6 +505,13 @@ def softmax_cross_entropy_log_loss(
         a large value or inf. Need to test which is stable, softmax(X) or sum(exp(X).
         xi is the correct input at index i.
 
+        P[                        T[
+          [x0,x1,...xi,...xd-1],    i,
+          ...                       ...
+        ]                         ]
+        j = -log(pi) = -log( exp(xi) / sum(exp(x0),...,exp(xd-1) )
+          = log(sum(exp(X))) - xi  : X=[x0,x1,...xi,...xd-1]
+
     Args:
         X: Input data of shape (N,M) to go through softmax where:
             N is Batch size
@@ -520,39 +527,32 @@ def softmax_cross_entropy_log_loss(
     X, T = transform_scalar_X_T(X, T)
     check_categorical_classification_X_T(X, T)
 
-    # --------------------------------------------------------------------------------
-    # P[                        T[
-    #   [x0,x1,...xi,...xd-1],    i,
-    #   ...                       ...
-    # ]                         ]
-    # j = -log(pi) = -log( exp(xi) / sum(exp(x0),...,exp(xd-1) )
-    #   = log(sum(exp(X))) - xi  : X=[x0,x1,...xi,...xd-1]
-    # --------------------------------------------------------------------------------
+    P = softmax(X)
     N = batch_size = X.shape[0]
     rows = np.arange(N)     # (N,)
     cols = T                # Same shape (N,) with rows
     assert rows.shape == cols.shape, \
         f"np P indices need the same shape but rows {rows.shape} cols {cols.shape}."
 
-    # --------------------------------------------------------------------------------
-    # Array of correct answers xi as _A = X[rows, cols] via numpy tuple indexing.
-    # _A:shape(N,) and J = log(sum(exp(X))) - _A
-    # --------------------------------------------------------------------------------
-    _A = X[rows, cols]
-    Logger.debug("%s: N is [%s]", name, N)
-    Logger.debug("%s: X.shape %s", name, X.shape)
-    Logger.debug("%s: X[rows, cols].shape %s", name, _A.shape)
-    Logger.debug("%s: X[rows, cols] is %s", name, _A)
+    USE_REFORMULA = False
+    if USE_REFORMULA:
+        _A = X[rows, cols]
+        J = logarithm(X=np.sum(np.exp(X), axis=-1), offset=offset) - _A
 
-    J = logarithm(X=np.sum(np.exp(X), axis=-1), offset=offset) - _A
-    Logger.debug("%s: J is [%s]", name, J)
-    Logger.debug("%s: J.shape %s\n", name, J.shape)
+    else:
+        _A = P[rows, cols]
+        J = -logarithm(X=_A, offset=offset)
 
     assert np.all(np.isfinite(J)) and (J.ndim > 0) and (0 < N == J.shape[0]), \
         "Invalid Loss J: should be finite and shape %s be (%s,). J=\n%s\n" \
         % (J.shape, N, J)
 
-    return J, softmax(X)
+    Logger.debug(
+        "%s: J is [%s] J.shape %s\n"
+        % (name, J, J.shape)
+    )
+
+    return J, P
 
 
 def check_binary_classification_X_T(X, T):

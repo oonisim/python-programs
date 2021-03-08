@@ -1,4 +1,5 @@
 import logging
+from functools import partial
 import cProfile
 import numpy as np
 from common import (
@@ -7,7 +8,9 @@ from common import (
     sigmoid,
     softmax,
     cross_entropy_log_loss,
-    softmax_cross_entropy_log_loss
+    softmax_cross_entropy_log_loss,
+    sigmoid_cross_entropy_log_loss,
+    numerical_jacobian
 )
 
 from common.test_config import (
@@ -39,7 +42,7 @@ def test_010_softmax_cross_entropy_log_loss_2d(caplog):
         Then -log(_P) should be almost same with softmax_cross_entropy_log_loss(X, T).
         Almost because finite float precision always has rounding errors.
     """
-    caplog.set_level(logging.DEBUG, logger=Logger.name)
+    # caplog.set_level(logging.DEBUG, logger=Logger.name)
     u = REFORMULA_DIFF_ACCEPTANCE_VALUE
 
     # --------------------------------------------------------------------------------
@@ -109,6 +112,31 @@ def test_010_softmax_cross_entropy_log_loss_2d(caplog):
         assert np.all(np.abs(L-J) < u), \
             "Expected abs(L-J) < %s but \n%s\nL=\n%s\nT=%s\nX=\n%s\nJ=\n%s\n" \
             % (u, np.abs(E - J), E, T, X, J)
+
+    profiler.disable()
+    profiler.print_stats(sort="cumtime")
+
+
+def test_test_010_softmax_cross_entropy_log_loss_performance():
+
+    N = 10
+    M = 10
+    X = np.random.randn(N, M)
+    T = np.random.randint(0, M, N)
+
+    f = partial(softmax_cross_entropy_log_loss, T=T)
+
+    def objective(X):
+        J, P = f(X)
+        return np.sum(J)
+
+    profiler = cProfile.Profile()
+    profiler.enable()
+
+    for _ in range(10):
+        numerical_jacobian(objective, X)
+        #softmax_cross_entropy_log_loss(X, T)
+        #softmax(X)
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")
