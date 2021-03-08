@@ -95,7 +95,9 @@ def train_binary_classifier(
     )
     matmul.objective = loss.function
 
-    history: List[float] = [np.finfo(float, max(float))]
+    num_no_progress:int = 0     # how many time when loss L not decreased.
+    loss.T = T
+    history: List[float] = [matmul.function(X)]
     for i in range(num_epochs):
         # --------------------------------------------------------------------------------
         # Layer forward path
@@ -103,21 +105,23 @@ def train_binary_classifier(
         # Test the numerical gradient dL/dX=matmul.gradient_numerical().
         # --------------------------------------------------------------------------------
         Y = matmul.function(X)
-        loss.T = T
         L = loss.function(Y)
         history.append(L)
-        print(L)
 
+        print(L)
         Logger.info("%s: iteration[%s]. Loss is [%s]", name, i, L)
 
         # --------------------------------------------------------------------------------
         # Constraint: 1. Objective/Loss L(Yn+1) after gradient descent < L(Yn)
         # --------------------------------------------------------------------------------
-        check.less(
-            L, history[-2],
-            "Iteration [%i]: Loss[%s] should decrease but increased from previous [%s]"
-            % (i, L, history[-1])
-        )
+        if L >= history[-1]:
+            Logger.warning(
+                "Iteration [%i]: Loss[%s] has not improved from the previous [%s]."
+                % (i, L, history[-1])
+            )
+            if (num_no_progress:= num_no_progress+1) > 20:
+                Logger.error("Stopping the training as there has been no progress more than N times.")
+                break
 
         # --------------------------------------------------------------------------------
         # Numerical gradient
@@ -169,6 +173,9 @@ def test_binary_classification(caplog, graph=False):
     X, T, V = linear_separable(d=D, n=N)
     callback = lambda _: _
 
+    profiler = cProfile.Profile()
+    profiler.enable()
+
     train_binary_classifier(
         N=N,
         D=D,
@@ -176,13 +183,9 @@ def test_binary_classification(caplog, graph=False):
         T=T,
         W=W,
         optimizer=optimizer,
-        num_epochs=100,
+        num_epochs=1000,
         callback=callback
     )
-    return
-    profiler = cProfile.Profile()
-    profiler.enable()
-
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")

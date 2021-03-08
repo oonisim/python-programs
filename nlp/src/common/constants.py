@@ -38,15 +38,11 @@ BOUNDARY_SIGMOID = -np.log(OFFSET_LOG) * 0.5
 
 # Threshold below which the gradient is regarded as saturated.
 GRADIENT_SATURATION_THRESHOLD = 1e-10
-# TODO restore the original
-# GRADIENT_SATURATION_THRESHOLD = 0
 
 # Min difference between f(x+h) and f(x-h) at numerical gradient to avoid
 # floating precision error. If f(x+h) - f(x-h) is small
 GN_DIFF_ACCEPTANCE_VALUE = 2 * OFFSET_DELTA * GRADIENT_SATURATION_THRESHOLD
-# TODO restore the original
 GN_DIFF_ACCEPTANCE_RATIO = 1e-15
-# GN_DIFF_ACCEPTANCE_RATIO = 0.0
 
 # To enforce assertion failure, set False (True -> assert True)
 ENFORCE_STRICT_ASSERT = (not False)
