@@ -260,8 +260,11 @@ class Layer:
 
     @T.setter
     def T(self, T: Union[np.ndarray, int]):
-        assert T is not None and \
-               (isinstance(T, np.ndarray) and T.dtype == int) or (isinstance(T, int))
+        assert T is not None and (
+                (isinstance(T, np.ndarray) and np.issubdtype(T.dtype, np.integer)) or
+                (isinstance(T, int))
+            )
+
         self._T = np.array(T, dtype=int) if isinstance(T, int) else T.astype(int)
         # T can be set after X, hence not possible to verify.
         # assert T.shape[0] == self.N, \

@@ -1,6 +1,6 @@
 """Data for classifications"""
 import numpy as np
-from np import (
+from mathematics import (
     rotate,
     is_point_inside_sector
 )
@@ -42,23 +42,34 @@ def linear_separable(d: int = 3, n: int = 10000):
     return X, T, W
 
 
-def linear_separable_sectors(n: int = 10000, d: int = 2, m: int = 3, r=0.0):
+def linear_separable_sectors(
+        n: int = 10000, d: int = 3, m: int = 3, r: float = 1.0, rotation: float = 0.0
+):
     """Generate a data set X to linearly separate into m sectors.
     Args:
         n: number of coordinates
         d: number of dimension of the data
         m: number of classes (sectors)
-        r: angle to rotate X
+        r: radius
+        rotation = angle to rotate X
     Returns:
         X: d dimension data (x0, x1, ... xn) of shape (n, d)
         T: labels (0, 1, ...M-1) of m classees
         B: List of the base (sin(θ), cos(θ)) of each section
     """
     assert m > 1, f"m {m} > 1 required to split."
-    assert d == 2, "currently only d==2 is valid"
+    assert d == 3, "currently only d==3 for 2D (bias, x1, x2) is valid"
     assert n >= m, "At least m instance of coordinates required."
 
-    X = np.random.uniform(-1, 1, (n, d))
+    # Remove bias.
+    d = d - 1
+
+    Z = np.random.uniform(0, 2 * np.pi, n)
+    radii = np.random.uniform(0.0, r, n)
+    X = np.c_[
+        radii * np.cos(Z),
+        radii * np.sin(Z)
+    ]
     T = np.zeros(n, dtype=int)
     sector = (2 * np.pi) / float(m)  # angle of a sector
 
@@ -71,25 +82,34 @@ def linear_separable_sectors(n: int = 10000, d: int = 2, m: int = 3, r=0.0):
             np.array([[np.cos(base), np.sin(base)]])
         ]
 
-    r = r % (2 * np.pi)
-    X = rotate(X, r)
-    B = rotate(B, r)
+    rotation = rotation % (2 * np.pi)
+    X = rotate(X, rotation)
+    B = rotate(B, rotation)
+
+    # Add bias
+    X = np.c_[
+        np.ones(n),
+        X
+    ]       # Add bias=1
     return X, T, B
 
 
-def spiral(n: int, d: int=2, m: int=3):
+def spiral(k: int, d: int=3, m: int=3):
     """Generate spiral data points
     https://cs231n.github.io/neural-networks-case-study/#data
     Args:
-        n: number of points per class
+        k: number of points per class
         d: dimensionality
         m: number of classes
     Returns:
         X: spiral data coordinates of shape (n, d)
         y: label (0, 1, ...m-1)
     """
-    N = n
-    D = d
+    assert k >= m > 1
+    assert d == 3, "currently only d==3 for 2D (bias, x1, x2) is valid"
+
+    N = k
+    D = d - 1
     M = m
     X = np.zeros((N * M, D))
     y = np.zeros(N * M, dtype='uint8')
@@ -100,4 +120,8 @@ def spiral(n: int, d: int=2, m: int=3):
         X[ix] = np.c_[r * np.sin(t), r * np.cos(t)]
         y[ix] = j
 
+    X = np.c_[
+        np.ones(X.shape[0]),
+        X
+    ]       # Add bias=1
     return X, y

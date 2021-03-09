@@ -307,8 +307,8 @@ def transform_X_T(
     name = "transform_X_T"
     assert (isinstance(X, np.ndarray) and X.dtype == float) or isinstance(X, float), \
         "Type of P must be float"
-    assert (isinstance(T, np.ndarray) and T.dtype == int) or isinstance(T, int), \
-        "Type of T must be integer"
+    assert (isinstance(T, np.ndarray) and np.issubdtype(T.dtype, np.integer)) or \
+           isinstance(T, int), "Type of T must be integer"
 
     if isinstance(X, float) or X.ndim == 0:
         # --------------------------------------------------------------------------------
@@ -475,7 +475,7 @@ def check_categorical_classification_X_T(X, T):
     ), f"X.shape(N,M>1) expected for categorical (M>1) classification but {X.shape}"
 
     assert \
-        isinstance(T, np.ndarray) and T.dtype == int and \
+        isinstance(T, np.ndarray) and np.issubdtype(T.dtype, np.integer) and \
         T.shape[0] == X.shape[0] and T.size > 0, \
         "X:shape(N, M) and T:shape(N,) in index label format expected but X %s T %s" \
         % (X.shape, T.shape)
@@ -547,10 +547,7 @@ def softmax_cross_entropy_log_loss(
         "Invalid Loss J: should be finite and shape %s be (%s,). J=\n%s\n" \
         % (J.shape, N, J)
 
-    Logger.debug(
-        "%s: J is [%s] J.shape %s\n"
-        % (name, J, J.shape)
-    )
+    Logger.debug("%s: J is [%s] J.shape %s\n", name, J, J.shape)
 
     return J, P
 
@@ -563,7 +560,10 @@ def check_binary_classification_X_T(X, T):
     """
     assert \
         (isinstance(X, np.ndarray) and X.dtype == float and X.size > 0) and \
-        (isinstance(T, np.ndarray) and T.dtype == int and np.all(np.isin(T, [0, 1]))) and \
+        (
+                isinstance(T, np.ndarray) and np.issubdtype(T.dtype, np.integer) and
+                np.all(np.isin(T, [0, 1]))
+        ) and \
         (
             (X.ndim == 0 and T.ndim == 0) or
             ((1 < X.ndim == T.ndim) and (X.shape[1] == T.shape[1] == 1))
@@ -730,7 +730,7 @@ def cross_entropy_log_loss(
     Logger.debug("%s: J.shape %s\n", name, J.shape)
 
     assert (J.ndim > 0) and (0 < N == J.shape[0]), \
-        "Loss J.shape is expected to be (%s,) but %s" % (N, J.shape)
+        f"Loss J.shape is expected to be ({N},) but {J.shape}"
     return J
 
 
@@ -885,3 +885,38 @@ def compose(*args):
         return result
 
     return _
+
+
+def prediction_grid(X, W):
+    """
+    https://cs231n.github.io/neural-networks-case-study/#update
+    Args:
+        X: Data of D features including a bias. shape (N, D). N is batch size
+        W: NN layer weight of shape (M, D) where M is number of classes
+    Returns:
+        x1_grid: X grid of numpy meshgrid
+        x2_grid: Y grid of numpy meshgrid
+        Z: predictions in the index format
+    """
+    h = 0.02
+    x1_min, x1_max = X[:, 1].min() - 1, X[:, 1].max() + 1
+    x2_min, x2_max = X[:, 2].min() - 1, X[:, 2].max() + 1
+    x1_grid, x2_grid = np.meshgrid(
+        np.arange(x1_min, x1_max, h),
+        np.arange(x2_min, x2_max, h)
+    )
+    x1 = x1_grid.ravel()
+    x2 = x2_grid.ravel()
+    x0 = np.ones(x1.size)
+    Z = np.dot(
+        np.c_[
+            x0,
+            x1,
+            x2
+        ],
+        W.T
+    )
+    Z = np.argmax(Z, axis=1)
+    Z = Z.reshape(x1_grid.shape)
+
+    return x1_grid, x2_grid, Z

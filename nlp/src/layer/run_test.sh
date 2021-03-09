@@ -41,16 +41,22 @@ done
 
 #--------------------------------------------------------------------------------
 # PyTest
+#   --pdb \ to invoke pdb at failure
+#   -k 'test_softmax_classifier' to specify a test
 #--------------------------------------------------------------------------------
 echo "--------------------------------------------------------------------------------"
 echo "Running PyTest..."
 # pytest --log-level=DEBUG -o log_cli=True -o log_cli_level=DEBUG --verbose --cache-clear -x -capture=tee-sys ${DIR} | tee pytest.log
-pytest \
+
+# To disable assert
+# PYTHONOPTIMIZE=TRUE
+
+#pytest \
+python3 -m cProfile -o profile -m pytest \
   --rootdir=${DIR} \
-  --debug \
   -vv \
   -capture=tee-sys  \
-  --log-level=DEBUG \
+  --log-level=ERROR \
   --log-auto-indent=on \
   --cache-clear -x \
   --color=yes --code-highlight=yes \
@@ -58,5 +64,6 @@ pytest \
   --tb=long \
   --showlocals \
   --durations=5 \
-  --pdb \
 ${DIR}
+
+python3 run_cprofile_analysis.py

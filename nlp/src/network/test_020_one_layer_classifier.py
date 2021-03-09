@@ -19,6 +19,7 @@ from common import (
     softmax_cross_entropy_log_loss
 )
 from data.classifications import (
+    linear_separable,
     linear_separable_sectors
 )
 from layer import (
@@ -34,6 +35,7 @@ from common.test_config import (
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,
     MAX_ACTIVATION_VALUE,
+    GRADIENT_DIFF_CHECK_TRIGGER,
     GRADIENT_DIFF_ACCEPTANCE_RATIO,
     GRADIENT_DIFF_ACCEPTANCE_VALUE
 )
@@ -43,7 +45,7 @@ Logger = logging.getLogger(__name__)
 Logger.setLevel(logging.DEBUG)
 
 
-def train_categorical_classifier(
+def train_classifier(
         N: int,
         D: int,
         M: int,
@@ -53,9 +55,10 @@ def train_categorical_classifier(
         log_loss_function: Callable,
         optimizer: Optimizer,
         num_epochs: int = 100,
+        test_numerical_gradient: bool = False,
         callback: Callable = None
 ):
-    """Test case for categorical classification with matmul + log loss.
+    """Test case for binary classification with matmul + log loss.
     Args:
         N: Batch size
         D: Number of features
@@ -66,15 +69,17 @@ def train_categorical_classifier(
         log_loss_function: cross entropy logg loss function
         optimizer: Optimizer
         num_epochs: Number of epochs to run
+        test_numerical_gradient: Flag if test the analytical gradient with the numerical one.
         callback: callback function to invoke at the each epoch end.
     """
     name = __name__
-    assert isinstance(T, np.ndarray) and T.dtype == int and T.ndim == 1 and T.shape[0] == N
+    assert isinstance(T, np.ndarray) and np.issubdtype(T.dtype, np.integer) and T.ndim == 1 and T.shape[0] == N
     assert isinstance(X, np.ndarray) and X.dtype == float and X.ndim == 2 and X.shape[0] == N and X.shape[1] == D
     assert isinstance(W, np.ndarray) and W.dtype == float and W.ndim == 2 and W.shape[0] == M and W.shape[1] == D
     assert num_epochs > 0 and N > 0 and D > 0
 
     assert (
+        (log_loss_function == sigmoid_cross_entropy_log_loss and M == 1) or
         (log_loss_function == softmax_cross_entropy_log_loss and M >= 2)
     )
 
@@ -149,9 +154,8 @@ def train_categorical_classifier(
         # --------------------------------------------------------------------------------
         #  Constraint 1. W in the matmul has been updated by the gradient descent.
         # --------------------------------------------------------------------------------
-        Logger.info("W after is \n%s", matmul.W)
-        assert not np.array_equal(before, matmul.W), \
-            "W has not been updated. \n%s\n"
+        Logger.debug("W after is \n%s", matmul.W)
+        assert not np.array_equal(before, matmul.W), "W has not been updated."
 
         # --------------------------------------------------------------------------------
         # Expected dL/dW.T = X.T @ dL/dY = X.T @ (P-T) / N, and dL/dX = dL/dY @ W
@@ -162,6 +166,7 @@ def train_categorical_classifier(
             P = sigmoid(np.matmul(X, W.T))
             P = P - T.reshape(-1, 1)    # T(N,) -> T(N,1) to align with P(N,1)
             assert P.shape == (N,1), "P.shape is %s T.shape is %s" % (P.shape, T.shape)
+
         elif log_loss_function == softmax_cross_entropy_log_loss:
             P = softmax(np.matmul(X, W.T))
             P[
@@ -169,14 +174,25 @@ def train_categorical_classifier(
                 T
             ] -= 1
 
-        EDW = np.dot(X.T, P/N).T    # dL/dW.T shape(D,M) -> dL/dW shape(M, D)
         EDX = np.dot(P/N, W)        # (N,M) @ (M, D) -> (N, D)
+        EDW = np.dot(X.T, P/N).T    # dL/dW.T shape(D,M) -> dL/dW shape(M, D)
 
-        np.all(np.abs(EDX - dS[0]) < GRADIENT_DIFF_ACCEPTANCE_VALUE)
-        np.all(np.abs(EDW - dS[1]) < GRADIENT_DIFF_ACCEPTANCE_VALUE)
+        delta_dX = np.abs(EDX-dS[0])
+        delta_dW = np.abs(EDW-dS[1])
+        if not (
+            np.all(np.abs(EDX) < GRADIENT_DIFF_CHECK_TRIGGER) or
+            np.all(delta_dX < GRADIENT_DIFF_ACCEPTANCE_VALUE) or
+            np.all(delta_dX < np.abs(dS[0] * GRADIENT_DIFF_ACCEPTANCE_RATIO))
+        ):
+            Logger.warning("Expected dL/dX \n%s\nDiff\n%s", EDX, EDX-dS[0])
+        if not (
+            np.all(np.abs(EDW) < GRADIENT_DIFF_CHECK_TRIGGER) or
+            np.all(delta_dW < GRADIENT_DIFF_ACCEPTANCE_VALUE) or
+            np.all(delta_dW < np.abs(dS[1] * GRADIENT_DIFF_ACCEPTANCE_RATIO))
+        ):
+            Logger.warning("Expected dL/dW \n%s\nDiff\n%s", EDW, EDW-dS[1])
 
-        TEST_GRADIENT_NUMERICAL = False
-        if TEST_GRADIENT_NUMERICAL:
+        if test_numerical_gradient:
             # --------------------------------------------------------------------------------
             # Numerical gradient
             # --------------------------------------------------------------------------------
@@ -185,31 +201,53 @@ def train_categorical_classifier(
             # --------------------------------------------------------------------------------
             #  Constraint 2. Numerical gradient (dL/dX, dL/dW) are closer to the analytical ones.
             # --------------------------------------------------------------------------------
-            assert np.all(np.abs(dS[0] - gn[0]) < GRADIENT_DIFF_ACCEPTANCE_VALUE), \
-                "dL/dX analytical gradient \n%s \nneed to close to numerical gradient \n%s\n" \
-                % (dS[0], gn[0])
-            assert np.all(np.abs(dS[1] - gn[1]) < GRADIENT_DIFF_ACCEPTANCE_VALUE), \
-                "dL/dW analytical gradient \n%s \nneed to close to numerical gradient \n%s\n" \
-                % (dS[1], gn[1])
+            delta_GX = np.abs(dS[0] - gn[0])
+            if not (
+                np.all(delta_GX <= GRADIENT_DIFF_CHECK_TRIGGER) or
+                np.all(delta_GX <= GRADIENT_DIFF_ACCEPTANCE_VALUE) or
+                np.all(delta_GX <= np.abs(gn[0] * GRADIENT_DIFF_ACCEPTANCE_RATIO))
+            ):
+                Logger.warning(
+                    "dL/dX analytical gradient \n%s \nneed to close to numerical gradient \n%s\ndifference=\n%s\n",
+                    dS[0], gn[0], delta_GX
+                )
+
+            delta_GW = np.abs(dS[1] - gn[1])
+            if not (
+                np.all(delta_GW <= GRADIENT_DIFF_CHECK_TRIGGER) or
+                np.all(delta_GW <= GRADIENT_DIFF_ACCEPTANCE_VALUE) or
+                np.all(delta_GW <= np.abs(gn[1] * GRADIENT_DIFF_ACCEPTANCE_RATIO))
+            ):
+                Logger.warning(
+                    "dL/dW analytical gradient \n%s \nneed to close to numerical gradient \n%s\ndifference=\n%s\n",
+                    dS[1], gn[1], delta_GW
+                )
 
         if callback:
-            callback(W=matmul.W[0]) if W.shape[1] == 1 else callback(W=np.average(matmul.W, axis=0))
+            # if W.shape[1] == 1 else callback(W=np.average(matmul.W, axis=0))
+            callback(W=matmul.W[0])
+
+    return matmul.W
 
 
-def _test_categorical_classifier(M: int = 2, log_loss_function: Callable = softmax_cross_entropy_log_loss):
+def _test_binary_classifier(
+        M: int = 2,
+        log_loss_function: Callable = softmax_cross_entropy_log_loss,
+        num_epochs: int = 100
+):
     """Test case for layer matmul class
     """
     N = 50
     D = 3
     W = weights.he(M, D)
     optimizer = SGD(lr=0.1)
-    X, T, V = linear_separable_sectors(n=N, d=D, m=3)
+    X, T, V = linear_separable(d=D, n=N)
     # X, T = transform_X_T(X, T)
 
     def callback(W):
         W
 
-    train_categorical_classifier(
+    train_classifier(
         N=N,
         D=D,
         M=M,
@@ -218,16 +256,73 @@ def _test_categorical_classifier(M: int = 2, log_loss_function: Callable = softm
         W=W,
         log_loss_function=log_loss_function,
         optimizer=optimizer,
-        num_epochs=1,
+        num_epochs=num_epochs,
+        test_numerical_gradient=True,
         callback=callback
     )
+
+
+def test_sigmoid_classifier(caplog):
+    profiler = cProfile.Profile()
+    profiler.enable()
+
+    _test_binary_classifier(
+        M=1,
+        log_loss_function=sigmoid_cross_entropy_log_loss
+    )
+
+    profiler.disable()
+    profiler.print_stats(sort="cumtime")
 
 
 def test_softmax_classifier(caplog):
     profiler = cProfile.Profile()
     profiler.enable()
 
-    _test_categorical_classifier(M=2, log_loss_function=softmax_cross_entropy_log_loss)
+    _test_binary_classifier(
+        M=2,
+        log_loss_function=softmax_cross_entropy_log_loss
+    )
+
+    profiler.disable()
+    profiler.print_stats(sort="cumtime")
+
+
+def test_categorical_classifier(
+        M: int = 3,
+        log_loss_function: Callable = softmax_cross_entropy_log_loss
+):
+    """Test case for layer matmul class
+    """
+    N = 50
+    D = 3
+    W = weights.he(M, D)
+    optimizer = SGD(lr=0.1)
+    X, T, V = linear_separable_sectors(n=N, d=2, m=M)
+    X = np.c_[
+        np.ones(N),
+        X
+    ]       # Add bias=1
+    assert X.shape == (N, D)
+    X, T = transform_X_T(X, T)
+
+    def callback(W):
+        W
+
+    profiler = cProfile.Profile()
+    profiler.enable()
+
+    train_classifier(
+        N=N,
+        D=D,
+        M=M,
+        X=X,
+        T=T,
+        W=W,
+        log_loss_function=log_loss_function,
+        optimizer=optimizer,
+        callback=callback
+    )
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")
