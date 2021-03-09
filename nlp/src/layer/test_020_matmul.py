@@ -302,10 +302,10 @@ def test_020_matmul_instantiation():
         assert layer.objective == objective
 
 
-def test_020_matmul_methods():
+def test_020_matmul_round_trip():
     """
     Objective:
-        Verify the initialized layer instance provides its properties.
+        Verify the forward and backward paths at matmul.
 
     Expected:
         Forward path:
