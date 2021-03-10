@@ -18,7 +18,7 @@ from common import (
     sigmoid_cross_entropy_log_loss,
     softmax_cross_entropy_log_loss
 )
-from data.classifications import (
+from data import (
     linear_separable,
     linear_separable_sectors
 )
@@ -298,11 +298,7 @@ def test_categorical_classifier(
     D = 3
     W = weights.he(M, D)
     optimizer = SGD(lr=0.1)
-    X, T, V = linear_separable_sectors(n=N, d=2, m=M)
-    X = np.c_[
-        np.ones(N),
-        X
-    ]       # Add bias=1
+    X, T, V = linear_separable_sectors(n=N, d=D, m=M)
     assert X.shape == (N, D)
     X, T = transform_X_T(X, T)
 

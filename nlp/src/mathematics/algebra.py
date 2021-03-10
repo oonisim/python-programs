@@ -24,6 +24,30 @@ def rotate(X, θ):
     return Z.T
 
 
+def shift(X, offsets):
+    """Shift X offset
+    Args:
+        X: data of shape (N, D)
+        offsets: distance to offset. shape (D) or (1, D), or (N, D)
+    Returns:
+        Z: shifted X
+    """
+    if not isinstance(X, np.ndarray):
+        X = np.array(X)
+    if not isinstance(offsets, np.ndarray):
+        offsets = np.array(offsets)
+
+    if X.ndim == offsets.ndim:
+        return X + offsets
+    elif X.ndim == offsets.ndim + 1:
+        offsets = offsets[
+            np.newaxis,
+            ::
+        ]
+        return X + offsets
+    else:
+        assert False
+
 def is_point_inside_sector(X: np.ndarray, base: float, coverage: float):
     """
     Check if the point(x, y) is within or on the sector with the coverage angle

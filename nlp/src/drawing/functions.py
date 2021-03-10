@@ -1,6 +1,9 @@
-import numpy as np
 import sys
+from itertools import product, combinations
+import random
+import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 COLOR_LABELS = np.array([
     'red',
@@ -38,6 +41,7 @@ def plot_categorical_predictions(axes, grid, X, Y, predictions):
     # Plot data and labels
     # axes.scatter(X[:, 1], X[:, 2], c=T, s=40, cmap=plt.cm.Spectral)
     axes.scatter(X[:, 1], X[:, 2], c=Y, s=40)
+
     # plot predictions
     axes.contourf(grid[0], grid[1], predictions, cmap=plt.cm.Spectral, alpha=0.3)
 
@@ -45,3 +49,27 @@ def plot_categorical_predictions(axes, grid, X, Y, predictions):
     axes.set_ylim(grid[1].min(), grid[1].max())
     axes.grid()
 
+
+def draw_sphere(ax, radius, color='indigo'):
+    """Draw a sphere in wireframe
+    https://matplotlib.org/3.1.1/gallery/mplot3d/scatter3d.html
+    https://stackoverflow.com/questions/11140163
+
+    Usage:
+        fig = plt.figure(figsize=(7,6))
+        ax = fig.add_subplot(111, projection='3d')
+        draw_sphere(ax, radius=2)
+    """
+    # draw cube
+    assert radius > 0
+    r = [-radius, radius]
+    for s, e in combinations(np.array(list(product(r, r, r))), 2):
+        if np.sum(np.abs(s - e)) == r[1] - r[0]:
+            ax.plot3D(*zip(s, e), color="olive", alpha=0.8)
+
+    # draw sphere wireframe
+    u, v = np.mgrid[0:2 * np.pi:20j, 0:np.pi:10j]
+    x = radius * np.cos(u) * np.sin(v)
+    y = radius * np.sin(u) * np.sin(v)
+    z = radius * np.cos(v)
+    ax.plot_wireframe(x, y, z, color=color, alpha=0.2)
