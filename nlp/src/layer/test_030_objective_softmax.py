@@ -9,10 +9,13 @@ from typing import (
 import logging
 import numpy as np
 from common import (
-    cross_entropy_log_loss,
+    transform_X_T,
     softmax,
+    logarithm,
+    cross_entropy_log_loss,
+    softmax_cross_entropy_log_loss,
     numerical_jacobian,
-    random_string
+    random_string,
 )
 from layer import (
     CrossEntropyLogLoss
@@ -21,14 +24,14 @@ from common.test_config import (
     NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,
-    NUM_MAX_FEATURES,
     GRADIENT_DIFF_ACCEPTANCE_VALUE,
-    GRADIENT_DIFF_ACCEPTANCE_RATIO
+    GRADIENT_DIFF_ACCEPTANCE_RATIO,
+    ACTIVATION_DIFF_ACCEPTANCE_VALUE,
+    LOSS_DIFF_ACCEPTANCE_VALUE
 )
 
 
-Logger = logging.getLogger("test_030_objective")
-Logger.setLevel(logging.DEBUG)
+Logger = logging.getLogger(__name__)
 
 
 def test_030_objective_instantiation_to_fail():
@@ -497,3 +500,116 @@ def test_030_objective_methods_2d_ohe():
             np.all(np.abs(G - GN[0]) <= GRADIENT_DIFF_ACCEPTANCE_VALUE) or \
             np.all(np.abs(G - GN[0]) <= np.abs(GRADIENT_DIFF_ACCEPTANCE_RATIO * GN[0])), \
             f"dX is \n{G}\nGN[0] is \n{GN[0]}\nRatio * GN[0] is \n{GRADIENT_DIFF_ACCEPTANCE_RATIO * GN[0]}.\n"
+
+
+def test_040_softmax_log_loss_2d(caplog):
+    """
+    Objective:
+        Verify the forward path constraints:
+        1. Layer output L/loss is np.sum(softmax_cross_entropy_log_loss) / N.
+        2. gradient_numerical() == numerical_jacobian(objective, X).
+
+        Verify the backward path constraints:
+        1. Analytical gradient G: gradient() == (P-1)/N
+        2. Analytical gradient G is close to GN: gradient_numerical().
+    """
+    caplog.set_level(logging.DEBUG)
+
+    # --------------------------------------------------------------------------------
+    # Instantiate a CrossEntropyLogLoss layer
+    # --------------------------------------------------------------------------------
+    name = "test_040_softmax_log_loss_2d_ohe"
+    for _ in range(NUM_MAX_TEST_TIMES):
+        N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
+        M: int = np.random.randint(2, NUM_MAX_NODES)    # number of node > 1
+        layer = CrossEntropyLogLoss(
+            name=name,
+            num_nodes=M,
+            log_loss_function=softmax_cross_entropy_log_loss,
+            log_level=logging.DEBUG
+        )
+
+        # ================================================================================
+        # Layer forward path
+        # ================================================================================
+        X = np.random.randn(N, M)
+        T = np.zeros_like(X, dtype=int)     # OHE labels.
+        T[
+            np.arange(N),
+            np.random.randint(0, M, N)
+        ] = int(1)
+
+        # log_loss function require (X, T) in X(N, M), and T(N, M) in index label format.
+        X, T = transform_X_T(X, T)
+        layer.T = T
+        Logger.debug("%s: X is \n%s\nT is \n%s", name, X, T)
+
+        # --------------------------------------------------------------------------------
+        # Expected analytical gradient EG = (dX/dL) = (A-T)/N
+        # --------------------------------------------------------------------------------
+        A = softmax(X)
+        EG = np.copy(A)
+        EG[
+            np.arange(N),
+            T
+        ] -= 1   # Shape(N,), subtract from elements for T=1 only
+        EG /= N
+
+        # --------------------------------------------------------------------------------
+        # Total loss Z = np.sum(J)/N
+        # Expected loss EL = -sum(T*log(_A))
+        # (J, P) = softmax_cross_entropy_log_loss(X, T) and J:shape(N,) where J:shape(N,)
+        # is loss for each input and P is activation by sigmoid(X).
+        # --------------------------------------------------------------------------------
+        L = layer.function(X)
+        J, P = softmax_cross_entropy_log_loss(X, T)
+        EL = np.array(-np.sum(logarithm(A[np.arange(N), T])) / N, dtype=float)
+
+        # Constraint: A == P as they are sigmoid(X)
+        assert np.all(np.abs(A-P) < ACTIVATION_DIFF_ACCEPTANCE_VALUE), \
+            f"Need A==P==sigmoid(X) but A=\n{A}\n P=\n{P}\n(A-P)=\n{(A-P)}\n"
+
+        # Constraint: Log loss layer output L == sum(J) from the log loss function
+        Z = np.array(np.sum(J) / N, dtype=float)
+        assert np.array_equal(L, Z), \
+            f"Need log loss layer output L == sum(J) but L=\n{L}\nZ=\n{Z}."
+
+        # Constraint: L/loss is close to expected loss EL.
+        assert np.all(np.abs(EL-L) < LOSS_DIFF_ACCEPTANCE_VALUE), \
+            "Need EL close to L but \nEL=\n{EL}\nL=\n{L}\n"
+
+        # constraint: gradient_numerical() == numerical_jacobian(objective, X)
+        # TODO: compare the diff to accommodate numerical errors.
+        GN = layer.gradient_numerical()                     # [dL/dX] from the layer
+
+        def objective(x):
+            """Function to calculate the scalar loss L for cross entropy log loss"""
+            j, p = softmax_cross_entropy_log_loss(x, T)
+            return np.array(np.sum(j) / N, dtype=float)
+
+        EGN = numerical_jacobian(objective, X)              # Expected numerical dL/dX
+        assert np.array_equal(GN[0], EGN), \
+            f"GN[0]==EGN expected but GN[0] is \n%s\n EGN is \n%s\n" % (GN[0], EGN)
+
+        # ================================================================================
+        # Layer backward path
+        # ================================================================================
+
+        # constraint: Analytical gradient G: gradient() == EG == (P-1)/N.
+        dY = float(1)
+        G = layer.gradient(dY)
+        assert np.all(np.abs(G-EG) <= GRADIENT_DIFF_ACCEPTANCE_VALUE), \
+            f"Layer gradient dL/dX \n{G} \nneeds to be \n{EG}."
+
+        # constraint: Analytical gradient G is close to GN: gradient_numerical().
+        assert \
+            np.all(np.abs(G - GN[0]) <= GRADIENT_DIFF_ACCEPTANCE_VALUE) or \
+            np.all(np.abs(G - GN[0]) <= np.abs(GRADIENT_DIFF_ACCEPTANCE_RATIO * GN[0])), \
+            f"dX is \n{G}\nGN[0] is \n{GN[0]}\nRatio * GN[0] is \n{GRADIENT_DIFF_ACCEPTANCE_RATIO * GN[0]}.\n"
+
+        # constraint: Gradient g of the log loss layer needs -1 < g < 1
+        # abs(P-T) = abs(sigmoid(X)-T) cannot be > 1.
+        assert np.all(np.abs(G) < 1), \
+            f"Log loss layer gradient cannot be < -1 nor > 1 but\n{G}"
+        assert np.all(np.abs(GN[0]) < (1+GRADIENT_DIFF_ACCEPTANCE_RATIO)), \
+            f"Log loss layer gradient cannot be < -1 nor > 1 but\n{GN[0]}"

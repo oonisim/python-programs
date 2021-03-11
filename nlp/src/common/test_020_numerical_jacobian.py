@@ -8,7 +8,6 @@ WARNING:
 """
 import logging
 from functools import partial
-import cProfile
 import numpy as np
 import pytest_check as check    # https://pypi.org/project/pytest-check/
 from common import (
@@ -17,6 +16,7 @@ from common import (
     sigmoid,
     softmax,
     cross_entropy_log_loss,
+    softmax_cross_entropy_log_loss,
     OFFSET_LOG,
     OFFSET_DELTA,
     BOUNDARY_SIGMOID
@@ -258,9 +258,6 @@ def test_020_cross_entropy_log_loss_2d(caplog):
     h: float = OFFSET_DELTA
     u: float = GRADIENT_DIFF_ACCEPTANCE_VALUE
 
-    profiler = cProfile.Profile()
-    profiler.enable()
-
     for _ in range(NUM_MAX_TEST_TIMES):
         # --------------------------------------------------------------------------------
         # [2D test case]
@@ -303,17 +300,17 @@ def test_020_cross_entropy_log_loss_2d(caplog):
 
         check.equal(np.all(np.abs(A-G) < u), True, "A-G %s\n" % np.abs(A-G))
 
-    profiler.disable()
-    profiler.print_stats(sort="cumtime")
-
 
 # ================================================================================
 # Softmax + log loss
 # ================================================================================
 def test_020_softmax_1d(caplog):
     """Test case for softmax for 1D
-    Verify the delta between the analytical and numerical gradient is small (<h).
+    Constraint:
+        Delta between the analytical and numerical gradient < u.
     """
+    # caplog.set_level(logging.DEBUG, logger=Logger.name)
+
     def L(X: np.ndarray, T: np.ndarray):
         """Loss function for the softmax input A (activations)
         Args:
@@ -322,14 +319,11 @@ def test_020_softmax_1d(caplog):
         Returns:
             L: Loss value of from the softmax with log loss.
         """
-        return np.sum(cross_entropy_log_loss(softmax(X), T))
-
-    # caplog.set_level(logging.DEBUG, logger=Logger.name)
+        # return np.sum(cross_entropy_log_loss(softmax(X), T))
+        J, _ = softmax_cross_entropy_log_loss(X, T, use_reformula=False, need_softmax=False)
+        return np.sum(J)
 
     u: float = GRADIENT_DIFF_ACCEPTANCE_VALUE
-
-    profiler = cProfile.Profile()
-    profiler.enable()
 
     for _ in range(NUM_MAX_TEST_TIMES):
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)   # Batch size
@@ -345,10 +339,8 @@ def test_020_softmax_1d(caplog):
             T
         ] -= 1
 
+        # Constraint: Delta between the analytical and numerical gradient < u
         assert \
             np.all(np.abs(dA - G) < u) or \
-            (np.all(np.abs(dA - G) < np.abs(GRADIENT_DIFF_ACCEPTANCE_RATIO * G))), \
+            np.all(np.abs(dA - G) < np.abs(GRADIENT_DIFF_ACCEPTANCE_RATIO * G)), \
             f"For T {T} and A: \n{A}\nthe delta between G\n{G}\n and dA: \n{dA}\nwas expected to be < {u} but \n{np.abs(dA-G)}"
-
-    profiler.disable()
-    profiler.print_stats(sort="cumtime")

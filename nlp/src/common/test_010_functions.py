@@ -6,6 +6,7 @@ from common import (
     sigmoid,
     softmax,
     cross_entropy_log_loss,
+    OFFSET_LOG,
     OFFSET_DELTA
 )
 
@@ -13,8 +14,10 @@ from common.test_config import (
     NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,
+    MAX_ACTIVATION_VALUE,
     ACTIVATION_DIFF_ACCEPTANCE_VALUE,
-    LOSS_DIFF_ACCEPTANCE_VALUE
+    LOSS_DIFF_ACCEPTANCE_VALUE,
+    LOSS_DIFF_ACCEPTANCE_RATIO
 )
 
 
@@ -27,7 +30,7 @@ def test_010_standardize():
     Objective:
         Verify the standardize() function.
     Expected:
-        (X - np.mean(A)) / np.std(X) with eps=0
+        standardize(X, eps=0) == (X - np.mean(A)) / np.std(X)
     """
     name = "test_010_standardize"
     for _ in range(NUM_MAX_TEST_TIMES):
@@ -36,6 +39,7 @@ def test_010_standardize():
         X = np.random.randint(0, 1000, (N, M)).astype(float)
         Logger.debug("%s: X \n%s\n", name, X)
 
+        # Constraint: standardize(X, eps=0) == (X - np.mean(A)) / np.std(X)
         mean = X - np.mean(X, axis=0)
         sd = np.std(X, axis=0)
         if np.all(sd > 0):
@@ -65,6 +69,12 @@ def test_010_softmax():
     E = np.array([0.57642539, 0.42357461])
     assert np.all(np.abs(P-E) < u)
 
+    for _ in range(NUM_MAX_TEST_TIMES):
+        N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
+        M: int = np.random.randint(2, NUM_MAX_NODES)
+        X = MAX_ACTIVATION_VALUE * np.random.randn(N, M)
+        np.all(np.isfinite(softmax(X)))
+
 
 def test_010_cross_entropy_log_loss():
     """
@@ -72,8 +82,7 @@ def test_010_cross_entropy_log_loss():
         Verify the cross_entropy_log_loss() function.
     Expected:
     """
-    h: float = OFFSET_DELTA
-    u = LOSS_DIFF_ACCEPTANCE_VALUE
+    u = LOSS_DIFF_ACCEPTANCE_RATIO
     # --------------------------------------------------------------------------------
     # [Scalar test case]
     # For scalar P=1, T=1 for -t * log(P) -> log(1+k)
@@ -123,7 +132,7 @@ def test_010_cross_entropy_log_loss():
         # T:(N,)   is index label where Tn=m is label as integer e.g. m=3 for 3rd label.
         # Pnm = log(P[i][j] + k)
         # --------------------------------------------------------------------------------
-        p = np.random.uniform(0, 1)
+        p = np.random.uniform(OFFSET_LOG, 1-OFFSET_LOG)     # prevent log(0)
         N = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M = np.random.randint(2, NUM_MAX_NODES)
         T = np.random.randint(0, M, N)  # N rows of labels, max label value is M-1
@@ -135,6 +144,6 @@ def test_010_cross_entropy_log_loss():
 
         E = np.full(T.shape, -logarithm(p))
         L = cross_entropy_log_loss(P, T)
-        assert np.all(np.abs(E-L) < u), \
+        assert np.all(np.abs(E-L) < u * -logarithm(p)), \
             f"Loss deviation (E-L) is expected to be < {u} but {np.abs(E-L)}"
 

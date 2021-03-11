@@ -13,8 +13,9 @@ MAX_ACTIVATION_VALUE = 5.0  # max output value from an activation function
 GRADIENT_DIFF_CHECK_TRIGGER = 0.01
 GRADIENT_DIFF_ACCEPTANCE_RATIO = 0.3
 GRADIENT_DIFF_ACCEPTANCE_VALUE = 1e-4
-ACTIVATION_DIFF_ACCEPTANCE_VALUE = 1e-4
-LOSS_DIFF_ACCEPTANCE_VALUE = 1e-4
+ACTIVATION_DIFF_ACCEPTANCE_VALUE = 1e-5
+LOSS_DIFF_ACCEPTANCE_VALUE = 1e-5
+LOSS_DIFF_ACCEPTANCE_RATIO = 0.001
 
 # Accept the Numerical difference between re-formulated functions, e.g.
 # log( exp(xi) / sum(exp(X)) ) = sum(exp(X)) - xi,

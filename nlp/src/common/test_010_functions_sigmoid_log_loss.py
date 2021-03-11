@@ -1,5 +1,4 @@
 import logging
-import cProfile
 import numpy as np
 from common import (
     standardize,
@@ -59,8 +58,6 @@ def test_010_sigmoid_cross_entropy_log_loss_2d(caplog):
         "Expected (E==J) but \n%s\nE=\n%s\nT=%s\nX=\n%s\nJ=\n%s\n" \
         % (np.abs(E - J), E, T, X, J)
     assert P == 0.5
-    profiler = cProfile.Profile()
-    profiler.enable()
 
     # --------------------------------------------------------------------------------
     # [Test case 02]
@@ -100,6 +97,3 @@ def test_010_sigmoid_cross_entropy_log_loss_2d(caplog):
         assert np.all(np.abs(L-J) < u), \
             "Expected abs(L-J) < %s but \n%s\nL=\n%s\nT=%s\nX=\n%s\nJ=\n%s\n" \
             % (u, np.abs(L-J), L, T, X, J)
-
-    profiler.disable()
-    profiler.print_stats(sort="cumtime")

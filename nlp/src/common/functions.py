@@ -484,7 +484,9 @@ def check_categorical_classification_X_T(X, T):
 def softmax_cross_entropy_log_loss(
         X: Union[np.ndarray],
         T: Union[np.ndarray],
-        offset: float = 0
+        offset: float = 0,
+        use_reformula: bool = True,
+        need_softmax: bool = True
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Cross entropy log loss for softmax activation -T * log(softmax(X))
     NOTE:
@@ -518,6 +520,8 @@ def softmax_cross_entropy_log_loss(
             M is Number of nodes
         T: label in the index format of shape (N,).
         offset: small number to avoid np.inf by log(0) by log(0+offset)
+        use_reformula: Flag to use "J=sum(exp(X)) - xi" or not
+        need_softmax: Flag if P=softmax(X) needs to be returned
 
     Returns:
         J: Loss value of shape (N,), a loss value per batch.
@@ -527,25 +531,26 @@ def softmax_cross_entropy_log_loss(
     X, T = transform_scalar_X_T(X, T)
     check_categorical_classification_X_T(X, T)
 
-    P = softmax(X)
-    N = batch_size = X.shape[0]
+    N = X.shape[0]
     rows = np.arange(N)     # (N,)
     cols = T                # Same shape (N,) with rows
     assert rows.shape == cols.shape, \
         f"np P indices need the same shape but rows {rows.shape} cols {cols.shape}."
 
-    USE_REFORMULA = False
-    if USE_REFORMULA:
+    if use_reformula:
         _A = X[rows, cols]
         J = logarithm(X=np.sum(np.exp(X), axis=-1), offset=offset) - _A
-
+        P = softmax(X) if need_softmax else np.empty(X.shape)
     else:
+        P = softmax(X)
         _A = P[rows, cols]
         J = -logarithm(X=_A, offset=offset)
 
-    assert np.all(np.isfinite(J)) and (J.ndim > 0) and (0 < N == J.shape[0]), \
-        "Invalid Loss J: should be finite and shape %s be (%s,). J=\n%s\n" \
-        % (J.shape, N, J)
+    if not np.all(np.isfinite(J)):
+        raise RuntimeError(f"{name}: Invalid loss J:\n{J}.")
+
+    assert (J.ndim > 0) and (0 < N == J.shape[0]), \
+        f"Need J shape ({N},) but {J.shape}."
 
     Logger.debug("%s: J is [%s] J.shape %s\n", name, J, J.shape)
 
@@ -851,7 +856,8 @@ def numerical_jacobian(
         # Set the gradient element scalar value or shape()
         # --------------------------------------------------------------------------------
         g: Union[np.ndarray, float] = np.subtract(fx1, fx2) / (2 * delta)
-        assert np.isfinite(g)
+        if not np.all(np.isfinite(g)):
+            raise RuntimeError(f"{name}: Invalid gradient g:{g}.")
 
         J[idx] = g
         Logger.debug("%s: idx[%s] j=[%s]", name, idx, g)

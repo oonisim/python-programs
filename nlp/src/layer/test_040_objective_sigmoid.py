@@ -422,14 +422,12 @@ def test_040_objective_methods_2d_ohe(caplog):
     """
     Objective:
         Verify the forward path constraints:
-        1. Layer output L/loss is np.sum(cross_entropy_log_loss(sigmoid(X), T, f=logistic_log_loss))) / N.
+        1. Layer output L/loss is np.sum(sigmoid_cross_entropy_log_loss) / N.
         2. gradient_numerical() == numerical Jacobian numerical_jacobian(O, X).
 
         Verify the backward path constraints:
         1. Analytical gradient G: gradient() == (P-1)/N
         2. Analytical gradient G is close to GN: gradient_numerical().
-    Expected:
-        Initialization detects the access to the non-initialized parameters and fails.
     """
     caplog.set_level(logging.DEBUG)
 
@@ -463,55 +461,67 @@ def test_040_objective_methods_2d_ohe(caplog):
         Logger.debug("%s: X is \n%s\nT is \n%s", name, X, T)
 
         # --------------------------------------------------------------------------------
-        # Expected analytical gradient dL/dX = (P-T)/N
+        # Expected analytical gradient EG = (dX/dL) = (A-T)/N
         # --------------------------------------------------------------------------------
         A = sigmoid(X)
         EG = (A - T) / N
 
         # --------------------------------------------------------------------------------
-        # constraint: L/loss == Z and close to EL.
-        # Z = np.sum(J)/N, and (J, P) = sigmoid_cross_entropy_log_loss(X, T)
-        # EL = sum((1-T)X + np.log(1 + np.exp(-X)))
+        # Total loss Z = np.sum(J)/N
+        # Expected loss EL = sum((1-T)X + np.log(1 + np.exp(-X)))
+        # (J, P) = sigmoid_cross_entropy_log_loss(X, T) and J:shape(N,) where J:shape(N,)
+        # is loss for each input and P is activation by sigmoid(X).
         # --------------------------------------------------------------------------------
         L = layer.function(X)
         J, P = sigmoid_cross_entropy_log_loss(X, T)
-        Z = np.array(np.sum(J) / N, dtype=float)
         EL = np.array(np.sum((1-T) * X + logarithm(1 + np.exp(-X))) / N, dtype=float)
 
+        # Constraint: A == P as they are sigmoid(X)
         assert np.all(np.abs(A-P) < ACTIVATION_DIFF_ACCEPTANCE_VALUE), \
-            "A=sigmoid(X) close to P but A\n%s\n P\n%s\n" % (A, P)
-        assert np.array_equal(L, Z), f"Layer output should be {L} but {Z}."
+            f"Need A==P==sigmoid(X) but A=\n{A}\n P=\n{P}\n(A-P)=\n{(A-P)}\n"
+
+        # Constraint: Log loss layer output L == sum(J) from the log loss function
+        Z = np.array(np.sum(J) / N, dtype=float)
+        assert np.array_equal(L, Z), \
+            f"Need log loss layer output L == sum(J) but L=\n{L}\nZ=\n{Z}."
+
+        # Constraint: L/loss is close to expected loss EL.
         assert np.all(np.abs(EL-L) < LOSS_DIFF_ACCEPTANCE_VALUE), \
-            "EL close to L but \nEL\n%s\n L\n%s\n" % (EL, L)
+            "Need EL close to L but \nEL=\n{EL}\nL=\n{L}\n"
 
         # --------------------------------------------------------------------------------
-        # constraint: gradient_numerical() == numerical Jacobian numerical_jacobian(O, X)
+        # constraint: gradient_numerical() == numerical_jacobian(objective, X)
+        # TODO: compare the diff to accommodate numerical errors.
         # --------------------------------------------------------------------------------
         GN = layer.gradient_numerical()                     # [dL/dX] from the layer
 
         def objective(x):
+            """Function to calculate the scalar loss L for cross entropy log loss"""
             j, p = sigmoid_cross_entropy_log_loss(x, T)
             return np.array(np.sum(j) / N, dtype=float)
 
-        EGN = numerical_jacobian(objective, X)                      # Expected numerical dL/dX
+        EGN = numerical_jacobian(objective, X)              # Expected numerical dL/dX
         assert np.array_equal(GN[0], EGN), \
             f"GN[0]==EGN expected but GN[0] is \n%s\n EGN is \n%s\n" % (GN[0], EGN)
 
         # ================================================================================
         # Layer backward path
         # ================================================================================
-        # --------------------------------------------------------------------------------
         # constraint: Analytical gradient G: gradient() == (P-1)/N.
-        # --------------------------------------------------------------------------------
         dY = float(1)
         G = layer.gradient(dY)
         assert np.all(np.abs(G-EG) <= GRADIENT_DIFF_ACCEPTANCE_VALUE), \
             f"Layer gradient dL/dX \n{G} \nneeds to be \n{EG}."
 
-        # --------------------------------------------------------------------------------
         # constraint: Analytical gradient G is close to GN: gradient_numerical().
-        # --------------------------------------------------------------------------------
         assert \
             np.all(np.abs(G - GN[0]) <= GRADIENT_DIFF_ACCEPTANCE_VALUE) or \
             np.all(np.abs(G - GN[0]) <= np.abs(GRADIENT_DIFF_ACCEPTANCE_RATIO * GN[0])), \
             f"dX is \n{G}\nGN[0] is \n{GN[0]}\nRatio * GN[0] is \n{GRADIENT_DIFF_ACCEPTANCE_RATIO * GN[0]}.\n"
+
+        # constraint: Gradient g of the log loss layer needs -1 < g < 1
+        # abs(P-T) = abs(sigmoid(X)-T) cannot be > 1.
+        assert np.all(np.abs(G) < 1), \
+            f"Log loss layer gradient cannot be < -1 nor > 1 but\n{G}"
+        assert np.all(np.abs(GN[0]) < (1+GRADIENT_DIFF_ACCEPTANCE_RATIO)), \
+            f"Log loss layer gradient cannot be < -1 nor > 1 but\n{GN[0]}"

@@ -202,6 +202,14 @@ class CrossEntropyLogLoss(Layer):
         dP/dX: impact on P by the activation input dX
         dL/dX = dL/dJ * (dJ/dP * dP/dX) = 1/N * (P - T)
 
+        TODO:
+            Clarify what to do with the gradient for elements where T=0.
+            For T=1, gradient (_P-T) is calculated, but no calculation for T=0.
+            Need to make sure this is a correct operation.
+
+            If gradient descent is not required for T=0 elements, might need
+            to zero-clear the gradients for those elements.
+
         Note:
             For both softmax and sigmoid, dL/dX is (P-T)/N, so designed.
             P=sigmoid(X) or softmax(X). 0 <= P <=1 are the limits, T is 0 or 1.
@@ -285,7 +293,7 @@ class CrossEntropyLogLoss(Layer):
             np.multiply(dJ, dX, out=dX)
 
         assert np.all(np.abs(dX) <= 1), \
-            "Gradient dL/dX needs between [-1, 1] but %s." % dX
+            f"Need the gradient dL/dX between [-1, 1] but\n{dX}"
 
         self.logger.debug("%s: dL/dX is \n%s.\n", name, dX)
         return dX

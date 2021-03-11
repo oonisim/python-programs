@@ -1,6 +1,5 @@
 import logging
 from functools import partial
-import cProfile
 import numpy as np
 from common import (
     standardize,
@@ -72,9 +71,6 @@ def test_010_softmax_cross_entropy_log_loss_2d(caplog):
     # [Test case 01]
     # For X:(N,M)
     # --------------------------------------------------------------------------------
-    profiler = cProfile.Profile()
-    profiler.enable()
-
     for _ in range(NUM_MAX_TEST_TIMES):
         # X(N, M), and T(N,) in index label format
         N = np.random.randint(1, NUM_MAX_BATCH_SIZE)
@@ -113,30 +109,21 @@ def test_010_softmax_cross_entropy_log_loss_2d(caplog):
             "Expected abs(L-J) < %s but \n%s\nL=\n%s\nT=%s\nX=\n%s\nJ=\n%s\n" \
             % (u, np.abs(E - J), E, T, X, J)
 
-    profiler.disable()
-    profiler.print_stats(sort="cumtime")
-
 
 def test_test_010_softmax_cross_entropy_log_loss_performance():
+    return
 
-    N = 10
-    M = 10
-    X = np.random.randn(N, M)
-    T = np.random.randint(0, M, N)
+    for _ in range(NUM_MAX_TEST_TIMES):
+        N = NUM_MAX_BATCH_SIZE
+        M = NUM_MAX_NODES
+        X = np.random.randn(N, M)
+        T = np.random.randint(0, M, N)
 
-    f = partial(softmax_cross_entropy_log_loss, T=T)
+        f = partial(softmax_cross_entropy_log_loss, T=T)
 
-    def objective(X):
-        J, P = f(X)
-        return np.sum(J)
+        def objective(x):
+            J, P = f(x)
+            return np.sum(J)
 
-    profiler = cProfile.Profile()
-    profiler.enable()
-
-    for _ in range(10):
-        #numerical_jacobian(objective, X)
-        #softmax_cross_entropy_log_loss(X, T)
-        softmax(X)
-
-    profiler.disable()
-    profiler.print_stats(sort="cumtime")
+        numerical_jacobian(objective, X)
+        softmax_cross_entropy_log_loss(X, T)
