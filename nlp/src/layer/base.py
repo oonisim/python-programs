@@ -247,7 +247,7 @@ class Layer:
 
         if np.all(np.abs(self._dX) < GRADIENT_SATURATION_THRESHOLD):
             self.logger.warning(
-                "Gradient dL/dX \n[%s] may have been saturated." % self._dX
+                "Gradient dL/dX \n[%s] may have been saturated." % self._dX[5]
             )
 
         return self._dX
@@ -290,7 +290,7 @@ class Layer:
 
         if np.all(np.abs(self._dY) < GRADIENT_SATURATION_THRESHOLD):
             self.logger.warning(
-                "Gradient dY/dX \n[%s] may have been saturated." % self._dY
+                "Gradient dY/dX \n[%s] may have been saturated." % self._dY[5::]
             )
         return self._dY
 

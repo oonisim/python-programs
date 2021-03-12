@@ -24,6 +24,7 @@ from data import (
     linear_separable_sectors
 )
 from layer import (
+    Standardization,
     Matmul,
     Relu,
     CrossEntropyLogLoss
@@ -104,6 +105,16 @@ def train_matmul_relu_classifier(
         log_level=logging.WARNING
     )
     matmul.objective = compose(activation.function, loss.function)
+
+    # --------------------------------------------------------------------------------
+    # Instantiate a Normalization layer
+    # --------------------------------------------------------------------------------
+    norm = Standardization(
+        name="standardization",
+        num_nodes=M
+    )
+    X = np.copy(X)
+    X = norm.function(X)
 
     # Network objective function f: L=f(X)
     objective = compose(matmul.function, matmul.objective)

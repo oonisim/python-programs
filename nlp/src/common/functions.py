@@ -837,7 +837,7 @@ def numerical_jacobian(
         derivative_saturation_condition = (fx1 == fx2)
         if derivative_saturation_condition:
             fmt = "%s: derivative saturation fx1=fx2=%s detected.\n"
-            args = tuple([fx1])
+            args = tuple([name, fx1])
             Logger.warning(fmt, *args)
             assert ENFORCE_STRICT_ASSERT, fmt % args
 
@@ -968,14 +968,14 @@ def prediction_grid_2d(x_min, x_max, y_min, y_max, prediction_function):
     x1 = x1_grid.ravel()
     x2 = x2_grid.ravel()
     x0 = np.ones(x1.size)
-    P = prediction_function(
+    _P = prediction_function(
         np.c_[
             x0,
             x1,
             x2
-        ],
+        ]
     )
-    P = np.argmax(P, axis=1)
+    P = np.argmax(_P, axis=1)
     P = P.reshape(x1_grid.shape)
 
-    return x1_grid, x2_grid, P
+    return x1_grid, x2_grid, P, _P

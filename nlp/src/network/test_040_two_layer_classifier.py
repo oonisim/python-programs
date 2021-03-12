@@ -23,10 +23,10 @@ from common.test_config import (
     GRADIENT_DIFF_ACCEPTANCE_VALUE
 )
 from data import (
-    linear_separable_sectors,
     spiral
 )
 from layer import (
+    Standardization,
     Matmul,
     Relu,
     CrossEntropyLogLoss
@@ -137,14 +137,23 @@ def train_two_layer_classifier(
     matmul01.objective = compose(activation01.function, activation01.objective)
 
     # --------------------------------------------------------------------------------
+    # Instantiate a Normalization layer
+    # --------------------------------------------------------------------------------
+    norm = Standardization(
+        name="standardization",
+        num_nodes=M1
+    )
+    X = np.copy(X)
+    X = norm.function(X)
+
+    # --------------------------------------------------------------------------------
     # Network objective function f: L=f(X)
     # --------------------------------------------------------------------------------
     objective = compose(matmul01.function, matmul01.objective)
     prediction = compose(
         matmul01.function,
         activation01.function,
-        matmul02.function,
-        activation02.function
+        matmul02.function
     )
 
     # ================================================================================

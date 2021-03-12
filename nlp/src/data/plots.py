@@ -216,3 +216,36 @@ def sets_of_circle_A_not_B(
     # a:(4, M), b:(10, M), c:(7,M) is as a list [a,b,c].
     # ------------------------------------------------------------
     return result, centres
+
+
+def spiral(k: int, d: int=3, m: int=3):
+    """Generate spiral data points
+    https://cs231n.github.io/neural-networks-case-study/#data
+    Args:
+        k: number of points per class
+        d: dimensionality
+        m: number of classes
+    Returns:
+        X: spiral data coordinates of shape (n, d)
+        y: label (0, 1, ...m-1)
+    """
+    assert k >= m > 1
+    assert d == 3, "currently only d==3 for 2D (bias, x1, x2) is valid"
+
+    N = k
+    D = d - 1
+    M = m
+    X = np.zeros((N * M, D))
+    y = np.zeros(N * M, dtype='uint8')
+    for j in range(M):
+        ix = range(N * j, N * (j + 1))
+        r = np.linspace(0.0, 1, N)  # radius
+        t = np.linspace(j * 4, (j + 1) * 4, N) + np.random.randn(N) * 0.2  # theta
+        X[ix] = np.c_[r * np.sin(t), r * np.cos(t)]
+        y[ix] = j
+
+    X = np.c_[
+        np.ones(X.shape[0]),
+        X
+    ]       # Add bias=1
+    return X, y

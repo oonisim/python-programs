@@ -1,5 +1,6 @@
 from layer.constants import *
-from layer.base import Layer
+from layer.base import *
+from layer.normalization import *
 from layer.matmul import Matmul
 from layer.activation import (
     Sigmoid,
