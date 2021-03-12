@@ -4,20 +4,20 @@ np.set_printoptions(threshold=sys.maxsize)
 np.set_printoptions(linewidth=120)
 
 
-def rotate(X, θ):
-    """Rotate X with θ radians counter-clockwise
+def rotate(X, radian):
+    """Rotate X with radians counter-clockwise
     Args:
         X: data of shape (N, 2) where each point is (x, y) and N is number of points.
-        θ: radian to rotate
+        radian: radian to rotate
     Returns:
-        Z: roated data of shape (N, 2)
+        Z: rotated data of shape (N, 2)
     """
     if not isinstance(X, np.ndarray):
         X = np.array(X)
     Z = np.matmul(
         np.array([
-            [np.cos(θ), -np.sin(θ)],
-            [np.sin(θ), np.cos(θ)]
+            [np.cos(radian), -np.sin(radian)],
+            [np.sin(radian), np.cos(radian)]
         ]),
         X.T     # (N, 2) to (2, M) to be able to (2, 2) @ (2, N)
     )
@@ -48,7 +48,8 @@ def shift(X, offsets):
     else:
         assert False
 
-def is_point_inside_sector(X: np.ndarray, base: float, coverage: float):
+
+def is_point_inside_sector(X: np.ndarray, base: float, coverage: float, centre=None, radius: float = -1.0):
     """
     Check if the point(x, y) is within or on the sector with the coverage angle
     starting from the base angle. For instance, base=1/4 pi and coverage is pi,
@@ -56,7 +57,7 @@ def is_point_inside_sector(X: np.ndarray, base: float, coverage: float):
 
     Domain: 0 <= base <2pi and 0 <= coverage < 2pi
         (base, coverage)=(b, 0) checks if a point is on the angle b.
-        (base, coverage)=(b, 2pi) is invalid as it accepts any points.
+        (base, coverage)=(b, 2pi) is valid to check if a point is in a circle
 
 
     If coverage > 2pi,
@@ -67,27 +68,35 @@ def is_point_inside_sector(X: np.ndarray, base: float, coverage: float):
             y is y-coordinate of a point
         base: base angle to start the coverage in radian units
         coverage: angles to cover in radian units.
+        centre: if not None, the centre of the sector
+        radius: limit of the sector when > 0. When <=0, no check
     Returns:
         Y: Labels of shape (N,). True if (x,y) is on or between the coverage.
     """
     if not isinstance(X, np.ndarray):
         X = np.array(X, dtype=float).reshape(-1, 2)
 
-    assert (0 <= base < 2 * np.pi) and (0 <= coverage < 2 * np.pi), \
+    assert (0 <= base < 2 * np.pi) and (0 <= coverage <= 2 * np.pi), \
         "base and coverage need [0, 2pi) but base %s, coverage %s" \
         % (base, coverage)
     end = base + coverage
 
     # y: shape(N,)
+    X = np.copy(X)
     y = X[
         ::,
         1
-        ]
+    ]
     # x: shape(N,)
     x = X[
         ::,
         0
-        ]
+    ]
+
+    if centre is not None and isinstance(centre, np.ndarray) and centre.size == 2:
+        centre = centre.reshape(2)
+        x -= centre[0]
+        y -= centre[1]
 
     # --------------------------------------------------------------------------------
     # angle=atan2(y/x) is preserved if angle > 0 or mapped to the copmplement
@@ -102,4 +111,29 @@ def is_point_inside_sector(X: np.ndarray, base: float, coverage: float):
     # --------------------------------------------------------------------------------
     Y = np.logical_and((angle >= base), (angle < end))
 
+    # --------------------------------------------------------------------------------
+    # Check if a point is inside the radius.
+    # --------------------------------------------------------------------------------
+    if radius > 0:
+        radii = np.sqrt(np.power(x, 2) + np.power(y, 2))
+        Y = np.logical_and(Y, (radii <= radius))
+
     return Y
+
+
+def test():
+    X = np.array([
+        [-0.5, 0],
+        [-2, -3]
+    ])
+    centre = (1, 1)
+    X = X[
+        is_point_inside_sector(
+            X=X,
+            base=0,
+            coverage=2 * np.pi,
+            centre=centre,
+            radius = np.sqrt(5)
+        )
+    ]
+    print(X)

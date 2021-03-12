@@ -29,6 +29,16 @@ COLOR_LABELS = np.array([
 ])
 
 
+def scatter(X, Y, color=None, title=None, figsize=None):
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.set_xlabel('x label')
+    ax.set_ylabel('y label')
+    ax.axis('equal')
+    ax.set_title(title)
+    ax.grid()
+    ax.scatter(X, Y, color=color)
+
+
 def plot_categorical_predictions(axes, grid, X, Y, predictions):
     """
     Args:

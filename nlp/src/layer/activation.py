@@ -41,17 +41,6 @@ class Relu(Layer):
     # --------------------------------------------------------------------------------
     # Instance properties
     # --------------------------------------------------------------------------------
-    @property
-    def M(self) -> int:
-        """Batch size"""
-        assert self._M > 0, "M is not initialized"
-        return self._M
-
-    @property
-    def A(self) -> np.ndarray:
-        """Activation"""
-        assert self._A.size > 0, "A is not initialized"
-        return self._A
 
     # --------------------------------------------------------------------------------
     # Instance methods
@@ -63,10 +52,12 @@ class Relu(Layer):
 
         self.X = X
         self.mask = (X <= 0)
-        A = copy.deepcopy(X)
-        A[self.mask] = 0
+        # Y = copy.deepcopy(X)
+        Y = np.copy(X)
+        Y[self.mask] = 0
 
-        return A
+        self._Y = Y
+        return self.Y
 
     def gradient(self, dA: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
         """Calculate gradient dL/dX=(dL/dA * dA/dX) to back-propagate
@@ -80,9 +71,14 @@ class Relu(Layer):
         dA = np.array(dA).reshape((1, -1)) if isinstance(dA, float) else dA
         assert dA.shape == (self.N, self.M), \
             f"dA shape should be {(self.N, self.M)} but {dA.shape}."
-        dX: np.ndarray = copy.deepcopy(dA)
+        self._dY = dA
+
+        # dX: np.ndarray = copy.deepcopy(dA)
+        dX = np.copy(dA)
         dX[self.mask] = 0
-        return dX
+
+        self._dX = dX
+        return self.dX
 
 
 class Sigmoid(Layer):
@@ -102,17 +98,6 @@ class Sigmoid(Layer):
     # --------------------------------------------------------------------------------
     # Instance properties
     # --------------------------------------------------------------------------------
-    @property
-    def M(self) -> int:
-        """Batch size"""
-        assert self._M > 0, "M is not initialized"
-        return self._M
-
-    @property
-    def A(self) -> np.ndarray:
-        """Activation"""
-        assert self._A.size > 0, "A is not initialized"
-        return self._A
 
     # --------------------------------------------------------------------------------
     # Instance methods
@@ -123,8 +108,8 @@ class Sigmoid(Layer):
             f"Number of node X {X.shape[1] } does not match {self.M}."
 
         self._X = X
-        self._A = sigmoid(X)
-        return self.A
+        self._Y = sigmoid(X)
+        return self.Y
 
     def gradient(self, dA: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
         """Calculate gradient dL/dX=(dL/dA * dA/dX) to back-propagate
@@ -138,5 +123,8 @@ class Sigmoid(Layer):
         dA = np.array(dA).reshape((1, -1)) if isinstance(dA, float) else dA
         assert dA.shape == (self.N, self.M), \
             f"dA shape should be {(self.N, self.M)} but {dA.shape}."
-        dX = dA * (1.0 - self.A) * self.A
-        return dX
+
+        self._dY = dA
+        self._dX = dA * (1.0 - self.Y) * self.Y
+        return self.dX
+

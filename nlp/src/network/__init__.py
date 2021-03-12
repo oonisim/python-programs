@@ -1,0 +1,2 @@
+from network.test_020_binary_classifier import train_binary_classifier
+from network.test_030_matmul_relu_classifier import train_matmul_relu_classifier

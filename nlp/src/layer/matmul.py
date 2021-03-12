@@ -90,6 +90,10 @@ class Matmul(Layer):
         self._W: np.ndarray = W             # node weight vectors
         self._dW: np.ndarray = np.empty(0, dtype=float)
 
+        # Not use WT because W keeps updated every cycle, hence need to update WT as well.
+        # Hence not much performance gain and risk of introducing bugs.
+        # self._WT: np.ndarray = W.T          # transpose of W
+
         # --------------------------------------------------------------------------------
         # Optimizer for gradient descent
         # Z(n+1) = optimizer.update((Z(n), dL/dZ(n)+regularization)
@@ -167,6 +171,7 @@ class Matmul(Layer):
         # would save the calculation time. This is probably the reason why cs231n uses
         # in column order format.
         # --------------------------------------------------------------------------------
+        # np.matmul(X, self.W.T, out=self._Y)
         np.matmul(X, self.W.T, out=self._Y)
         return self.Y
 

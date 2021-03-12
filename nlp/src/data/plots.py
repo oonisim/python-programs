@@ -1,5 +1,14 @@
 """Data for classifications"""
+from typing import (
+    Tuple,
+    List
+)
 import numpy as np
+from mathematics import (
+    rotate,
+    shift,
+    is_point_inside_sector
+)
 
 
 def set_in_a_radius(radius: float, d: int, n: int):
@@ -78,3 +87,95 @@ def set_in_a_radius(radius: float, d: int, n: int):
     del radii, cosines
 
     return cartesians
+
+
+def sets_in_circles(radius: float, ratio: float = 1.0, m: int = 3, n: int = 10000):
+    """Generate m set of coordinates where each set forms plots in a circle
+    Args:
+        radius: circle radius
+        ratio: how far to locate a new centre of a circle
+        m: number of circles
+        n: Number of points in a circle
+    Returns:
+        circles: coordinates of circles. Shape (m, n, d). (n, d) per circle
+        centre: coordinates of the centre of each circle. Shape (m, 2)
+    """
+    assert 2 <= m <= n and ratio > 0 and radius > 0.0
+
+    radius = float(radius)
+    d = 2   # circle is in 2D
+    circle = set_in_a_radius(radius=radius, d=d, n=n)
+
+    # Generate a new circle by shifting the centre of the "circle" to a "centre".
+    # The coordinate of the new centre = rotate(base, step * i).
+    base = np.array([radius * ratio, float(0)])
+    step = (2 * np.pi) / (m-1)
+    step = step if step < (np.pi / 2) else np.pi / m
+
+    def __rotate(angle):
+        return rotate(X=base, radian=angle)
+
+    centres = list(map(__rotate, [step * i for i in range(0, m-1, 1)]))
+    centres.insert(0, np.array([0.0, 0.0]))    # add the original circle
+    mean = np.mean(np.array(centres), axis=0)
+    centres = np.array([_centre - mean for _centre in centres])
+
+    def __relocate(location):
+        return shift(X=circle, offsets=location)
+
+    circles = np.array(list(map(__relocate, centres)))
+    assert circles.shape == (m, n, d), f"{circles.shape}\n{circles}"
+    assert centres.shape == (m, 2)
+
+    return circles, centres
+
+
+def set_in_A_not_B(A, centre_B, radius_B):
+    # --------------------------------------------------------------------------------
+    # Note A_NOT_B can be empty.
+    # --------------------------------------------------------------------------------
+    A_NOT_B = A[
+        np.logical_not(
+            is_point_inside_sector(
+                X=A,
+                base=0.0,
+                coverage=2 * np.pi,
+                centre=centre_B,
+                radius=radius_B
+            )
+        )
+    ]
+    return A_NOT_B
+
+
+def sets_of_circle_A_not_B(
+        radius: float, ratio: float = 1.0, m: int = 3, d: int = 2, n: int = 10000
+) -> Tuple[List[np.ndarray], np.ndarray]:
+    """Generate m set (A NOT B).
+        First generate m circles. Let circles[i] be A and circles[i+1] as B.
+        A is a set of points that form a circle. B as well. Then A_NOT_B is
+        those point in A but not in B.
+
+    Args:
+        radius: circle radius
+        ratio: how far to locate a new centre of a circle
+        d: dimension. 2 only for now
+        m: number of circles
+        n: Number of points in a circle
+    Returns:
+        [A_NOT_B]: List of A_NOT_B
+        centre: coordinates of the centre of each circle. Shape (m, 2)
+    """
+    assert 2 <= m <= n and ratio > 0 and radius > 0.0
+    circles, centres = sets_in_circles(radius=radius, ratio=ratio, m=m, n=n)
+    result = []
+
+    assert d == 2, "Only 2 is supported for now"
+
+    for i in range(m):
+        A = circles[i]
+        centre_B = centres[(i+1) % m]
+        A_NOT_B = set_in_A_not_B(A, centre_B, radius)
+        result.append(A_NOT_B)
+
+    return result, centres

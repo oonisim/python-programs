@@ -45,7 +45,7 @@ Logger = logging.getLogger(__name__)
 Logger.setLevel(logging.DEBUG)
 
 
-def train_classifier(
+def train_binary_classifier(
         N: int,
         D: int,
         M: int,
@@ -163,12 +163,14 @@ def train_classifier(
         # --------------------------------------------------------------------------------
         P = None
         if log_loss_function == sigmoid_cross_entropy_log_loss:
-            P = sigmoid(np.matmul(X, W.T))
+            # P = sigmoid(np.matmul(X, W.T))
+            P = sigmoid(np.matmul(matmul.X, matmul.W.T))
             P = P - T.reshape(-1, 1)    # T(N,) -> T(N,1) to align with P(N,1)
             assert P.shape == (N,1), "P.shape is %s T.shape is %s" % (P.shape, T.shape)
 
         elif log_loss_function == softmax_cross_entropy_log_loss:
-            P = softmax(np.matmul(X, W.T))
+            # P = softmax(np.matmul(X, W.T))
+            P = softmax(np.matmul(matmul.X, matmul.W.T))
             P[
                 np.arange(N),
                 T
@@ -247,7 +249,7 @@ def _test_binary_classifier(
     def callback(W):
         W
 
-    train_classifier(
+    train_binary_classifier(
         N=N,
         D=D,
         M=M,
@@ -263,29 +265,17 @@ def _test_binary_classifier(
 
 
 def test_sigmoid_classifier(caplog):
-    profiler = cProfile.Profile()
-    profiler.enable()
-
     _test_binary_classifier(
         M=1,
         log_loss_function=sigmoid_cross_entropy_log_loss
     )
 
-    profiler.disable()
-    profiler.print_stats(sort="cumtime")
-
 
 def test_softmax_classifier(caplog):
-    profiler = cProfile.Profile()
-    profiler.enable()
-
     _test_binary_classifier(
         M=2,
         log_loss_function=softmax_cross_entropy_log_loss
     )
-
-    profiler.disable()
-    profiler.print_stats(sort="cumtime")
 
 
 def test_categorical_classifier(
@@ -305,10 +295,7 @@ def test_categorical_classifier(
     def callback(W):
         W
 
-    profiler = cProfile.Profile()
-    profiler.enable()
-
-    train_classifier(
+    train_binary_classifier(
         N=N,
         D=D,
         M=M,
@@ -319,6 +306,3 @@ def test_categorical_classifier(
         optimizer=optimizer,
         callback=callback
     )
-
-    profiler.disable()
-    profiler.print_stats(sort="cumtime")
