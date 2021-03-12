@@ -51,8 +51,14 @@ echo "Running PyTest..."
 # To disable assert
 # PYTHONOPTIMIZE=TRUE
 
+# Parallel pytest requires pytest-xdist
+# https://stackoverflow.com/questions/28908319
+# conda install pytest-xdist -y
+# Then use with -n option
+NUM_CPU=4
 #pytest \
 python3 -m cProfile -o profile -m pytest \
+  -n $NUM_CPU \
   --rootdir=${DIR} \
   -vv \
   -capture=tee-sys  \
