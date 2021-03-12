@@ -3,6 +3,7 @@ from typing import (
     List,
     Callable
 )
+import sys
 import copy
 import logging
 import cProfile
@@ -35,6 +36,8 @@ from optimizer import (
     SGD
 )
 
+np.set_printoptions(threshold=sys.maxsize)
+np.set_printoptions(linewidth=1024)
 Logger = logging.getLogger(__name__)
 
 
@@ -61,7 +64,7 @@ def train_two_layer_classifier(
         T: labels
         M1: Number of nodes in layer 1.
         W1: weight for layer 1
-        M1: Number of nodes in layer 2.
+        M2: Number of nodes in layer 2.
         W2: weight for layer 2
         log_loss_function: cross entropy logg loss function
         optimizer: Optimizer
@@ -137,6 +140,12 @@ def train_two_layer_classifier(
     # Network objective function f: L=f(X)
     # --------------------------------------------------------------------------------
     objective = compose(matmul01.function, matmul01.objective)
+    prediction = compose(
+        matmul01.function,
+        activation01.function,
+        matmul02.function,
+        activation02.function
+    )
 
     # ================================================================================
     # Train the classifier
@@ -399,14 +408,14 @@ def train_two_layer_classifier(
         if callback:
             callback(matmul01.W, matmul02.W)
 
-    return matmul01.W, matmul02.W
+    return matmul01.W, matmul02.W, objective, prediction
 
 
 def test_two_layer_classifier():
     """Test case for layer matmul class
     """
     D = 3
-    M1 = 30
+    M1 = 10
     W1 = weights.he(M1, D)
     M2: int = 3                 # Number of categories to classify
     W2 = weights.he(M2, M1)
@@ -414,7 +423,7 @@ def test_two_layer_classifier():
     # X, T, V = linear_separable_sectors(n=N, d=D, m=M)
 
     # X[::,0] is bias
-    K = 20                      # Number of data points per class
+    K = 10                      # Number of data points per class
     N = M2 * K                  # Number of entire data points
     X, T = spiral(K, D, M2)
 
@@ -439,6 +448,7 @@ def test_two_layer_classifier():
         W2=W2,
         log_loss_function=softmax_cross_entropy_log_loss,
         optimizer=optimizer,
+        test_numerical_gradient=True,
         callback=callback
     )
 

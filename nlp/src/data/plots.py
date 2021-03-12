@@ -178,4 +178,41 @@ def sets_of_circle_A_not_B(
         A_NOT_B = set_in_A_not_B(A, centre_B, radius)
         result.append(A_NOT_B)
 
+    # ------------------------------------------------------------
+    # You cannot do this because the number of rows are different.
+    # numpy array a, b, c can exist in a higher dimension only when
+    # their shapes are the same.
+    #
+    # a = np.array([
+    #     [-0.68595   , -0.59704907],
+    #     [-0.70704997, -0.30369686]])
+    # b = np.array([
+    #     [ 0.51405   , -0.59704907],
+    #     [ 1.51991102, -0.48112732],
+    #     [ 0.49295003, -0.30369686]])
+    # c = np.array([
+    #     [ 0.91991102,  0.55810317],
+    #     [-0.10704997,  0.73553363]])
+    #
+    # d = [a, b, c]
+    # np.array(d)
+    # ---
+    # [Result]
+    # array([array([[-0.68595   , -0.59704907],
+    #        [-0.70704997, -0.30369686]]),
+    #        array([[ 0.51405   , -0.59704907],
+    #        [ 1.51991102, -0.48112732],
+    #        [ 0.49295003, -0.30369686]]),
+    #        array([[ 0.91991102,  0.55810317],
+    #        [-0.10704997,  0.73553363]])], dtype=object)
+    #
+    # With warning:
+    # Creating an ndarray from ragged nested sequences (which is a
+    # list-or-tuple of lists-or-tuples-or ndarrays with different
+    # lengths or shapes) is deprecated. If you meant to do this,
+    # you must specify 'dtype=object' when creating the ndarray
+    #
+    # Hence the only way to return multiple arrays of shape
+    # a:(4, M), b:(10, M), c:(7,M) is as a list [a,b,c].
+    # ------------------------------------------------------------
     return result, centres

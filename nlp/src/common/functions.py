@@ -833,13 +833,22 @@ def numerical_jacobian(
         # from being too close to zero by f(x+k)-f(x-k) > GN_DIFF_ACCEPTANCE_VALUE
         # --------------------------------------------------------------------------------
         Logger.debug("%s: (fx1-fx2)=[%s]", name, (fx1-fx2))
+
+        derivative_saturation_condition = (fx1 == fx2)
+        if derivative_saturation_condition:
+            fmt = "%s: derivative saturation fx1=fx2=%s detected.\n"
+            args = tuple([fx1])
+            Logger.warning(fmt, *args)
+            assert ENFORCE_STRICT_ASSERT, fmt % args
+
         difference = np.abs(fx1 - fx2)
-        subtract_cancellation_condition = (
+        subtract_cancellation_condition = (fx1 != fx2) and (
                 (difference < (fx1 * GN_DIFF_ACCEPTANCE_RATIO)) or
                 (difference < (fx2 * GN_DIFF_ACCEPTANCE_RATIO))
         )
+
         if subtract_cancellation_condition:
-            fmt = "%s: subtract cancellation (fx1-fx2)/fx < %s detected.\n"\
+            fmt = "%s: potential subtract cancellation (fx1-fx2)/fx < %s detected.\n"\
                   "(fx1:%s - fx2:%s) is %s, gn %s."
             args = tuple([
                 name,
@@ -914,7 +923,7 @@ def prediction_grid(X, W):
     x1 = x1_grid.ravel()
     x2 = x2_grid.ravel()
     x0 = np.ones(x1.size)
-    Z = np.dot(
+    Z = np.matmul(
         np.c_[
             x0,
             x1,
@@ -926,3 +935,47 @@ def prediction_grid(X, W):
     Z = Z.reshape(x1_grid.shape)
 
     return x1_grid, x2_grid, Z
+
+
+def prediction_grid_2d(x_min, x_max, y_min, y_max, prediction_function):
+    """
+    https://cs231n.github.io/neural-networks-case-study/#update
+    1. Generate the input X from the grid (x_min, y_min, x_max, y_max)
+       Add bias x0=1. X:shape(N, 3) where N is number of rows in X
+    2. Calculate predictions P = prediction_function(X).
+       P:shape(N, M). M is the number of categorical classes.
+    3. Transform predictions (N,M) into the index format using argmax.
+
+    Args:
+        x_min:
+        x_max:
+        y_min:
+        y_max:
+        prediction_function:
+
+    Returns:
+        x1_grid: X grid of numpy meshgrid
+        x2_grid: Y grid of numpy meshgrid
+        Z: predictions in the index format
+    """
+    h = 0.02
+    x1_min, x1_max = x_min - 1, x_max + 1
+    x2_min, x2_max = y_min - 1, y_max + 1
+    x1_grid, x2_grid = np.meshgrid(
+        np.arange(x1_min, x1_max, h),
+        np.arange(x2_min, x2_max, h)
+    )
+    x1 = x1_grid.ravel()
+    x2 = x2_grid.ravel()
+    x0 = np.ones(x1.size)
+    P = prediction_function(
+        np.c_[
+            x0,
+            x1,
+            x2
+        ],
+    )
+    P = np.argmax(P, axis=1)
+    P = P.reshape(x1_grid.shape)
+
+    return x1_grid, x2_grid, P
