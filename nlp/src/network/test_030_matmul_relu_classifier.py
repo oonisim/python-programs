@@ -47,7 +47,8 @@ def train_matmul_relu_classifier(
         log_loss_function: Callable,
         optimizer: Optimizer,
         num_epochs: int = 100,
-        test_numerical_gradient: bool = True,
+        test_numerical_gradient: bool = False,
+        log_level: int = logging.ERROR,
         callback: Callable = None
 ):
     """Test case for binary classification with matmul + log loss.
@@ -62,6 +63,7 @@ def train_matmul_relu_classifier(
         optimizer: Optimizer
         num_epochs: Number of epochs to run
         test_numerical_gradient: Flag if test the analytical gradient with the numerical one.
+        log_level: logging level
         callback: callback function to invoke at the each epoch end.
     """
     name = __name__
@@ -81,7 +83,7 @@ def train_matmul_relu_classifier(
         name="loss",
         num_nodes=M,
         log_loss_function=log_loss_function,
-        log_level=logging.WARNING
+        log_level=log_level
     )
 
     # --------------------------------------------------------------------------------
@@ -90,7 +92,7 @@ def train_matmul_relu_classifier(
     activation = Relu(
         name="relu",
         num_nodes=M,
-        log_level=logging.WARNING
+        log_level=log_level
     )
     activation.objective = loss.function
 
@@ -102,7 +104,7 @@ def train_matmul_relu_classifier(
         num_nodes=M,
         W=W,
         optimizer=optimizer,
-        log_level=logging.WARNING
+        log_level=log_level
     )
     matmul.objective = compose(activation.function, loss.function)
 
@@ -111,7 +113,8 @@ def train_matmul_relu_classifier(
     # --------------------------------------------------------------------------------
     norm = Standardization(
         name="standardization",
-        num_nodes=M
+        num_nodes=M,
+        log_level=log_level
     )
     X = np.copy(X)
     X = norm.function(X)
@@ -261,7 +264,7 @@ def test_matmul_relu_classifier(
 ):
     """Test case for layer matmul class
     """
-    N = 50
+    N = 10
     D = 3
     W = weights.he(M, D)
     optimizer = SGD(lr=0.1)
@@ -285,6 +288,7 @@ def test_matmul_relu_classifier(
         W=W,
         log_loss_function=softmax_cross_entropy_log_loss,
         optimizer=optimizer,
+        test_numerical_gradient=True,
         callback=callback
     )
 

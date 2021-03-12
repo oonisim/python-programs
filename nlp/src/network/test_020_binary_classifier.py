@@ -56,6 +56,7 @@ def train_binary_classifier(
         optimizer: Optimizer,
         num_epochs: int = 100,
         test_numerical_gradient: bool = False,
+        log_level: int = logging.ERROR,
         callback: Callable = None
 ):
     """Test case for binary classification with matmul + log loss.
@@ -70,6 +71,7 @@ def train_binary_classifier(
         optimizer: Optimizer
         num_epochs: Number of epochs to run
         test_numerical_gradient: Flag if test the analytical gradient with the numerical one.
+        log_level: logging level
         callback: callback function to invoke at the each epoch end.
     """
     name = __name__
@@ -90,7 +92,7 @@ def train_binary_classifier(
         name="loss",
         num_nodes=M,
         log_loss_function=log_loss_function,
-        log_level=logging.WARNING
+        log_level=log_level
     )
 
     # --------------------------------------------------------------------------------
@@ -101,7 +103,7 @@ def train_binary_classifier(
         num_nodes=M,
         W=W,
         optimizer=optimizer,
-        log_level=logging.WARNING
+        log_level=log_level
     )
     matmul.objective = loss.function
 
@@ -284,7 +286,7 @@ def test_categorical_classifier(
 ):
     """Test case for layer matmul class
     """
-    N = 50
+    N = 10
     D = 3
     W = weights.he(M, D)
     optimizer = SGD(lr=0.1)
@@ -304,5 +306,7 @@ def test_categorical_classifier(
         W=W,
         log_loss_function=log_loss_function,
         optimizer=optimizer,
+        test_numerical_gradient=True,
+        log_level=logging.WARNING,
         callback=callback
     )

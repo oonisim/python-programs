@@ -210,8 +210,10 @@ class Layer:
 
     @X.setter
     def X(self, X: Union[float, np.ndarray]):
-        """Layer input X
-        Convert into 2D array if X is scalar or X.ndim < 2.
+        """Set layer input X
+        1. Convert into 2D array if X is scalar or X.ndim < 2.
+        2. Allocate _dX storage.
+        3. DO NOT set/update _D as it can be set with the weight shape.
         """
         assert X is not None and \
                ((isinstance(X, np.ndarray) and X.dtype == float) or isinstance(X, float))
@@ -232,6 +234,9 @@ class Layer:
         # Allocate the storage for np.func(out=dX).
         if self._dX.shape != self.X.shape:
             self._dX = np.empty(self.X.shape, dtype=float)
+
+        # DO NOT
+        # self._D = X.shape[1]
 
     @property
     def N(self) -> int:

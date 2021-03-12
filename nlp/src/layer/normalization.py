@@ -76,8 +76,9 @@ class Standardization(Layer):
     def X(self, X: np.ndarray):
         """Set X"""
         super(Standardization, type(self)).X.fset(self, X)
-        assert self.X.shape[1] == self.D, \
-            "X shape needs (%s, %s) but %s" % (self.N, self.D, self.X.shape)
+        # Cannot check. Setting _D can be done using weight shape.
+        # assert self.X.shape[1] == self.D, \
+        #     "X shape needs (%s, %s) but %s" % (self.N, self.D, self.X.shape)
 
     # --------------------------------------------------------------------------------
     # Instance methods
@@ -96,7 +97,6 @@ class Standardization(Layer):
         # --------------------------------------------------------------------------------
         # Allocate array storage for np.func(out=) for Y but not dY.
         # Y:(N,M) = [ X:(N,D) @ W.T:(D,M) ]
-        # gradient() need to validate the dY shape is (N,M)
         # --------------------------------------------------------------------------------
         if self._Y.size <= 0 or self.Y.shape[0] != self.N:
             self._Y = np.empty((self.N, self.M), dtype=float)

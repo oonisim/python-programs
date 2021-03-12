@@ -53,13 +53,14 @@ def train_two_layer_classifier(
         log_loss_function: Callable,
         optimizer: Optimizer,
         num_epochs: int = 100,
-        test_numerical_gradient: bool = True,
+        test_numerical_gradient: bool = False,
+        log_level: int = logging.ERROR,
         callback: Callable = None
 ):
     """Test case for binary classification with matmul + log loss.
     Args:
-        N: Batch size
-        D: Number of features
+        N: Batch size of X
+        D: Number of features in X
         X: train data
         T: labels
         M1: Number of nodes in layer 1.
@@ -70,6 +71,7 @@ def train_two_layer_classifier(
         optimizer: Optimizer
         num_epochs: Number of epochs to run
         test_numerical_gradient: Flag if test the analytical gradient with the numerical one.
+        log_level: logging level
         callback: callback function to invoke at the each epoch end.
     """
     name = __name__
@@ -89,7 +91,7 @@ def train_two_layer_classifier(
         name="loss",
         num_nodes=M2,
         log_loss_function=log_loss_function,
-        log_level=logging.WARNING
+        log_level=log_level
     )
 
     # --------------------------------------------------------------------------------
@@ -98,7 +100,7 @@ def train_two_layer_classifier(
     activation02 = Relu(
         name="relu02",
         num_nodes=M2,
-        log_level=logging.WARNING
+        log_level=log_level
     )
     activation02.objective = loss.function
 
@@ -110,7 +112,7 @@ def train_two_layer_classifier(
         num_nodes=M2,
         W=W2,
         optimizer=optimizer,
-        log_level=logging.WARNING
+        log_level=log_level
     )
     matmul02.objective = compose(activation02.function, activation02.objective)
 
@@ -120,7 +122,7 @@ def train_two_layer_classifier(
     activation01 = Relu(
         name="relu01",
         num_nodes=M1,
-        log_level=logging.WARNING
+        log_level=log_level
     )
     activation01.objective = compose(matmul02.function, matmul02.objective)
 
@@ -132,7 +134,7 @@ def train_two_layer_classifier(
         num_nodes=M1,
         W=W1,
         optimizer=optimizer,
-        log_level=logging.WARNING
+        log_level=log_level
     )
     matmul01.objective = compose(activation01.function, activation01.objective)
 
@@ -141,7 +143,7 @@ def train_two_layer_classifier(
     # --------------------------------------------------------------------------------
     norm = Standardization(
         name="standardization",
-        num_nodes=M1
+        num_nodes=D
     )
     X = np.copy(X)
     X = norm.function(X)
@@ -424,7 +426,7 @@ def test_two_layer_classifier():
     """Test case for layer matmul class
     """
     D = 3
-    M1 = 10
+    M1 = 5
     W1 = weights.he(M1, D)
     M2: int = 3                 # Number of categories to classify
     W2 = weights.he(M2, M1)
@@ -458,6 +460,7 @@ def test_two_layer_classifier():
         log_loss_function=softmax_cross_entropy_log_loss,
         optimizer=optimizer,
         test_numerical_gradient=True,
+        log_level=logging.WARNING,
         callback=callback
     )
 

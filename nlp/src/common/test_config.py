@@ -1,7 +1,7 @@
-NUM_MAX_TEST_TIMES = 1000
-NUM_MAX_BATCH_SIZE: int = 10+1
-NUM_MAX_NODES: int = 5+1
-NUM_MAX_FEATURES: int = 5
+NUM_MAX_TEST_TIMES = 200
+NUM_MAX_BATCH_SIZE: int = 5+1
+NUM_MAX_NODES: int = 4+1
+NUM_MAX_FEATURES: int = 4
 MAX_ACTIVATION_VALUE = 5.0  # max output value from an activation function
 
 # Accept the difference between the numerical gradient GN and analytical gradient G
