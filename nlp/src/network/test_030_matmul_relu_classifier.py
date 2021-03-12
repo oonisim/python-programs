@@ -46,7 +46,7 @@ def train_matmul_relu_classifier(
         log_loss_function: Callable,
         optimizer: Optimizer,
         num_epochs: int = 100,
-        test_numerical_gradient: bool = False,
+        test_numerical_gradient: bool = True,
         callback: Callable = None
 ):
     """Test case for binary classification with matmul + log loss.
@@ -87,7 +87,7 @@ def train_matmul_relu_classifier(
     # Instantiate a ReLu layer
     # --------------------------------------------------------------------------------
     activation = Relu(
-        name="matmul",
+        name="relu",
         num_nodes=M,
         log_level=logging.WARNING
     )
@@ -261,6 +261,7 @@ def test_matmul_relu_classifier(
     def callback(W):
         """Dummy callback"""
         W
+
     profiler = cProfile.Profile()
     profiler.enable()
 

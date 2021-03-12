@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # https://stackoverflow.com/questions/66406811
+
 #--------------------------------------------------------------------------------
 # Bash crates a new shell process in which the Python virtual environment has not been activated.
 # Hence will fail without setting it up.
@@ -55,7 +56,8 @@ python3 -m cProfile -o profile -m pytest \
   --rootdir=${DIR} \
   -vv \
   -capture=tee-sys  \
-  --log-level=ERROR \
+  --log-level=DEBUG \
+  -o log_cli=True -o log_cli_level=ERROR \
   --log-auto-indent=on \
   --cache-clear -x \
   --color=yes --code-highlight=yes \

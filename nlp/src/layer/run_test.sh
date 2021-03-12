@@ -56,7 +56,8 @@ python3 -m cProfile -o profile -m pytest \
   --rootdir=${DIR} \
   -vv \
   -capture=tee-sys  \
-  --log-level=ERROR \
+  --log-level=DEBUG \
+  -o log_cli=True -o log_cli_level=ERROR \
   --log-auto-indent=on \
   --cache-clear -x \
   --color=yes --code-highlight=yes \
@@ -64,6 +65,7 @@ python3 -m cProfile -o profile -m pytest \
   --tb=long \
   --showlocals \
   --durations=5 \
+  $@ \
 ${DIR}
 
 python3 run_cprofile_analysis.py

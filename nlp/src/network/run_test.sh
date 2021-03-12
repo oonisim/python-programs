@@ -65,6 +65,7 @@ python3 -m cProfile -o profile -m pytest \
   --tb=long \
   --showlocals \
   --durations=5 \
+  $@ \
 ${DIR}
 
 python3 run_cprofile_analysis.py
