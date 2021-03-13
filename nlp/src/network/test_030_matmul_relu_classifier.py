@@ -110,14 +110,15 @@ def train_matmul_relu_classifier(
 
     # --------------------------------------------------------------------------------
     # Instantiate a Normalization layer
+    # Need to apply the same mean and std to the non-training data set.
     # --------------------------------------------------------------------------------
-    norm = Standardization(
-        name="standardization",
-        num_nodes=M,
-        log_level=log_level
-    )
-    X = np.copy(X)
-    X = norm.function(X)
+    # norm = Standardization(
+    #     name="standardization",
+    #     num_nodes=M,
+    #     log_level=log_level
+    # )
+    # X = np.copy(X)
+    # X = norm.function(X)
 
     # Network objective function f: L=f(X)
     objective = compose(matmul.function, matmul.objective)
@@ -145,13 +146,13 @@ def train_matmul_relu_classifier(
             f"Network objective L(X) %s must match layer-by-layer output %s." \
             % (objective(X), L)
 
-        print(L)
+        if not (i % 50): print(f"iteration {i} Loss {L}")
         Logger.info("%s: iteration[%s]. Loss is [%s]", name, i, L)
 
         # ********************************************************************************
         # Constraint: Objective/Loss L(Yn+1) after gradient descent < L(Yn)
         # ********************************************************************************
-        if L >= history[-1]:
+        if L >= history[-1] and (i % 20) == 1:
             Logger.warning(
                 "Iteration [%i]: Loss[%s] has not improved from the previous [%s].",
                 i, L, history[-1]

@@ -140,13 +140,14 @@ def train_two_layer_classifier(
 
     # --------------------------------------------------------------------------------
     # Instantiate a Normalization layer
+    # Need to apply the same mean and std to the non-training data set.
     # --------------------------------------------------------------------------------
-    norm = Standardization(
-        name="standardization",
-        num_nodes=D
-    )
-    X = np.copy(X)
-    X = norm.function(X)
+    # # norm = Standardization(
+    #     name="standardization",
+    #     num_nodes=D
+    # )
+    # X = np.copy(X)
+    # X = norm.function(X)
 
     # --------------------------------------------------------------------------------
     # Network objective function f: L=f(X)
@@ -186,13 +187,13 @@ def train_two_layer_classifier(
             "Network objective L(X) %s must match layer-by-layer output %s." \
             % (objective(X), L)
 
-        print(L)
+        if not (i % 100): print(f"iteration {i} Loss {L}")
         Logger.info("%s: iteration[%s]. Loss is [%s]", name, i, L)
 
         # ********************************************************************************
         # Constraint: Objective/Loss L(Yn+1) after gradient descent < L(Yn)
         # ********************************************************************************
-        if L >= history[-1]:
+        if L >= history[-1] and (i % 20) == 1:
             Logger.warning(
                 "Iteration [%i]: Loss[%s] has not improved from the previous [%s] for %s times.",
                 i, L, history[-1], num_no_progress+1
@@ -422,11 +423,13 @@ def train_two_layer_classifier(
     return matmul01.W, matmul02.W, objective, prediction
 
 
-def test_two_layer_classifier():
+def test_two_layer_classifier(caplog):
     """Test case for layer matmul class
     """
+    caplog.set_level(logging.DEBUG, logger=Logger.name)
+
     D = 3
-    M1 = 5
+    M1 = 4
     W1 = weights.he(M1, D)
     M2: int = 3                 # Number of categories to classify
     W2 = weights.he(M2, M1)
@@ -434,7 +437,7 @@ def test_two_layer_classifier():
     # X, T, V = linear_separable_sectors(n=N, d=D, m=M)
 
     # X[::,0] is bias
-    K = 10                      # Number of data points per class
+    K = 3                      # Number of data points per class
     N = M2 * K                  # Number of entire data points
     X, T = spiral(K, D, M2)
 
@@ -460,7 +463,7 @@ def test_two_layer_classifier():
         log_loss_function=softmax_cross_entropy_log_loss,
         optimizer=optimizer,
         test_numerical_gradient=True,
-        log_level=logging.WARNING,
+        log_level=logging.DEBUG,
         callback=callback
     )
 

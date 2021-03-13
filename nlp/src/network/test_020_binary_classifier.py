@@ -120,13 +120,13 @@ def train_binary_classifier(
         Y = matmul.function(X)
         L = loss.function(Y)
 
-        print(L)
+        if not (i % 50): print(f"iteration {i} Loss {L}")
         Logger.info("%s: iteration[%s]. Loss is [%s]", name, i, L)
 
         # --------------------------------------------------------------------------------
         # Constraint: 1. Objective/Loss L(Yn+1) after gradient descent < L(Yn)
         # --------------------------------------------------------------------------------
-        if L >= history[-1]:
+        if L >= history[-1] and (i % 20) == 1:
             Logger.warning(
                 "Iteration [%i]: Loss[%s] has not improved from the previous [%s]."
                 % (i, L, history[-1])

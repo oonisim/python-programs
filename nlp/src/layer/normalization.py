@@ -27,7 +27,11 @@ from common.functions import (
 
 
 class Standardization(Layer):
-    """Standardization Layer class"""
+    """Standardization Layer class
+    Considerations:
+        Need to apply the same mean and std to the non-training data set because the
+        model has been trained on the specific mean/sd of the training data set.
+    """
     # ================================================================================
     # Class initialization
     # ================================================================================

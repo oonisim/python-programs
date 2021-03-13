@@ -13,7 +13,7 @@ class SGD(Optimizer):
     # ================================================================================
     # Instance initialization
     # ================================================================================
-    def __init__(self, name="SGD", lr=0.01, l2: float = 1e-3, log_level=logging.WARNING):
+    def __init__(self, name="SGD", lr=0.01, l2: float = 1e-3, log_level=logging.ERROR):
         super().__init__(name=name, lr=lr, l2=l2, log_level=log_level)
 
     # --------------------------------------------------------------------------------
