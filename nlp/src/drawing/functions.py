@@ -53,7 +53,8 @@ def plot_categorical_predictions(axes, grid, X, Y, predictions):
     axes.scatter(X[:, 1], X[:, 2], c=Y, s=40)
 
     # plot predictions
-    axes.contourf(grid[0], grid[1], predictions, cmap=plt.cm.Spectral, alpha=0.3)
+    # axes.contourf(grid[0], grid[1], predictions, cmap=plt.cm.Spectral, alpha=0.3)
+    axes.contourf(grid[0], grid[1], predictions, cmap=plt.cm.gist_rainbow, alpha=0.3, linewidths=10)
 
     axes.set_xlim(grid[0].min(), grid[0].max())
     axes.set_ylim(grid[1].min(), grid[1].max())

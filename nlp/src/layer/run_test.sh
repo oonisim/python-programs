@@ -61,7 +61,7 @@ python3 -m cProfile -o profile -m pytest \
   -n $NUM_CPU \
   --rootdir=${DIR} \
   -vv \
-  -capture=tee-sys  \
+  --capture=tee-sys \
   --log-level=DEBUG \
   -o log_cli=False -o log_cli_level=WARNING \
   --log-auto-indent=on \

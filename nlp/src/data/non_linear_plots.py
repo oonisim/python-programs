@@ -130,7 +130,23 @@ def sets_in_circles(radius: float, ratio: float = 1.0, m: int = 3, n: int = 1000
     return circles, centres
 
 
-def set_in_A_not_B(A, centre_B, radius_B):
+def set_in_circle_A_and_B(A, centre_B, radius_B):
+    # --------------------------------------------------------------------------------
+    # Note A_NOT_B can be empty.
+    # --------------------------------------------------------------------------------
+    A_AND_B = A[
+        is_point_inside_sector(
+            X=A,
+            base=0.0,
+            coverage=2 * np.pi,
+            centre=centre_B,
+            radius=radius_B
+        )
+    ]
+    return A_AND_B
+
+
+def set_in_circle_A_not_B(A, centre_B, radius_B):
     # --------------------------------------------------------------------------------
     # Note A_NOT_B can be empty.
     # --------------------------------------------------------------------------------
@@ -150,8 +166,8 @@ def set_in_A_not_B(A, centre_B, radius_B):
 
 def sets_of_circle_A_not_B(
         radius: float, ratio: float = 1.0, m: int = 3, d: int = 2, n: int = 10000
-) -> Tuple[List[np.ndarray], np.ndarray]:
-    """Generate m set (A NOT B).
+) -> Tuple[List[np.ndarray], np.ndarray, np.ndarray]:
+    """Generate m sets of (A NOT B).
         First generate m circles. Let circles[i] be A and circles[i+1] as B.
         A is a set of points that form a circle. B as well. Then A_NOT_B is
         those point in A but not in B.
@@ -165,6 +181,7 @@ def sets_of_circle_A_not_B(
     Returns:
         [A_NOT_B]: List of A_NOT_B
         centre: coordinates of the centre of each circle. Shape (m, 2)
+        intersection: intersection of all circles.
     """
     assert 2 <= m <= n and ratio > 0 and radius > 0.0
     circles, centres = sets_in_circles(radius=radius, ratio=ratio, m=m, n=n)
@@ -172,10 +189,17 @@ def sets_of_circle_A_not_B(
 
     assert d == 2, "Only 2 is supported for now"
 
+    intersection = circles[0]
+    for i in range(1, m):
+        centre_B = centres[i]
+        intersection = set_in_circle_A_and_B(intersection, centre_B, radius)
+        if intersection.size <= 0:
+            break
+
     for i in range(m):
         A = circles[i]
         centre_B = centres[(i+1) % m]
-        A_NOT_B = set_in_A_not_B(A, centre_B, radius)
+        A_NOT_B = set_in_circle_A_not_B(A, centre_B, radius)
         result.append(A_NOT_B)
 
     # ------------------------------------------------------------
@@ -215,7 +239,7 @@ def sets_of_circle_A_not_B(
     # Hence the only way to return multiple arrays of shape
     # a:(4, M), b:(10, M), c:(7,M) is as a list [a,b,c].
     # ------------------------------------------------------------
-    return result, centres
+    return result, centres, intersection
 
 
 def spiral(k: int, d: int=3, m: int=3):
