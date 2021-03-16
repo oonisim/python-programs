@@ -40,14 +40,18 @@ def test_010_standardize():
         Logger.debug("%s: X \n%s\n", name, X)
 
         # Constraint: standardize(X, eps=0) == (X - np.mean(A)) / np.std(X)
-        mean = X - np.mean(X, axis=0)
         sd = np.std(X, axis=0)
         if np.all(sd > 0):
             # Expected
-            E = mean / sd
+            mean = np.mean(X, axis=0)
+            E = (X - mean) / sd
             # Actual
-            A = standardize(X, eps=0.0)
-            assert np.all(E == A), \
+            A, __mean, __sd = standardize(X, eps=0.0)
+
+            # Constraint. mean/sd should be same
+            assert np.all(np.abs(mean - __mean) < 1e-6)
+            assert np.all(np.abs(sd - __sd) < 1e-6)
+            assert np.all(np.abs(E-A) < 1e-6), \
                 f"X\n{X}\nstandardized\n{E}\nneeds\n{A}\n"
 
 

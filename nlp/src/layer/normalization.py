@@ -110,7 +110,7 @@ class Standardization(Layer):
             # --------------------------------------------------------------------------------
             # self._dY = np.empty((self.N, self.M), dtype=float)
 
-        standardize(X, out=self._Y)
+        _, mean, sd = standardize(X, out=self._Y)
         return self.Y
 
     def gradient(self, dY: Union[np.ndarray, float] = 1.0) -> Union[np.ndarray, float]:
