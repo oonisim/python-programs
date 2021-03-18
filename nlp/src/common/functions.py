@@ -27,7 +27,8 @@ Logger = logging.getLogger("functions")
 
 
 def standardize(
-        X: Union[np.ndarray, float], eps: float = OFFSET_STD, out=None
+    # X: Union[np.ndarray, float], eps: float = 0.0, out=None
+    X: Union[np.ndarray, float], out=None
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Standardize X per-feature basis.
     Each feature is independent from other features, hence standardize per feature.
@@ -45,7 +46,7 @@ def standardize(
         mean: mean of X
         sd: standard deviation of X
     """
-    assert (isinstance(X, np.ndarray) and X.dtype == float and eps >= 0.0)
+    assert (isinstance(X, np.ndarray) and X.dtype == float)
     if isinstance(X, float):
         X = np.array(X).reshape(1, -1)
     if X.ndim <= 1:
@@ -55,9 +56,26 @@ def standardize(
     mean = np.sum(X, axis=0) / N    # mean of each feature
     deviation = X - mean
     variance = np.var(X, axis=0)
-    sd = np.sqrt(variance + eps)
+    sd = np.sqrt(variance)
 
-    standardized = np.divide(deviation, sd, out)
+    mask = (sd == 0.0)
+    if np.any(mask):
+        # Temporary replace the zero elements with one
+        sd[mask] = 1.0
+
+        # reuse deviation memory area
+        out = deviation if out is None else out
+
+        # standardize and zero clear the mask elements
+        standardized = np.divide(deviation, sd, out)
+        out[::, mask] = 0.0
+
+        # restore sd
+        sd[mask] = 0.0
+
+    else:
+        standardized = np.divide(deviation, sd, out)
+
     assert np.all(np.isfinite(standardized))
 
     return standardized, mean, sd

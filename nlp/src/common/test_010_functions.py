@@ -30,7 +30,7 @@ def test_010_standardize():
     Objective:
         Verify the standardize() function.
     Expected:
-        standardize(X, eps=0) == (X - np.mean(A)) / np.std(X)
+        standardize(X) == (X - np.mean(A)) / np.std(X)  (when np.std(X) != 0)
     """
     name = "test_010_standardize"
     for _ in range(NUM_MAX_TEST_TIMES):
@@ -39,14 +39,14 @@ def test_010_standardize():
         X = np.random.randint(0, 1000, (N, M)).astype(float)
         Logger.debug("%s: X \n%s\n", name, X)
 
-        # Constraint: standardize(X, eps=0) == (X - np.mean(A)) / np.std(X)
+        # Constraint: standardize(X) == (X - np.mean(A)) / np.std(X)
         sd = np.std(X, axis=0)
         if np.all(sd > 0):
             # Expected
             mean = np.mean(X, axis=0)
             E = (X - mean) / sd
             # Actual
-            A, __mean, __sd = standardize(X, eps=0.0)
+            A, __mean, __sd = standardize(X)
 
             # Constraint. mean/sd should be same
             assert np.all(np.abs(mean - __mean) < 1e-6)
