@@ -1,8 +1,4 @@
 """Matmul layer implementation
-Note:
-    Python passes a pointer to an object storage if it is mutable.
-    Matrices can take up lage storage, hence to avoid temporary copies,
-    directly update the target storage area.
 """
 from typing import (
     Optional,
@@ -26,12 +22,55 @@ from optimizer import (
 from common import (
     TYPE_LABEL,
     TYPE_FLOAT,
+    OFFSET_DELTA,
     numerical_jacobian
 )
 
 
 class Matmul(Layer):
-    """MatMul Layer class"""
+    """MatMul Layer class
+    Batch X: shape(N, D)
+    --------------------
+    Note that the original input X e.g. N x 28x28 pixel image (784 features) has
+    (N, D-1) shape WITHOUT the bias feature x0. The layer adds the bias, when the
+    input is given at function(X). Hence internally the shape of X is (N, D).
+
+    X has N rows. Each row X[n] (n: 0, ... N-1) has D features of X[j][d] = x(j)(n).
+    Batch is referred as 'X' in capital and its scalar element is referred as x.
+    X[n] = [x(n)(0), ..., x(n)(d), ..., x(n)(D-1)]. The bias x(n)(0) = 1.
+
+    As an illustration, an input batch X of shape (N, D-1) where (D-1)=784 pixels.
+    The layer adds bias x(n)(0)=1 at each row, and the X becomes shape (N, D).
+    'X' is not limited to the 0th input layer e.g. image pixels but to any layer.
+
+    Gradient dL/dX: shape(N, D-1) to back-propagate but (N, D) internally
+    --------------------
+    Internally, dX or dL/dX is of shape (N, D) to match with the shape of X.
+    However, dL/dX to back-propagate must match the shape of the output form the
+    previous layer, which is (N, D-1) because the Matmul has added the bias.
+
+    Weights W: shape(M, D)
+    --------------------
+    The layer has M nodes where each node m (m:0, 1, .. M-1) has a weight vector
+    W(m) = [w(m)(0), ... , w(m)(d), w(m)(D-1)] INCLUDING the bias weight w(m)(0).
+    When the layer is instantiated, W of shape (M, D) needs to be provided,
+    because how to configure the weights is up to the user's decision.
+
+    Gradient dL/dW: shape(M, D)
+    --------------------
+    Has the same shape of W and externaized as-is.
+
+
+    Numpy slice indexing
+    --------------------
+    Numpy uses View with slice-indexing, hence would be able to re-use the
+    existing memory area to save the memory.
+
+    dX = self.dX[
+        ::,
+        1::     # Omit the bias
+    ]
+   """
     # ================================================================================
     # Class initialization
     # ================================================================================
@@ -56,46 +95,26 @@ class Matmul(Layer):
             posteriors: Post layers to which forward the matmul layer output
             optimizer: Gradient descent implementation e.g SGD, Adam.
             log_level: logging level
-
-        Batch X: shape(N, D)
-        --------------------
-        A batch X has N rows and each row x has D features where x[d=0] is the bias value 1.
-        X[j] = [x(j)(0), x(j)(1), ... x(j)(D-1)]
-        "input" is not limited to the 0th input layer e.g. image pixels but to any layer.
-
-        Note that the original input data e.g. a 28x28 pixel image (784 features) does not
-        have D-1 features without the bias. A bias 1 is to be prepended as x[0].
-
-        Weights W: shape(M, D) where M=num_nodes
-        --------------------
-        Node k (k:0, 1, .. M-1) has a weight vector W(k):[w(k)(0), w(k)(1), ... w(k)(D-1)].
-        w(k)(0) is a bias weight. Each w(k)(i) amplifies i-th feature in an input x.
         """
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
 
         # --------------------------------------------------------------------------------
-        # Validate the expected dimensions.
-        # `W` has `M` nodes (nodes)
+        # W: weight matrix of shape(M,D) where M=num_nodes
+        # Gradient dL/dW has the same shape shape(M, D) with W because L is scalar.
+        #
+        # Not use WT because W keeps updated every cycle, hence need to update WT as well.
+        # Hence not much performance gain and risk of introducing bugs.
+        # self._WT: np.ndarray = W.T          # transpose of W
         # --------------------------------------------------------------------------------
+        assert W.shape[0] == num_nodes, \
+            f"W shape needs to be ({num_nodes}, D) but {W.shape}."
+        self._D = W.shape[1]                # number of features in x including bias
+        self._W: np.ndarray = W             # node weight vectors
+        self._dW: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)
         self.logger.debug(
             "Matmul[%s] W.shape is [%s], number of nodes is [%s]",
             name, W.shape, num_nodes
         )
-        assert W.shape[0] == num_nodes, \
-            f"W shape needs to be ({num_nodes}, D) but {W.shape}."
-
-        # --------------------------------------------------------------------------------
-        # W: weight matrix of shape(M,D) where M=num_nodes
-        # Gradient dL/dW has the same shape shape(M, D) with W because L is scalar.
-        # --------------------------------------------------------------------------------
-        self._D = W.shape[1]                # number of features in x
-        self._W: np.ndarray = W             # node weight vectors
-        self._dW: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)
-
-        # Not use WT because W keeps updated every cycle, hence need to update WT as well.
-        # Hence not much performance gain and risk of introducing bugs.
-        # self._WT: np.ndarray = W.T          # transpose of W
-
         # --------------------------------------------------------------------------------
         # Optimizer for gradient descent
         # Z(n+1) = optimizer.update((Z(n), dL/dZ(n)+regularization)
@@ -141,12 +160,21 @@ class Matmul(Layer):
     def function(self, X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
         """Calculate the layer output Y = X@W.T
         Args:
-            X: Batch input data from the input layer.
+            X: Batch input data from the input layer without the bias.
         Returns:
             Y: Layer value of X@W.T
         """
+        assert isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT, \
+            f"Only np array of type {TYPE_FLOAT} is accepted"
+
         name = "function"
-        self.X = X
+        # --------------------------------------------------------------------------------
+        # Y = (W@X + b) could be efficient
+        # --------------------------------------------------------------------------------
+        self.X = np.c_[
+            np.ones(X.shape[0], dtype=TYPE_FLOAT),  # Add bias
+            X
+        ]
         self.logger.debug(
             "layer[%s].%s: X.shape %s W.shape %s",
             self.name, name, self.X.shape, self.W.shape
@@ -173,8 +201,7 @@ class Matmul(Layer):
         # would save the calculation time. This is probably the reason why cs231n uses
         # in column order format.
         # --------------------------------------------------------------------------------
-        # np.matmul(X, self.W.T, out=self._Y)
-        np.matmul(X, self.W.T, out=self._Y)
+        np.matmul(self.X, self.W.T, out=self._Y)
         return self.Y
 
     def gradient(self, dY: Union[np.ndarray, float] = 1.0) -> Union[np.ndarray, float]:
@@ -182,7 +209,7 @@ class Matmul(Layer):
         Args:
             dY: Gradient dL/dY, the total impact on L by dY.
         Returns:
-            dL/dX of shape (N,D):  [ dL/dY:(N,M) @ W:(M,D)) ]
+            dX: dL/dX of shape (N, D-1) without the bias
         """
         name = "gradient"
         assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT)
@@ -201,14 +228,21 @@ class Matmul(Layer):
         assert self.dX.shape == (self.N, self.D), \
             "dL/dX shape needs (%s, %s) but %s" % (self.N, self.D, self.dX.shape)
 
-        return self.dX
+        return self.dX[
+            ::,
+            1::     # Omit bias column 0
+        ]
 
-    def gradient_numerical(self, h: float = 1e-5) -> List[Union[float, np.ndarray]]:
+    def gradient_numerical(
+            self, h: Optional[TYPE_FLOAT] = None
+    ) -> List[Union[float, np.ndarray]]:
         """Calculate numerical gradients
         Args:
             h: small number for delta to calculate the numerical gradient
         Returns:
-            [dX, dW]: Numerical gradients for X and W
+            [dX, dW]: Numerical gradients for X and W without bias
+            dX is dL/dX of shape (N, D-1) without the bias to match the original input
+            dW is dL/dW of shape (M, D) including the bias weight w0.
         """
         name = "gradient_numerical"
         self.logger.debug("layer[%s].%s", self.name, name)
@@ -220,8 +254,12 @@ class Matmul(Layer):
         def objective_W(W: np.ndarray):
             return L(self.X @ W.T)
 
-        dX = numerical_jacobian(objective_X, self.X)
-        dW = numerical_jacobian(objective_W, self.W)
+        dX = numerical_jacobian(objective_X, self.X, delta=h)
+        dX = dX[
+            ::,
+            1::     # Omit the bias
+        ]
+        dW = numerical_jacobian(objective_W, self.W, delta=h)
         return [dX, dW]
 
     def _gradient_descent(self, W, dW, out=None) -> Union[np.ndarray, float]:
@@ -236,8 +274,10 @@ class Matmul(Layer):
         Hence dL/dW of shape (M,D):  [ X.T:(D, N)  @ dL/dY:(N,M) ].T.
 
         Returns:
-            [self.dX, self.dW]: dL/dS=[dL/ds for s in S]
-        """
+            [dL/dX, dL/dW]: List of dL/dX and dL/dW.
+            dX is dL/dX of shape (N, D-1) without the bias of the layer.
+            dW is dL/dW of shape (M, D) including the bias weight w0.
+       """
         # --------------------------------------------------------------------------------
         # dL/dW of shape (M,D):  [ X.T:(D, N)  @ dL/dY:(N,M) ].T
         # --------------------------------------------------------------------------------
@@ -252,4 +292,8 @@ class Matmul(Layer):
 
         self._dW = dW
         self._gradient_descent(self.W, self.dW, out=self._W)
-        return [self.dX, self.dW]
+        dX = self.dX[
+            ::,
+            1::     # Omit the bias
+        ]
+        return [dX, self.dW]

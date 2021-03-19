@@ -1,4 +1,21 @@
-"""Matmul layer test cases"""
+"""Matmul layer test cases
+Batch X: shape(N, D):
+--------------------
+X is the input data into a Matmul layer, hence it does NOT include the bias.
+
+Gradient dL/dX: shape(N, D)
+--------------------
+Same shape of X because L is scalar.
+
+Weights W: shape(M, D+1)
+--------------------
+W includes the bias weight because we need to control the weight initializations
+including the bias weight.
+
+Gradient dL/dW: shape(M, D+1)
+--------------------
+Same shape with W.
+"""
 from typing import (
     Optional,
     Union,
@@ -22,7 +39,8 @@ from common.test_config import (
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,
     NUM_MAX_FEATURES,
-    GRADIENT_DIFF_ACCEPTANCE_VALUE
+    GRADIENT_DIFF_ACCEPTANCE_VALUE,
+    GRADIENT_DIFF_ACCEPTANCE_RATIO
 )
 
 
@@ -46,7 +64,7 @@ def test_020_matmul_instantiation_to_fail():
             Matmul(
                 name="",
                 num_nodes=1,
-                W=weights.xavier(M, D)
+                W=weights.xavier(M, D+1)
             )
             raise RuntimeError("Matmul initialization with invalid name must fail")
         except AssertionError:
@@ -103,7 +121,7 @@ def test_020_matmul_instance_properties():
         layer = Matmul(
             name=name,
             num_nodes=M,
-            W=weights.uniform(M, D),
+            W=weights.uniform(M, D+1),
             log_level=logging.DEBUG
         )
 
@@ -268,7 +286,7 @@ def test_020_matmul_instantiation():
         layer = Matmul(
             name=name,
             num_nodes=M,
-            W=weights.he(M, D),
+            W=weights.he(M, D+1),
             log_level=logging.DEBUG
         )
         layer.objective = objective
@@ -329,7 +347,7 @@ def test_020_matmul_round_trip():
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(1, NUM_MAX_NODES)
         D: int = np.random.randint(1, NUM_MAX_FEATURES)
-        W = weights.he(M, D)
+        W = weights.he(M, D+1)
         name = "test_020_matmul_methods"
 
         def objective(X: np.ndarray) -> Union[float, np.ndarray]:
@@ -348,6 +366,9 @@ def test_020_matmul_round_trip():
         # Layer forward path
         # Calculate the layer output Y=f(X), and get the loss L = objective(Y)
         # Test the numerical gradient dL/dX=layer.gradient_numerical().
+        #
+        # Note that bias columns are added inside the matmul layer instance, hence
+        # layer.X.shape is (N, 1+D), layer.W.shape is (M, 1+D)
         # ================================================================================
         X = np.random.randn(N, D)
         Logger.debug("%s: X is \n%s", name, X)
@@ -356,18 +377,32 @@ def test_020_matmul_round_trip():
         L = layer.objective(Y)
 
         # Constraint 1 : Matmul outputs Y should be X@W.T
-        assert np.array_equal(Y, np.matmul(X, W.T))
+        assert np.array_equal(Y, np.matmul(layer.X, layer.W.T))
 
         # Constraint 2: Numerical gradient should be the same with numerical Jacobian
         GN = layer.gradient_numerical()         # [dL/dX, dL/dW]
 
-        LX = lambda x: layer.objective(layer.function(x))
-        JX = numerical_jacobian(LX, X)           # Numerical dL/dX
-        assert np.array_equal(GN[0], JX)
+        # DO NOT use layer.function() as the objective function for numerical_jacobian().
+        # The state of the layer will be modified.
+        # LX = lambda x: layer.objective(layer.function(x))
+        def LX(x):
+            y = np.matmul(x, layer.W.T)
+            return layer.objective(y)
 
-        LW = lambda w: layer.objective(np.matmul(X, w.T))
-        JW = numerical_jacobian(LW, W)           # Numerical dL/dX
-        assert np.array_equal(GN[1], JW)
+        EGNX = numerical_jacobian(LX, layer.X)          # Numerical dL/dX including bias
+        EGNX = EGNX[::, 1::]                            # Remove bias for dL/dX
+        assert np.array_equal(GN[0], EGNX), \
+            "GN[0]\n%s\nEGNX=\n%s\n" % (GN[0], EGNX)
+
+        # DO NOT use layer.function() as the objective function for numerical_jacobian().
+        # The state of the layer will be modified.
+        # LW = lambda w: layer.objective(np.matmul(X, w.T))
+        def LW(w):
+            Y = np.matmul(layer.X, w.T)
+            return layer.objective(Y)
+
+        EGNW = numerical_jacobian(LW, layer.W)          # Numerical dL/dW including bias
+        assert np.array_equal(GN[1], EGNW)              # No need to remove bias
 
         # ================================================================================
         # Layer backward path
@@ -377,7 +412,11 @@ def test_020_matmul_round_trip():
         dX = layer.gradient(dY)
 
         # Constraint 3: Matmul gradient dL/dX should be dL/dY @ W. Use a dummy dL/dY = 1.0.
-        expected_dX = np.matmul(dY, W)
+        expected_dX = np.matmul(dY, layer.W)
+        expected_dX = expected_dX[
+            ::,
+            1::     # Omit bias
+        ]
         assert np.array_equal(dX, expected_dX)
 
         # Constraint 5: Analytical gradient dL/dX close to the numerical gradient GN.
@@ -399,8 +438,18 @@ def test_020_matmul_round_trip():
         assert np.any(backup != layer.W), "W has not been updated "
 
         # Constraint 5: the numerical gradient (dL/dX, dL/dW) are closer to the analytical ones.
-        assert np.all(np.abs(dS[0] - GN[0]) < GRADIENT_DIFF_ACCEPTANCE_VALUE) # dL/dX
-        assert np.all(np.abs(dS[1] - GN[1]) < GRADIENT_DIFF_ACCEPTANCE_VALUE) # dL/dW
+        assert np.allclose(
+            dS[0],
+            GN[0],
+            atol=GRADIENT_DIFF_ACCEPTANCE_VALUE,
+            rtol=GRADIENT_DIFF_ACCEPTANCE_RATIO
+        ), "dS[0]=\n%s\nGN[0]=\n%sdiff=\n%s\n" % (dS[0], GN[0], (dS[0]-GN[0]))
+        assert np.allclose(
+            dS[1],
+            GN[1],
+            atol=GRADIENT_DIFF_ACCEPTANCE_VALUE,
+            rtol=GRADIENT_DIFF_ACCEPTANCE_RATIO
+        ), "dS[1]=\n%s\nGN[1]=\n%sdiff=\n%s\n" % (dS[1], GN[1], (dS[1]-GN[1]))
 
         # Constraint 7: gradient descent progressing with the new objective L(Yn+1) < L(Yn)
         assert np.all(np.abs(objective(layer.function(X)) < L))

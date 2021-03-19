@@ -772,7 +772,7 @@ def cross_entropy_log_loss(
 def numerical_jacobian(
         f: Callable[[np.ndarray], np.ndarray],
         X: Union[np.ndarray, float],
-        delta: float = OFFSET_DELTA
+        delta: Optional[TYPE_FLOAT] = OFFSET_DELTA
 ) -> np.ndarray:
     """Calculate Jacobian matrix J numerically with (f(X+h) - f(X-h)) / 2h
     Jacobian matrix element Jpq = df/dXpq, the impact on J by the
@@ -795,6 +795,7 @@ def numerical_jacobian(
     name = "numerical_jacobian"
     X = np.array(X, dtype=TYPE_FLOAT) if isinstance(X, (float, int)) else X
     J = np.zeros_like(X, dtype=TYPE_FLOAT)
+    delta = OFFSET_DELTA if (delta is None or delta <= 0.0) else delta
 
     # --------------------------------------------------------------------------------
     # (x+h) or (x-h) may cause an invalid value area for the function f.
@@ -806,12 +807,12 @@ def numerical_jacobian(
     # e.g. f(1-h) = log(1-h) causes log(0) instead of log(1-h).
     # --------------------------------------------------------------------------------
     assert (X.dtype == TYPE_FLOAT), "X must be float type"
-    assert delta > 0.0
+    assert delta > 0.0 and isinstance(delta, TYPE_FLOAT)
 
     it = np.nditer(X, flags=['multi_index'], op_flags=['readwrite'])
     while not it.finished:
         idx = it.multi_index
-        tmp: float = X[idx]
+        tmp: TYPE_FLOAT = X[idx]
 
         # --------------------------------------------------------------------------------
         # f(x+h)
