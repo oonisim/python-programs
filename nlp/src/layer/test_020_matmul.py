@@ -75,7 +75,7 @@ def test_020_matmul_instantiation_to_fail():
             Matmul(
                 name="test_020_matmul",
                 num_nodes=0,
-                W=weights.xavier(M, D)
+                W=weights.xavier(M, D+1)
             )
             raise RuntimeError("Matmul(num_nodes<1) must fail.")
         except AssertionError:
@@ -86,7 +86,7 @@ def test_020_matmul_instantiation_to_fail():
             Matmul(
                 name="test_020_matmul",
                 num_nodes=M,
-                W=weights.xavier(M, D),
+                W=weights.xavier(M, D+1),
                 log_level=-1
             )
             raise RuntimeError("Matmul initialization with invalid log level must fail")
@@ -98,7 +98,7 @@ def test_020_matmul_instantiation_to_fail():
             Matmul(
                 name="",
                 num_nodes=1,
-                W=weights.xavier(2, D)
+                W=weights.xavier(2, D+1)
             )
             raise RuntimeError("Matmul initialization with invalid name must fail")
         except AssertionError:
@@ -242,7 +242,7 @@ def test_020_matmul_instance_properties():
             layer = Matmul(
                 name=name,
                 num_nodes=M,
-                W=weights.uniform(M, D),
+                W=weights.xavier(M, D+1),
                 log_level=logging.DEBUG
             )
             layer.function(int(1))
@@ -254,7 +254,7 @@ def test_020_matmul_instance_properties():
             layer = Matmul(
                 name=name,
                 num_nodes=M,
-                W=weights.uniform(M, D),
+                W=weights.xavier(M, D+1),
                 log_level=logging.DEBUG
             )
             layer.function(int(1))

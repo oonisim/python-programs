@@ -242,7 +242,7 @@ def sets_of_circle_A_not_B(
     return result, centres, intersection
 
 
-def spiral(k: int, d: int=3, m: int=3):
+def spiral(k: int, d: int = 2, m: int=3):
     """Generate spiral data points
     https://cs231n.github.io/neural-networks-case-study/#data
     Args:
@@ -254,10 +254,10 @@ def spiral(k: int, d: int=3, m: int=3):
         y: label (0, 1, ...m-1)
     """
     assert k >= m > 1
-    assert d == 3, "currently only d==3 for 2D (bias, x1, x2) is valid"
+    assert d == 2, "currently only d==3 for 2D (bias, x1, x2) is valid"
 
     N = k
-    D = d - 1
+    D = d
     M = m
     X = np.zeros((N * M, D))
     y = np.zeros(N * M, dtype='uint8')

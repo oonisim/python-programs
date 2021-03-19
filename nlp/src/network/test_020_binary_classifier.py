@@ -79,7 +79,7 @@ def train_binary_classifier(
     name = __name__
     assert isinstance(T, np.ndarray) and np.issubdtype(T.dtype, np.integer) and T.ndim == 1 and T.shape[0] == N
     assert isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT and X.ndim == 2 and X.shape[0] == N and X.shape[1] == D
-    assert isinstance(W, np.ndarray) and W.dtype == TYPE_FLOAT and W.ndim == 2 and W.shape[0] == M and W.shape[1] == D
+    assert isinstance(W, np.ndarray) and W.dtype == TYPE_FLOAT and W.ndim == 2 and W.shape[0] == M and W.shape[1] == D+1
     assert num_epochs > 0 and N > 0 and D > 0
 
     assert (
@@ -109,7 +109,7 @@ def train_binary_classifier(
     )
     matmul.objective = loss.function
 
-    num_no_progress:int = 0     # how many time when loss L not decreased.
+    num_no_progress: int = 0     # how many time when loss L not decreased.
     loss.T = T
     history: List[np.ndarray] = [loss.function(matmul.function(X))]
 
@@ -144,24 +144,6 @@ def train_binary_classifier(
         history.append(L)
 
         # --------------------------------------------------------------------------------
-        # Layer backward path
-        # 1. Calculate the analytical gradient dL/dX=matmul.gradient(dL/dY) with a dL/dY.
-        # 2. Gradient descent to update Wn+1 = Wn - lr * dL/dX.
-        # --------------------------------------------------------------------------------
-        before = copy.deepcopy(matmul.W)
-        dY = loss.gradient(float(1))
-        dX = matmul.gradient(dY)
-
-        # gradient descent and get the analytical dL/dX, dL/dW
-        dS = matmul.update()
-
-        # --------------------------------------------------------------------------------
-        #  Constraint 1. W in the matmul has been updated by the gradient descent.
-        # --------------------------------------------------------------------------------
-        Logger.debug("W after is \n%s", matmul.W)
-        assert not np.array_equal(before, matmul.W), "W has not been updated."
-
-        # --------------------------------------------------------------------------------
         # Expected dL/dW.T = X.T @ dL/dY = X.T @ (P-T) / N, and dL/dX = dL/dY @ W
         # P = sigmoid(X) or softmax(X)
         # --------------------------------------------------------------------------------
@@ -170,18 +152,41 @@ def train_binary_classifier(
             # P = sigmoid(np.matmul(X, W.T))
             P = sigmoid(np.matmul(matmul.X, matmul.W.T))
             P = P - T.reshape(-1, 1)    # T(N,) -> T(N,1) to align with P(N,1)
-            assert P.shape == (N,1), "P.shape is %s T.shape is %s" % (P.shape, T.shape)
+            assert P.shape == (N, 1), "P.shape is %s T.shape is %s" % (P.shape, T.shape)
 
         elif log_loss_function == softmax_cross_entropy_log_loss:
-            # P = softmax(np.matmul(X, W.T))
-            P = softmax(np.matmul(matmul.X, matmul.W.T))
+            # matmul.X.shape is (N, D+1), matmul.W.T.shape is (D+1, M)
+            P = softmax(np.matmul(matmul.X, matmul.W.T))    # (N, M)
             P[
                 np.arange(N),
                 T
             ] -= 1
 
-        EDX = np.dot(P/N, W)        # (N,M) @ (M, D) -> (N, D)
-        EDW = np.dot(X.T, P/N).T    # dL/dW.T shape(D,M) -> dL/dW shape(M, D)
+        # TODO: Calculate expected gradients BEFORE update W !!!
+        # dL/dX = dL/dY * W is to use W BEFORE updating W !!!
+        EDX = np.matmul(P/N, matmul.W)      # (N,M) @ (M, D+1) -> (N, D+1)
+        EDX = EDX[::, 1:]                   # Hide the bias    -> (N, D)
+        EDW = np.matmul(matmul.X.T, P/N).T  # ((D+1,N) @ (N, M)).T -> (M, D+1)
+
+        # --------------------------------------------------------------------------------
+        # Layer backward path
+        # 1. Calculate the analytical gradient dL/dX=matmul.gradient(dL/dY) with a dL/dY.
+        # 2. Gradient descent to update Wn+1 = Wn - lr * dL/dX.
+        # --------------------------------------------------------------------------------
+        before = copy.deepcopy(matmul.W)
+        dY = loss.gradient(float(1))
+        dX = matmul.gradient(dY)
+
+        # gradient descent and get the analytical gradients dS=[dL/dX, dL/dW]
+        # dL/dX.shape = (N, D)
+        # dL/dW.shape = (M, D+1)
+        dS = matmul.update()
+
+        # --------------------------------------------------------------------------------
+        #  Constraint 1. W in the matmul has been updated by the gradient descent.
+        # --------------------------------------------------------------------------------
+        Logger.debug("W after is \n%s", matmul.W)
+        assert not np.array_equal(before, matmul.W), "W has not been updated."
 
         delta_dX = np.abs(EDX-dS[0])
         delta_dW = np.abs(EDW-dS[1])
@@ -200,7 +205,9 @@ def train_binary_classifier(
 
         if test_numerical_gradient:
             # --------------------------------------------------------------------------------
-            # Numerical gradient
+            # Numerical gradients gn=[dL/dX, dL/dW]
+            # dL/dX.shape = (N, D)
+            # dL/dW.shape = (M, D+1)
             # --------------------------------------------------------------------------------
             gn = matmul.gradient_numerical()
 
@@ -244,8 +251,8 @@ def _test_binary_classifier(
     """Test case for layer matmul class
     """
     N = 50
-    D = 3
-    W = weights.he(M, D)
+    D = 2
+    W = weights.he(M, D+1)
     optimizer = SGD(lr=0.1)
     X, T, V = linear_separable(d=D, n=N)
     # X, T = transform_X_T(X, T)
@@ -289,8 +296,8 @@ def test_categorical_classifier(
     """Test case for layer matmul class
     """
     N = 10
-    D = 3
-    W = weights.he(M, D)
+    D = 2
+    W = weights.he(M, D+1)
     optimizer = SGD(lr=0.1)
     X, T, V = linear_separable_sectors(n=N, d=D, m=M)
     assert X.shape == (N, D)
