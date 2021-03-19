@@ -146,6 +146,7 @@ def train_binary_classifier(
         # --------------------------------------------------------------------------------
         # Expected dL/dW.T = X.T @ dL/dY = X.T @ (P-T) / N, and dL/dX = dL/dY @ W
         # P = sigmoid(X) or softmax(X)
+        # dL/dX = dL/dY * W is to use W BEFORE updating W.
         # --------------------------------------------------------------------------------
         P = None
         if log_loss_function == sigmoid_cross_entropy_log_loss:
@@ -162,8 +163,6 @@ def train_binary_classifier(
                 T
             ] -= 1
 
-        # TODO: Calculate expected gradients BEFORE update W !!!
-        # dL/dX = dL/dY * W is to use W BEFORE updating W !!!
         EDX = np.matmul(P/N, matmul.W)      # (N,M) @ (M, D+1) -> (N, D+1)
         EDX = EDX[::, 1:]                   # Hide the bias    -> (N, D)
         EDW = np.matmul(matmul.X.T, P/N).T  # ((D+1,N) @ (N, M)).T -> (M, D+1)
