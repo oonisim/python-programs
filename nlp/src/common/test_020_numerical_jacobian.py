@@ -3,7 +3,7 @@ WARNING:
     DO NOT reuse X/P and T e.g. T = P or T = X.
     Python passes references to an object and (X=X+h) in numerical_jacobian
     will change T if you do T = X, causing bugs because T=[0+1e-6, 1+1e-6]
-    can be T=[1,1] for T.dtype=int.
+    can be T=[1,1] for T.dtype=TYPE_LABEL.
 
 """
 import logging
@@ -11,6 +11,8 @@ from functools import partial
 import numpy as np
 import pytest_check as check    # https://pypi.org/project/pytest-check/
 from common import (
+    TYPE_FLOAT,
+    TYPE_LABEL,
     numerical_jacobian,
     logarithm,
     sigmoid,
@@ -121,7 +123,7 @@ def test_020_cross_entropy_log_loss_1d(caplog):
     index: int = np.random.randint(0, M)            # Position of the true label in P
     P1 = np.zeros(M)
     P1[index] = float(1.0)
-    T1 = np.zeros(M, dtype=int)
+    T1 = np.zeros(M, dtype=TYPE_LABEL)
     T1[index] = int(1)
 
     # Analytica correct gradient for P=1, T=1

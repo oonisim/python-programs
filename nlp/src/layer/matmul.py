@@ -23,7 +23,9 @@ from optimizer import (
     Optimizer,
     SGD,
 )
-from common.functions import (
+from common import (
+    TYPE_LABEL,
+    TYPE_FLOAT,
     numerical_jacobian
 )
 
@@ -88,7 +90,7 @@ class Matmul(Layer):
         # --------------------------------------------------------------------------------
         self._D = W.shape[1]                # number of features in x
         self._W: np.ndarray = W             # node weight vectors
-        self._dW: np.ndarray = np.empty(0, dtype=float)
+        self._dW: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)
 
         # Not use WT because W keeps updated every cycle, hence need to update WT as well.
         # Hence not much performance gain and risk of introducing bugs.
@@ -158,12 +160,12 @@ class Matmul(Layer):
         # gradient() need to validate the dY shape is (N,M)
         # --------------------------------------------------------------------------------
         if self._Y.size <= 0 or self.Y.shape[0] != self.N:
-            self._Y = np.empty((self.N, self.M), dtype=float)
+            self._Y = np.empty((self.N, self.M), dtype=TYPE_FLOAT)
             # --------------------------------------------------------------------------------
             # DO NOT allocate memory area for the gradient that has already been calculated.
             # dL/dY is calculated at the post layer, hence it has the buffer allocated already.
             # --------------------------------------------------------------------------------
-            # self._dY = np.empty((self.N, self.M), dtype=float)
+            # self._dY = np.empty((self.N, self.M), dtype=TYPE_FLOAT)
 
         # --------------------------------------------------------------------------------
         # TODO:
@@ -183,7 +185,7 @@ class Matmul(Layer):
             dL/dX of shape (N,D):  [ dL/dY:(N,M) @ W:(M,D)) ]
         """
         name = "gradient"
-        assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == float)
+        assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT)
 
         dY = np.array(dY).reshape((1, -1)) if isinstance(dY, float) or dY.ndim < 2 else dY
         assert dY.shape == self.Y.shape, \

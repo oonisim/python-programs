@@ -20,7 +20,9 @@ from optimizer import (
     Optimizer,
     SGD,
 )
-from common.functions import (
+from common import (
+    TYPE_FLOAT,
+    TYPE_LABEL,
     standardize,
     numerical_jacobian
 )
@@ -104,12 +106,12 @@ class Standardization(Layer):
         # Y:(N,M) = [ X:(N,D) @ W.T:(D,M) ]
         # --------------------------------------------------------------------------------
         if self._Y.size <= 0 or self.Y.shape[0] != self.N:
-            self._Y = np.empty((self.N, self.M), dtype=float)
+            self._Y = np.empty((self.N, self.M), dtype=TYPE_FLOAT)
             # --------------------------------------------------------------------------------
             # DO NOT allocate memory area for the gradient that has already been calculated.
             # dL/dY is calculated at the post layer, hence it has the buffer allocated already.
             # --------------------------------------------------------------------------------
-            # self._dY = np.empty((self.N, self.M), dtype=float)
+            # self._dY = np.empty((self.N, self.M), dtype=TYPE_FLOAT)
 
         _, mean, sd = standardize(X, out=self._Y)
         return self.Y
@@ -122,7 +124,7 @@ class Standardization(Layer):
             dL/dX of shape (N,D):  [ dL/dY:(N,M) @ W:(M,D)) ]
         """
         name = "gradient"
-        assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == float)
+        assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT)
 
         dY = np.array(dY).reshape((1, -1)) if isinstance(dY, float) or dY.ndim < 2 else dY
         assert dY.shape == self.Y.shape, \
@@ -187,11 +189,11 @@ class BatchNormalization(Layer):
         self._posteriors: List[Layer] = posteriors
         self._num_posteriors: int = len(posteriors) if posteriors else -1
 
-        self._Xstd = np.empty(0, dtype=float)               # Standardized X
-        self._U: np.ndarray = np.empty(0, dtype=float)      # Feature mean of shape(1.M)
-        self._V: np.ndarray = np.empty(0, dtype=float)      # Feature variance of shape (1,M)
-        self._RU: np.ndarray = np.empty(0, dtype=float)     # Feature running mean of shape(1.M)
-        self._RV: np.ndarray = np.empty(0, dtype=float)     # Feature running variance of shape (1,M)
+        self._Xstd = np.empty(0, dtype=TYPE_FLOAT)               # Standardized X
+        self._U: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)      # Feature mean of shape(1.M)
+        self._V: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)      # Feature variance of shape (1,M)
+        self._RU: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)     # Feature running mean of shape(1.M)
+        self._RV: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)     # Feature running variance of shape (1,M)
 
         self._gamma: np.ndarray = np.ones(num_nodes)        # Scale
         self._beta: np.ndarray = np.zeros(num_nodes)        # Shift
@@ -278,12 +280,12 @@ class BatchNormalization(Layer):
         # Y:(N,M) = [ X:(N,D) @ W.T:(D,M) ]
         # --------------------------------------------------------------------------------
         if self._Y.size <= 0 or self.Y.shape[0] != self.N:
-            self._Y = np.empty((self.N, self.M), dtype=float)
+            self._Y = np.empty((self.N, self.M), dtype=TYPE_FLOAT)
             # --------------------------------------------------------------------------------
             # DO NOT allocate memory area for the gradient that has already been calculated.
             # dL/dY is calculated at the post layer, hence it has the buffer allocated already.
             # --------------------------------------------------------------------------------
-            # self._dY = np.empty((self.N, self.M), dtype=float)
+            # self._dY = np.empty((self.N, self.M), dtype=TYPE_FLOAT)
 
         _, mean, sd = standardize(X, out=self._Y)
         return self.Y
@@ -296,7 +298,7 @@ class BatchNormalization(Layer):
             dL/dX of shape (N,D):  [ dL/dY:(N,M) @ W:(M,D)) ]
         """
         name = "gradient"
-        assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == float)
+        assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT)
 
         dY = np.array(dY).reshape((1, -1)) if isinstance(dY, float) or dY.ndim < 2 else dY
         assert dY.shape == self.Y.shape, \

@@ -113,6 +113,8 @@ import inspect
 import logging
 import numpy as np
 from common import (
+    TYPE_FLOAT,
+    TYPE_LABEL,
     GRADIENT_SATURATION_THRESHOLD,
     numerical_jacobian
 )
@@ -151,21 +153,21 @@ class Layer:
         # X: batch input of shape(N, D)
         # Gradient dL/dX of has the same shape(N,D) with X because L is scalar.
         # --------------------------------------------------------------------------------
-        self._X: np.ndarray = np.empty(0, dtype=float)
+        self._X: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)
         self._N: int = -1
-        self._dX: np.ndarray = np.empty(0, dtype=float)
+        self._dX: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)
         self._D: int = -1
 
         # Labels of shape(N, M) for OHE or (N,) for index.
-        self._T: np.ndarray = np.empty(0, dtype=int)
+        self._T: np.ndarray = np.empty(0, dtype=TYPE_LABEL)
 
         # --------------------------------------------------------------------------------
         # layer output Y of shape(N, M)
         # Gradient dL/dY has the same shape (N, M) with Y because the L is scalar.
         # dL/dY is the sum of all the impact on L by dY.
         # --------------------------------------------------------------------------------
-        self._Y: np.ndarray = np.empty(0, dtype=float)
-        self._dY: np.ndarray = np.empty(0, dtype=float)
+        self._Y: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)
+        self._dY: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)
 
         # Layers to which forward the matmul output
         self._posteriors: List[Layer] = posteriors
@@ -204,7 +206,7 @@ class Layer:
     @property
     def X(self) -> np.ndarray:
         """Latest batch input to the layer"""
-        assert isinstance(self._X, np.ndarray) and self._X.dtype == float \
+        assert isinstance(self._X, np.ndarray) and self._X.dtype == TYPE_FLOAT \
             and self._X.size > 0, "X is not initialized or invalid"
         return self._X
 
@@ -216,7 +218,7 @@ class Layer:
         3. DO NOT set/update _D as it can be set with the weight shape.
         """
         assert X is not None and \
-               ((isinstance(X, np.ndarray) and X.dtype == float) or isinstance(X, float))
+               ((isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) or isinstance(X, float))
 
         if np.all(np.abs(X) > 1.0):
             self.logger.warning("Input data X has not been standardized.")
@@ -233,7 +235,7 @@ class Layer:
 
         # Allocate the storage for np.func(out=dX).
         if self._dX.shape != self.X.shape:
-            self._dX = np.empty(self.X.shape, dtype=float)
+            self._dX = np.empty(self.X.shape, dtype=TYPE_FLOAT)
 
         # DO NOT
         # self._D = X.shape[1]
@@ -270,7 +272,7 @@ class Layer:
                 (isinstance(T, int))
             )
 
-        self._T = np.array(T, dtype=int) if isinstance(T, int) else T.astype(int)
+        self._T = np.array(T, dtype=TYPE_LABEL) if isinstance(T, int) else T.astype(int)
         # T can be set after X, hence not possible to verify.
         # assert T.shape[0] == self.N, \
         #     f"Set X first and the batch size of T should be {self.N} but {T.shape[0]}"
@@ -281,7 +283,7 @@ class Layer:
         No need to allocate a storage for dY as it is allocated by the post layer.
         """
         assert \
-            (isinstance(self._Y, np.ndarray) and self._Y.dtype == float) and \
+            (isinstance(self._Y, np.ndarray) and self._Y.dtype == TYPE_FLOAT) and \
             self._Y.size > 0, \
             "Y %s of type %s is not initialized or invalid." % \
             (self._Y, type(self._Y))
@@ -290,7 +292,7 @@ class Layer:
     @property
     def dY(self) -> np.ndarray:
         """Latest gradient dL/dY (impact on L by dY) given from the post layer(s)"""
-        assert isinstance(self._dY, np.ndarray) and self._dY.dtype == float \
+        assert isinstance(self._dY, np.ndarray) and self._dY.dtype == TYPE_FLOAT \
             and self._dY.size > 0, "dY is not initialized or invalid"
 
         if np.all(np.abs(self._dY) < GRADIENT_SATURATION_THRESHOLD):
@@ -326,7 +328,7 @@ class Layer:
         Returns:
             Y: Layer output
         """
-        assert isinstance(X, float) or (isinstance(X, np.ndarray) and X.dtype == float)
+        assert isinstance(X, float) or (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT)
         self.logger.warning(
             "Layer base method %s not overridden but called by %s.",
             inspect.stack()[0][3], inspect.stack()[1][3]
@@ -343,7 +345,7 @@ class Layer:
     #         inspect.stack()[0][3], inspect.stack()[1][3]
     #     )
     #     X = np.array(X) if isinstance(X, float) else X
-    #     assert isinstance(X, np.ndarray) and X.dtype == float
+    #     assert isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT
     #     return X
 
     def forward(self, X: np.ndarray) -> Union[np.ndarray, float]:
@@ -379,14 +381,14 @@ class Layer:
         Returns:
             dL/dX: impact on L by the layer input X
         """
-        assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == float)
+        assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT)
 
         # In case the layer is a repeater or no gradient, pass dY through.
         self.logger.warning(
             "Layer base method %s not overridden but called by %s.",
             inspect.stack()[0][3], inspect.stack()[1][3]
         )
-        assert isinstance(dY, np.ndarray) and dY.dtype == float
+        assert isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT
         return dY
 
     # def backward(self) -> Union[np.ndarray, float]:

@@ -9,7 +9,9 @@ from typing import (
     NoReturn
 )
 import numpy as np
-from common.functions import (
+from common import (
+    TYPE_FLOAT,
+    TYPE_LABEL,
     transform_X_T,
     logistic_log_loss,
     categorical_log_loss,
@@ -186,7 +188,7 @@ class CrossEntropyLogLoss(Layer):
         # Convert scalar back to np.ndarray as np.sum() gives scalar.
         # https://numpy.org/doc/stable/reference/generated/numpy.sum.html
         # --------------------------------------------------------------------------------
-        L = np.array(_L / self.N, dtype=float)
+        L = np.array(_L / self.N, dtype=TYPE_FLOAT)
         self._Y = L         # L is alias of Y.
 
         self.logger.debug("Layer[%s].%s: L = %s", self.name, name, self.Y)
@@ -227,13 +229,13 @@ class CrossEntropyLogLoss(Layer):
         # Shapes of dL/dY and Y are the same because L is scalar.
         # --------------------------------------------------------------------------------
         assert \
-            (isinstance(dY, np.ndarray) and dY.dtype == float) and \
+            (isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT) and \
             (dY.shape == self.Y.shape), \
             "dY/dY shape needs %s of type float but %s of type %s" % \
             (self.Y.shape, dY.shape, dY.dtype)
 
         # dL/dJ is 1/N of shape (N,) but transform into shape (N,1) to np-broadcast.
-        dJ: np.ndarray = (dY * np.ones(self.N, dtype=float) / float(self.N)).reshape(-1, 1)
+        dJ: np.ndarray = (dY * np.ones(self.N, dtype=TYPE_FLOAT) / float(self.N)).reshape(-1, 1)
 
         # --------------------------------------------------------------------------------
         # Calculate the layer gradient

@@ -8,6 +8,8 @@ import logging
 import cProfile
 import numpy as np
 from common import (
+    TYPE_FLOAT,
+    TYPE_LABEL,
     weights,
     softmax,
     relu,
@@ -68,8 +70,8 @@ def train_matmul_relu_classifier(
     """
     name = __name__
     assert isinstance(T, np.ndarray) and np.issubdtype(T.dtype, np.integer) and T.ndim == 1 and T.shape[0] == N
-    assert isinstance(X, np.ndarray) and X.dtype == float and X.ndim == 2 and X.shape[0] == N and X.shape[1] == D
-    assert isinstance(W, np.ndarray) and W.dtype == float and W.ndim == 2 and W.shape[0] == M and W.shape[1] == D
+    assert isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT and X.ndim == 2 and X.shape[0] == N and X.shape[1] == D
+    assert isinstance(W, np.ndarray) and W.dtype == TYPE_FLOAT and W.ndim == 2 and W.shape[0] == M and W.shape[1] == D
     assert num_epochs > 0 and N > 0 and D > 0
 
     assert (

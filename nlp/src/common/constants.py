@@ -46,3 +46,11 @@ GN_DIFF_ACCEPTANCE_RATIO = 1e-15
 
 # To enforce assertion failure, set False (True -> assert True)
 ENFORCE_STRICT_ASSERT = (not False)
+
+# --------------------------------------------------------------------------------
+# Float number type to use. For NN, 32 bit is enough.
+# --------------------------------------------------------------------------------
+TYPE_INT = np.int32
+TYPE_LABEL = np.int8
+TYPE_FLOAT = np.float       # alias of Python float
+# FLOAT_TYPE = np.float32

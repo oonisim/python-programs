@@ -1,6 +1,8 @@
 import logging
 import numpy as np
 from common import (
+    TYPE_FLOAT,
+    TYPE_LABEL,
     standardize,
     logarithm,
     sigmoid,
@@ -47,10 +49,10 @@ def test_010_sigmoid_cross_entropy_log_loss_2d(caplog):
     # Expected:
     #   sigmoid_cross_entropy_log_loss(X, T) == -log(0.5)
     # --------------------------------------------------------------------------------
-    X = np.array([[0.0]])
-    T = np.array([1])
+    X = np.array([[TYPE_FLOAT(0.0)]])
+    T = np.array([TYPE_LABEL(1)])
     X, T = transform_X_T(X, T)
-    E = -logarithm(np.array([0.5]))
+    E = -logarithm(np.array([TYPE_FLOAT(0.5)]))
 
     J, P = sigmoid_cross_entropy_log_loss(X, T)
     assert E.shape == J.shape

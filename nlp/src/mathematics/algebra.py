@@ -1,5 +1,11 @@
 import sys
 import numpy as np
+from common import (
+    TYPE_FLOAT,
+    TYPE_LABEL
+)
+
+
 np.set_printoptions(threshold=sys.maxsize)
 np.set_printoptions(linewidth=120)
 
@@ -74,7 +80,7 @@ def is_point_inside_sector(X: np.ndarray, base: float, coverage: float, centre=N
         Y: Labels of shape (N,). True if (x,y) is on or between the coverage.
     """
     if not isinstance(X, np.ndarray):
-        X = np.array(X, dtype=float).reshape(-1, 2)
+        X = np.array(X, dtype=TYPE_FLOAT).reshape(-1, 2)
 
     assert (0 <= base < 2 * np.pi) and (0 <= coverage <= 2 * np.pi), \
         "base and coverage need [0, 2pi) but base %s, coverage %s" \

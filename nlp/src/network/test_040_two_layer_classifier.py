@@ -9,6 +9,8 @@ import logging
 import cProfile
 import numpy as np
 from common import (
+    TYPE_FLOAT,
+    TYPE_LABEL,
     weights,
     softmax,
     relu,
@@ -76,9 +78,9 @@ def train_two_layer_classifier(
     """
     name = __name__
     assert isinstance(T, np.ndarray) and np.issubdtype(T.dtype, np.integer) and T.ndim == 1 and T.shape[0] == N
-    assert isinstance(X, np.ndarray) and X.dtype == float and X.ndim == 2 and X.shape[0] == N and X.shape[1] == D
-    assert isinstance(W1, np.ndarray) and W1.dtype == float and W1.ndim == 2 and W1.shape[0] == M1 and W1.shape[1] == D
-    assert isinstance(W2, np.ndarray) and W2.dtype == float and W2.ndim == 2 and W2.shape[0] == M2 and W2.shape[1] == M1
+    assert isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT and X.ndim == 2 and X.shape[0] == N and X.shape[1] == D
+    assert isinstance(W1, np.ndarray) and W1.dtype == TYPE_FLOAT and W1.ndim == 2 and W1.shape[0] == M1 and W1.shape[1] == D
+    assert isinstance(W2, np.ndarray) and W2.dtype == TYPE_FLOAT and W2.ndim == 2 and W2.shape[0] == M2 and W2.shape[1] == M1
     assert num_epochs > 0 and N > 0 and D > 0 and M1 > 1
     assert (
         log_loss_function == softmax_cross_entropy_log_loss and M2 >= 2

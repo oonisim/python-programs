@@ -1,5 +1,9 @@
 """Data for classifications"""
 import numpy as np
+from common import (
+    TYPE_FLOAT,
+    TYPE_LABEL
+)
 from mathematics import (
     rotate,
     is_point_inside_sector
@@ -70,7 +74,7 @@ def linear_separable_sectors(
         radii * np.cos(Z),
         radii * np.sin(Z)
     ]
-    T = np.zeros(n, dtype=int)
+    T = np.zeros(n, dtype=TYPE_LABEL)
     sector = (2 * np.pi) / float(m)  # angle of a sector
 
     B = np.array([[1.0, 0.0]])

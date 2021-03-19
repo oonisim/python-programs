@@ -9,6 +9,8 @@ from typing import (
 import logging
 import numpy as np
 from common import (
+    TYPE_FLOAT,
+    TYPE_LABEL,
     transform_X_T,
     sigmoid,
     logarithm,
@@ -391,7 +393,7 @@ def test_040_objective_methods_1d_ohe():
         # --------------------------------------------------------------------------------
         def objective(x):
             j, p = sigmoid_cross_entropy_log_loss(x, T)
-            return np.array(np.sum(j) / N, dtype=float)
+            return np.array(np.sum(j) / N, dtype=TYPE_FLOAT)
 
         EGN = numerical_jacobian(objective, X).reshape(1, -1)   # Expected numerical dL/dX
         assert np.array_equal(GN[0], EGN), \
@@ -449,7 +451,7 @@ def test_040_objective_methods_2d_ohe(caplog):
         # Layer forward path
         # ================================================================================
         X = np.random.randn(N, M)
-        T = np.zeros_like(X, dtype=int)     # OHE labels.
+        T = np.zeros_like(X, dtype=TYPE_LABEL)     # OHE labels.
         T[
             np.arange(N),
             np.random.randint(0, M, N)
@@ -474,14 +476,14 @@ def test_040_objective_methods_2d_ohe(caplog):
         # --------------------------------------------------------------------------------
         L = layer.function(X)
         J, P = sigmoid_cross_entropy_log_loss(X, T)
-        EL = np.array(np.sum((1-T) * X + logarithm(1 + np.exp(-X))) / N, dtype=float)
+        EL = np.array(np.sum((1-T) * X + logarithm(1 + np.exp(-X))) / N, dtype=TYPE_FLOAT)
 
         # Constraint: A == P as they are sigmoid(X)
         assert np.all(np.abs(A-P) < ACTIVATION_DIFF_ACCEPTANCE_VALUE), \
             f"Need A==P==sigmoid(X) but A=\n{A}\n P=\n{P}\n(A-P)=\n{(A-P)}\n"
 
         # Constraint: Log loss layer output L == sum(J) from the log loss function
-        Z = np.array(np.sum(J) / N, dtype=float)
+        Z = np.array(np.sum(J) / N, dtype=TYPE_FLOAT)
         assert np.array_equal(L, Z), \
             f"Need log loss layer output L == sum(J) but L=\n{L}\nZ=\n{Z}."
 
@@ -498,7 +500,7 @@ def test_040_objective_methods_2d_ohe(caplog):
         def objective(x):
             """Function to calculate the scalar loss L for cross entropy log loss"""
             j, p = sigmoid_cross_entropy_log_loss(x, T)
-            return np.array(np.sum(j) / N, dtype=float)
+            return np.array(np.sum(j) / N, dtype=TYPE_FLOAT)
 
         EGN = numerical_jacobian(objective, X)              # Expected numerical dL/dX
         assert np.array_equal(GN[0], EGN), \
