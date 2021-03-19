@@ -1,6 +1,8 @@
 import logging
 import numpy as np
 from common import (
+    TYPE_FLOAT,
+    TYPE_LABEL,
     standardize,
     logarithm,
     sigmoid,
@@ -40,7 +42,8 @@ def test_010_standardize():
         Logger.debug("%s: X \n%s\n", name, X)
 
         # Constraint: standardize(X) == (X - np.mean(A)) / np.std(X)
-        sd = np.std(X, axis=0)
+        ddof = 1 if N > 1 else 0
+        sd = np.std(X, axis=0, ddof=ddof)
         if np.all(sd > 0):
             # Expected
             mean = np.mean(X, axis=0)
@@ -117,7 +120,7 @@ def test_010_cross_entropy_log_loss():
         # sum(-t * log(p)) -> log(k)
         # --------------------------------------------------------------------------------
         P = np.zeros(length)
-        T = np.zeros(length, dtype=int)
+        T = np.zeros(length, dtype=TYPE_LABEL)
 
         P[index] = 1.0
         while (position:= np.random.randint(0, length)) == index: pass

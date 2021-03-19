@@ -12,6 +12,8 @@ from typing import (
 )
 import numpy as np
 from common import (
+    TYPE_FLOAT,
+    TYPE_LABEL,
     OFFSET_DELTA,
     OFFSET_LOG,
     OFFSET_STD,
@@ -46,17 +48,21 @@ def standardize(
         mean: mean of X
         sd: standard deviation of X
     """
-    assert (isinstance(X, np.ndarray) and X.dtype == float)
+    assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT)
     if isinstance(X, float):
         X = np.array(X).reshape(1, -1)
     if X.ndim <= 1:
         X = X.reshape(1, -1)
 
     N = X.shape[0]
-    mean = np.sum(X, axis=0) / N    # mean of each feature
+
+    # --------------------------------------------------------------------------------
+    # Calculate mean/variance/sd deviation per feature
+    # --------------------------------------------------------------------------------
+    ddof = 1 if N > 1 else 0    # Bessel's correction
+    sd = np.std(X, axis=0, ddof=ddof)
+    mean = np.mean(X, axis=0)   # mean of each feature
     deviation = X - mean
-    variance = np.var(X, axis=0)
-    sd = np.sqrt(variance)
 
     mask = (sd == 0.0)
     if np.any(mask):
@@ -95,7 +101,7 @@ def logarithm(
     if isinstance(X, float):
         return np.log(X + offset)
 
-    assert (isinstance(X, np.ndarray) and X.dtype == float)
+    assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT)
     offset = OFFSET_LOG if (offset is None or offset <= 0.0) else offset   # offset > 0
     assert offset > 0.0
     if OFFSET_MODE_ELEMENT_WISE:
@@ -141,7 +147,7 @@ def sigmoid(
         X: > domain value for log
         boundary: The lower boundary of acceptable X value.
     """
-    assert (isinstance(X, np.ndarray) and X.dtype == float) or isinstance(X, float)
+    assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) or isinstance(X, float)
     boundary = BOUNDARY_SIGMOID if (boundary is None or boundary <= float(0)) else boundary
     assert boundary > 0
 
@@ -171,14 +177,14 @@ def sigmoid_gradient(X: Union[int, float, np.ndarray]) -> Union[int, float, np.n
         X:
     Returns: gradient
     """
-    assert (isinstance(X, np.ndarray) and X.dtype == float) or isinstance(X, float)
+    assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) or isinstance(X, float)
     Z = sigmoid(X)
     return Z * (1.0 - Z)
 
 
 def relu(X: Union[int, float, np.ndarray]) -> Union[int, float, np.ndarray]:
     """ReLU activation function"""
-    assert (isinstance(X, np.ndarray) and X.dtype == float) or isinstance(X, float)
+    assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) or isinstance(X, float)
     return np.maximum(0, X)
 
 
@@ -188,7 +194,7 @@ def relu_gradient(X: Union[int, float, np.ndarray]) -> Union[int, float, np.ndar
         X:
     Returns: gradient
     """
-    assert (isinstance(X, np.ndarray) and X.dtype == float) or isinstance(X, float)
+    assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) or isinstance(X, float)
     grad = np.zeros_like(X)
     grad[X >= 0] = 1
     return grad
@@ -204,8 +210,8 @@ def softmax(X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
         P: Probability of shape (N,M)
     """
     name = "softmax"
-    assert isinstance(X, float) or (isinstance(X, np.ndarray) and X.dtype == float), \
-        "X must be float or ndarray(dtype=float)"
+    assert isinstance(X, float) or (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT), \
+        "X must be float or ndarray(dtype=TYPE_FLOAT)"
 
     # --------------------------------------------------------------------------------
     # exp(x-c) to prevent the infinite exp(x) for a large value x, with c = max(x).
@@ -329,7 +335,7 @@ def transform_X_T(
         (X, T): reshaped X of shape(N,M), T of shape(M,)
     """
     name = "transform_X_T"
-    assert (isinstance(X, np.ndarray) and X.dtype == float) or isinstance(X, float), \
+    assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) or isinstance(X, float), \
         "Type of P must be float"
     assert (isinstance(T, np.ndarray) and np.issubdtype(T.dtype, np.integer)) or \
            isinstance(T, int), "Type of T must be integer"
@@ -354,7 +360,7 @@ def transform_X_T(
         # ]
         # ================================================================================
         assert isinstance(X, np.ndarray)
-        T = np.array(T, dtype=int) if isinstance(T, int) else T
+        T = np.array(T, dtype=TYPE_LABEL) if isinstance(T, int) else T
 
         if X.ndim == 1:
             # --------------------------------------------------------------------------------
@@ -480,8 +486,8 @@ def transform_X_T(
 
 def transform_scalar_X_T(X, T):
     """Transform scalar X, T to np.ndarray"""
-    X = np.array(X, dtype=float) if isinstance(X, float) else X
-    T = np.array(T, dtype=int) if isinstance(T, int) else T
+    X = np.array(X, dtype=TYPE_FLOAT) if isinstance(X, float) else X
+    T = np.array(T, dtype=TYPE_LABEL) if isinstance(T, int) else T
     return X, T
 
 
@@ -494,7 +500,7 @@ def check_categorical_classification_X_T(X, T):
     X(N, M) and T(N,) in index label format are expected.
     """
     assert (
-            isinstance(X, np.ndarray) and X.dtype == float and
+            isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT and
             X.ndim == (T.ndim+1) and X.shape[1] > 1 and X.size > 0
     ), f"X.shape(N,M>1) expected for categorical (M>1) classification but {X.shape}"
 
@@ -588,7 +594,7 @@ def check_binary_classification_X_T(X, T):
         T: label
     """
     assert \
-        (isinstance(X, np.ndarray) and X.dtype == float and X.size > 0) and \
+        (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT and X.size > 0) and \
         (
                 isinstance(T, np.ndarray) and np.issubdtype(T.dtype, np.integer) and
                 np.all(np.isin(T, [0, 1]))
@@ -787,8 +793,8 @@ def numerical_jacobian(
         J: Jacobian matrix that has the same shape of X.
     """
     name = "numerical_jacobian"
-    X = np.array(X, dtype=float) if isinstance(X, (float, int)) else X
-    J = np.zeros_like(X, dtype=float)
+    X = np.array(X, dtype=TYPE_FLOAT) if isinstance(X, (float, int)) else X
+    J = np.zeros_like(X, dtype=TYPE_FLOAT)
 
     # --------------------------------------------------------------------------------
     # (x+h) or (x-h) may cause an invalid value area for the function f.
@@ -799,7 +805,7 @@ def numerical_jacobian(
     # X and tmp must be float, or it will be int causing float calculation fail.
     # e.g. f(1-h) = log(1-h) causes log(0) instead of log(1-h).
     # --------------------------------------------------------------------------------
-    assert (X.dtype == float), "X must be float type"
+    assert (X.dtype == TYPE_FLOAT), "X must be float type"
     assert delta > 0.0
 
     it = np.nditer(X, flags=['multi_index'], op_flags=['readwrite'])
