@@ -30,8 +30,7 @@ Logger = logging.getLogger("functions")
 
 
 def standardize(
-    # X: Union[np.ndarray, float], eps: float = 0.0, out=None
-    X: Union[np.ndarray, float], out=None
+    X: Union[np.ndarray, float], eps: float = 1e-8, out=None
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Standardize X per-feature basis.
     Each feature is independent from other features, hence standardize per feature.
@@ -65,6 +64,10 @@ def standardize(
     # deviation = X - mean
     deviation = ne.evaluate("X - mean")
 
+    # --------------------------------------------------------------------------------
+    # TODO: See if below works. If it does not, implement the original BN which uses
+    # variance = sqrt(variance + eps) / (N -ddos)
+    # --------------------------------------------------------------------------------
     mask = (sd == 0.0)
     if np.any(mask):
         # Temporary replace the zero elements with one
@@ -75,10 +78,22 @@ def standardize(
 
         # standardize and zero clear the mask elements
         standardized = np.divide(deviation, sd, out)
-        out[::, mask] = 0.0
 
+        # --------------------------------------------------------------------------------
+        # sd == 0 means variance == 0, which happens when (x-mu) == 0
+        # v=sum(square(x-mu)) / (n-1).
+        # Then elements of (X-mean) where sd ==0 should be 0.
+        # Hence there should be no need to zero-clear those elements.
+        # --------------------------------------------------------------------------------
+        # out[::, mask] = 0.0
+
+        # --------------------------------------------------------------------------------
+        # Leaving "sd[mask] = 1.0" should be OK because (X-mean)/sd -> 0
+        # for those element where sd == 0. Then the BN output
+        # "gamma * ((X-mean) / sd) + beta" -> beta
+        # --------------------------------------------------------------------------------
         # restore sd
-        sd[mask] = 0.0
+        # sd[mask] = 0.0
 
     else:
         standardized = np.divide(deviation, sd, out)
