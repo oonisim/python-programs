@@ -18,7 +18,8 @@ from common import (
     transform_X_T,
     sigmoid,
     sigmoid_cross_entropy_log_loss,
-    softmax_cross_entropy_log_loss
+    softmax_cross_entropy_log_loss,
+    check_with_numerical_gradient
 )
 from data import (
     linear_separable,
@@ -209,31 +210,7 @@ def train_binary_classifier(
             # dL/dW.shape = (M, D+1)
             # --------------------------------------------------------------------------------
             gn = matmul.gradient_numerical()
-
-            # --------------------------------------------------------------------------------
-            #  Constraint 2. Numerical gradient (dL/dX, dL/dW) are closer to the analytical ones.
-            # --------------------------------------------------------------------------------
-            delta_GX = np.abs(dS[0] - gn[0])
-            if not (
-                np.all(delta_GX <= GRADIENT_DIFF_CHECK_TRIGGER) or
-                np.all(delta_GX <= GRADIENT_DIFF_ACCEPTANCE_VALUE) or
-                np.all(delta_GX <= np.abs(gn[0] * GRADIENT_DIFF_ACCEPTANCE_RATIO))
-            ):
-                Logger.warning(
-                    "dL/dX analytical gradient \n%s \nneed to close to numerical gradient \n%s\ndifference=\n%s\n",
-                    dS[0], gn[0], delta_GX
-                )
-
-            delta_GW = np.abs(dS[1] - gn[1])
-            if not (
-                np.all(delta_GW <= GRADIENT_DIFF_CHECK_TRIGGER) or
-                np.all(delta_GW <= GRADIENT_DIFF_ACCEPTANCE_VALUE) or
-                np.all(delta_GW <= np.abs(gn[1] * GRADIENT_DIFF_ACCEPTANCE_RATIO))
-            ):
-                Logger.warning(
-                    "dL/dW analytical gradient \n%s \nneed to close to numerical gradient \n%s\ndifference=\n%s\n",
-                    dS[1], gn[1], delta_GW
-                )
+            check_with_numerical_gradient(dS, gn, Logger)
 
         if callback:
             # if W.shape[1] == 1 else callback(W=np.average(matmul.W, axis=0))
@@ -305,6 +282,9 @@ def test_categorical_classifier(
     def callback(W):
         W
 
+    profiler = cProfile.Profile()
+    profiler.enable()
+
     train_binary_classifier(
         N=N,
         D=D,
@@ -318,3 +298,6 @@ def test_categorical_classifier(
         log_level=logging.WARNING,
         callback=callback
     )
+
+    profiler.disable()
+    profiler.print_stats(sort="cumtime")

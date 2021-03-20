@@ -14,6 +14,7 @@ from typing import (
 import logging
 import copy
 import numpy as np
+import numexpr as ne
 from layer import Layer
 from optimizer import (
     Optimizer,
@@ -247,12 +248,13 @@ class Matmul(Layer):
         name = "gradient_numerical"
         self.logger.debug("layer[%s].%s", self.name, name)
         L = self.objective
+        WT = self.W.T
 
-        def objective_X(X: np.ndarray):
-            return L(X @ self.W.T)
+        def objective_X(x: np.ndarray):
+            return L(x @ WT)
 
-        def objective_W(W: np.ndarray):
-            return L(self.X @ W.T)
+        def objective_W(w: np.ndarray):
+            return L(self.X @ w.T)
 
         dX = numerical_jacobian(objective_X, self.X, delta=h)
         dX = dX[
@@ -282,8 +284,11 @@ class Matmul(Layer):
         # dL/dW of shape (M,D):  [ X.T:(D, N)  @ dL/dY:(N,M) ].T
         # --------------------------------------------------------------------------------
         dW = np.matmul(self.X.T, self.dY).T
-        assert np.array_equal(dW.shape, (self.M, self.D)), \
+        assert dW.shape == (self.M, self.D), \
             f"Gradient dL/dW shape needs {(self.M, self.D)} but ({dW.shape}))"
+
+        assert not np.all(dW == 0.0), \
+            "dW is zero. dw=\n%s\nX=\n%s\ndY=\n%s\n" % (dW, self.X, self.dY)
 
         if self.logger.level in (logging.DEBUG, logging.WARNING) and np.all(dW < dW / 100):
             self.logger.warning(

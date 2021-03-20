@@ -55,15 +55,15 @@ echo "Running PyTest..."
 # https://stackoverflow.com/questions/28908319
 # conda install pytest-xdist -y
 # Then use with -n option
-NUM_CPU=4
-#pytest \
-python3 -m cProfile -o profile -m pytest \
+NUM_CPU=6
+#python3 -m cProfile -o profile -m pytest \
+pytest \
   -n $NUM_CPU \
   --rootdir=${DIR} \
   -vv \
   --capture=tee-sys \
   --log-level=DEBUG \
-  -o log_cli=False -o log_cli_level=WARNING \
+  -o log_cli=True -o log_cli_level=ERROR \
   --log-auto-indent=on \
   --cache-clear -x \
   --color=yes --code-highlight=yes \
@@ -74,4 +74,4 @@ python3 -m cProfile -o profile -m pytest \
   $@ \
 ${DIR}
 
-python3 run_cprofile_analysis.py
+#python3 run_cprofile_analysis.py

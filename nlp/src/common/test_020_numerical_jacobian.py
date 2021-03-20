@@ -9,6 +9,7 @@ WARNING:
 import logging
 from functools import partial
 import numpy as np
+import numexpr as ne
 import pytest_check as check    # https://pypi.org/project/pytest-check/
 from common import (
     TYPE_FLOAT,

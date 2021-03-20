@@ -4,6 +4,11 @@ from typing import (
     List
 )
 import numpy as np
+from common import (
+    TYPE_FLOAT,
+    TYPE_INT,
+    TYPE_LABEL
+)
 from mathematics import (
     rotate,
     shift,
@@ -11,7 +16,7 @@ from mathematics import (
 )
 
 
-def set_in_a_radius(radius: float, d: int, n: int):
+def set_in_a_radius(radius: TYPE_FLOAT, d: int, n: int):
     """Generate cartesian coordinate points in a radius in a D dimension space.
     Args:
         radius: A distance within which data points are to be generated
@@ -64,7 +69,7 @@ def set_in_a_radius(radius: float, d: int, n: int):
         axis=-1,
         dtype=np.ndarray,
         out=cartesians
-    ).astype(float)
+    ).astype(TYPE_FLOAT)
     cartesians = np.flip(cartesians, axis=-1)
 
     # --------------------------------------------------------------------------------
@@ -89,7 +94,12 @@ def set_in_a_radius(radius: float, d: int, n: int):
     return cartesians
 
 
-def sets_in_circles(radius: float, ratio: float = 1.0, m: int = 3, n: int = 10000):
+def sets_in_circles(
+        radius: TYPE_FLOAT,
+        ratio: TYPE_FLOAT = 1.0,
+        m: int = 3,
+        n: int = 10000
+):
     """Generate m set of coordinates where each set forms plots in a circle
     Args:
         radius: circle radius
@@ -102,13 +112,13 @@ def sets_in_circles(radius: float, ratio: float = 1.0, m: int = 3, n: int = 1000
     """
     assert 2 <= m <= n and ratio > 0 and radius > 0.0
 
-    radius = float(radius)
+    radius = TYPE_FLOAT(radius)
     d = 2   # circle is in 2D
     circle = set_in_a_radius(radius=radius, d=d, n=n)
 
     # Generate a new circle by shifting the centre of the "circle" to a "centre".
     # The coordinate of the new centre = rotate(base, step * i).
-    base = np.array([radius * ratio, float(0)])
+    base = np.array([radius * ratio, TYPE_FLOAT(0)])
     step = (2 * np.pi) / (m-1)
     step = step if step < (np.pi / 2) else np.pi / m
 
@@ -165,7 +175,11 @@ def set_in_circle_A_not_B(A, centre_B, radius_B):
 
 
 def sets_of_circle_A_not_B(
-        radius: float, ratio: float = 1.0, m: int = 3, d: int = 2, n: int = 10000
+        radius: TYPE_FLOAT,
+        ratio: TYPE_FLOAT = 1.0,
+        m: int = 3,
+        d: int = 2,
+        n: int = 10000
 ) -> Tuple[List[np.ndarray], np.ndarray, np.ndarray]:
     """Generate m sets of (A NOT B).
         First generate m circles. Let circles[i] be A and circles[i+1] as B.
@@ -242,6 +256,36 @@ def sets_of_circle_A_not_B(
     return result, centres, intersection
 
 
+def venn_of_circle_a_not_b(
+        radius: TYPE_FLOAT,
+        ratio: TYPE_FLOAT = 1.0,
+        m: int = 3,
+        n: int = 1000
+):
+    """
+    Args:
+        radius: radius of the circle in which to generate data points.
+        ratio: Distance between centres as radius * ratio.
+        m: number of circles (classes to classify)
+        n: number of data points per circle
+    """
+    circles, centres, intersection = \
+        sets_of_circle_A_not_B(radius=radius, ratio=ratio, m=m, n=n)
+
+    X = np.vstack(
+        [circles[i] for i in range(m-1)] +
+        [intersection]
+    ).astype(TYPE_FLOAT)
+
+    T = np.hstack(
+        [np.full(circles[i].shape[0], i) for i in range(m-1)] +
+        [np.full(intersection.shape[0], m-1)]
+    ).astype(TYPE_INT)
+    assert T.shape[0] == X.shape[0]
+
+    return X, T
+
+
 def spiral(k: int, d: int = 2, m: int=3):
     """Generate spiral data points
     https://cs231n.github.io/neural-networks-case-study/#data
@@ -268,8 +312,4 @@ def spiral(k: int, d: int = 2, m: int=3):
         X[ix] = np.c_[r * np.sin(t), r * np.cos(t)]
         y[ix] = j
 
-    X = np.c_[
-        np.ones(X.shape[0]),
-        X
-    ]       # Add bias=1
     return X, y

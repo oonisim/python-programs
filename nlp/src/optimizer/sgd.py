@@ -1,6 +1,7 @@
 """Gradient descent algorithm implementations"""
 import logging
 import numpy as np
+import numexpr as ne
 from . base import Optimizer
 
 
@@ -41,5 +42,8 @@ class SGD(Optimizer):
         # Overfitting is when the model is sensitive to changes in the input.
         # Bias is fixed (x0=1), hence no change, hence no point to include it
         # --------------------------------------------------------------------------------
-        regularization = dW * self.l2
-        return np.subtract(W, self.lr * (dW + regularization), out=out)
+        # regularization = dW * self.l2
+        # return np.subtract(W, self.lr * (dW + regularization), out=out)
+        l2 = self.l2
+        lr = self.lr
+        return ne.evaluate("W - lr * dW * (1 + l2)", out=out)

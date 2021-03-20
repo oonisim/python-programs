@@ -2,15 +2,16 @@
 Those marked as "From deep-learning-from-scratch" is copied from the github.
 https://github.com/oreilly-japan/deep-learning-from-scratch
 """
-import logging
-import copy
 from typing import (
     Optional,
     Union,
     Tuple,
     Callable
 )
+import logging
+import copy
 import numpy as np
+import numexpr as ne
 from common import (
     TYPE_FLOAT,
     TYPE_LABEL,
@@ -48,9 +49,7 @@ def standardize(
         mean: mean of X
         sd: standard deviation of X
     """
-    assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT)
-    if isinstance(X, float):
-        X = np.array(X).reshape(1, -1)
+    assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT and X.size > 0)
     if X.ndim <= 1:
         X = X.reshape(1, -1)
 
@@ -60,9 +59,11 @@ def standardize(
     # Calculate mean/variance/sd deviation per feature
     # --------------------------------------------------------------------------------
     ddof = 1 if N > 1 else 0    # Bessel's correction
+
     sd = np.std(X, axis=0, ddof=ddof)
     mean = np.mean(X, axis=0)   # mean of each feature
-    deviation = X - mean
+    # deviation = X - mean
+    deviation = ne.evaluate("X - mean")
 
     mask = (sd == 0.0)
     if np.any(mask):
@@ -117,12 +118,14 @@ def logarithm(
         else:
             _X = X
 
-        Y = np.log(_X)
+        # Y = np.log(_X)
+        Y = ne.evaluate("log(_X)")
     else:
         # --------------------------------------------------------------------------------
         # Adding the offset value to all elements as log(x+k) to avoid log(0)=-inf.
         # --------------------------------------------------------------------------------
-        Y = np.log(X+offset)
+        # Y = np.log(X+offset)
+        Y = ne.evalue("log(X + offset)")
     assert np.all(np.isfinite(Y)), f"log(X) caused nan for X \nX={X}."
 
     return Y
@@ -218,7 +221,8 @@ def softmax(X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
     # keepdims=True to be able to broadcast.
     # --------------------------------------------------------------------------------
     C = np.max(X, axis=-1, keepdims=True)
-    exp = np.exp(X - C)
+    # exp = np.exp(X - C)
+    exp = ne.evaluate("exp(X - C)")
     P = exp / np.sum(exp, axis=-1, keepdims=True)
     Logger.debug("%s: X %s exp %s P %s", name, X, exp, P)
 
@@ -796,6 +800,7 @@ def numerical_jacobian(
     X = np.array(X, dtype=TYPE_FLOAT) if isinstance(X, (float, int)) else X
     J = np.zeros_like(X, dtype=TYPE_FLOAT)
     delta = OFFSET_DELTA if (delta is None or delta <= 0.0) else delta
+    divider = 2 * delta
 
     # --------------------------------------------------------------------------------
     # (x+h) or (x-h) may cause an invalid value area for the function f.
@@ -863,53 +868,48 @@ def numerical_jacobian(
         # if using the numerical gradient is fit for the purpose. Prevent the gradient
         # from being too close to zero by f(x+k)-f(x-k) > GN_DIFF_ACCEPTANCE_VALUE
         # --------------------------------------------------------------------------------
-        Logger.debug("%s: (fx1-fx2)=[%s]", name, (fx1-fx2))
+        difference = (fx1 - fx2)
+        Logger.debug("%s: (fx1-fx2)=[%s]", name, difference)
 
-        derivative_saturation_condition = (fx1 == fx2)
+        derivative_saturation_condition = (difference == 0.0)
         if derivative_saturation_condition:
             fmt = "%s: derivative saturation fx1=fx2=%s detected.\n"
             args = tuple([name, fx1])
             Logger.warning(fmt, *args)
             assert ENFORCE_STRICT_ASSERT, fmt % args
 
-        difference = np.abs(fx1 - fx2)
-        subtract_cancellation_condition = (fx1 != fx2) and (
-                (difference < (fx1 * GN_DIFF_ACCEPTANCE_RATIO)) or
-                (difference < (fx2 * GN_DIFF_ACCEPTANCE_RATIO))
-        )
+        # subtract_cancellation_condition = (fx1 != fx2) and (
+        #         (difference < (fx1 * GN_DIFF_ACCEPTANCE_RATIO)) or
+        #         (difference < (fx2 * GN_DIFF_ACCEPTANCE_RATIO))
+        # )
 
-        if subtract_cancellation_condition:
-            fmt = "%s: potential subtract cancellation (fx1-fx2)/fx < %s detected.\n"\
-                  "(fx1:%s - fx2:%s) is %s, gn %s."
-            args = tuple([
-                name,
-                GN_DIFF_ACCEPTANCE_RATIO,
-                fx1,
-                fx2,
-                difference,
-                (fx1-fx2) / (2 * delta)
-            ])
-            Logger.warning(fmt, *args)
-            assert ENFORCE_STRICT_ASSERT, fmt % args
+        # if subtract_cancellation_condition:
+        #     fmt = "%s: potential subtract cancellation (fx1-fx2)/fx < %s detected.\n"\
+        #           "(fx1:%s - fx2:%s) is %s, gn %s."
+        #     args = tuple([
+        #         name,
+        #         GN_DIFF_ACCEPTANCE_RATIO,
+        #         fx1,
+        #         fx2,
+        #         difference,
+        #         (fx1-fx2) / (2 * delta)
+        #     ])
+        #     Logger.warning(fmt, *args)
+        #     assert ENFORCE_STRICT_ASSERT, fmt % args
 
-        # --------------------------------------------------------------------------------
-        # Set the gradient element scalar value or shape()
-        # --------------------------------------------------------------------------------
-        g: Union[np.ndarray, float] = np.subtract(fx1, fx2) / (2 * delta)
-        if not np.all(np.isfinite(g)):
-            raise RuntimeError(f"{name}: Invalid gradient g:{g}.")
-
-        J[idx] = g
-        Logger.debug("%s: idx[%s] j=[%s]", name, idx, g)
-
+        J[idx] = difference / divider
         X[idx] = tmp
         it.iternext()
 
-    gradient_saturation_condition = np.all(np.abs(J) < GRADIENT_SATURATION_THRESHOLD)
-    if gradient_saturation_condition:
+    if not np.all(np.isfinite(J)):
+        raise ValueError(f"{name} caused Nan or Inf")
+
+    gradient_saturation_condition = ne.evaluate("abs(J) < GRADIENT_SATURATION_THRESHOLD")
+    if np.all(gradient_saturation_condition):
+        __J = J[gradient_saturation_condition]
         msg = "%s: The gradient [%s] should be saturated."
-        Logger.warning(msg, name, g)
-        assert ENFORCE_STRICT_ASSERT, msg % (name, g)
+        Logger.warning(msg, name, __J)
+        assert ENFORCE_STRICT_ASSERT, msg % (name, __J)
 
     return J
 
@@ -945,8 +945,8 @@ def prediction_grid(X, W):
         Z: predictions in the index format
     """
     h = 0.02
-    x1_min, x1_max = X[:, 1].min() - 1, X[:, 1].max() + 1
-    x2_min, x2_max = X[:, 2].min() - 1, X[:, 2].max() + 1
+    x1_min, x1_max = X[:, 0].min() - 1, X[:, 0].max() + 1
+    x2_min, x2_max = X[:, 1].min() - 1, X[:, 1].max() + 1
     x1_grid, x2_grid = np.meshgrid(
         np.arange(x1_min, x1_max, h),
         np.arange(x2_min, x2_max, h)
@@ -998,10 +998,8 @@ def prediction_grid_2d(x_min, x_max, y_min, y_max, prediction_function):
     )
     x1 = x1_grid.ravel()
     x2 = x2_grid.ravel()
-    x0 = np.ones(x1.size)
     _P = prediction_function(
         np.c_[
-            x0,
             x1,
             x2
         ]

@@ -15,7 +15,8 @@ from common import (
     relu,
     transform_X_T,
     softmax_cross_entropy_log_loss,
-    compose
+    compose,
+    check_with_numerical_gradient
 )
 from common.test_config import (
     GRADIENT_DIFF_CHECK_TRIGGER,
@@ -71,7 +72,7 @@ def train_matmul_relu_classifier(
     name = __name__
     assert isinstance(T, np.ndarray) and np.issubdtype(T.dtype, np.integer) and T.ndim == 1 and T.shape[0] == N
     assert isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT and X.ndim == 2 and X.shape[0] == N and X.shape[1] == D
-    assert isinstance(W, np.ndarray) and W.dtype == TYPE_FLOAT and W.ndim == 2 and W.shape[0] == M and W.shape[1] == D
+    assert isinstance(W, np.ndarray) and W.dtype == TYPE_FLOAT and W.ndim == 2 and W.shape[0] == M and W.shape[1] == D+1
     assert num_epochs > 0 and N > 0 and D > 0
 
     assert (
@@ -203,7 +204,8 @@ def train_matmul_relu_classifier(
         # dA/dY gradient at ReLU. 1 when y > 0 or 0 otherwise.
         P[(Y <= 0)] = 0                    # Expected dL/dY
         EDX = np.matmul(P/N, matmul.W)        # (N,M) @ (M, D) -> (N, D)
-        assert np.array_equal(X, matmul.X)
+        EDX = EDX[::, 1::]
+        assert np.array_equal(X, matmul.X[::, 1::])
         EDW = np.matmul(matmul.X.T, P/N).T    # dL/dW.T shape(D,M) -> dL/dW shape(M, D)
 
         # ********************************************************************************
@@ -229,31 +231,7 @@ def train_matmul_relu_classifier(
             # Numerical gradient
             # --------------------------------------------------------------------------------
             gn = matmul.gradient_numerical()
-
-            # ********************************************************************************
-            #  Constraint. Numerical gradient (dL/dX, dL/dW) are closer to the analytical ones.
-            # ********************************************************************************
-            delta_GX = np.abs(dS[0] - gn[0])
-            if not (
-                np.all(delta_GX <= GRADIENT_DIFF_CHECK_TRIGGER) or
-                np.all(delta_GX <= GRADIENT_DIFF_ACCEPTANCE_VALUE) or
-                np.all(delta_GX <= np.abs(gn[0] * GRADIENT_DIFF_ACCEPTANCE_RATIO))
-            ):
-                Logger.error(
-                    "dL/dX analytical gradient \n%s \nneed to close to numerical gradient \n%s\ndifference=\n%s\n",
-                    dS[0], gn[0], delta_GX
-                )
-
-            delta_GW = np.abs(dS[1] - gn[1])
-            if not (
-                np.all(delta_GW <= GRADIENT_DIFF_CHECK_TRIGGER) or
-                np.all(delta_GW <= GRADIENT_DIFF_ACCEPTANCE_VALUE) or
-                np.all(delta_GW <= np.abs(gn[1] * GRADIENT_DIFF_ACCEPTANCE_RATIO))
-            ):
-                Logger.error(
-                    "dL/dW analytical gradient \n%s \nneed to close to numerical gradient \n%s\ndifference=\n%s\n",
-                    dS[1], gn[1], delta_GW
-                )
+            check_with_numerical_gradient(dS, gn, Logger)
 
         if callback:
             # if W.shape[1] == 1 else callback(W=np.average(matmul.W, axis=0))
@@ -268,8 +246,8 @@ def test_matmul_relu_classifier(
     """Test case for layer matmul class
     """
     N = 10
-    D = 3
-    W = weights.he(M, D)
+    D = 2
+    W = weights.he(M, D+1)
     optimizer = SGD(lr=0.1)
     X, T, V = linear_separable_sectors(n=N, d=D, m=M)
     assert X.shape == (N, D)

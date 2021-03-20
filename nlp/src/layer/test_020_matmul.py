@@ -23,6 +23,7 @@ from typing import (
     Dict,
     Tuple
 )
+import cProfile
 import copy
 import logging
 import numpy as np
@@ -340,6 +341,9 @@ def test_020_matmul_round_trip():
         7. Objective L is decreasing via the gradient descent.
 
     """
+    profiler = cProfile.Profile()
+    profiler.enable()
+
     for _ in range(NUM_MAX_TEST_TIMES):
         # --------------------------------------------------------------------------------
         # Instantiate a Matmul layer
@@ -454,4 +458,5 @@ def test_020_matmul_round_trip():
         # Constraint 7: gradient descent progressing with the new objective L(Yn+1) < L(Yn)
         assert np.all(np.abs(objective(layer.function(X)) < L))
 
-
+    profiler.disable()
+    profiler.print_stats(sort="cumtime")

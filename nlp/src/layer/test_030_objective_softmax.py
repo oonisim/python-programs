@@ -7,6 +7,7 @@ from typing import (
     Tuple
 )
 import logging
+import cProfile
 import numpy as np
 from common import (
     TYPE_FLOAT,
@@ -521,6 +522,10 @@ def test_040_softmax_log_loss_2d(caplog):
     # Instantiate a CrossEntropyLogLoss layer
     # --------------------------------------------------------------------------------
     name = "test_040_softmax_log_loss_2d_ohe"
+
+    profiler = cProfile.Profile()
+    profiler.enable()
+
     for _ in range(NUM_MAX_TEST_TIMES):
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)    # number of node > 1
@@ -615,3 +620,6 @@ def test_040_softmax_log_loss_2d(caplog):
             f"Log loss layer gradient cannot be < -1 nor > 1 but\n{G}"
         assert np.all(np.abs(GN[0]) < (1+GRADIENT_DIFF_ACCEPTANCE_RATIO)), \
             f"Log loss layer gradient cannot be < -1 nor > 1 but\n{GN[0]}"
+
+    profiler.disable()
+    profiler.print_stats(sort="cumtime")

@@ -50,7 +50,7 @@ def plot_categorical_predictions(axes, grid, X, Y, predictions):
     """
     # Plot data and labels
     # axes.scatter(X[:, 1], X[:, 2], c=T, s=40, cmap=plt.cm.Spectral)
-    axes.scatter(X[:, 1], X[:, 2], c=Y, s=40)
+    axes.scatter(X[:, 0], X[:, 1], c=Y, s=40)
 
     # plot predictions
     # axes.contourf(grid[0], grid[1], predictions, cmap=plt.cm.Spectral, alpha=0.3)

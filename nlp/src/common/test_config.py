@@ -10,7 +10,7 @@ MAX_ACTIVATION_VALUE = 5.0  # max output value from an activation function
 #
 # Skip the check when the gradient is in the saturation: < GRADIENT_DIFF_CHECK_TRIGGER
 # Do not make it small enough. For gradient 0.001, 0.0011 would be good enough.
-GRADIENT_DIFF_CHECK_TRIGGER = 0.01
+GRADIENT_DIFF_CHECK_TRIGGER = 0.005
 GRADIENT_DIFF_ACCEPTANCE_RATIO = 0.3
 GRADIENT_DIFF_ACCEPTANCE_VALUE = 1e-2
 ACTIVATION_DIFF_ACCEPTANCE_VALUE = 1e-4
