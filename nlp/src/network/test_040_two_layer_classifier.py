@@ -20,7 +20,7 @@ from common import (
     check_with_numerical_gradient,
     ENFORCE_STRICT_ASSERT
 )
-from common.test_config import (
+from test import (
     GRADIENT_DIFF_CHECK_TRIGGER,
     GRADIENT_DIFF_ACCEPTANCE_RATIO,
     GRADIENT_DIFF_ACCEPTANCE_VALUE

@@ -23,7 +23,7 @@ from common import (
 from layer import (
     CrossEntropyLogLoss
 )
-from common.test_config import (
+from test import (
     NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,
