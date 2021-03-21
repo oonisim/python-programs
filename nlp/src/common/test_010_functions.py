@@ -57,7 +57,7 @@ def test_010_standardize():
             mean = np.mean(X, axis=0)
             E = (X - mean) / sd
             # Actual
-            A, __mean, __sd = standardize(X, keepdims=keepdims)
+            A, __mean, __sd, _ = standardize(X, keepdims=keepdims)
 
             # Constraint. mean/sd should be same
             assert np.all(np.abs(mean - __mean) < u)
@@ -99,7 +99,7 @@ def test_010_standardize_sd_is_zero():
         assert np.allclose(E, 0.0, atol=u, rtol=0)
 
         # Actual
-        A, __mean, __sd = standardize(X, keepdims=keepdims)
+        A, __mean, __sd, _ = standardize(X, keepdims=keepdims)
 
         # Constraint. mean/sd should be same
         assert np.allclose(mean, __mean, atol=u, rtol=0)
@@ -149,13 +149,13 @@ def test_010_standardize_eps(caplog):
                     # **********************************************************************
                     # Constraint: numpy sd matches __sd from standardize()
                     # **********************************************************************
-                    A, __mean, __sd = standardize(X, keepdims=keepdims, eps=eps)
+                    A, __mean, __sd, _ = standardize(X, keepdims=keepdims, eps=eps)
                     assert np.allclose(a=__sd, b=npsd, atol=u, rtol=0)
                 else:
                     eps = backup
                     continue
 
-            A, __mean, __sd = standardize(X, keepdims=keepdims, eps=eps)
+            A, __mean, __sd, _ = standardize(X, keepdims=keepdims, eps=eps)
 
             # **********************************************************************
             # Constraint. mean/sd should be same. Use default rtol in np.allclose()
@@ -201,7 +201,7 @@ def test_010_standardize_sd_is_zero_eps():
         assert np.allclose(E, 0.0, atol=u, rtol=0)
 
         # Actual
-        A, __mean, __sd = standardize(X, keepdims=keepdims, eps=eps)
+        A, __mean, __sd, _ = standardize(X, keepdims=keepdims, eps=eps)
 
         # Constraint. mean/sd should be same
         assert np.allclose(mean, __mean, atol=u, rtol=0)

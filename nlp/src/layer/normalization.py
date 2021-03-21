@@ -114,7 +114,7 @@ class Standardization(Layer):
             # --------------------------------------------------------------------------------
             # self._dY = np.empty((self.N, self.M), dtype=TYPE_FLOAT)
 
-        _, mean, sd = standardize(X, out=self._Y)
+        _, mean, sd, _ = standardize(X, out=self._Y)
         return self.Y
 
     def gradient(self, dY: Union[np.ndarray, float] = 1.0) -> Union[np.ndarray, float]:
@@ -164,6 +164,7 @@ class BatchNormalization(Layer):
             name: str,
             num_nodes: int,
             momentum: float = 0.9,
+            optimizer: Optimizer = SGD(),
             posteriors: Optional[List[Layer]] = None,
             log_level: int = logging.ERROR
     ):
@@ -172,14 +173,19 @@ class BatchNormalization(Layer):
             name: Layer identity name
             num_nodes: Number of nodes in the layer
             momentum: Decay of running mean/variance
+            optimizer: Gradient descent implementation e.g SGD, Adam.
             posteriors: Post layers to which forward the matmul layer output
             log_level: logging level
         """
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
         self.logger.debug(
-            "BatchNormalization[%s] number of nodes is [%s]",
-            name, num_nodes
+            "BatchNormalization[%s] number of nodes is [%s] momentum is %s]",
+            name, num_nodes, momentum
         )
+
+        assert 0 < momentum < 1
+        assert isinstance(optimizer, Optimizer)
+        self._optimizer: Optimizer = optimizer
 
         # Layers to which forward the output
         self._posteriors: List[Layer] = posteriors
@@ -188,23 +194,41 @@ class BatchNormalization(Layer):
         # --------------------------------------------------------------------------------
         # Standardized
         # --------------------------------------------------------------------------------
+        # Per-feature standardized X
         self._Xstd = np.empty(0, dtype=TYPE_FLOAT)
-        # Feature mean of shape(1,M)
-        self._U: np.ndarray = np.empty((1, num_nodes), dtype=TYPE_FLOAT)
-        # SD-per-feature of batch X in shape (1,M)
-        self._SD: np.ndarray = np.empty((1, num_nodes), dtype=TYPE_FLOAT)
+        self._dXstd = np.empty(0, dtype=TYPE_FLOAT)
+        # Per-feature mean deviation (X-mean)
+        self._Xmd = np.empty(0, dtype=TYPE_FLOAT)
+        self._dXmd01 = np.empty(0, dtype=TYPE_FLOAT)
+        self._dXmd02 = np.empty(0, dtype=TYPE_FLOAT)
 
         # --------------------------------------------------------------------------------
         # Statistics. allocate storage at the instance initialization.
         # --------------------------------------------------------------------------------
-        # Running mean-per-feature of all the batches X* in shape(1,M)
-        self._RU: np.ndarray = np.zeros((1, num_nodes), dtype=TYPE_FLOAT)
-        # Running SD-per-feature of all the batches X* in shape (1,M)
-        self._RSD: np.ndarray = np.zeros((1, num_nodes), dtype=TYPE_FLOAT)
-        # Scale and shift parameters
-        self._gamma: np.ndarray = np.ones(num_nodes)        # Scale
-        self._beta: np.ndarray = np.zeros(num_nodes)        # Shift
+        # Feature mean of shape(M)
+        self._U: np.ndarray = np.empty(num_nodes, dtype=TYPE_FLOAT)
+        self._dU: np.ndarray = np.empty(num_nodes, dtype=TYPE_FLOAT)
+        # SD-per-feature of batch X in shape (M,)
+        self._SD: np.ndarray = np.empty(num_nodes, dtype=TYPE_FLOAT)
+        # Norm = 1/SD in shape (1,M)
+        self._norm: np.ndarray = np.empty(num_nodes, dtype=TYPE_FLOAT)
+        # dL/dV. Gradient of variance V in shape (M,)
+        self._dV: np.ndarray = np.empty(num_nodes, dtype=TYPE_FLOAT)
 
+        self._count = 0
+        self._momentum: TYPE_FLOAT = momentum
+        # Running mean-per-feature of all the batches X* in shape(M,)
+        self._RU: np.ndarray = np.zeros(num_nodes, dtype=TYPE_FLOAT)
+        # Running SD-per-feature of all the batches X* in shape (M,)
+        self._RSD: np.ndarray = np.zeros(num_nodes, dtype=TYPE_FLOAT)
+
+        # --------------------------------------------------------------------------------
+        # Scale and shift parameters
+        # --------------------------------------------------------------------------------
+        self._gamma: np.ndarray = np.ones(num_nodes, dtype=TYPE_FLOAT)
+        self._dGamma: np.ndarray = np.empty(num_nodes, dtype=TYPE_FLOAT)
+        self._beta: np.ndarray = np.zeros(num_nodes, dtype=TYPE_FLOAT)
+        self._dBeta: np.ndarray = np.zeros(num_nodes, dtype=TYPE_FLOAT)
 
     # --------------------------------------------------------------------------------
     # Instance properties
@@ -225,7 +249,19 @@ class BatchNormalization(Layer):
     @property
     def Xstd(self) -> np.ndarray:
         """Standardized X"""
+        assert self._Xstd.size > 0 and self._Xstd.shape == (self.N, self.M)
         return self._Xstd
+
+    def dXstd(self) -> np.ndarray:
+        """Gradient of standardized X"""
+        assert self._dXstd.size > 0 and self._dXstd.shape == (self.N, self.M)
+        return self._dXstd
+
+    @property
+    def Xmd(self) -> np.ndarray:
+        """Mean deviation (X-mean)"""
+        assert self._Xmd.size > 0 and self._Xmd.shape == (self.N, self.M)
+        return self._Xmd
 
     @property
     def U(self) -> np.ndarray:
@@ -242,11 +278,25 @@ class BatchNormalization(Layer):
         return self._RU
 
     @property
+    def dV(self) -> np.ndarray:
+        """dL/dV (impact on L by variance dV) of each feature"""
+        assert self._dV.size > 0 and self._dV.shape == (self.M,), \
+            "dV is not initialized or invalid"
+        return self._dV
+
+    @property
     def SD(self) -> np.ndarray:
         """Standard Deviation (SD) of each feature in X"""
         assert self._SD.size > 0 and self._SD.shape == (self.M,), \
             "SD is not initialized or invalid"
         return self._SD
+
+    @property
+    def norm(self) -> np.ndarray:
+        """1/SD of each feature in X"""
+        assert self._norm.size > 0 and self._norm.shape == (self.M,), \
+            "norm is not initialized or invalid"
+        return self._norm
 
     @property
     def RSD(self) -> np.ndarray:
@@ -263,15 +313,50 @@ class BatchNormalization(Layer):
         return self._gamma
 
     @property
+    def dGamma(self) -> np.ndarray:
+        """Gradient of gamma for each feature in X"""
+        assert self._dGamma.size > 0 and self._dGamma.shape == (self.M,)
+        return self._dGamma
+
+    @property
     def beta(self) -> np.ndarray:
         """Bias shift parameter beta for each feature in X"""
-        assert self._beta.size > 0 and self._beta.shape == (self.M,), \
+        assert self._beta.size > 0 and self._beta.shape == (self.M,),\
             "beta is not initialized or invalid"
         return self._beta
+
+    @property
+    def dBeta(self) -> np.ndarray:
+        """Gradient of beta for each feature in X"""
+        assert self._dBeta.size > 0 and self._dBeta.shape == (self.M,), \
+            "dBeta is not initialized or invalid"
+        return self._dBeta
+
+    @property
+    def momentum(self) -> TYPE_FLOAT:
+        """Decay parameter for calculating running means"""
+        return self._momentum
+
+    @property
+    def count(self) -> TYPE_FLOAT:
+        """Number of times mini-batch trainings have been done."""
+        return self._count
+
+    @property
+    def optimizer(self) -> Optimizer:
+        """Optimizer instance for gradient descent
+        """
+        return self._optimizer
 
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
+    def update_running_means(self):
+        """Update running means using decaying.
+            """
+        self._RU = self.momentum * self.RU + (1 - self.momentum) * self.U
+        self._RSD = self.momentum * self.RSD + (1 - self.momentum) * self.SD
+
     def function(self, X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
         """Standardize the input X per feature/column basis.
         Args:
@@ -286,8 +371,7 @@ class BatchNormalization(Layer):
             % (X.shape[1], self.M)
 
         # --------------------------------------------------------------------------------
-        # Allocate array storage for np.func(out=) for Y but not dY.
-        # Y:(N,M) = [ X:(N,D) @ W.T:(D,M) ]
+        # Allocate array storage for Y but not dY.
         # --------------------------------------------------------------------------------
         if self._Y.size <= 0 or self.Y.shape[0] != self.N:
             self._Y = np.empty((self.N, self.M), dtype=TYPE_FLOAT)
@@ -302,18 +386,32 @@ class BatchNormalization(Layer):
         # --------------------------------------------------------------------------------
         if self._Xstd.size <= 0 or self._Xstd.shape[0] != self.N:
             self._Xstd = np.empty(X.shape, dtype=TYPE_FLOAT)
+            self._dXstd = np.empty(X.shape, dtype=TYPE_FLOAT)
+            self._dXmd01 = np.empty(X.shape, dtype=TYPE_FLOAT)
+            self._dXmd02 = np.empty(X.shape, dtype=TYPE_FLOAT)
 
-        _, self._U, self._SD = standardize(
+        # --------------------------------------------------------------------------------
+        # Standardize X and update running means.
+        # --------------------------------------------------------------------------------
+        _, self._U, self._SD, self._Xmd = standardize(
             X,
-            keepdims=True,
+            keepdims=False,
             out=self._Xstd,
             out_mean=self._U,
             out_sd=self._SD
         )
+        self.update_running_means()
+        self._norm = 1.0 / self.SD
+        assert np.isfinite(self.norm)
+
+        # --------------------------------------------------------------------------------
+        # Calculate layer output Y
+        # --------------------------------------------------------------------------------
         gamma = self.gamma
         beta = self.beta
         standardized = self.Xstd
         ne.evaluate("gamma * standardized + beta", out=self._Y)
+        self._count += 1
 
         return self.Y
 
@@ -334,14 +432,96 @@ class BatchNormalization(Layer):
         self.logger.debug("layer[%s].%s: dY.shape %s", self.name, name, dY.shape)
         self._dY = dY
 
+        N = self.N
+        ddof = 1 if N > 1 else 0
+        Xstd = self.Xstd
+        dXstd = self.dXstd
+        Xmd = self.Xmd
+        dXmd01 = self._dXmd01
+        dXmd02 = self._dXmd02
+        dV = self.dV
+        dU = self._dU
+        norm = self.norm
+        gamma = self.gamma
+        dGamma = self.dGamma
+        dBeta = self.dBeta
+
         # --------------------------------------------------------------------------------
-        # dL/dX of shape (N,D):  [ dL/dY:(N,M) @ W:(M,D)) ]
-        # TODO: Implement the BatchNormalization layer gradient calculation.
-        # See the batch normalization reference. For now, just return dL/dY
+        # dL/dGamma:(M,) = sum(dL/dY:(N,M) * Xstd(N,M), axis=0)
         # --------------------------------------------------------------------------------
-        # assert self.dX.shape == (self.N, self.D), \
-        #     "dL/dX shape needs (%s, %s) but %s" % (self.N, self.D, self.dX.shape)
-        # return self.dX
+        ne.evaluate("sum(dY * Xstd, axis=0)", out=dGamma)
+
         # --------------------------------------------------------------------------------
-        return self.dY
+        # dL/dBeta:(M,) = sum(dL/dY:(N,M) * 1, axis=0)
         # --------------------------------------------------------------------------------
+        ne.evaluate("sum(dY, axis=0)", out=dBeta)
+
+        # --------------------------------------------------------------------------------
+        # dL/dXstd: (N,M): dL/dY:(N,M) * gamma(M,)
+        # --------------------------------------------------------------------------------
+        ne.evaluate("sum(dY * gamma, axis=0)", out=dXstd)
+
+        # --------------------------------------------------------------------------------
+        # dL/dV:(M,) = sum(dL/dXstd:(N,M) * Xmd:(N,M), axis=0) * -1/2 * norm**3
+        # --------------------------------------------------------------------------------
+        ne.evaluate("sum(dXstd * Xmd, axis=0)", out=dV)
+        np.eavluate("dV * (norm ** 3) / -2", out=dV)
+
+        # --------------------------------------------------------------------------------
+        # dL/dXmd01:(N,M) = dL/dV:(M,) / (N-ddof) * 2 * Xmd:(N,M)
+        # See https://github.com/pytorch/pytorch/issues/1410 for (N-ddof).
+        # --------------------------------------------------------------------------------
+        ne.evaluate("2 * dV * Xmd / (N - ddof)", out=dXmd02)
+
+        # --------------------------------------------------------------------------------
+        # dL/dXmd02:(N,M) = dL/dXstd:(N,M) * norm:(M,)
+        # --------------------------------------------------------------------------------
+        ne.evaluate("dXstd * norm", out=dXmd02)
+
+        # --------------------------------------------------------------------------------
+        # dL/dU: (M,) = sum(-dL/dXmd01 + -dL/dXmd02, axis=0)
+        # --------------------------------------------------------------------------------
+        ne.evaluate("sum(-1 * (dXmd01 + dXmd01), axis=0)", out=dU)
+
+        # --------------------------------------------------------------------------------
+        # dL/dX: (N,M) = dL/dXmd01 + dL/dXmd02  + dU/N
+        # --------------------------------------------------------------------------------
+        ne.evaluate("dXmd01 + dXmd02 + (dU / N)", out=self._dX)
+
+        return self.dX
+
+    def _gradient_descent(self, X, dX, out=None) -> Union[np.ndarray, float]:
+        """Gradient descent
+        Directly update matrices to avoid the temporary copies
+        """
+        return self.optimizer.update(X, dX, out=out)
+
+    def update(self) -> List[Union[float, np.ndarray]]:
+        """Run gradient descent
+        Returns:
+            [dL/dGamma, dL/dBeta]: List of gradients.
+       """
+        self._gradient_descent(self.gamma, self.dGamma, out=self._gamma)
+        self._gradient_descent(self.beta, self.dBeta, out=self._beta)
+        return [self.dGamma, self.dBeta]
+
+    def predict(self, X):
+        """Predict
+        Args:
+            X: input
+        Returns:
+            Prediction: Index to the category
+        """
+        assert \
+            isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT and \
+            X.ndim == 2 and X.shape[1] == self.M and X.size > 0
+
+        assert np.all(self.RSD > 0)
+        RU = self.RU
+        RSD = self.RSD
+        gamma = self.gamma
+        beta = self.beta
+        P = ne.evaluate("gamma * ((X - RU) / RSD) + beta")
+
+        return P
+

@@ -36,7 +36,7 @@ def standardize(
         out=None,
         out_mean=None,
         out_sd=None
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Standardize X per-feature basis.
     Each feature is independent from other features, hence standardize per feature.
     1. Calculate the mean per each column, not entire matrix.
@@ -56,6 +56,7 @@ def standardize(
         standardized: standardized X
         mean: mean of X
         sd: standard deviation of X
+        deviation: X-mean
     """
     assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT and X.size > 0)
     if X.ndim <= 1:
@@ -115,9 +116,6 @@ def standardize(
             # Temporary replace the zero elements with one
             sd[mask] = 1.0
 
-            # reuse deviation memory area
-            out = deviation if out is None else out
-
             # standardize and zero clear the mask elements
             standardized = np.divide(deviation, sd, out)
 
@@ -141,7 +139,7 @@ def standardize(
             standardized = np.divide(deviation, sd, out)
 
     assert np.all(np.isfinite(standardized))
-    return standardized, mean, sd
+    return standardized, mean, sd, deviation
 
 
 def logarithm(
