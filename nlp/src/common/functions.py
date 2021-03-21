@@ -30,7 +30,12 @@ Logger = logging.getLogger("functions")
 
 
 def standardize(
-    X: Union[np.ndarray, float], eps: float = 1e-8, out=None
+    X: Union[np.ndarray, float],
+        eps: TYPE_FLOAT = 0.0,
+        keepdims=True,
+        out=None,
+        out_mean=None,
+        out_sd=None
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Standardize X per-feature basis.
     Each feature is independent from other features, hence standardize per feature.
@@ -42,7 +47,11 @@ def standardize(
         X: Input data to standardize per feature basis.
         eps: A small positive value to assure sd > 0 for deviation/sd will not be div-by-zero.
              Allow eps=0 to simulate or compare np.std().
-        out: Output storage for np.divide(dividend, divisor, out)
+        keepdims: bool, optional to control numpy keepdims option.
+        out: Output storage for the standardized X
+        out_mean: Output storage for the mean
+        out_sd: Output storage for the SD
+
     Returns:
         standardized: standardized X
         mean: mean of X
@@ -53,53 +62,85 @@ def standardize(
         X = X.reshape(1, -1)
 
     N = X.shape[0]
-
-    # --------------------------------------------------------------------------------
-    # Calculate mean/variance/sd deviation per feature
-    # --------------------------------------------------------------------------------
     ddof = 1 if N > 1 else 0    # Bessel's correction
 
-    sd = np.std(X, axis=0, ddof=ddof)
-    mean = np.mean(X, axis=0)   # mean of each feature
-    # deviation = X - mean
+    # --------------------------------------------------------------------------------
+    # Calculate mean/deviation/sd per feature
+    # --------------------------------------------------------------------------------
+    mean = np.mean(X, axis=0, keepdims=keepdims, out=out_mean)
     deviation = ne.evaluate("X - mean")
-
-    # --------------------------------------------------------------------------------
-    # TODO: See if below works. If it does not, implement the original BN which uses
-    # variance = sqrt(variance + eps) / (N -ddos)
-    # --------------------------------------------------------------------------------
-    mask = (sd == 0.0)
-    if np.any(mask):
-        # Temporary replace the zero elements with one
-        sd[mask] = 1.0
-
-        # reuse deviation memory area
-        out = deviation if out is None else out
-
-        # standardize and zero clear the mask elements
-        standardized = np.divide(deviation, sd, out)
-
-        # --------------------------------------------------------------------------------
-        # sd == 0 means variance == 0, which happens when (x-mu) == 0
-        # v=sum(square(x-mu)) / (n-1).
-        # Then elements of (X-mean) where sd ==0 should be 0.
-        # Hence there should be no need to zero-clear those elements.
-        # --------------------------------------------------------------------------------
-        # out[::, mask] = 0.0
-
-        # --------------------------------------------------------------------------------
-        # Leaving "sd[mask] = 1.0" should be OK because (X-mean)/sd -> 0
-        # for those element where sd == 0. Then the BN output
-        # "gamma * ((X-mean) / sd) + beta" -> beta
-        # --------------------------------------------------------------------------------
-        # restore sd
-        # sd[mask] = 0.0
-
+    if eps > 0:
+        # Re-use the storage of buffer for standardized.
+        buffer = ne.evaluate("deviation ** 2")
+        sd = np.sum(buffer, axis=0, keepdims=keepdims)
+        sd = ne.evaluate("sqrt( (sd / (N - ddof)) + eps )", out=sd)
+        standardized = ne.evaluate("deviation / sd", out=buffer)
     else:
-        standardized = np.divide(deviation, sd, out)
+        sd = np.std(X, axis=0, ddof=ddof, keepdims=keepdims, out=out_sd)
+        # deviation = X - mean
+
+        # --------------------------------------------------------------------------------
+        # TODO: See if below works. If it does not, implement the original BN which uses
+        # variance = sqrt(variance + eps) / (N -ddos)
+        # --------------------------------------------------------------------------------
+
+        # --------------------------------------------------------------------------------
+        # NOTE:
+        # Even when a feature has the same values e.g. -3.29686744, its mean may not be 0.
+        # https://stackoverflow.com/questions/66728134
+        #
+        # X = np.array([
+        #     [-1.11793447, -3.29686744, -3.50615096],
+        #     [-1.11793447, -3.29686744, -3.50615096],
+        #     [-1.11793447, -3.29686744, -3.50615096],
+        #     [-1.11793447, -3.29686744, -3.50615096],
+        #     [-1.11793447, -3.29686744, -3.50615096]
+        # ])
+        #
+        # X-mean is
+        # [[0.0000000e+00 4.4408921e-16 4.4408921e-16]
+        #  [0.0000000e+00 4.4408921e-16 4.4408921e-16]
+        #  [0.0000000e+00 4.4408921e-16 4.4408921e-16]
+        #  [0.0000000e+00 4.4408921e-16 4.4408921e-16]
+        #  [0.0000000e+00 4.4408921e-16 4.4408921e-16]]
+        #
+        # SD is
+        # [0.0000000e+00 4.4408921e-16 4.4408921e-16]
+        #
+        # Hence regard the SD as 0 when the value is less than a small value k. e.g. 1e-8.
+        # If the distribution is such skewed around the mean, regard it as (X-mean) == 0.
+        # --------------------------------------------------------------------------------
+        mask = (sd < 1e-8)
+        if np.any(mask):
+            # Temporary replace the zero elements with one
+            sd[mask] = 1.0
+
+            # reuse deviation memory area
+            out = deviation if out is None else out
+
+            # standardize and zero clear the mask elements
+            standardized = np.divide(deviation, sd, out)
+
+            # --------------------------------------------------------------------------------
+            # sd == 0 means variance == 0, which happens when (x-mu) == 0
+            # v=sum(square(x-mu)) / (n-1).
+            # Then elements of (X-mean) where sd ==0 should be 0.
+            # Hence there should be no need to zero-clear those elements.
+            # --------------------------------------------------------------------------------
+            # out[::, mask] = 0.0
+
+            # --------------------------------------------------------------------------------
+            # Leaving "sd[mask] = 1.0" should be OK because (X-mean)/sd -> 0
+            # for those element where sd == 0. Then the BN output
+            # "gamma * ((X-mean) / sd) + beta" -> beta
+            # --------------------------------------------------------------------------------
+            # restore sd
+            # sd[mask] = 0.0
+
+        else:
+            standardized = np.divide(deviation, sd, out)
 
     assert np.all(np.isfinite(standardized))
-
     return standardized, mean, sd
 
 

@@ -15,6 +15,7 @@ import inspect
 import logging
 import copy
 import numpy as np
+import numexpr as ne
 from layer import Layer
 from optimizer import (
     Optimizer,
@@ -175,28 +176,35 @@ class BatchNormalization(Layer):
             log_level: logging level
         """
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
-
-        # --------------------------------------------------------------------------------
-        # Validate the expected dimensions.
-        # `W` has `M` nodes (nodes)
-        # --------------------------------------------------------------------------------
         self.logger.debug(
             "BatchNormalization[%s] number of nodes is [%s]",
             name, num_nodes
         )
 
-        # Layers to which forward the matmul output
+        # Layers to which forward the output
         self._posteriors: List[Layer] = posteriors
         self._num_posteriors: int = len(posteriors) if posteriors else -1
 
-        self._Xstd = np.empty(0, dtype=TYPE_FLOAT)               # Standardized X
-        self._U: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)      # Feature mean of shape(1.M)
-        self._V: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)      # Feature variance of shape (1,M)
-        self._RU: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)     # Feature running mean of shape(1.M)
-        self._RV: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)     # Feature running variance of shape (1,M)
+        # --------------------------------------------------------------------------------
+        # Standardized
+        # --------------------------------------------------------------------------------
+        self._Xstd = np.empty(0, dtype=TYPE_FLOAT)
+        # Feature mean of shape(1,M)
+        self._U: np.ndarray = np.empty((1, num_nodes), dtype=TYPE_FLOAT)
+        # SD-per-feature of batch X in shape (1,M)
+        self._SD: np.ndarray = np.empty((1, num_nodes), dtype=TYPE_FLOAT)
 
+        # --------------------------------------------------------------------------------
+        # Statistics. allocate storage at the instance initialization.
+        # --------------------------------------------------------------------------------
+        # Running mean-per-feature of all the batches X* in shape(1,M)
+        self._RU: np.ndarray = np.zeros((1, num_nodes), dtype=TYPE_FLOAT)
+        # Running SD-per-feature of all the batches X* in shape (1,M)
+        self._RSD: np.ndarray = np.zeros((1, num_nodes), dtype=TYPE_FLOAT)
+        # Scale and shift parameters
         self._gamma: np.ndarray = np.ones(num_nodes)        # Scale
         self._beta: np.ndarray = np.zeros(num_nodes)        # Shift
+
 
     # --------------------------------------------------------------------------------
     # Instance properties
@@ -234,18 +242,18 @@ class BatchNormalization(Layer):
         return self._RU
 
     @property
-    def V(self) -> np.ndarray:
-        """Variance of each feature in X"""
-        assert self._V.size > 0 and self._V.shape == (self.M,), \
-            "V is not initialized or invalid"
-        return self._V
+    def SD(self) -> np.ndarray:
+        """Standard Deviation (SD) of each feature in X"""
+        assert self._SD.size > 0 and self._SD.shape == (self.M,), \
+            "SD is not initialized or invalid"
+        return self._SD
 
     @property
-    def RV(self) -> np.ndarray:
-        """Running Variance of each feature in X"""
-        assert self._RV.size > 0 and self._RV.shape == (self.M,), \
-            "RV is not initialized or invalid"
-        return self._RV
+    def RSD(self) -> np.ndarray:
+        """Running SD of each feature in X"""
+        assert self._RSD.size > 0 and self._RSD.shape == (self.M,), \
+            "RSD is not initialized or invalid"
+        return self._RSD
 
     @property
     def gamma(self) -> np.ndarray:
@@ -273,7 +281,9 @@ class BatchNormalization(Layer):
         """
         name = "function"
         self.X = X
-        self.logger.debug("layer[%s].%s: X.shape %s", self.name, name, self.X.shape)
+        assert self.X.shape[1] == self.M, \
+            "Number of features %s must match number of nodes %s in the BN layer." \
+            % (X.shape[1], self.M)
 
         # --------------------------------------------------------------------------------
         # Allocate array storage for np.func(out=) for Y but not dY.
@@ -287,7 +297,24 @@ class BatchNormalization(Layer):
             # --------------------------------------------------------------------------------
             # self._dY = np.empty((self.N, self.M), dtype=TYPE_FLOAT)
 
-        _, mean, sd = standardize(X, out=self._Y)
+        # --------------------------------------------------------------------------------
+        # Allocate array storages standardization.
+        # --------------------------------------------------------------------------------
+        if self._Xstd.size <= 0 or self._Xstd.shape[0] != self.N:
+            self._Xstd = np.empty(X.shape, dtype=TYPE_FLOAT)
+
+        _, self._U, self._SD = standardize(
+            X,
+            keepdims=True,
+            out=self._Xstd,
+            out_mean=self._U,
+            out_sd=self._SD
+        )
+        gamma = self.gamma
+        beta = self.beta
+        standardized = self.Xstd
+        ne.evaluate("gamma * standardized + beta", out=self._Y)
+
         return self.Y
 
     def gradient(self, dY: Union[np.ndarray, float] = 1.0) -> Union[np.ndarray, float]:
