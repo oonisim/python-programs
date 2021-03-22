@@ -12,6 +12,7 @@ import numpy as np
 
 from common import (
     TYPE_FLOAT,
+    NUMEXPR_ENABLED,
     standardize
 )
 from layer import Layer
@@ -468,6 +469,7 @@ class BatchNormalization(Layer):
         return self.Y
 
     def _gradient_numpy(self):
+        """Calculate dL/dX using numpy"""
         ddof = 1 if self.N > 1 else 0
 
         # --------------------------------------------------------------------------------
@@ -510,14 +512,21 @@ class BatchNormalization(Layer):
         #
         # * -1 in sum(-1 * …) is from d(X-U)/dU
         # --------------------------------------------------------------------------------
+        np.sum(self.Xmd, axis=0, keepdims=True, out=self._dU)
+        np.multiply(self.dV, self.dU, out=self._dU)
+        np.divide(self.dU, ((self.N-ddof) / -2), out=self._dU)
         ne.evaluate("sum(-1 * (dXmd01 + dXmd01), axis=0)", out=self._dU)
+        self._dU -= np.sum(self.dXstd, axis=0, keepdims=True)
 
         # --------------------------------------------------------------------------------
         # dL/dX: (N,M) = dL/dXmd01 + dL/dXmd02  + dU/N
         # --------------------------------------------------------------------------------
-        return ne.evaluate("dXmd01 + dXmd02 + (dU / N)", out=self._dX)
+        np.add(self.dXmd01, self.dXmd02, out=self._dX)
+        np.add(self.dX, self.dU / self.N, out=self._dX)
+        return self.dX
 
     def _gradient_numexpr(self):
+        """Calculate dL/dX using numexpr"""
         N = self.N
         ddof = 1 if N > 1 else 0
         Xstd = self.Xstd
@@ -593,8 +602,10 @@ class BatchNormalization(Layer):
         self.logger.debug("layer[%s].%s: dY.shape %s", self.name, name, dY.shape)
         self._dY = dY
 
-        dX = self._gradient_numexpr()
-        return dX
+        if NUMEXPR_ENABLED:
+            return self._gradient_numexpr()
+        else:
+            return self._gradient_numpy()
 
     def _gradient_descent(self, X, dX, out=None) -> Union[np.ndarray, TYPE_FLOAT]:
         """Gradient descent

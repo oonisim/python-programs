@@ -54,3 +54,8 @@ TYPE_INT = np.int32
 TYPE_LABEL = np.int8
 TYPE_FLOAT = np.float       # alias of Python float
 # FLOAT_TYPE = np.float32
+
+# --------------------------------------------------------------------------------
+# Numexpr
+# --------------------------------------------------------------------------------
+NUMEXPR_ENABLED = True
