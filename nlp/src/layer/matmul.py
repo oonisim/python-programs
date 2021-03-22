@@ -176,6 +176,8 @@ class Matmul(Layer):
             np.ones(X.shape[0], dtype=TYPE_FLOAT),  # Add bias
             X
         ]
+        assert self.X.shape == (self.N, self.D)
+
         self.logger.debug(
             "layer[%s].%s: X.shape %s W.shape %s",
             self.name, name, self.X.shape, self.W.shape

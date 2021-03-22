@@ -85,11 +85,11 @@ class Standardization(Layer):
     # Instance methods
     # --------------------------------------------------------------------------------
     def function(self, X: Union[np.ndarray, TYPE_FLOAT]) -> Union[np.ndarray, TYPE_FLOAT]:
-        """Standardize the input X per feature/column basis.
+        """Calculate batch normalization.
         Args:
             X: Batch input data from the input layer.
         Returns:
-            Y: Per-feature standardized output
+            Y: gamma * Xstd + beta.
         """
         name = "function"
         self.X = X
@@ -327,6 +327,7 @@ class BatchNormalization(Layer):
         assert self._Xstd.size > 0 and self._Xstd.shape == (self.N, self.M)
         return self._Xstd
 
+    @property
     def dXstd(self) -> np.ndarray:
         """Gradient dL/dXstd = (dL/dY * gamma) in shape:(N,M)"""
         assert self._dXstd.size > 0 and self._dXstd.shape == (self.N, self.M)
@@ -414,9 +415,9 @@ class BatchNormalization(Layer):
         """
         name = "function"
         self.X = X
-        assert self.X.shape[1] == self.M, \
+        assert self.X.shape == (self.N, self.M), \
             "Number of features %s must match number of nodes %s in the BN layer." \
-            % (X.shape[1], self.M)
+            % (X.shape[1], self.M)      # Make sure to check N is updated too.
 
         # --------------------------------------------------------------------------------
         # Allocate array storage for Y but not dY.
