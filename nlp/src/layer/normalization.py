@@ -83,7 +83,7 @@ class Standardization(Layer):
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
-    def function(self, X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
+    def function(self, X: Union[np.ndarray, TYPE_FLOAT]) -> Union[np.ndarray, TYPE_FLOAT]:
         """Standardize the input X per feature/column basis.
         Args:
             X: Batch input data from the input layer.
@@ -109,7 +109,7 @@ class Standardization(Layer):
         standardize(X, out=self._Y)
         return self.Y
 
-    def gradient(self, dY: Union[np.ndarray, float] = 1.0) -> Union[np.ndarray, float]:
+    def gradient(self, dY: Union[np.ndarray, TYPE_FLOAT] = 1.0) -> Union[np.ndarray, TYPE_FLOAT]:
         """Calculate the gradients dL/dX and dL/dW.
         Args:
             dY: Gradient dL/dY, the total impact on L by dY.
@@ -117,9 +117,9 @@ class Standardization(Layer):
             dL/dX of shape (N,D):  [ dL/dY:(N,M) @ W:(M,D)) ]
         """
         name = "gradient"
-        assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT)
+        assert isinstance(dY, TYPE_FLOAT) or (isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT)
 
-        dY = np.array(dY).reshape((1, -1)) if isinstance(dY, float) or dY.ndim < 2 else dY
+        dY = np.array(dY).reshape((1, -1)) if isinstance(dY, TYPE_FLOAT) or dY.ndim < 2 else dY
         assert dY.shape == self.Y.shape, \
             "dL/dY shape needs %s but %s" % (self.Y.shape, dY.shape)
 
@@ -155,7 +155,7 @@ class BatchNormalization(Layer):
             self,
             name: str,
             num_nodes: int,
-            momentum: float = 0.9,
+            momentum: TYPE_FLOAT = 0.9,
             optimizer: Optimizer = SGD(),
             posteriors: Optional[List[Layer]] = None,
             log_level: int = logging.ERROR
@@ -175,7 +175,7 @@ class BatchNormalization(Layer):
             name, num_nodes, momentum
         )
 
-        assert 0 < momentum < 1
+        assert TYPE_FLOAT(0) < momentum < TYPE_FLOAT(1)
         assert isinstance(optimizer, Optimizer)
         self._optimizer: Optimizer = optimizer
 
@@ -199,13 +199,14 @@ class BatchNormalization(Layer):
         # --------------------------------------------------------------------------------
         # Feature mean of shape(M)
         self._U: np.ndarray = np.empty(num_nodes, dtype=TYPE_FLOAT)
-        self._dU: np.ndarray = np.empty(num_nodes, dtype=TYPE_FLOAT)
+        # Gradient dL/dU of shape (1,M). Not (M,) to calculate dL/dX:(N,M).
+        self._dU: np.ndarray = np.empty((1, num_nodes), dtype=TYPE_FLOAT)
         # SD-per-feature of batch X in shape (M,)
         self._SD: np.ndarray = np.empty(num_nodes, dtype=TYPE_FLOAT)
-        # Norm = 1/SD in shape (1,M)
+        # Norm = 1/SD in shape (M,)
         self._norm: np.ndarray = np.empty(num_nodes, dtype=TYPE_FLOAT)
-        # dL/dV. Gradient of variance V in shape (M,)
-        self._dV: np.ndarray = np.empty(num_nodes, dtype=TYPE_FLOAT)
+        # Gradient of variance V in shape (1,M). Not (M,) to calculate dL/dX:(N,M).
+        self._dV: np.ndarray = np.empty((1, num_nodes), dtype=TYPE_FLOAT)
 
         # --------------------------------------------------------------------------------
         # Running statistics. allocate storage at the instance initialization.
@@ -250,11 +251,14 @@ class BatchNormalization(Layer):
 
     @property
     def dU(self) -> np.ndarray:
-        """Gradient dL/dU = (dXmd01 + dXmd02) in shape:(M,)
-        dL/dX = dL/dXmd + (dL/dU / N)
-              = (dXmd01 + dXmd02) + (dL/dU / N)
+        """Gradient dL/dU in shape:(1,M)
+        dL/dU =
+          [ dL/dV / (N-1) * sum(-1 * 2 * Xmd, axis=0, keepdims=True)] # from dXmd01
+        + [ sum(-1 * dL/dXstd, axis=0, keepdims=True) ]               # from dXmd02
+
+        * -1 in sum(-1 * …) is from d(X-U)/dU
         """
-        assert self._dU.size > 0 and self._dU.shape == (self.M,), \
+        assert self._dU.size > 0 and self._dU.shape == (1, self.M), \
             "dU is not initialized or invalid"
         return self._dU
 
@@ -268,7 +272,7 @@ class BatchNormalization(Layer):
     @property
     def dXmd01(self) -> np.ndarray:
         """
-        Gradient 01 of dL/dXmd = dL/dV / (N-1) * 2Xmd
+        Gradient 01 of dL/dXmd = (dL/dV / (N-1) * 2Xmd)
         -1 is Bessel's correction at Variance calculation.
         Shape:(N,M) as per (X-mean)
         """
@@ -278,8 +282,8 @@ class BatchNormalization(Layer):
     @property
     def dXmd02(self) -> np.ndarray:
         """
-        Gradient 02 of dL/dXmd = gamma * dL/dY * norm where norm = 1/SD.
-        Shape:(N,M) as per (X-mean)
+        Gradient 02 of dL/dXmd = [(gamma * dL/dY) * norm] = (dL/dXstd * norm).
+        Shape:(N,M)
         """
         assert self._dXmd02.size > 0 and self._dXmd02.shape == (self.N, self.M)
         return self._dXmd02
@@ -288,10 +292,13 @@ class BatchNormalization(Layer):
     def dV(self) -> np.ndarray:
         """
         Gradient dL/dV, the impact on L by the variance delta dV of X.
-        dL/dV = sum(dL/dY * gamma * Xmd, axis=0) * [-1/2 * (norm **3)]
-        Shape:(M,)
+        dL/dV = sum((dL/dY * gamma) * Xmd, axis=0, keepdims=True) * [-1/2 * (norm **3)]
+              = sum( dL/dXstd       * Xmd, axis=0, keepdims=True) * [-1/2 * (norm **3)]
+        Shape:(1, M)
+
+        dL/dV:(1,M) is to later calculate dL/dX:(N,M). Hence keepdims to broadcast.
         """
-        assert self._dV.size > 0 and self._dV.shape == (self.M,), \
+        assert self._dV.size > 0 and self._dV.shape == (1, self.M), \
             "dV is not initialized or invalid"
         return self._dV
 
@@ -320,14 +327,13 @@ class BatchNormalization(Layer):
         return self._Xstd
 
     def dXstd(self) -> np.ndarray:
-        """Gradient of standardized X in shape:(N,M)"""
+        """Gradient dL/dXstd = (dL/dY * gamma) in shape:(N,M)"""
         assert self._dXstd.size > 0 and self._dXstd.shape == (self.N, self.M)
         return self._dXstd
 
     @property
     def gamma(self) -> np.ndarray:
-        """Feature scale parameter gamma for each feature in X.
-        Shape:(M,)
+        """Feature scale parameter gamma for each feature in X in shape:(M,)
         """
         assert self._gamma.size > 0 and self._gamma.shape == (self.M,), \
             "gamma is not initialized or invalid"
@@ -335,7 +341,7 @@ class BatchNormalization(Layer):
 
     @property
     def dGamma(self) -> np.ndarray:
-        """Gradient dL/dGamma = sum(dL/dY * dL/dXstd) for each feature in X.
+        """Gradient dL/dGamma = sum(dL/dY * dL/dXstd, axis=0) for each feature in X.
         Shape:(M,)
         """
         assert self._dGamma.size > 0 and self._dGamma.shape == (self.M,)
@@ -351,8 +357,9 @@ class BatchNormalization(Layer):
 
     @property
     def dBeta(self) -> np.ndarray:
-        """Gradient dL/dBeta = dL/dY * 1 for each feature in X.
-        Shape:(M,)"""
+        """Gradient dL/dBeta = sum(dL/dY * 1, axis=0) for each feature in X.
+        Shape:(M,)
+        """
         assert self._dBeta.size > 0 and self._dBeta.shape == (self.M,), \
             "dBeta is not initialized or invalid"
         return self._dBeta
@@ -391,12 +398,13 @@ class BatchNormalization(Layer):
     # Instance methods
     # --------------------------------------------------------------------------------
     def update_running_means(self):
-        """Update running means using decaying.
-            """
+        """Update running means using decaying"""
         self._RU = self.momentum * self.RU + (1 - self.momentum) * self.U
         self._RSD = self.momentum * self.RSD + (1 - self.momentum) * self.SD
 
-    def function(self, X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
+    def function(
+            self, X: Union[np.ndarray, TYPE_FLOAT]
+    ) -> Union[np.ndarray, TYPE_FLOAT]:
         """Standardize the input X per feature/column basis.
         Args:
             X: Batch input data from the input layer.
@@ -459,36 +467,71 @@ class BatchNormalization(Layer):
 
         return self.Y
 
-    def gradient(self, dY: Union[np.ndarray, float] = 1.0) -> Union[np.ndarray, float]:
-        """Calculate the gradients dL/dX and dL/dW.
-        Args:
-            dY: Gradient dL/dY, the total impact on L by dY.
-        Returns:
-            dL/dX of shape (N,D):  [ dL/dY:(N,M) @ W:(M,D)) ]
-        """
-        name = "gradient"
-        assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT)
+    def _gradient_numpy(self):
+        ddof = 1 if self.N > 1 else 0
 
-        dY = np.array(dY).reshape((1, -1)) if isinstance(dY, float) or dY.ndim < 2 else dY
-        assert dY.shape == self.Y.shape, \
-            "dL/dY shape needs %s but %s" % (self.Y.shape, dY.shape)
+        # --------------------------------------------------------------------------------
+        # dL/dGamma:(M,) = sum(dL/dY:(N,M) * Xstd(N,M), axis=0)
+        # --------------------------------------------------------------------------------
+        np.sum(self.dY * self.Xstd, axis=0, out=self._dGamma)
 
-        self.logger.debug("layer[%s].%s: dY.shape %s", self.name, name, dY.shape)
-        self._dY = dY
+        # --------------------------------------------------------------------------------
+        # dL/dBeta:(M,) = sum(dL/dY:(N,M) * 1, axis=0)
+        # --------------------------------------------------------------------------------
+        np.sum(self.dY, axis=0, out=self._dBeta)
 
+        # --------------------------------------------------------------------------------
+        # dL/dXstd: (N,M): dL/dY:(N,M) * gamma(M,)
+        # --------------------------------------------------------------------------------
+        np.sum(self.dY * self.gamma, axis=0, out=self._dXstd)
+
+        # --------------------------------------------------------------------------------
+        # dL/dV:(1,M) = sum(dL/dXstd:(N,M) * Xmd, axis=0, keepdim=True) * [-1/2 * (norm**3)]
+        # --------------------------------------------------------------------------------
+        np.sum(self.dXstd * self.Xmd, axis=0, keepdims=True, out=self._dV)
+        np.multiply(self.dV, (self.norm ** 3) / -2, out=self._dV)
+
+        # --------------------------------------------------------------------------------
+        # dL/dXmd01:(N,M) = dL/dV:(M,) / (N-ddof) * 2 * Xmd:(N,M)
+        # See https://github.com/pytorch/pytorch/issues/1410 for (N-ddof).
+        # --------------------------------------------------------------------------------
+        np.multiply(self.dV, self.Xmd, out=self._dXmd01)
+        np.divide(self.dXmd01, ((self.N-ddof) / 2), out=self._dXmd01)
+
+        # --------------------------------------------------------------------------------
+        # dL/dXmd02:(N,M) = dL/dXstd:(N,M) * norm:(M,)
+        # --------------------------------------------------------------------------------
+        np.multiply(self.dXstd, self.norm, out=self._dXmd02)
+
+        # --------------------------------------------------------------------------------
+        # dL/dU:(1,M) =
+        #   [ dL/dV / (N-1) * sum(-1 * 2 * Xmd, axis=0, keepdims=True)] # from dXmd01
+        # + [ sum(-1 * dL/dXstd, axis=0, keepdims=True) ]               # from dXmd02
+        #
+        # * -1 in sum(-1 * …) is from d(X-U)/dU
+        # --------------------------------------------------------------------------------
+        ne.evaluate("sum(-1 * (dXmd01 + dXmd01), axis=0)", out=self._dU)
+
+        # --------------------------------------------------------------------------------
+        # dL/dX: (N,M) = dL/dXmd01 + dL/dXmd02  + dU/N
+        # --------------------------------------------------------------------------------
+        return ne.evaluate("dXmd01 + dXmd02 + (dU / N)", out=self._dX)
+
+    def _gradient_numexpr(self):
         N = self.N
         ddof = 1 if N > 1 else 0
         Xstd = self.Xstd
         dXstd = self.dXstd
         Xmd = self.Xmd
-        dXmd01 = self._dXmd01
-        dXmd02 = self._dXmd02
+        dXmd01 = self.dXmd01
+        dXmd02 = self.dXmd02
         dV = self.dV
-        dU = self._dU
+        dU = self.dU
         norm = self.norm
         gamma = self.gamma
         dGamma = self.dGamma
         dBeta = self.dBeta
+        dX = self.dX
 
         # --------------------------------------------------------------------------------
         # dL/dGamma:(M,) = sum(dL/dY:(N,M) * Xstd(N,M), axis=0)
@@ -515,7 +558,7 @@ class BatchNormalization(Layer):
         # dL/dXmd01:(N,M) = dL/dV:(M,) / (N-ddof) * 2 * Xmd:(N,M)
         # See https://github.com/pytorch/pytorch/issues/1410 for (N-ddof).
         # --------------------------------------------------------------------------------
-        ne.evaluate("2 * dV * Xmd / (N - ddof)", out=dXmd02)
+        ne.evaluate("2 * dV * Xmd / (N - ddof)", out=dXmd01)
 
         # --------------------------------------------------------------------------------
         # dL/dXmd02:(N,M) = dL/dXstd:(N,M) * norm:(M,)
@@ -530,17 +573,36 @@ class BatchNormalization(Layer):
         # --------------------------------------------------------------------------------
         # dL/dX: (N,M) = dL/dXmd01 + dL/dXmd02  + dU/N
         # --------------------------------------------------------------------------------
-        ne.evaluate("dXmd01 + dXmd02 + (dU / N)", out=self._dX)
+        return ne.evaluate("dXmd01 + dXmd02 + (dU / N)", out=dX)
 
-        return self.dX
+    def gradient(self, dY: Union[np.ndarray, TYPE_FLOAT] = 1.0) -> Union[np.ndarray, TYPE_FLOAT]:
+        """Calculate the gradients dL/dX and dL/dW.
+        Args:
+            dY: Gradient dL/dY, the total impact on L by dY.
+        Returns:
+            dX: dL/dX:(N,M) = [         dL/dXmd         + (dL/dU / N) ]
+                            = [ (dL/dXmd01 + dL/dXmd02) + (dL/dU / N) ]
+        """
+        name = "gradient"
+        assert isinstance(dY, TYPE_FLOAT) or (isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT)
 
-    def _gradient_descent(self, X, dX, out=None) -> Union[np.ndarray, float]:
+        dY = np.array(dY).reshape((1, -1)) if isinstance(dY, TYPE_FLOAT) or dY.ndim < 2 else dY
+        assert dY.shape == self.Y.shape, \
+            "dL/dY shape needs %s but %s" % (self.Y.shape, dY.shape)
+
+        self.logger.debug("layer[%s].%s: dY.shape %s", self.name, name, dY.shape)
+        self._dY = dY
+
+        dX = self._gradient_numexpr()
+        return dX
+
+    def _gradient_descent(self, X, dX, out=None) -> Union[np.ndarray, TYPE_FLOAT]:
         """Gradient descent
         Directly update matrices to avoid the temporary copies
         """
         return self.optimizer.update(X, dX, out=out)
 
-    def update(self) -> List[Union[float, np.ndarray]]:
+    def update(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
         """Run gradient descent
         Returns:
             [dL/dGamma, dL/dBeta]: List of gradients.
