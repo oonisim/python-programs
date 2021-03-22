@@ -12,6 +12,9 @@ from typing import (
 )
 import logging
 import numpy as np
+from common import (
+    TYPE_FLOAT
+)
 
 
 class Optimizer:
@@ -23,15 +26,15 @@ class Optimizer:
     # ================================================================================
     # Instance initialization
     # ================================================================================
-    def __init__(self, name, lr=0.01, l2: float = 1e-3, log_level=logging.WARNING):
+    def __init__(self, name, lr=0.01, l2: TYPE_FLOAT = 1e-3, log_level=logging.WARNING):
         """
         Args:
             lr: learning rate of the gradient descent
             l2: L2 regularization hyper parameter, e.g. 1e-3, set to 0 not to use it
         """
         self._name = name
-        self._lr: Union[float, np.ndarray] = lr
-        self._l2: Union[float, np.ndarray] = l2
+        self.lr = lr
+        self.l2 = l2
 
         self._logger = logging.getLogger(name)
         self._logger.setLevel(logging._levelToName[log_level])
@@ -46,16 +49,36 @@ class Optimizer:
         return self._name
 
     @property
-    def lr(self) -> Union[float, np.ndarray]:
+    def lr(self) -> Union[TYPE_FLOAT, np.ndarray]:
         """Learning rate of the gradient descent"""
-        assert self._lr and self._lr >= 0
         return self._lr
 
+    @lr.setter
+    def lr(self, lr: Union[TYPE_FLOAT, np.ndarray]):
+        """Set Learning rate"""
+        assert \
+            (
+                isinstance(lr, TYPE_FLOAT) or
+                (isinstance(lr, np.ndarray) and lr.dtype == TYPE_FLOAT)
+            ) and (0.0 < lr < 1.0)
+
+        self._lr = lr
+
     @property
-    def l2(self) -> Union[float, np.ndarray]:
+    def l2(self) -> Union[TYPE_FLOAT, np.ndarray]:
         """L2 regularization hyper parameter"""
-        assert self._l2 and self._l2 >= 0
         return self._l2
+
+    @l2.setter
+    def l2(self, l2: Union[TYPE_FLOAT, np.ndarray]):
+        """Set L2 regularization"""
+        assert \
+            (
+                isinstance(l2, TYPE_FLOAT) or
+                (isinstance(l2, np.ndarray) and l2.dtype == TYPE_FLOAT)
+            ) and (0.0 < l2 < 1.0)
+
+        self._l2 = l2
 
     @property
     def logger(self) -> logging.Logger:

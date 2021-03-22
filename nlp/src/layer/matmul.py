@@ -155,6 +155,26 @@ class Matmul(Layer):
         """
         return self._optimizer
 
+    @property
+    def lr(self) -> Union[float, np.ndarray]:
+        """Learning rate of the gradient descent"""
+        return self.optimizer.lr
+
+    @lr.setter
+    def lr(self, lr):
+        """Set Learning rate"""
+        self.optimizer.lr = lr
+
+    @property
+    def l2(self) -> Union[float, np.ndarray]:
+        """L2 regularization hyper parameter"""
+        return self.optimizer.l2
+
+    @l2.setter
+    def l2(self, l2):
+        """Set L2 regularization"""
+        self.optimizer.l2 = l2
+
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
