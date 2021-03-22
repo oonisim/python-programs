@@ -457,6 +457,8 @@ def train_two_layer_classifier(
     assert num_epochs > 0 and N > 0 and D > 0 and M1 > 1
     assert log_loss_function == softmax_cross_entropy_log_loss and M2 >= 2
 
+    matmul01: Matmul
+    matmul02: Matmul
     *network, = build(
         M1,
         W1,
@@ -499,11 +501,16 @@ def train_two_layer_classifier(
         # ********************************************************************************
         # Constraint: Objective/Loss L(Yn+1) after gradient descent < L(Yn)
         # ********************************************************************************
-        if L >= history[-1] and (i % 20) == 1:
+        if L >= history[-1] and i > 0:
             Logger.warning(
                 "Iteration [%i]: Loss[%s] has not improved from the previous [%s] for %s times.",
                 i, L, history[-1], num_no_progress + 1
             )
+            # --------------------------------------------------------------------------------
+            # Reduce the learning rate.
+            # --------------------------------------------------------------------------------
+            matmul01.lr = matmul01.lr * 0.95
+            matmul02.lr = matmul02.lr * 0.95
             if (num_no_progress := num_no_progress + 1) > 50:
                 Logger.error(
                     "The training has no progress more than %s times.", num_no_progress
