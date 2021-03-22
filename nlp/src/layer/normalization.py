@@ -1,31 +1,23 @@
 """Normalization layer implementation
 """
+import logging
 from typing import (
     Optional,
     Union,
-    List,
-    Dict,
-    Tuple,
-    Final,
-    Generator,
-    Iterator,
-    Callable
+    List
 )
-import inspect
-import logging
-import copy
-import numpy as np
+
 import numexpr as ne
+import numpy as np
+
+from common import (
+    TYPE_FLOAT,
+    standardize
+)
 from layer import Layer
 from optimizer import (
     Optimizer,
     SGD,
-)
-from common import (
-    TYPE_FLOAT,
-    TYPE_LABEL,
-    standardize,
-    numerical_jacobian
 )
 
 
@@ -114,7 +106,7 @@ class Standardization(Layer):
             # --------------------------------------------------------------------------------
             # self._dY = np.empty((self.N, self.M), dtype=TYPE_FLOAT)
 
-        _, mean, sd, _ = standardize(X, out=self._Y)
+        standardize(X, out=self._Y)
         return self.Y
 
     def gradient(self, dY: Union[np.ndarray, float] = 1.0) -> Union[np.ndarray, float]:
@@ -192,7 +184,7 @@ class BatchNormalization(Layer):
         self._num_posteriors: int = len(posteriors) if posteriors else -1
 
         # --------------------------------------------------------------------------------
-        # Standardized
+        # Standardization variables
         # --------------------------------------------------------------------------------
         # Per-feature standardized X
         self._Xstd = np.empty(0, dtype=TYPE_FLOAT)
@@ -203,7 +195,7 @@ class BatchNormalization(Layer):
         self._dXmd02 = np.empty(0, dtype=TYPE_FLOAT)
 
         # --------------------------------------------------------------------------------
-        # Statistics. allocate storage at the instance initialization.
+        # Batch statistics. allocate storage at the instance initialization.
         # --------------------------------------------------------------------------------
         # Feature mean of shape(M)
         self._U: np.ndarray = np.empty(num_nodes, dtype=TYPE_FLOAT)
@@ -215,7 +207,10 @@ class BatchNormalization(Layer):
         # dL/dV. Gradient of variance V in shape (M,)
         self._dV: np.ndarray = np.empty(num_nodes, dtype=TYPE_FLOAT)
 
-        self._count = 0
+        # --------------------------------------------------------------------------------
+        # Running statistics. allocate storage at the instance initialization.
+        # --------------------------------------------------------------------------------
+        self._total_rows_processed = 0
         self._momentum: TYPE_FLOAT = momentum
         # Running mean-per-feature of all the batches X* in shape(M,)
         self._RU: np.ndarray = np.zeros(num_nodes, dtype=TYPE_FLOAT)
@@ -240,97 +235,141 @@ class BatchNormalization(Layer):
 
     @X.setter
     def X(self, X: np.ndarray):
-        """Set X"""
+        """Batch X in shape:(N,M)"""
         super(BatchNormalization, type(self)).X.fset(self, X)
         # Cannot check. Setting _D can be done using weight shape.
         # assert self.X.shape[1] == self.D, \
         #     "X shape needs (%s, %s) but %s" % (self.N, self.D, self.X.shape)
 
     @property
-    def Xstd(self) -> np.ndarray:
-        """Standardized X"""
-        assert self._Xstd.size > 0 and self._Xstd.shape == (self.N, self.M)
-        return self._Xstd
-
-    def dXstd(self) -> np.ndarray:
-        """Gradient of standardized X"""
-        assert self._dXstd.size > 0 and self._dXstd.shape == (self.N, self.M)
-        return self._dXstd
-
-    @property
-    def Xmd(self) -> np.ndarray:
-        """Mean deviation (X-mean)"""
-        assert self._Xmd.size > 0 and self._Xmd.shape == (self.N, self.M)
-        return self._Xmd
-
-    @property
     def U(self) -> np.ndarray:
-        """Mean of each feature in X"""
+        """Mean of each feature in X. Shape:(M,)"""
         assert self._U.size > 0 and self._U.shape == (self.M,), \
             "U is not initialized or invalid"
         return self._U
 
     @property
-    def RU(self) -> np.ndarray:
-        """Running mean of each feature in X"""
-        assert self._RU.size > 0 and self._RU.shape == (self.M,), \
-            "RU is not initialized or invalid"
-        return self._RU
+    def dU(self) -> np.ndarray:
+        """Gradient dL/dU = (dXmd01 + dXmd02) in shape:(M,)
+        dL/dX = dL/dXmd + (dL/dU / N)
+              = (dXmd01 + dXmd02) + (dL/dU / N)
+        """
+        assert self._dU.size > 0 and self._dU.shape == (self.M,), \
+            "dU is not initialized or invalid"
+        return self._dU
+
+    @property
+    def Xmd(self) -> np.ndarray:
+        """Per-feature MD(Mean Deviation) of X = (X-U) in shape:(N,M)
+        """
+        assert self._Xmd.size > 0 and self._Xmd.shape == (self.N, self.M)
+        return self._Xmd
+
+    @property
+    def dXmd01(self) -> np.ndarray:
+        """
+        Gradient 01 of dL/dXmd = dL/dV / (N-1) * 2Xmd
+        -1 is Bessel's correction at Variance calculation.
+        Shape:(N,M) as per (X-mean)
+        """
+        assert self._dXmd01.size > 0 and self._dXmd01.shape == (self.N, self.M)
+        return self._dXmd01
+
+    @property
+    def dXmd02(self) -> np.ndarray:
+        """
+        Gradient 02 of dL/dXmd = gamma * dL/dY * norm where norm = 1/SD.
+        Shape:(N,M) as per (X-mean)
+        """
+        assert self._dXmd02.size > 0 and self._dXmd02.shape == (self.N, self.M)
+        return self._dXmd02
 
     @property
     def dV(self) -> np.ndarray:
-        """dL/dV (impact on L by variance dV) of each feature"""
+        """
+        Gradient dL/dV, the impact on L by the variance delta dV of X.
+        dL/dV = sum(dL/dY * gamma * Xmd, axis=0) * [-1/2 * (norm **3)]
+        Shape:(M,)
+        """
         assert self._dV.size > 0 and self._dV.shape == (self.M,), \
             "dV is not initialized or invalid"
         return self._dV
 
     @property
     def SD(self) -> np.ndarray:
-        """Standard Deviation (SD) of each feature in X"""
+        """Standard Deviation (SD) of each feature in X in shape:(M,)
+        Bessel's correction is used when calculating the variance.
+        """
         assert self._SD.size > 0 and self._SD.shape == (self.M,), \
             "SD is not initialized or invalid"
         return self._SD
 
     @property
     def norm(self) -> np.ndarray:
-        """1/SD of each feature in X"""
+        """1/SD of each feature in X that standardizes X as (X-U) * norm
+        Shape:(M,)
+        """
         assert self._norm.size > 0 and self._norm.shape == (self.M,), \
             "norm is not initialized or invalid"
         return self._norm
 
     @property
-    def RSD(self) -> np.ndarray:
-        """Running SD of each feature in X"""
-        assert self._RSD.size > 0 and self._RSD.shape == (self.M,), \
-            "RSD is not initialized or invalid"
-        return self._RSD
+    def Xstd(self) -> np.ndarray:
+        """Per-feature standardized X in shape:(N,M)"""
+        assert self._Xstd.size > 0 and self._Xstd.shape == (self.N, self.M)
+        return self._Xstd
+
+    def dXstd(self) -> np.ndarray:
+        """Gradient of standardized X in shape:(N,M)"""
+        assert self._dXstd.size > 0 and self._dXstd.shape == (self.N, self.M)
+        return self._dXstd
 
     @property
     def gamma(self) -> np.ndarray:
-        """Feature scale parameter gamma for each feature in X"""
+        """Feature scale parameter gamma for each feature in X.
+        Shape:(M,)
+        """
         assert self._gamma.size > 0 and self._gamma.shape == (self.M,), \
             "gamma is not initialized or invalid"
         return self._gamma
 
     @property
     def dGamma(self) -> np.ndarray:
-        """Gradient of gamma for each feature in X"""
+        """Gradient dL/dGamma = sum(dL/dY * dL/dXstd) for each feature in X.
+        Shape:(M,)
+        """
         assert self._dGamma.size > 0 and self._dGamma.shape == (self.M,)
         return self._dGamma
 
     @property
     def beta(self) -> np.ndarray:
-        """Bias shift parameter beta for each feature in X"""
+        """Feature bias parameter beta for each feature in X.
+        Shape:(M,)"""
         assert self._beta.size > 0 and self._beta.shape == (self.M,),\
             "beta is not initialized or invalid"
         return self._beta
 
     @property
     def dBeta(self) -> np.ndarray:
-        """Gradient of beta for each feature in X"""
+        """Gradient dL/dBeta = dL/dY * 1 for each feature in X.
+        Shape:(M,)"""
         assert self._dBeta.size > 0 and self._dBeta.shape == (self.M,), \
             "dBeta is not initialized or invalid"
         return self._dBeta
+
+    @property
+    def RU(self) -> np.ndarray:
+        """Running mean of each feature in X. Shape:(M,)"""
+        assert self._RU.size > 0 and self._RU.shape == (self.M,), \
+            "RU is not initialized or invalid"
+        return self._RU
+
+    @property
+    def RSD(self) -> np.ndarray:
+        """Running SD of each feature in X. Shape:(M,)"""
+        assert self._RSD.size > 0 and self._RSD.shape == (self.M,), \
+            "RSD is not initialized or invalid"
+        return self._RSD
 
     @property
     def momentum(self) -> TYPE_FLOAT:
@@ -338,9 +377,9 @@ class BatchNormalization(Layer):
         return self._momentum
 
     @property
-    def count(self) -> TYPE_FLOAT:
-        """Number of times mini-batch trainings have been done."""
-        return self._count
+    def total_rows_processed(self) -> TYPE_FLOAT:
+        """Total number of training data (row) processed"""
+        return self._total_rows_processed
 
     @property
     def optimizer(self) -> Optimizer:
@@ -387,6 +426,7 @@ class BatchNormalization(Layer):
         if self._Xstd.size <= 0 or self._Xstd.shape[0] != self.N:
             self._Xstd = np.empty(X.shape, dtype=TYPE_FLOAT)
             self._dXstd = np.empty(X.shape, dtype=TYPE_FLOAT)
+            self._Xmd = np.empty(X.shape, dtype=TYPE_FLOAT)
             self._dXmd01 = np.empty(X.shape, dtype=TYPE_FLOAT)
             self._dXmd02 = np.empty(X.shape, dtype=TYPE_FLOAT)
 
@@ -411,7 +451,11 @@ class BatchNormalization(Layer):
         beta = self.beta
         standardized = self.Xstd
         ne.evaluate("gamma * standardized + beta", out=self._Y)
-        self._count += 1
+
+        # --------------------------------------------------------------------------------
+        # Total training data (rows) processed
+        # --------------------------------------------------------------------------------
+        self._total_rows_processed += self.N
 
         return self.Y
 
@@ -521,7 +565,6 @@ class BatchNormalization(Layer):
         RSD = self.RSD
         gamma = self.gamma
         beta = self.beta
-        P = ne.evaluate("gamma * ((X - RU) / RSD) + beta")
+        scores = ne.evaluate("gamma * ((X - RU) / RSD) + beta")
 
-        return P
-
+        return scores

@@ -35,6 +35,7 @@ def standardize(
         keepdims=True,
         out=None,
         out_mean=None,
+        out_md=None,
         out_sd=None
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Standardize X per-feature basis.
@@ -50,6 +51,7 @@ def standardize(
         keepdims: bool, optional to control numpy keepdims option.
         out: Output storage for the standardized X
         out_mean: Output storage for the mean
+        out_md: Output storage for the MD (Mean Deviation) = X-mean
         out_sd: Output storage for the SD
 
     Returns:
@@ -69,7 +71,7 @@ def standardize(
     # Calculate mean/deviation/sd per feature
     # --------------------------------------------------------------------------------
     mean = np.mean(X, axis=0, keepdims=keepdims, out=out_mean)
-    deviation = ne.evaluate("X - mean")
+    deviation = ne.evaluate("X - mean", out_md)
     if eps > 0:
         # Re-use the storage of buffer for standardized.
         buffer = ne.evaluate("deviation ** 2")
