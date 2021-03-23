@@ -15,6 +15,7 @@ import logging
 import copy
 import numpy as np
 import numexpr as ne
+from numba import jit
 from layer import Layer
 from optimizer import (
     Optimizer,
@@ -24,6 +25,8 @@ from common import (
     TYPE_LABEL,
     TYPE_FLOAT,
     OFFSET_DELTA,
+    ENFORCE_STRICT_ASSERT,
+    ENABLE_NUMBA,
     numerical_jacobian
 )
 
@@ -309,13 +312,12 @@ class Matmul(Layer):
         assert dW.shape == (self.M, self.D), \
             f"Gradient dL/dW shape needs {(self.M, self.D)} but ({dW.shape}))"
 
-        assert not np.all(dW == 0.0), \
-            "dW is zero. dw=\n%s\nX=\n%s\ndY=\n%s\n" % (dW, self.X, self.dY)
-
-        if self.logger.level in (logging.DEBUG, logging.WARNING) and np.all(dW < dW / 100):
+        if np.all(dW == 0.0) or np.all(dW/self.W < 1e-2):
             self.logger.warning(
-                "update(): Gradient descent potentially stalling with dW < 1% of W."
+                "Gradient descent looks stalling. dw=\n%s\ndY=\n%s\n",
+                dW, self.dY
             )
+            assert ENFORCE_STRICT_ASSERT
 
         self._dW = dW
         self._gradient_descent(self.W, self.dW, out=self._W)

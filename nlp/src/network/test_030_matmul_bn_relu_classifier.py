@@ -166,7 +166,7 @@ def train_matmul_bn_relu_classifier(
             f"Network objective L(X) %s must match layer-by-layer output %s." \
             % (objective(X), L)
 
-        if not (i % 50): print(f"iteration {i} Loss {L}")
+        if not (i % 10): print(f"iteration {i} Loss {L}")
         Logger.info("%s: iteration[%s]. Loss is [%s]", name, i, L)
 
         # ********************************************************************************

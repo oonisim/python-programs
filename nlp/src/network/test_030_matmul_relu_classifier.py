@@ -149,7 +149,7 @@ def train_matmul_relu_classifier(
             f"Network objective L(X) %s must match layer-by-layer output %s." \
             % (objective(X), L)
 
-        if not (i % 50): print(f"iteration {i} Loss {L}")
+        if not (i % 10): print(f"iteration {i} Loss {L}")
         Logger.info("%s: iteration[%s]. Loss is [%s]", name, i, L)
 
         # ********************************************************************************
@@ -187,7 +187,8 @@ def train_matmul_relu_classifier(
         #  Constraint. W in the matmul has been updated by the gradient descent.
         # ********************************************************************************
         Logger.debug("W after is \n%s", matmul.W)
-        assert not np.array_equal(before, matmul.W), "W has not been updated."
+        if np.array_equal(before, matmul.W):
+            Logger.warning("W has not been updated.dW=\n%s\n", dS[1])
 
         # --------------------------------------------------------------------------------
         # Expected dL/dW.T = X.T @ dL/dY = X.T @ (P-T) / N for y > 0 because of ReLU.

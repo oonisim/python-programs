@@ -12,9 +12,6 @@ import logging
 import copy
 import numpy as np
 import numexpr as ne
-from numba import (
-    jit
-)
 from common import (
     TYPE_FLOAT,
     TYPE_LABEL,
@@ -25,7 +22,9 @@ from common import (
     BOUNDARY_SIGMOID,
     GN_DIFF_ACCEPTANCE_RATIO,
     GRADIENT_SATURATION_THRESHOLD,
-    ENFORCE_STRICT_ASSERT
+    ENFORCE_STRICT_ASSERT,
+    ENABLE_NUMBA,
+    ENABLE_NUMEXPR
 )
 
 
@@ -332,7 +331,6 @@ def logistic_log_loss(
     return J
 
 
-@jit(nopython=True)
 def logistic_log_loss_gradient(X, T, offset: float = BOUNDARY_SIGMOID):
     """Derivative of
     Z = sigmoid(X), dZ/dX = Z(1-Z)

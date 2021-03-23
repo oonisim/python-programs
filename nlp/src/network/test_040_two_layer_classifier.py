@@ -327,9 +327,11 @@ def __backward(
     # ********************************************************************************
     dS = matmul.update()  # [dL/dX: (N, M1), dL/dW: (M2, M1+1)]
     Logger.debug("W after is \n%s", matmul.W)
-    assert not np.array_equal(before, matmul.W), \
-        "W has not been updated. Before=\n%s\nAfter=\n%s\nDiff=\n%s\ndW=\n%s\n" \
-        % (before, matmul.W, (before - matmul.W), dS[1])
+    if np.array_equal(before, matmul.W):
+        Logger.warning(
+            "W has not been updated. Before=\n%s\nAfter=\n%s\nDiff=\n%s\ndW=\n%s\n",
+            before, matmul.W, (before - matmul.W), dS[1]
+        )
 
     # ********************************************************************************
     #  Constraint.

@@ -594,10 +594,6 @@ class BatchNormalization(Layer):
 
         return self.dX
 
-    @jit(nopython=True)
-    def _gradient_numba(self):
-        return self._gradient_numpy()
-
     def _gradient_numexpr(self):
         """Calculate dL/dX using numexpr"""
         N = self.N
