@@ -128,6 +128,26 @@ def test_020_bn_instantiation_to_fail():
         except AssertionError:
             pass
 
+        # Constraint: 0 < eps < 1e-3.
+        try:
+            BatchNormalization(
+                name="test_020_bn",
+                num_nodes=np.random.randint(1, 100),
+                eps=np.random.uniform(-100.0, 0)
+            )
+            raise RuntimeError("BN initialization with eps < 0 must fail")
+        except AssertionError:
+            pass
+        try:
+            BatchNormalization(
+                name="test_020_bn",
+                num_nodes=np.random.randint(1, 100),
+                eps=np.random.uniform(1e-3, 100.0)
+            )
+            raise RuntimeError("BN initialization with eps >=1e-3 must fail")
+        except AssertionError:
+            pass
+
 
 def test_020_bn_instance_properties_access_to_fail():
     """
@@ -394,29 +414,37 @@ def _validate_storage_allocation(layer, X):
         layer.dXmd02.shape == X.shape and layer.dXmd02.dtype == TYPE_FLOAT
 
 
-def _validate_layer_values(layer, X):
+def _validate_layer_values(layer, X, eps):
     ddof = 1 if X.shape[0] > 1 else 0
 
     # ----------------------------------------------------------------------
     # Currently in standardize(), sd[sd==0.0] = 1.0 is implemented.
     # ----------------------------------------------------------------------
-    md = X - X.mean(axis=0)
-    sd = X.std(axis=0, ddof=ddof)
-    sd[sd == 0.0] = 1.0
+    md = X - X.mean(axis=0)     # md = mean deviation
+    variance = X.var(axis=0, ddof=ddof)
+    if eps > 0.0:
+        sd = np.sqrt(variance + eps)
+    else:
+        sd = np.std(X, axis=0, ddof=ddof)
+        sd[sd == 0.0] = 1.0
+
+    expected_standardized = md / sd
+    diff = expected_standardized - layer.Xstd
 
     assert np.allclose(layer.U, X.mean(axis=0), atol=1e-6, rtol=0.0)
-    assert np.allclose(layer.Xmd, X - X.mean(axis=0), atol=1e-6, rtol=0.0)
+    assert np.allclose(layer.Xmd, md, atol=1e-6, rtol=0.0)
     assert np.allclose(layer.SD, sd, atol=1e-6, rtol=0.0)
     assert np.allclose(
         layer.Xstd,
-        (X - X.mean(axis=0)) / sd,
+        expected_standardized,
         atol=1e-6,
         rtol=0.0
-    )
+    ), "Xstd\n%s\nexpected_standardized=\n%s\ndiff=\n%s\n" \
+       % (layer.Xstd, expected_standardized, diff)
 
 
 def _validate_layer_running_statistics(
-        layer: BatchNormalization, previous_ru, previous_rsd, X
+        layer: BatchNormalization, previous_ru, previous_rsd, X, eps
 ):
     momentum = layer.momentum
     ddof = 1 if X.shape[0] > 1 else 0
@@ -424,9 +452,12 @@ def _validate_layer_running_statistics(
     # ----------------------------------------------------------------------
     # Currently in standardize(), sd[sd==0.0] = 1.0 is implemented.
     # ----------------------------------------------------------------------
-    md = X - X.mean(axis=0)
-    sd = X.std(axis=0, ddof=ddof)
-    sd[sd == 0.0] = 1.0
+    variance = X.var(axis=0, ddof=ddof)
+    if eps > 0.0:
+        sd = np.sqrt(variance + eps)
+    else:
+        sd = np.std(X, axis=0, ddof=ddof)
+        sd[sd == 0.0] = 1.0
 
     expected_ru = momentum * previous_ru + (1 - momentum) * X.mean(axis=0)
     expected_rsd = momentum * previous_rsd + (1 - momentum) * sd
@@ -434,10 +465,10 @@ def _validate_layer_running_statistics(
     assert \
         np.allclose(layer.RSD, expected_rsd, atol=1e-6, rtol=0), \
         "X=\n%s\nX.sd()=\n%s\nlayer.SD=\n%s\nlayer.RSD=\n%s\n" \
-        % (X, X.sd(), layer.SD, layer.RSD)
+        % (X, X.std(axis=0, ddof=ddof), layer.SD, layer.RSD)
 
 
-def test_020_bn_method_function():
+def test_020_bn_method_function_to_succeed():
     """
     Objective:
         Verify the layer class instance function method
@@ -461,15 +492,17 @@ def test_020_bn_method_function():
         M: int = np.random.randint(2, NUM_MAX_NODES)
 
         X = np.random.randn(N, M)
-        momentum = TYPE_FLOAT(0.85)
-        ddof = 1 if N > 1 else 0
+        momentum = np.random.uniform(0.7, 0.99)
+        eps = np.random.uniform(1e-12, 1e-10) if np.random.uniform() < 0.5 else 0.0
 
         layer = BatchNormalization(
             name=name,
             num_nodes=M,
             momentum=momentum,
+            eps=eps,
             log_level=logging.DEBUG
         )
+        layer.objective = objective
 
         # ********************************************************************************
         # Constraint: total_rows_processed = times_of_invocations * N
@@ -482,17 +515,20 @@ def test_020_bn_method_function():
             numexpr_enabled=numexpr_enabled,
             numba_enabled=numba_enabled
         )
-        _validate_layer_running_statistics(layer, ru, rsd, X)
+        _validate_layer_values(layer, X, eps=eps)
+        _validate_layer_running_statistics(
+            layer=layer, previous_ru=ru, previous_rsd=rsd, X=X, eps=eps
+        )
 
         # ********************************************************************************
         # Constraint:
         #   layer.N provides the latest X.shape[0]
-        #   Storage of Y is allocated.
         #   X related arrays should have its storage allocated and has the X.shape.
         #   * dX
         #   * dXmd01
         #   * dXmd02
         # ********************************************************************************
+        assert layer.N == X.shape[0]
         assert \
             layer.dX.dtype == TYPE_FLOAT and \
             layer.dX.shape == (N, M)
@@ -504,30 +540,49 @@ def test_020_bn_method_function():
         assert \
             layer.dXmd02.dtype == TYPE_FLOAT and \
             layer.dXmd02.shape == (N, M)
+        assert layer.total_rows_processed == N
 
         # ********************************************************************************
         # Constraint: total_rows_processed = times_of_invocations * N
         # ********************************************************************************
-        layer = BatchNormalization(
-            name=name,
-            num_nodes=M,
-            momentum=momentum,
-            log_level=logging.DEBUG
-        )
         for i in range(np.random.randint(1, 100)):
-            Y = layer.function(
+            layer.function(
                 X,
                 numexpr_enabled=numexpr_enabled,
                 numba_enabled=numba_enabled
             )
-            assert layer.total_rows_processed == N * (i + 1)
+            assert layer.total_rows_processed == N * (i + 2)
 
-        _validate_storage_allocation(layer, X)
+    profiler.disable()
+    profiler.print_stats(sort="cumtime")
 
-        # ********************************************************************************
-        # Constraint: Xsd, U, Xmd, SD should match those of X
-        # ********************************************************************************
-        _validate_layer_values(layer, X)
+
+def test_020_bn_method_function_multi_invocations_to_succeed():
+    """
+    Objective:
+        Verify the layer class instance function method
+    Expected:
+        Layer method calculate expected values.
+    """
+    def objective(X: np.ndarray) -> Union[float, np.ndarray]:
+        """Dummy objective function"""
+        return np.sum(X)
+
+    profiler = cProfile.Profile()
+    profiler.enable()
+    for _ in range(NUM_MAX_TEST_TIMES):
+        name = random_string(np.random.randint(1, 10))
+        numexpr_enabled = bool(np.random.randint(0, 2))
+        numba_enabled = bool(np.random.randint(0, 2))
+
+        # For BN which works on statistics on per-feature basis,
+        # no sense if M = 1 or N = 1.
+        N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
+        M: int = np.random.randint(2, NUM_MAX_NODES)
+
+        X = np.random.randn(N, M)
+        momentum = np.random.uniform(0.7, 0.99)
+        eps = np.random.uniform(1e-12, 1e-10) if np.random.uniform() < 0.5 else 0.0
 
         # ********************************************************************************
         # Constraint:
@@ -537,8 +592,18 @@ def test_020_bn_method_function():
             name=name,
             num_nodes=M,
             momentum=momentum,
+            eps=eps,
             log_level=logging.DEBUG
         )
+        layer.objective = objective
+
+        for i in range(np.random.randint(1, 100)):
+            layer.function(
+                X,
+                numexpr_enabled=numexpr_enabled,
+                numba_enabled=numba_enabled
+            )
+
         total_rows_processed = layer.total_rows_processed
         ru = layer.RU
         rsd = layer.RSD
@@ -553,18 +618,20 @@ def test_020_bn_method_function():
             numexpr_enabled=numexpr_enabled,
             numba_enabled=numba_enabled
         )
-        _validate_storage_allocation(layer, Z)
 
         # ********************************************************************************
-        # Constraint: Xsd, U, Xmd, SD should match those of X
+        # Constraint: Xsd, U, Xmd, SD should match those of Z
         # ********************************************************************************
-        _validate_layer_values(layer, Z)
+        _validate_storage_allocation(layer, Z)
+        _validate_layer_values(layer, Z, eps=eps)
 
         # ********************************************************************************
         # Constraint: Statistics is updated with Z
         # ********************************************************************************
         assert layer.total_rows_processed == total_rows_processed + Z.shape[0]
-        _validate_layer_running_statistics(layer, ru, rsd, Z)
+        _validate_layer_running_statistics(
+            layer=layer, previous_ru=ru, previous_rsd=rsd, X=Z, eps=eps
+        )
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")
@@ -595,20 +662,22 @@ def test_020_bn_method_function_validate_with_frederik_kratzert():
         M: int = np.random.randint(2, NUM_MAX_NODES)
 
         X = np.random.randn(N, M)
-        momentum = TYPE_FLOAT(0.85)
+        momentum = np.random.uniform(0.7, 0.99)
+        eps = np.random.uniform(1e-12, 1e-8) if np.random.uniform() < 0.5 else 0.0
         ddof = 1 if N > 1 else 0
 
         layer = BatchNormalization(
             name=name,
             num_nodes=M,
             momentum=momentum,
+            eps=eps,
             log_level=logging.DEBUG
         )
         objective = objective
 
         u = 1e-5
         out, cache = batchnorm_forward(
-            x=X, gamma=layer.gamma, beta=layer.beta, eps=0.0
+            x=X, gamma=layer.gamma, beta=layer.beta, eps=eps
         )
         xhat, gamma, xmu, norm, sd, var, eps = cache
 
@@ -666,13 +735,15 @@ def test_020_bn_method_gradient_validate_with_frederik_kratzert():
         M: int = np.random.randint(2, NUM_MAX_NODES)
 
         X = np.random.randn(N, M)
-        momentum = TYPE_FLOAT(0.85)
+        momentum = np.random.uniform(0.7, 0.99)
+        eps = np.random.uniform(1e-12, 1e-8) if np.random.uniform() < 0.5 else 0.0
         ddof = 1 if N > 1 else 0
 
         layer = BatchNormalization(
             name=name,
             num_nodes=M,
             momentum=momentum,
+            eps=eps,
             log_level=logging.DEBUG
         )
         objective = objective
@@ -684,7 +755,7 @@ def test_020_bn_method_gradient_validate_with_frederik_kratzert():
         # Benchmark (frederik_kratzert)
         # --------------------------------------------------------------------------------
         out, cache = batchnorm_forward(
-            x=X, gamma=layer.gamma, beta=layer.beta, eps=0.0
+            x=X, gamma=layer.gamma, beta=layer.beta, eps=eps
         )
         xhat, gamma, xmu, norm, sd, var, eps = cache
         dx, dgamma, dbeta, dxhat, dvar, dxmu2, dxmu1, dmu = batchnorm_backward(dout, cache)

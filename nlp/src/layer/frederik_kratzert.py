@@ -21,9 +21,11 @@ def batchnorm_forward(x, gamma, beta, eps):
     var = 1. / (N-ddof) * np.sum(sq, axis=0)
 
     # step5: add eps for numerical stability, then sqrt
-    sd = np.sqrt(var + eps)
     if eps == 0.0:
+        sd = np.sqrt(var)
         sd[sd == 0] = 1.0
+    else:
+        sd = np.sqrt(var + eps)
 
     # step6: invert sqrtwar
     norm = 1. / sd

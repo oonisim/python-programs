@@ -158,6 +158,7 @@ class BatchNormalization(Layer):
             num_nodes: int,
             momentum: TYPE_FLOAT = 0.9,
             optimizer: Optimizer = SGD(),
+            eps: TYPE_FLOAT = 0.0,
             posteriors: Optional[List[Layer]] = None,
             log_level: int = logging.ERROR
     ):
@@ -166,6 +167,7 @@ class BatchNormalization(Layer):
             name: Layer identity name
             num_nodes: Number of nodes in the layer
             momentum: Decay of running mean/variance
+            eps: Prevent x/sqrt(var+eps) from div-by-zero in standardize(eps=eps)
             optimizer: Gradient descent implementation e.g SGD, Adam.
             posteriors: Post layers to which forward the matmul layer output
             log_level: logging level
@@ -175,10 +177,9 @@ class BatchNormalization(Layer):
             "BatchNormalization[%s] number of nodes is [%s] momentum is %s]",
             name, num_nodes, momentum
         )
-
         assert TYPE_FLOAT(0) < momentum < TYPE_FLOAT(1)
+        assert TYPE_FLOAT(0) <= eps < TYPE_FLOAT(1e-3)
         assert isinstance(optimizer, Optimizer)
-        self._optimizer: Optimizer = optimizer
 
         # Layers to which forward the output
         self._posteriors: List[Layer] = posteriors
@@ -198,6 +199,7 @@ class BatchNormalization(Layer):
         # --------------------------------------------------------------------------------
         # Batch statistics. allocate storage at the instance initialization.
         # --------------------------------------------------------------------------------
+        self._eps = eps
         # Feature mean of shape(M)
         self._U: np.ndarray = np.empty(num_nodes, dtype=TYPE_FLOAT)
         # Gradient dL/dU of shape (1,M). Not (M,) to calculate dL/dX:(N,M).
@@ -228,6 +230,8 @@ class BatchNormalization(Layer):
         self._dGamma: np.ndarray = np.empty(num_nodes, dtype=TYPE_FLOAT)
         self._beta: np.ndarray = np.zeros(num_nodes, dtype=TYPE_FLOAT)
         self._dBeta: np.ndarray = np.zeros(num_nodes, dtype=TYPE_FLOAT)
+
+        self._optimizer: Optimizer = optimizer
 
     # --------------------------------------------------------------------------------
     # Instance properties
@@ -290,6 +294,11 @@ class BatchNormalization(Layer):
         """
         assert self._dXmd02.size > 0 and self._dXmd02.shape == (self.N, self.M)
         return self._dXmd02
+
+    @property
+    def eps(self) -> TYPE_FLOAT:
+        """epsilon to prevent div-by-zero at x/sqrt(var+eps)"""
+        return self._eps
 
     @property
     def dV(self) -> np.ndarray:
@@ -464,8 +473,9 @@ class BatchNormalization(Layer):
         # --------------------------------------------------------------------------------
         # Standardize X and update running means.
         # --------------------------------------------------------------------------------
-        _, self._U, self._SD, self._Xmd = standardize(
+        self._Xstd, self._U, self._SD, self._Xmd = standardize(
             X,
+            eps=self.eps,
             keepdims=False,
             out=self._Xstd,
             out_mean=self._U,

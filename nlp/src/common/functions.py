@@ -32,7 +32,7 @@ Logger = logging.getLogger("functions")
 def standardize(
     X: Union[np.ndarray, float],
         eps: TYPE_FLOAT = 0.0,
-        keepdims=True,
+        keepdims=False,
         out=None,
         out_mean=None,
         out_md=None,
@@ -43,6 +43,10 @@ def standardize(
     1. Calculate the mean per each column, not entire matrix.
     2. Calculate the variance per each column
     3. Standardize mean/sqrt(variance+eps) where small positive eps prevents sd from being zero.
+
+    TODO:
+        separate logic for numexpr and numpy
+        implement numba option
 
     Args:
         X: Input data to standardize per feature basis.
