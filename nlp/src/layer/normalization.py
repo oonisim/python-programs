@@ -6,13 +6,13 @@ from typing import (
     Union,
     List
 )
-
-import numexpr as ne
 import numpy as np
-
+import numexpr as ne
+from numba import jit
 from common import (
     TYPE_FLOAT,
-    NUMEXPR_ENABLED,
+    ENABLE_NUMEXPR,
+    ENABLE_NUMBA,
     standardize
 )
 from layer import Layer
@@ -201,13 +201,15 @@ class BatchNormalization(Layer):
         # Feature mean of shape(M)
         self._U: np.ndarray = np.empty(num_nodes, dtype=TYPE_FLOAT)
         # Gradient dL/dU of shape (1,M). Not (M,) to calculate dL/dX:(N,M).
-        self._dU: np.ndarray = np.empty((1, num_nodes), dtype=TYPE_FLOAT)
+        # self._dU: np.ndarray = np.empty((1, num_nodes), dtype=TYPE_FLOAT)
+        self._dU: np.ndarray = np.empty(num_nodes, dtype=TYPE_FLOAT)
         # SD-per-feature of batch X in shape (M,)
         self._SD: np.ndarray = np.empty(num_nodes, dtype=TYPE_FLOAT)
         # Norm = 1/SD in shape (M,)
         self._norm: np.ndarray = np.empty(num_nodes, dtype=TYPE_FLOAT)
         # Gradient of variance V in shape (1,M). Not (M,) to calculate dL/dX:(N,M).
-        self._dV: np.ndarray = np.empty((1, num_nodes), dtype=TYPE_FLOAT)
+        # self._dV: np.ndarray = np.empty((1, num_nodes), dtype=TYPE_FLOAT)
+        self._dV: np.ndarray = np.empty(num_nodes, dtype=TYPE_FLOAT)
 
         # --------------------------------------------------------------------------------
         # Running statistics. allocate storage at the instance initialization.
@@ -259,7 +261,7 @@ class BatchNormalization(Layer):
 
         * -1 in sum(-1 * …) is from d(X-U)/dU
         """
-        assert self._dU.size > 0 and self._dU.shape == (1, self.M), \
+        assert self._dU.size == self.M, \
             "dU is not initialized or invalid"
         return self._dU
 
@@ -299,7 +301,7 @@ class BatchNormalization(Layer):
 
         dL/dV:(1,M) is to later calculate dL/dX:(N,M). Hence keepdims to broadcast.
         """
-        assert self._dV.size > 0 and self._dV.shape == (1, self.M), \
+        assert self._dV.size == self.M, \
             "dV is not initialized or invalid"
         return self._dV
 
@@ -404,12 +406,31 @@ class BatchNormalization(Layer):
         self._RU = self.momentum * self.RU + (1 - self.momentum) * self.U
         self._RSD = self.momentum * self.RSD + (1 - self.momentum) * self.SD
 
+    @staticmethod
+    def _function_numexpr(x, gamma, beta, out):
+        ne.evaluate("gamma * x + beta", out=out)
+
+    @staticmethod
+    @jit
+    def _function_numba(x, gamma, beta):
+        return gamma * x + beta
+
+    @staticmethod
+    def _function_numpy(x, gamma, beta, out=None):
+        scaled = np.multiply(gamma, x, out=out)
+        shifted = np.add(scaled, beta, out=out)
+        return shifted
+
     def function(
-            self, X: Union[np.ndarray, TYPE_FLOAT]
+            self, X: Union[np.ndarray, TYPE_FLOAT],
+            numexpr_enabled: bool = ENABLE_NUMEXPR,
+            numba_enabled: bool = ENABLE_NUMBA
     ) -> Union[np.ndarray, TYPE_FLOAT]:
         """Standardize the input X per feature/column basis.
         Args:
             X: Batch input data from the input layer.
+            numexpr_enabled: flat to use numexpr
+            numba_enabled: flat to use numba
         Returns:
             Y: Per-feature standardized output
         """
@@ -452,15 +473,21 @@ class BatchNormalization(Layer):
         )
         self.update_running_means()
         self._norm = 1.0 / self.SD
-        assert np.isfinite(self.norm)
+        assert np.all(np.isfinite(self.norm))
 
         # --------------------------------------------------------------------------------
         # Calculate layer output Y
         # --------------------------------------------------------------------------------
         gamma = self.gamma
         beta = self.beta
-        standardized = self.Xstd
-        ne.evaluate("gamma * standardized + beta", out=self._Y)
+        x = self.Xstd
+        out = self._Y
+        if numexpr_enabled:
+            self._function_numexpr(x=x, gamma=gamma, beta=beta, out=out)
+        elif numba_enabled:
+            self._Y = self._function_numba(x=x, gamma=gamma, beta=beta)
+        else:
+            self._function_numpy(x=x, gamma=gamma, beta=beta, out=self._Y)
 
         # --------------------------------------------------------------------------------
         # Total training data (rows) processed
@@ -486,38 +513,36 @@ class BatchNormalization(Layer):
         # --------------------------------------------------------------------------------
         # dL/dXstd: (N,M): dL/dY:(N,M) * gamma(M,)
         # --------------------------------------------------------------------------------
-        np.sum(self.dY * self.gamma, axis=0, out=self._dXstd)
+        np.multiply(self.dY, self.gamma, out=self._dXstd)
 
         # --------------------------------------------------------------------------------
         # dL/dV:(1,M) = sum(dL/dXstd:(N,M) * Xmd, axis=0, keepdim=True) * [-1/2 * (norm**3)]
         # --------------------------------------------------------------------------------
-        np.sum(self.dXstd * self.Xmd, axis=0, keepdims=True, out=self._dV)
-        np.multiply(self.dV, (self.norm ** 3) / -2, out=self._dV)
+        # np.sum(self.dXstd * self.Xmd, axis=0, keepdims=True, out=self._dV)
+        np.sum(self.dXstd * self.Xmd, axis=0, out=self._dV)
+        np.multiply(self.dV, (self.norm ** 3) / -2.0, out=self._dV)
 
         # --------------------------------------------------------------------------------
         # dL/dXmd01:(N,M) = dL/dV:(M,) / (N-ddof) * 2 * Xmd:(N,M)
         # See https://github.com/pytorch/pytorch/issues/1410 for (N-ddof).
         # --------------------------------------------------------------------------------
         np.multiply(self.dV, self.Xmd, out=self._dXmd01)
-        np.divide(self.dXmd01, ((self.N-ddof) / 2), out=self._dXmd01)
+        np.divide(self.dXmd01, ((self.N-ddof) / 2.0), out=self._dXmd01)
+        assert self.dXmd01.shape == (self.N, self.M)
 
         # --------------------------------------------------------------------------------
         # dL/dXmd02:(N,M) = dL/dXstd:(N,M) * norm:(M,)
         # --------------------------------------------------------------------------------
         np.multiply(self.dXstd, self.norm, out=self._dXmd02)
+        assert self.dXmd02.shape == (self.N, self.M)
 
         # --------------------------------------------------------------------------------
-        # dL/dU:(1,M) =
-        #   [ dL/dV / (N-1) * sum(-1 * 2 * Xmd, axis=0, keepdims=True)] # from dXmd01
-        # + [ sum(-1 * dL/dXstd, axis=0, keepdims=True) ]               # from dXmd02
-        #
-        # * -1 in sum(-1 * …) is from d(X-U)/dU
+        # dL/dU:(1,M) = -sum(dL/dXmd01 + dL/dXmd02, axis-0, keepdims=True)
+        # * -1 in -sum() is from d(X-U)/dU
         # --------------------------------------------------------------------------------
-        np.sum(self.Xmd, axis=0, keepdims=True, out=self._dU)
-        np.multiply(self.dV, self.dU, out=self._dU)
-        np.divide(self.dU, ((self.N-ddof) / -2), out=self._dU)
-        ne.evaluate("sum(-1 * (dXmd01 + dXmd01), axis=0)", out=self._dU)
-        self._dU -= np.sum(self.dXstd, axis=0, keepdims=True)
+        # np.sum((self.dXmd01+self.dXmd02), axis=0, keepdims=True, out=self._dU)
+        np.sum((self.dXmd01+self.dXmd02), axis=0, out=self._dU)
+        self._dU *= -1
 
         # --------------------------------------------------------------------------------
         # dL/dX: (N,M) = dL/dXmd01 + dL/dXmd02  + dU/N
@@ -526,9 +551,14 @@ class BatchNormalization(Layer):
         np.add(self.dX, self.dU / self.N, out=self._dX)
         return self.dX
 
+    @jit
+    def _gradient_numba(self):
+        return self._gradient_numpy()
+
     def _gradient_numexpr(self):
         """Calculate dL/dX using numexpr"""
         N = self.N
+        dY = self.dY
         ddof = 1 if N > 1 else 0
         Xstd = self.Xstd
         dXstd = self.dXstd
@@ -556,13 +586,15 @@ class BatchNormalization(Layer):
         # --------------------------------------------------------------------------------
         # dL/dXstd: (N,M): dL/dY:(N,M) * gamma(M,)
         # --------------------------------------------------------------------------------
-        ne.evaluate("sum(dY * gamma, axis=0)", out=dXstd)
+        ne.evaluate("dY * gamma", out=dXstd)
 
         # --------------------------------------------------------------------------------
         # dL/dV:(M,) = sum(dL/dXstd:(N,M) * Xmd:(N,M), axis=0) * -1/2 * norm**3
         # --------------------------------------------------------------------------------
+        #dV = self._dV.reshape(-1)
         ne.evaluate("sum(dXstd * Xmd, axis=0)", out=dV)
-        np.eavluate("dV * (norm ** 3) / -2", out=dV)
+        ne.evaluate("dV * (norm ** 3) / -2", out=dV)
+        #self._dV = dV.reshape(1, -1)
 
         # --------------------------------------------------------------------------------
         # dL/dXmd01:(N,M) = dL/dV:(M,) / (N-ddof) * 2 * Xmd:(N,M)
@@ -576,19 +608,28 @@ class BatchNormalization(Layer):
         ne.evaluate("dXstd * norm", out=dXmd02)
 
         # --------------------------------------------------------------------------------
-        # dL/dU: (M,) = sum(-dL/dXmd01 + -dL/dXmd02, axis=0)
+        # dL/dU: (1,M) = sum(-dL/dXmd01 + -dL/dXmd02, axis=0, keepdims=True, )
         # --------------------------------------------------------------------------------
-        ne.evaluate("sum(-1 * (dXmd01 + dXmd01), axis=0)", out=dU)
+        #dU = self._dU.reshape(-1)
+        ne.evaluate("sum(-1 * (dXmd01 + dXmd02), axis=0)", out=dU)
+        #self._dU = dU.reshape(1, -1)
 
         # --------------------------------------------------------------------------------
         # dL/dX: (N,M) = dL/dXmd01 + dL/dXmd02  + dU/N
         # --------------------------------------------------------------------------------
         return ne.evaluate("dXmd01 + dXmd02 + (dU / N)", out=dX)
 
-    def gradient(self, dY: Union[np.ndarray, TYPE_FLOAT] = 1.0) -> Union[np.ndarray, TYPE_FLOAT]:
+    def gradient(
+            self,
+            dY: Union[np.ndarray, TYPE_FLOAT] = 1.0,
+            numexpr_enabled: bool = ENABLE_NUMEXPR,
+            numba_enabled: bool = ENABLE_NUMBA
+    ) -> Union[np.ndarray, TYPE_FLOAT]:
         """Calculate the gradients dL/dX and dL/dW.
         Args:
             dY: Gradient dL/dY, the total impact on L by dY.
+            numexpr_enabled: flat to use numexpr
+            numba_enabled: flat to use numexpr
         Returns:
             dX: dL/dX:(N,M) = [         dL/dXmd         + (dL/dU / N) ]
                             = [ (dL/dXmd01 + dL/dXmd02) + (dL/dU / N) ]
@@ -603,8 +644,10 @@ class BatchNormalization(Layer):
         self.logger.debug("layer[%s].%s: dY.shape %s", self.name, name, dY.shape)
         self._dY = dY
 
-        if NUMEXPR_ENABLED:
+        if numexpr_enabled:
             return self._gradient_numexpr()
+        elif numba_enabled:
+            return self._gradient_numba()
         else:
             return self._gradient_numpy()
 
