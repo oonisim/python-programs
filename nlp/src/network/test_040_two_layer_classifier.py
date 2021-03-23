@@ -308,15 +308,17 @@ def __backward(
     # EDX should match the gradient dL/dX back-propagated from the Matmul layer.
     # ********************************************************************************
     dX = matmul.gradient(dY)  # dL/dX: (N, M1)
-    assert \
-        np.allclose(
+    if not np.allclose(
             a=dX,
             b=EDX,
             atol=GRADIENT_DIFF_ACCEPTANCE_VALUE,
             rtol=GRADIENT_DIFF_ACCEPTANCE_RATIO
-        ), \
-        "dX should match EDX. dX=\n%s\nEDX=\n%s\nDiff=\n%s\n" \
-        % (dX, EDX, (dX - EDX))
+    ):
+        Logger.error(
+            "dX should match EDX. dX=\n%s\nEDX=\n%s\nDiff=\n%s\n",
+            dX, EDX, (dX - EDX)
+        )
+        assert ENFORCE_STRICT_ASSERT
 
     # ================================================================================
     # Layer  gradient descent

@@ -188,7 +188,7 @@ def logarithm(
         # Adding the offset value to all elements as log(x+k) to avoid log(0)=-inf.
         # --------------------------------------------------------------------------------
         # Y = np.log(X+offset)
-        Y = ne.evalue("log(X + offset)")
+        Y = ne.evaluate("log(X + offset)")
     assert np.all(np.isfinite(Y)), f"log(X) caused nan for X \nX={X}."
 
     return Y
@@ -968,7 +968,7 @@ def numerical_jacobian(
     if not np.all(np.isfinite(J)):
         raise ValueError(f"{name} caused Nan or Inf")
 
-    gradient_saturation_condition = ne.evaluate("abs(J) < GRADIENT_SATURATION_THRESHOLD")
+    gradient_saturation_condition = (abs(J) < GRADIENT_SATURATION_THRESHOLD)
     if np.all(gradient_saturation_condition):
         __J = J[gradient_saturation_condition]
         msg = "%s: The gradient [%s] should be saturated."
