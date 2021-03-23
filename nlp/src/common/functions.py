@@ -147,6 +147,7 @@ def standardize(
         else:
             standardized = np.divide(deviation, sd, out)
 
+    assert np.all(sd != 0.0)
     assert np.all(np.isfinite(standardized))
     return standardized, mean, sd, deviation
 

@@ -449,23 +449,28 @@ def _validate_layer_running_statistics(
     momentum = layer.momentum
     ddof = 1 if X.shape[0] > 1 else 0
 
-    # ----------------------------------------------------------------------
-    # Currently in standardize(), sd[sd==0.0] = 1.0 is implemented.
-    # ----------------------------------------------------------------------
-    variance = X.var(axis=0, ddof=ddof)
-    if eps > 0.0:
-        sd = np.sqrt(variance + eps)
+    if layer.total_training_invocations == 1:
+        assert np.all(layer.RU == layer.U)
+        assert np.all(layer.RSD == layer.SD)
+        assert layer.total_training_invocations * layer.N == layer.total_rows_processed
     else:
-        sd = np.std(X, axis=0, ddof=ddof)
-        sd[sd == 0.0] = 1.0
+        # ----------------------------------------------------------------------
+        # Currently in standardize(), sd[sd==0.0] = 1.0 is implemented.
+        # ----------------------------------------------------------------------
+        variance = X.var(axis=0, ddof=ddof)
+        if eps > 0.0:
+            sd = np.sqrt(variance + eps)
+        else:
+            sd = np.std(X, axis=0, ddof=ddof)
+            sd[sd == 0.0] = 1.0
 
-    expected_ru = momentum * previous_ru + (1 - momentum) * X.mean(axis=0)
-    expected_rsd = momentum * previous_rsd + (1 - momentum) * sd
-    assert np.allclose(layer.RU, expected_ru, atol=1e-6, rtol=0)
-    assert \
-        np.allclose(layer.RSD, expected_rsd, atol=1e-6, rtol=0), \
-        "X=\n%s\nX.sd()=\n%s\nlayer.SD=\n%s\nlayer.RSD=\n%s\n" \
-        % (X, X.std(axis=0, ddof=ddof), layer.SD, layer.RSD)
+        expected_ru = momentum * previous_ru + (1 - momentum) * X.mean(axis=0)
+        expected_rsd = momentum * previous_rsd + (1 - momentum) * sd
+        assert np.allclose(layer.RU, expected_ru, atol=1e-6, rtol=0)
+        assert \
+            np.allclose(layer.RSD, expected_rsd, atol=1e-6, rtol=0), \
+            "X=\n%s\nX.sd()=\n%s\nlayer.SD=\n%s\nlayer.RSD=\n%s\n" \
+            % (X, X.std(axis=0, ddof=ddof), layer.SD, layer.RSD)
 
 
 def test_020_bn_method_function_to_succeed():
@@ -875,3 +880,70 @@ def test_020_bn_method_gradient_descent():
         assert np.allclose(expected_dBeta, dBeta, atol=u), \
             "Need dBeta\n%s\nbut\n%s\ndiff=\n%s\n" \
             % (expected_dBeta, dBeta, expected_dBeta-dBeta)
+
+
+def test_020_bn_method_predict():
+    """
+    Objective:
+        Verify the prediction function
+    Expected:
+        The objective
+    """
+    def objective(X: np.ndarray) -> Union[float, np.ndarray]:
+        """Dummy objective function"""
+        return np.sum(X)
+
+    profiler = cProfile.Profile()
+    profiler.enable()
+
+    for _ in range(NUM_MAX_TEST_TIMES):
+        name = random_string(np.random.randint(1, 10))
+        numexpr_enabled = bool(np.random.randint(0, 2))
+        numba_enabled = bool(np.random.randint(0, 2))
+
+        # For BN which works on statistics on per-feature basis,
+        # no sense if M = 1 or N = 1.
+        N: int = np.random.randint(2, NUM_MAX_BATCH_SIZE)
+        M: int = np.random.randint(2, NUM_MAX_NODES)
+
+        X = np.random.randn(N, M)
+        momentum = np.random.uniform(0.7, 0.99)
+        eps = np.random.uniform(1e-12, 1e-8) if np.random.uniform() < 0.5 else 0.0
+        ddof = 1 if N > 1 else 0
+
+        layer = BatchNormalization(
+            name=name,
+            num_nodes=M,
+            momentum=momentum,
+            eps=eps,
+            log_level=logging.DEBUG
+        )
+        layer.objective = objective
+        Y = layer.function(
+            X,
+            numexpr_enabled=numexpr_enabled,
+            numba_enabled=numba_enabled
+        )
+        # ********************************************************************************
+        # Constraint: With only 1 invocation, predict should be the same with Y.
+        # RU = momentum * RU + (1 - momentum) * U
+        # After the 1st invocation, RU==U. Then momentum * U + (1 - momentum) * U -> U
+        # ********************************************************************************
+        assert np.allclose(Y, layer.predict(X), atol=1e-9, rtol=0)
+
+        # ********************************************************************************
+        # Constraint: At 2nd invocation, predict should be the same with
+        #
+        # ********************************************************************************
+        Z = np.random.randn(N, M)
+        standardized, mean, sd, deviation = standardize(Z, eps=eps, keepdims=False)
+        expected_RU = layer.RU * momentum + mean * (1-momentum)
+        expected_RSD = layer.RSD * momentum + sd * (1-momentum)
+        Y = layer.function(
+            Z,
+            numexpr_enabled=numexpr_enabled,
+            numba_enabled=numba_enabled
+        )
+        assert np.allclose(layer.RU, expected_RU, atol=1e-10, rtol=0)
+        assert np.allclose(layer.RSD, expected_RSD, atol=1e-10, rtol=0)
+

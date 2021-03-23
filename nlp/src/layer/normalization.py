@@ -215,11 +215,13 @@ class BatchNormalization(Layer):
         # Running statistics. allocate storage at the instance initialization.
         # --------------------------------------------------------------------------------
         self._total_rows_processed = 0
+        self._total_training_invocations = 0
         self._momentum: TYPE_FLOAT = momentum
         # Running mean-per-feature of all the batches X* in shape(M,)
         self._RU: np.ndarray = np.zeros(num_nodes, dtype=TYPE_FLOAT)
         # Running SD-per-feature of all the batches X* in shape (M,)
         self._RSD: np.ndarray = np.zeros(num_nodes, dtype=TYPE_FLOAT)
+        self.update_running_means = self._first_update_running_means
 
         # --------------------------------------------------------------------------------
         # Scale and shift parameters
@@ -395,6 +397,11 @@ class BatchNormalization(Layer):
         return self._total_rows_processed
 
     @property
+    def total_training_invocations(self) -> TYPE_FLOAT:
+        """Total number of train invocations"""
+        return self._total_training_invocations
+
+    @property
     def optimizer(self) -> Optimizer:
         """Optimizer instance for gradient descent
         """
@@ -403,7 +410,28 @@ class BatchNormalization(Layer):
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
-    def update_running_means(self):
+    def _first_update_running_means(self):
+        """Set the RS and RSD for the first time only
+        At the first invocation, RU and RSD are zero.
+        Hence RU = (momentum * RU + (1 - momentum) * U) is 0.1 * U (momentum=0.9).
+        However with 1 invocation, the correct running mean RU = U. (U/1=U).
+        Hence set U to RU.
+        """
+        # --------------------------------------------------------------------------------
+        # Bug! Beware of the memory address copy.
+        # A = B is copying the memory address making A and B refer to the same memory area.
+        # Need to update the memory contents of RU, not the address of the memory of RU.
+        # Took 2 hours to debug ...
+        # --------------------------------------------------------------------------------
+        # self._RU = self.U       # <--- Changing the memory address of RU with U
+        # self._RSD = self.SD     # <--- Changing the memory address of RSD with SD
+        # --------------------------------------------------------------------------------
+        np.copyto(self._RU, self.U)     # Copy the contents of U into the memory of RU
+        np.copyto(self._RSD, self.SD)   # Copy the contents of SD into the memory of RSD
+        # --------------------------------------------------------------------------------
+        self.update_running_means = self._update_running_means
+
+    def _update_running_means(self):
         """Update running means using decaying"""
         self._RU = self.momentum * self.RU + (1 - self.momentum) * self.U
         self._RSD = self.momentum * self.RSD + (1 - self.momentum) * self.SD
@@ -495,6 +523,7 @@ class BatchNormalization(Layer):
         # --------------------------------------------------------------------------------
         # Total training data (rows) processed
         # --------------------------------------------------------------------------------
+        self._total_training_invocations += 1
         self._total_rows_processed += self.N
 
         return self.Y
