@@ -1,6 +1,7 @@
 # conda install --yes --file requirements.txt
 numpy>=1.19.2
 numexpr>=2.7.3
+numba
 jupyter
 notebook
 matplotlib

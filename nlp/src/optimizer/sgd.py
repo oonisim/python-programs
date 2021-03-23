@@ -29,6 +29,11 @@ class SGD(Optimizer):
         Return:
             W: A reference to out if specified or a np array allocated.
         """
+        # --------------------------------------------------------------------------------
+        # Gradient can be zero. e.g for a Batch Normalization layer, when a feature xi
+        # in a batch has the same value, such as a specific pixel in images is all black
+        # then the standardized value xi_std = 0 -> dL/dGamma = sum(dL/dY * xi_std) = 0.
+        # --------------------------------------------------------------------------------
         if np.all(np.abs(dW) < np.abs(W / 100.0)):
             self.logger.warning(
                 "SGD[%s].update(): Gradient descent potentially stalling with dW < W/100.",
@@ -42,8 +47,7 @@ class SGD(Optimizer):
         # Overfitting is when the model is sensitive to changes in the input.
         # Bias is fixed (x0=1), hence no change, hence no point to include it
         # --------------------------------------------------------------------------------
-        # regularization = dW * self.l2
-        # return np.subtract(W, self.lr * (dW + regularization), out=out)
         l2 = self.l2
         lr = self.lr
+        # return np.subtract(W, dW * (1 + l2), out=out)
         return ne.evaluate("W - lr * dW * (1 + l2)", out=out)

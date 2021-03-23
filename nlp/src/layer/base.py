@@ -460,3 +460,15 @@ class Layer:
         # Return 0 as the default for dL/dS to mark no change in case there is none
         # to update in a layer.
         return [0.0]
+
+    def predict(self, X):
+        """Calculate the score for prediction
+        Args:
+            X: Input
+        Returns:
+            Y: score
+        """
+        self.logger.warning(
+            "Layer base method predict not overridden but called by %s."
+        )
+        return self.function(X)

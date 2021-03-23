@@ -673,7 +673,7 @@ def test_020_bn_method_function_validate_with_frederik_kratzert():
             eps=eps,
             log_level=logging.DEBUG
         )
-        objective = objective
+        layer.objective = objective
 
         u = 1e-5
         out, cache = batchnorm_forward(
@@ -746,7 +746,7 @@ def test_020_bn_method_gradient_validate_with_frederik_kratzert():
             eps=eps,
             log_level=logging.DEBUG
         )
-        objective = objective
+        layer.objective = objective
 
         u = 1e-5
         dout = np.ones(X.shape)
@@ -761,7 +761,7 @@ def test_020_bn_method_gradient_validate_with_frederik_kratzert():
         dx, dgamma, dbeta, dxhat, dvar, dxmu2, dxmu1, dmu = batchnorm_backward(dout, cache)
 
         # ********************************************************************************
-        # Constraint: gradients should match those of frederik_kratzert
+        # Constraint: layer gradients should match those of frederik_kratzert
         # ********************************************************************************
         Y = layer.function(
             X,
@@ -805,10 +805,73 @@ def test_020_bn_method_gradient_validate_with_frederik_kratzert():
             "dX=\n%s\ndx=\n%s\ndiff=\n%s\n" \
             % (layer.dX, dx, (dx - layer.dX))
 
-
     profiler.disable()
     profiler.print_stats(sort="cumtime")
 
-# TODO:
-#   test update
-#   test numeric graidient -> need to implement
+
+def test_020_bn_method_gradient_descent():
+    """
+    Objective:
+        Verify the gradient descent
+    Expected:
+        The objective decrease with the descents.
+    """
+    def objective(X: np.ndarray) -> Union[float, np.ndarray]:
+        """Dummy objective function"""
+        return np.sum(X)
+
+    profiler = cProfile.Profile()
+    profiler.enable()
+
+    for _ in range(NUM_MAX_TEST_TIMES):
+        name = random_string(np.random.randint(1, 10))
+        numexpr_enabled = bool(np.random.randint(0, 2))
+        numba_enabled = bool(np.random.randint(0, 2))
+
+        # For BN which works on statistics on per-feature basis,
+        # no sense if M = 1 or N = 1.
+        N: int = np.random.randint(2, NUM_MAX_BATCH_SIZE)
+        M: int = np.random.randint(2, NUM_MAX_NODES)
+
+        X = np.random.randn(N, M)
+        momentum = np.random.uniform(0.7, 0.99)
+        eps = np.random.uniform(1e-12, 1e-8) if np.random.uniform() < 0.5 else 0.0
+        ddof = 1 if N > 1 else 0
+
+        layer = BatchNormalization(
+            name=name,
+            num_nodes=M,
+            momentum=momentum,
+            eps=eps,
+            log_level=logging.DEBUG
+        )
+        layer.objective = objective
+
+        u = 1e-5
+        for _ in range(np.random.randint(1, 10)):
+            dout = np.random.uniform(-1, 1, size=X.shape)
+
+            Y = layer.function(
+                X,
+                numexpr_enabled=numexpr_enabled,
+                numba_enabled=numba_enabled
+            )
+            L = layer.objective(Y)
+            G = layer.gradient(
+                dY=dout,
+                numexpr_enabled=numexpr_enabled,
+                numba_enabled=numba_enabled
+            )
+            dX, dGamma, dBeta = layer.update()
+
+        # ********************************************************************************
+        # Constraint:
+        # ********************************************************************************
+        expected_dGamma = np.sum(dout * layer.Xstd, axis=0)
+        expected_dBeta = np.sum(dout, axis=0)
+        assert np.allclose(expected_dGamma, dGamma, atol=u), \
+            "Need dGamma\n%s\nbut\n%s\ndiff=\n%s\n" \
+            % (expected_dGamma, dGamma, expected_dGamma-dGamma)
+        assert np.allclose(expected_dBeta, dBeta, atol=u), \
+            "Need dBeta\n%s\nbut\n%s\ndiff=\n%s\n" \
+            % (expected_dBeta, dBeta, expected_dBeta-dBeta)

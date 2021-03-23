@@ -12,6 +12,9 @@ import logging
 import copy
 import numpy as np
 import numexpr as ne
+from numba import (
+    jit
+)
 from common import (
     TYPE_FLOAT,
     TYPE_LABEL,
@@ -301,7 +304,7 @@ def categorical_log_loss(
     Returns:
         J: Loss value.
     """
-    assert np.all(np.isin(T, [0, 1]))
+    # assert np.all(np.isin(T, [0, 1]))
     J: np.ndarray = -T * logarithm(P, offset)
     return J
 
@@ -328,6 +331,7 @@ def logistic_log_loss(
     return J
 
 
+@jit(nopython=True)
 def logistic_log_loss_gradient(X, T, offset: float = BOUNDARY_SIGMOID):
     """Derivative of
     Z = sigmoid(X), dZ/dX = Z(1-Z)
@@ -787,6 +791,7 @@ def cross_entropy_log_loss(
         # Return -T * log(P)
         # --------------------------------------------------------------------------------
         return np.squeeze(f(P=P, T=T, offset=offset), axis=-1)    # Shape from (N,M) to (N,)
+        # return f(P=P, T=T, offset=offset).reshape(-1)
 
     # ================================================================================
     # Calculate Cross entropy log loss -t * log(p).
