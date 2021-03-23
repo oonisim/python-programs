@@ -41,7 +41,7 @@ from optimizer import (
 Logger = logging.getLogger(__name__)
 
 
-def train_matmul_relu_classifier(
+def train_matmul_bn_relu_classifier(
         N: int,
         D: int,
         M: int,
@@ -223,7 +223,7 @@ def train_matmul_relu_classifier(
             # if W.shape[1] == 1 else callback(W=np.average(matmul.W, axis=0))
             callback(W=matmul.W)
 
-    return matmul.W
+    return matmul.W, objective, prediction
 
 
 def test_matmul_bn_relu_classifier(
@@ -246,7 +246,7 @@ def test_matmul_bn_relu_classifier(
     profiler = cProfile.Profile()
     profiler.enable()
 
-    train_matmul_relu_classifier(
+    train_matmul_bn_relu_classifier(
         N=N,
         D=D,
         M=M,
