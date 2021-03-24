@@ -304,7 +304,7 @@ def categorical_log_loss(
     Returns:
         J: Loss value.
     """
-    # assert np.all(np.isin(T, [0, 1]))
+    assert np.all(np.isin(T, [0, 1]))
     J: np.ndarray = -T * logarithm(P, offset)
     return J
 
