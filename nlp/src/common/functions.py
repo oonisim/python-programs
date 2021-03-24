@@ -77,7 +77,8 @@ def standardize(
     # Calculate mean/deviation/sd per feature
     # --------------------------------------------------------------------------------
     mean = np.mean(X, axis=0, keepdims=keepdims, out=out_mean)
-    deviation = ne.evaluate("X - mean", out_md)
+    deviation = ne.evaluate("X - mean", out_md) \
+        if ENABLE_NUMEXPR else np.subtract(X, mean, out=out_md)
     if eps > 0:
         # Re-use the storage of buffer for standardized.
         buffer = ne.evaluate("deviation ** 2")
@@ -86,7 +87,6 @@ def standardize(
         standardized = ne.evaluate("deviation / sd", out=buffer)
     else:
         sd = np.std(X, axis=0, ddof=ddof, keepdims=keepdims, out=out_sd)
-        # deviation = X - mean
 
         # --------------------------------------------------------------------------------
         # TODO: See if below works. If it does not, implement the original BN which uses
@@ -153,17 +153,19 @@ def standardize(
 
 def logarithm(
         X: Union[np.ndarray, float],
-        offset: Optional[Union[np.ndarray, float]] = OFFSET_LOG
+        offset: Optional[Union[np.ndarray, float]] = OFFSET_LOG,
+        out=None
 ) -> Union[np.ndarray, float]:
     """Wrapper for np.log(x) to set the hard-limit for x
     Args:
         X: domain value for log
         offset: The lower boundary of acceptable X value.
+        out: A location into which the result is stored
     Returns:
         np.log(X)
     """
     if isinstance(X, float):
-        return np.log(X + offset)
+        return np.log(X + offset, out=out)
 
     assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT)
     offset = OFFSET_LOG if (offset is None or offset <= 0.0) else offset   # offset > 0
@@ -175,21 +177,27 @@ def logarithm(
         # --------------------------------------------------------------------------------
         selections = (X < offset)
         if np.any(selections):
-            # _X = copy.deepcopy(X)
-            _X = np.copy(X)
+            if out is None:
+                _X = np.copy(X)
+            else:
+                assert out.shape == X.shape
+                np.copyto(out, X)
+                _X = out
+
             _X[selections] = offset
         else:
             _X = X
 
-        # Y = np.log(_X)
-        Y = ne.evaluate("log(_X)")
+        Y = ne.evaluate("log(_X)", out=out) \
+            if ENABLE_NUMEXPR else np.log(_X, out=out)
     else:
         # --------------------------------------------------------------------------------
         # Adding the offset value to all elements as log(x+k) to avoid log(0)=-inf.
         # --------------------------------------------------------------------------------
-        # Y = np.log(X+offset)
-        Y = ne.evaluate("log(X + offset)")
-    assert np.all(np.isfinite(Y)), f"log(X) caused nan for X \nX={X}."
+        Y = ne.evaluate("log(X + offset)", out=out) \
+            if ENABLE_NUMEXPR else np.log(X+offset, out=out)
+    assert \
+        np.all(np.isfinite(Y)), f"log(X) caused nan for X \nX={X}."
 
     return Y
 
@@ -212,6 +220,14 @@ def sigmoid(
     Args:
         X: > domain value for log
         boundary: The lower boundary of acceptable X value.
+
+    NOTE:
+        epsilon to prevent causing inf e.g. log(X+e) has a consequence of clipping
+        the derivative which can make numerical gradient unstable. For instance,
+        due to epsilon, log(X+e+h) and log(X+e-h) will get close or same, and
+        divide by 2*h can cause catastrophic cancellation.
+
+        To prevent such instability, limit the value range of X with boundary.
     """
     assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) or isinstance(X, float)
     boundary = BOUNDARY_SIGMOID if (boundary is None or boundary <= float(0)) else boundary
@@ -220,10 +236,16 @@ def sigmoid(
     if np.all(np.abs(X) <= boundary):
         _X = X
     elif isinstance(X, np.ndarray):
+        Logger.warning(
+            "sigmoid: X value exceeded the boundary %s, hence clipping.", boundary
+        )
         _X = copy.deepcopy(X)
         _X[X > boundary] = boundary
         _X[X < -boundary] = -boundary
     else:
+        Logger.warning(
+            "sigmoid: X value exceeded the boundary %s, hence clipping.", boundary
+        )
         _X = np.sign(X) * boundary
 
     return 1 / (1 + np.exp(-1 * _X))
@@ -266,12 +288,13 @@ def relu_gradient(X: Union[int, float, np.ndarray]) -> Union[int, float, np.ndar
     return grad
 
 
-def softmax(X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
+def softmax(X: np.ndarray, out=None) -> np.ndarray:
     """Softmax P = exp(X) / sum(exp(X))
     Args:
         X: batch input data of shape (N,M).
             N: Batch size
             M: Number of nodes
+        out: A location into which the result is stored
     Returns:
         P: Probability of shape (N,M)
     """
@@ -284,9 +307,8 @@ def softmax(X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
     # keepdims=True to be able to broadcast.
     # --------------------------------------------------------------------------------
     C = np.max(X, axis=-1, keepdims=True)
-    # exp = np.exp(X - C)
-    exp = ne.evaluate("exp(X - C)")
-    P = exp / np.sum(exp, axis=-1, keepdims=True)
+    exp = np.exp(X - C)
+    P = np.divide(exp, np.sum(exp, axis=-1, keepdims=True), out=out)
     Logger.debug("%s: X %s exp %s P %s", name, X, exp, P)
 
     return P
@@ -583,7 +605,9 @@ def softmax_cross_entropy_log_loss(
         T: Union[np.ndarray],
         offset: float = 0,
         use_reformula: bool = True,
-        need_softmax: bool = True
+        need_softmax: bool = True,
+        out_P=None,
+        out_J=None
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Cross entropy log loss for softmax activation -T * log(softmax(X))
     NOTE:
@@ -619,6 +643,8 @@ def softmax_cross_entropy_log_loss(
         offset: small number to avoid np.inf by log(0) by log(0+offset)
         use_reformula: Flag to use "J=sum(exp(X)) - xi" or not
         need_softmax: Flag if P=softmax(X) needs to be returned
+        out_P: A location into which the result is stored
+        out_J: A location into which the result is stored
 
     Returns:
         J: Loss value of shape (N,), a loss value per batch.
@@ -636,12 +662,12 @@ def softmax_cross_entropy_log_loss(
 
     if use_reformula:
         _A = X[rows, cols]
-        J = logarithm(X=np.sum(np.exp(X), axis=-1), offset=offset) - _A
-        P = softmax(X) if need_softmax else np.empty(X.shape)
+        J = logarithm(X=np.sum(np.exp(X), axis=-1), offset=offset, out=out_J) - _A
+        P = softmax(X=X, out=out_P) if need_softmax else np.empty(X.shape)
     else:
-        P = softmax(X)
+        P = softmax(X=X, out=out_P)
         _A = P[rows, cols]
-        J = -logarithm(X=_A, offset=offset)
+        J = -logarithm(X=_A, offset=offset, out=out_J)
 
     if not np.all(np.isfinite(J)):
         raise RuntimeError(f"{name}: Invalid loss J:\n{J}.")
