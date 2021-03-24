@@ -178,10 +178,17 @@ def train_matmul_bn_relu_classifier(
                 i, L, history[-1], num_no_progress + 1
             )
             # --------------------------------------------------------------------------------
-            # Reduce the learning rate.
+            # Reduce the learning rate can make the situation worse.
+            # When reduced the lr every time L >= history, the (L >= history) became successive
+            # and eventually exceeded 50 successive non-improvement ending in failure.
+            # Keep the learning rate make the L>=history more frequent but still up to 3
+            # successive events, and the training still kept progressing.
             # --------------------------------------------------------------------------------
-            matmul.lr = matmul.lr * 0.95
-            if (num_no_progress := num_no_progress + 1) > 50:
+            num_no_progress += 1
+            if num_no_progress > 5:
+                matmul.lr = matmul.lr * 0.95
+
+            if num_no_progress > 50:
                 Logger.error(
                     "The training has no progress more than %s times.", num_no_progress
                 )

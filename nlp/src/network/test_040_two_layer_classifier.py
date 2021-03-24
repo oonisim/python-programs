@@ -517,11 +517,12 @@ def train_two_layer_classifier(
             # Keep the learning rate make the L>=history more frequent but still up to 3
             # successive events, and the training still kept progressing.
             # --------------------------------------------------------------------------------
-            if (num_no_progress := num_no_progress + 1) > 20:
-                matmul01.lr = matmul01.lr * 0.98
-                matmul02.lr = matmul02.lr * 0.98
+            num_no_progress += 1
+            if num_no_progress > 5:
+                matmul01.lr = matmul01.lr * 0.95
+                matmul02.lr = matmul02.lr * 0.99
 
-            if (num_no_progress := num_no_progress + 1) > 50:
+            if num_no_progress > 50:
                 Logger.error(
                     "The training has no progress more than %s times.", num_no_progress
                 )
