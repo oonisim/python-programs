@@ -29,6 +29,16 @@ COLOR_LABELS = np.array([
 ])
 
 
+def plot(X, Y, color=None, title=None, figsize=(5, 4), xlabel=None, ylabel=None):
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+    ax.grid()
+    ax.plot(X, Y, color=color)
+    return fig, ax
+
+
 def scatter(X, Y, color=None, title=None, figsize=None):
     fig, ax = plt.subplots(figsize=figsize)
     ax.set_xlabel('x label')

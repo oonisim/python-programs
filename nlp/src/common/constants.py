@@ -64,5 +64,5 @@ TYPE_FLOAT = np.float       # alias of Python float
 # https://stackoverflow.com/questions/59347796/
 # For larger N x N matrices (aprox. size 20) a BLAS  is faster than Numba/Cython
 # --------------------------------------------------------------------------------
-ENABLE_NUMEXPR = True
+ENABLE_NUMEXPR = False
 ENABLE_NUMBA = False
