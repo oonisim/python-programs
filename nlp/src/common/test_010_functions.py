@@ -75,7 +75,7 @@ def test_010_standardize_sd_is_zero():
     """
     name = "test_010_standardize"
     keepdims = True
-    u = 1e-6
+    u = TYPE_FLOAT(1e-6)
 
     for _ in range(NUM_MAX_TEST_TIMES):
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
@@ -85,7 +85,8 @@ def test_010_standardize_sd_is_zero():
             MAX_ACTIVATION_VALUE,
             M
         ).astype(TYPE_FLOAT)
-        X = np.ones((N, M)) * row
+        X = np.ones((N, M)).astype(TYPE_FLOAT) * row
+        assert X.dtype == TYPE_FLOAT
         Logger.debug("%s: X \n%s\n", name, X)
 
         # Constraint: standardize(X) == (X - np.mean(A)) / np.std(X)
@@ -94,17 +95,17 @@ def test_010_standardize_sd_is_zero():
         assert np.allclose(sd, 0.0, atol=u, rtol=0)
 
         # Expected
-        mean = np.mean(X, axis=0)
-        E = (X - mean)
+        mean = np.mean(X, axis=0).astype(TYPE_FLOAT)
+        E = (X - mean).astype(TYPE_FLOAT)
         assert np.allclose(E, 0.0, atol=u, rtol=0)
 
         # Actual
         A, __mean, __sd, _ = standardize(X, keepdims=keepdims)
 
         # Constraint. mean/sd should be same
-        assert np.allclose(mean, __mean, atol=u, rtol=0)
-        assert np.allclose(__sd, 1.0, atol=u, rtol=0)
-        assert np.all(np.abs(E-A) < u), \
+        assert np.allclose(mean, __mean, atol=u)
+        assert np.allclose(__sd, TYPE_FLOAT(1.0), atol=u)
+        assert np.all(np.abs(E-A).astype(TYPE_FLOAT) < u), \
             f"X\n{X}\nstandardized\n{E}\nneeds\n{A}\n"
 
 
@@ -224,8 +225,8 @@ def test_010_softmax():
     """Test Case for sigmoid
     """
     u = ACTIVATION_DIFF_ACCEPTANCE_VALUE
-    P = softmax(np.array([2.44756739, 2.13945115]))
-    E = np.array([0.57642539, 0.42357461])
+    P = softmax(np.array([2.44756739, 2.13945115]).astype(TYPE_FLOAT))
+    E = np.array([0.57642539, 0.42357461]).astype(TYPE_FLOAT)
     assert np.all(np.abs(P-E) < u)
 
     for _ in range(NUM_MAX_TEST_TIMES):

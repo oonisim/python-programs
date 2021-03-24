@@ -32,7 +32,7 @@ Logger = logging.getLogger("functions")
 
 
 def standardize(
-    X: Union[np.ndarray, float],
+    X: Union[np.ndarray, TYPE_FLOAT],
         eps: TYPE_FLOAT = 0.0,
         keepdims=False,
         out=None,
@@ -122,7 +122,7 @@ def standardize(
         mask = (sd < 1e-8)
         if np.any(mask):
             # Temporary replace the zero elements with one
-            sd[mask] = 1.0
+            sd[mask] = TYPE_FLOAT(1.0)
 
             # standardize and zero clear the mask elements
             standardized = np.divide(deviation, sd, out)
@@ -146,16 +146,16 @@ def standardize(
         else:
             standardized = np.divide(deviation, sd, out)
 
-    assert np.all(sd != 0.0)
+    assert np.all(sd != TYPE_FLOAT(0.0))
     assert np.all(np.isfinite(standardized))
     return standardized, mean, sd, deviation
 
 
 def logarithm(
-        X: Union[np.ndarray, float],
-        offset: Optional[Union[np.ndarray, float]] = OFFSET_LOG,
+        X: Union[np.ndarray, TYPE_FLOAT],
+        offset: Optional[Union[np.ndarray, TYPE_FLOAT]] = OFFSET_LOG,
         out=None
-) -> Union[np.ndarray, float]:
+) -> Union[np.ndarray, TYPE_FLOAT]:
     """Wrapper for np.log(x) to set the hard-limit for x
     Args:
         X: domain value for log
@@ -164,7 +164,7 @@ def logarithm(
     Returns:
         np.log(X)
     """
-    if isinstance(X, float):
+    if isinstance(X, TYPE_FLOAT):
         return np.log(X + offset, out=out)
 
     assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT)
@@ -213,9 +213,9 @@ def sigmoid_reverse(y):
 
 
 def sigmoid(
-    X: Union[float, np.ndarray],
-    boundary: Optional[Union[np.ndarray, float]] = BOUNDARY_SIGMOID
-) -> Union[int, float, np.ndarray]:
+    X: Union[TYPE_FLOAT, np.ndarray],
+    boundary: Optional[Union[np.ndarray, TYPE_FLOAT]] = BOUNDARY_SIGMOID
+) -> Union[TYPE_FLOAT, np.ndarray]:
     """Sigmoid activate function
     Args:
         X: > domain value for log
@@ -229,8 +229,8 @@ def sigmoid(
 
         To prevent such instability, limit the value range of X with boundary.
     """
-    assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) or isinstance(X, float)
-    boundary = BOUNDARY_SIGMOID if (boundary is None or boundary <= float(0)) else boundary
+    assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) or isinstance(X, TYPE_FLOAT)
+    boundary = BOUNDARY_SIGMOID if (boundary is None or boundary <= TYPE_FLOAT(0)) else boundary
     assert boundary > 0
 
     if np.all(np.abs(X) <= boundary):
@@ -251,7 +251,7 @@ def sigmoid(
     return 1 / (1 + np.exp(-1 * _X))
 
 
-def sigmoid_gradient(X: Union[int, float, np.ndarray]) -> Union[int, float, np.ndarray]:
+def sigmoid_gradient(X: Union[TYPE_FLOAT, np.ndarray]) -> Union[TYPE_FLOAT, np.ndarray]:
     """Sigmoid gradient
     For X: [10,15, 20, 25, 30], sigmoid(X) gets saturated as:
     0.999954602131298
@@ -265,26 +265,26 @@ def sigmoid_gradient(X: Union[int, float, np.ndarray]) -> Union[int, float, np.n
         X:
     Returns: gradient
     """
-    assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) or isinstance(X, float)
+    assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) or isinstance(X, TYPE_FLOAT)
     Z = sigmoid(X)
-    return Z * (1.0 - Z)
+    return Z * (TYPE_FLOAT(1.0) - Z)
 
 
-def relu(X: Union[int, float, np.ndarray]) -> Union[int, float, np.ndarray]:
+def relu(X: Union[TYPE_FLOAT, np.ndarray]) -> Union[TYPE_FLOAT, np.ndarray]:
     """ReLU activation function"""
-    assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) or isinstance(X, float)
-    return np.maximum(0, X)
+    assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) or isinstance(X, TYPE_FLOAT)
+    return np.maximum(TYPE_FLOAT(0.0), X)
 
 
-def relu_gradient(X: Union[int, float, np.ndarray]) -> Union[int, float, np.ndarray]:
+def relu_gradient(X: Union[TYPE_FLOAT, np.ndarray]) -> Union[TYPE_FLOAT, np.ndarray]:
     """ReLU gradient
     Args:
         X:
     Returns: gradient
     """
-    assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) or isinstance(X, float)
+    assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) or isinstance(X, TYPE_FLOAT)
     grad = np.zeros_like(X)
-    grad[X >= 0] = 1
+    grad[X >= TYPE_FLOAT(0.0)] = TYPE_FLOAT(1)
     return grad
 
 
@@ -299,7 +299,7 @@ def softmax(X: np.ndarray, out=None) -> np.ndarray:
         P: Probability of shape (N,M)
     """
     name = "softmax"
-    assert isinstance(X, float) or (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT), \
+    assert isinstance(X, TYPE_FLOAT) or (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT), \
         "X must be float or ndarray(dtype=TYPE_FLOAT)"
 
     # --------------------------------------------------------------------------------
@@ -315,7 +315,7 @@ def softmax(X: np.ndarray, out=None) -> np.ndarray:
 
 
 def categorical_log_loss(
-        P: np.ndarray, T: np.ndarray, offset: Optional[float] = None
+        P: np.ndarray, T: np.ndarray, offset: Optional[TYPE_FLOAT] = None
 ) -> np.ndarray:
     """Categorical cross entropy log loss function for multi class classification.
     Args:
@@ -332,8 +332,8 @@ def categorical_log_loss(
 
 
 def logistic_log_loss(
-        P: np.ndarray, T: np.ndarray, offset: Optional[float] = None
-) -> Union[np.ndarray, float]:
+        P: np.ndarray, T: np.ndarray, offset: Optional[TYPE_FLOAT] = None
+) -> Union[np.ndarray, TYPE_FLOAT]:
     """Logistic cross entropy log loss function for binary classification.
     Args:
         P: Activations e.g. from Sigmoid
@@ -353,7 +353,7 @@ def logistic_log_loss(
     return J
 
 
-def logistic_log_loss_gradient(X, T, offset: float = BOUNDARY_SIGMOID):
+def logistic_log_loss_gradient(X, T, offset: TYPE_FLOAT = BOUNDARY_SIGMOID):
     """Derivative of
     Z = sigmoid(X), dZ/dX = Z(1-Z)
     L = -( T*log(Z) + (1-T) * log(1-Z) ) dL/dZ = -T(1-T)/Z + (1-T)/(1-Z)
@@ -366,7 +366,7 @@ def logistic_log_loss_gradient(X, T, offset: float = BOUNDARY_SIGMOID):
 
 
 def transform_X_T(
-        X: Union[np.ndarray, float], T: Union[np.ndarray, int]
+        X: Union[np.ndarray, TYPE_FLOAT], T: Union[np.ndarray, int]
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Validate acceptable (X, T) conditions. Identify if T is in OHE or index
     format and transform them accordingly into X:(N,M), T:(N) shapes for T in
@@ -424,12 +424,12 @@ def transform_X_T(
         (X, T): reshaped X of shape(N,M), T of shape(M,)
     """
     name = "transform_X_T"
-    assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) or isinstance(X, float), \
-        "Type of P must be float"
+    assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) or isinstance(X, TYPE_FLOAT), \
+        f"Type of P must be {TYPE_FLOAT}"
     assert (isinstance(T, np.ndarray) and np.issubdtype(T.dtype, np.integer)) or \
            isinstance(T, int), "Type of T must be integer"
 
-    if isinstance(X, float) or X.ndim == 0:
+    if isinstance(X, TYPE_FLOAT) or X.ndim == 0:
         # --------------------------------------------------------------------------------
         # When X is scalar, T must be a scalar. This is a binary (0/1) label.
         # --------------------------------------------------------------------------------
@@ -575,7 +575,7 @@ def transform_X_T(
 
 def transform_scalar_X_T(X, T):
     """Transform scalar X, T to np.ndarray"""
-    X = np.array(X, dtype=TYPE_FLOAT) if isinstance(X, float) else X
+    X = np.array(X, dtype=TYPE_FLOAT) if isinstance(X, TYPE_FLOAT) else X
     T = np.array(T, dtype=TYPE_LABEL) if isinstance(T, int) else T
     return X, T
 
@@ -603,7 +603,7 @@ def check_categorical_classification_X_T(X, T):
 def softmax_cross_entropy_log_loss(
         X: Union[np.ndarray],
         T: Union[np.ndarray],
-        offset: float = 0,
+        offset: TYPE_FLOAT = TYPE_FLOAT(0),
         use_reformula: bool = True,
         need_softmax: bool = True,
         out_P=None,
@@ -699,9 +699,9 @@ def check_binary_classification_X_T(X, T):
 
 
 def sigmoid_cross_entropy_log_loss(
-        X: Union[np.ndarray, float],
+        X: Union[np.ndarray, TYPE_FLOAT],
         T: Union[np.ndarray, int],
-        offset: float = 0
+        offset: TYPE_FLOAT = TYPE_FLOAT(0)
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Cross entropy log loss for sigmoid activation -( T*log(Z) + (1-T)*log(1-Z) )
     where Z = sigmoid(X).
@@ -737,9 +737,9 @@ def sigmoid_cross_entropy_log_loss(
     X, T = transform_scalar_X_T(X, T)
     check_binary_classification_X_T(X, T)
 
-    Z1 = 1.0 + np.exp(-X)    # 1/Z where Z = sigmoid(X) = (1/1 + np.exp(-X))
-    P = 1.0 / Z1
-    J = np.multiply((1 - T), X) + np.log(Z1)
+    Z1 = TYPE_FLOAT(1.0) + np.exp(-X)    # 1/Z where Z = sigmoid(X) = (1/1 + np.exp(-X))
+    P = TYPE_FLOAT(1.0) / Z1
+    J = np.multiply((TYPE_FLOAT(1.0) - T), X) + np.log(Z1)
     J = np.squeeze(J, axis=-1)    # Shape from (N,M) to (N,)
     assert np.all(np.isfinite(J))
 
@@ -747,11 +747,11 @@ def sigmoid_cross_entropy_log_loss(
 
 
 def generic_cross_entropy_log_loss(
-        X: Union[np.ndarray, float],
+        X: Union[np.ndarray, TYPE_FLOAT],
         T: Union[np.ndarray, int],
         activation: Callable = softmax,
         objective: Callable = categorical_log_loss,
-        offset: float = 0
+        offset: TYPE_FLOAT = TYPE_FLOAT(0)
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Calculate the cross entropy log loss as objective(activation(X), T)
     Args:
@@ -778,10 +778,10 @@ def generic_cross_entropy_log_loss(
 
 
 def cross_entropy_log_loss(
-        P: Union[np.ndarray, float],
+        P: Union[np.ndarray, TYPE_FLOAT],
         T: Union[np.ndarray, int],
         f: Callable = categorical_log_loss,
-        offset: float = OFFSET_LOG
+        offset: TYPE_FLOAT = OFFSET_LOG
 ) -> np.ndarray:
     """Cross entropy log loss [ -t(n)(m) * log(p(n)(m)) ] for multi labels.
     Args:
@@ -865,7 +865,7 @@ def cross_entropy_log_loss(
 
 def numerical_jacobian(
         f: Callable[[np.ndarray], np.ndarray],
-        X: Union[np.ndarray, float],
+        X: Union[np.ndarray, TYPE_FLOAT],
         delta: Optional[TYPE_FLOAT] = OFFSET_DELTA
 ) -> np.ndarray:
     """Calculate Jacobian matrix J numerically with (f(X+h) - f(X-h)) / 2h
@@ -887,7 +887,7 @@ def numerical_jacobian(
         J: Jacobian matrix that has the same shape of X.
     """
     name = "numerical_jacobian"
-    X = np.array(X, dtype=TYPE_FLOAT) if isinstance(X, (float, int)) else X
+    X = np.array(X, dtype=TYPE_FLOAT) if isinstance(X, (TYPE_FLOAT, int)) else X
     J = np.zeros_like(X, dtype=TYPE_FLOAT)
     delta = OFFSET_DELTA if (delta is None or delta <= 0.0) else delta
     divider = 2 * delta
@@ -901,7 +901,7 @@ def numerical_jacobian(
     # X and tmp must be float, or it will be int causing float calculation fail.
     # e.g. f(1-h) = log(1-h) causes log(0) instead of log(1-h).
     # --------------------------------------------------------------------------------
-    assert (X.dtype == TYPE_FLOAT), "X must be float type"
+    assert (X.dtype == TYPE_FLOAT), f"X must be type {TYPE_FLOAT}"
     assert delta > 0.0 and isinstance(delta, TYPE_FLOAT)
 
     it = np.nditer(X, flags=['multi_index'], op_flags=['readwrite'])
@@ -913,14 +913,14 @@ def numerical_jacobian(
         # f(x+h)
         # --------------------------------------------------------------------------------
         X[idx] = tmp + delta
-        fx1: Union[np.ndarray, float] = f(X)  # f(x+h)
+        fx1: Union[np.ndarray, TYPE_FLOAT] = f(X)  # f(x+h)
         Logger.debug(
             "%s: idx[%s] x[%s] (x+h)[%s] fx1=[%s]",
             name, idx, tmp, tmp+delta, fx1
         )
 
         assert \
-            ((isinstance(fx1, np.ndarray) and fx1.size == 1) or isinstance(fx1, float)), \
+            ((isinstance(fx1, np.ndarray) and fx1.size == 1) or isinstance(fx1, TYPE_FLOAT)), \
             f"The f function needs to return scalar or shape () but {fx1}"
         assert np.isfinite(fx1), \
             "f(x+h) caused nan for f %s for X %s" % (f, (tmp + delta))
@@ -929,13 +929,13 @@ def numerical_jacobian(
         # f(x-h)
         # --------------------------------------------------------------------------------
         X[idx] = tmp - delta
-        fx2: Union[np.ndarray, float] = f(X)
+        fx2: Union[np.ndarray, TYPE_FLOAT] = f(X)
         Logger.debug(
             "%s: idx[%s] x[%s] (x-h)[%s] fx2=[%s]",
             name, idx, tmp, tmp-delta, fx2
         )
         assert \
-            ((isinstance(fx2, np.ndarray) and fx2.size == 1) or isinstance(fx2, float)), \
+            ((isinstance(fx2, np.ndarray) and fx2.size == 1) or isinstance(fx2, TYPE_FLOAT)), \
             f"The f function needs to return scalar or shape () but {fx2}"
         assert np.isfinite(fx2), \
             "f(x-h) caused nan for f %s for X %s" % (f, (tmp - delta))

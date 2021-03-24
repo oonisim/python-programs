@@ -1,4 +1,13 @@
 import numpy as np
+# --------------------------------------------------------------------------------
+# Float number type to use. For NN, 32 bit is enough.
+# There is no way to change the default float type
+# https://github.com/numpy/numpy/issues/6860
+# --------------------------------------------------------------------------------
+TYPE_INT = np.int32
+TYPE_LABEL = np.int8
+TYPE_FLOAT = np.float       # alias of Python float
+# TYPE_FLOAT = np.float32   # Cannot use due to Numpy default is float64.
 
 # --------------------------------------------------------------------------------
 # Be mindful of the relation between h/OFFSET_DELTA and k/OFFSET_LOG
@@ -15,10 +24,10 @@ import numpy as np
 #   because we need OFFSET_LOG > OFFSET_DELTA to avoid the numerical gradient from
 #   causing np.nan by f(log(x + OFFSET_LOG - OFFSET_DELTA)).
 # --------------------------------------------------------------------------------
-OFFSET_DELTA = 1e-10
-OFFSET_LOG = 1e-9
+OFFSET_DELTA = TYPE_FLOAT(1e-10)
+OFFSET_LOG = TYPE_FLOAT(1e-9)
 assert OFFSET_LOG > OFFSET_DELTA
-OFFSET_STD = 1e-10      # Avoid div by zero at (X-u) / sqrt(variance + eps)
+OFFSET_STD = TYPE_FLOAT(1e-10)  # Avoid div by zero at (X-u) / sqrt(variance + eps)
 
 # When True, set the element to the offset value only when it is below the offset,
 # clipping element values at the offset.
@@ -34,26 +43,18 @@ OFFSET_MODE_ELEMENT_WISE = True
 # Before it starts, need to stop X from getting closer to log(k).
 # Hence X < -np.log(OFFSET_LOG) * safety_margin_ratio.
 # --------------------------------------------------------------------------------
-BOUNDARY_SIGMOID = -np.log(OFFSET_LOG) * 0.5
+BOUNDARY_SIGMOID = -np.log(OFFSET_LOG) * TYPE_FLOAT(0.5)
 
 # Threshold below which the gradient is regarded as saturated.
-GRADIENT_SATURATION_THRESHOLD = 1e-10
+GRADIENT_SATURATION_THRESHOLD = TYPE_FLOAT(1e-10)
 
 # Min difference between f(x+h) and f(x-h) at numerical gradient to avoid
 # floating precision error. If f(x+h) - f(x-h) is small
-GN_DIFF_ACCEPTANCE_VALUE = 2 * OFFSET_DELTA * GRADIENT_SATURATION_THRESHOLD
-GN_DIFF_ACCEPTANCE_RATIO = 1e-15
+GN_DIFF_ACCEPTANCE_VALUE = TYPE_FLOAT(2) * OFFSET_DELTA * GRADIENT_SATURATION_THRESHOLD
+GN_DIFF_ACCEPTANCE_RATIO = TYPE_FLOAT(1e-15)
 
 # To enforce assertion failure, set False (True -> assert True)
 ENFORCE_STRICT_ASSERT = (not False)
-
-# --------------------------------------------------------------------------------
-# Float number type to use. For NN, 32 bit is enough.
-# --------------------------------------------------------------------------------
-TYPE_INT = np.int32
-TYPE_LABEL = np.int8
-TYPE_FLOAT = np.float       # alias of Python float
-# FLOAT_TYPE = np.float32
 
 # --------------------------------------------------------------------------------
 # Numpy optimization
