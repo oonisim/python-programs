@@ -27,13 +27,17 @@ import cProfile
 import copy
 import logging
 import numpy as np
-from common import (
+from common.constants import (
     TYPE_FLOAT,
-    weights,
-    random_string,
-    numerical_jacobian,
-    standardize
 )
+from common.functions import (
+    standardize,
+)
+from common.utilities import (
+    random_string
+)
+import common.weights as weights
+
 from layer import (
     BatchNormalization
 )

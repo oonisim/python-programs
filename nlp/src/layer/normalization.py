@@ -1,21 +1,23 @@
 """Normalization layer implementation
 """
-import logging
 from typing import (
     Optional,
     Union,
     List
 )
+import logging
 import numpy as np
 import numexpr as ne
 from numba import jit
-from common import (
+from common.constants import (
     TYPE_FLOAT,
     ENABLE_NUMEXPR,
     ENABLE_NUMBA,
+)
+from common.functions import (
     standardize
 )
-from layer import Layer
+from layer.base import Layer
 from optimizer import (
     Optimizer,
     SGD,

@@ -8,7 +8,7 @@ from test import (
     GRADIENT_DIFF_ACCEPTANCE_RATIO,
     GRADIENT_DIFF_ACCEPTANCE_VALUE
 )
-from common import (
+from common.constants import (
     ENFORCE_STRICT_ASSERT
 )
 

@@ -1,7 +1,7 @@
 import logging
 from functools import partial
 import numpy as np
-from common import (
+from common.functions import (
     standardize,
     logarithm,
     sigmoid,

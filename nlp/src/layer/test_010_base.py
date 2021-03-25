@@ -8,10 +8,9 @@ from typing import (
 )
 import logging
 import numpy as np
-from layer import (
+from layer.base import (
     Layer
 )
-
 from test import (
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,

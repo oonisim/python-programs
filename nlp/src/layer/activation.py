@@ -17,7 +17,7 @@ from typing import (
 import logging
 import copy
 import numpy as np
-from layer import Layer
+from layer.base import Layer
 from common.functions import (
     sigmoid
 )
@@ -25,11 +25,24 @@ from common.functions import (
 
 class ReLU(Layer):
     # ================================================================================
-    # Class initialization
+    # Class
     # ================================================================================
+    @staticmethod
+    def build(specification: Dict):
+        spec = specification
+        assert (
+            "name" in spec and
+            "num_nodes" in spec
+        )
+
+        return ReLU(
+            name="relu01",
+            num_nodes=spec["num_nodes"],
+            log_level=spec["log_level"] if "log_level" in spec else logging.ERROR
+        )
 
     # ================================================================================
-    # Instance initialization
+    # Instance
     # ================================================================================
     def __init__(self, name: str, num_nodes: int, log_level: int = logging.ERROR):
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
@@ -37,10 +50,6 @@ class ReLU(Layer):
         self.mask: np.ndarray = np.empty(())    # To zero clear the outputs where x <= 0
         self._A: np.ndarray = np.empty(())      # Activation
         self._M = num_nodes                     # Number of nodes alias
-
-    # --------------------------------------------------------------------------------
-    # Instance properties
-    # --------------------------------------------------------------------------------
 
     # --------------------------------------------------------------------------------
     # Instance methods

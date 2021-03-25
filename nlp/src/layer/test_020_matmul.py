@@ -27,11 +27,13 @@ import cProfile
 import copy
 import logging
 import numpy as np
-from common import (
+from common.functions import (
     numerical_jacobian,
-    weights,
+)
+from common.utilities import (
     random_string
 )
+import common.weights as weights
 from layer import (
     Matmul
 )

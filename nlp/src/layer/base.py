@@ -112,11 +112,13 @@ from typing import (
 import inspect
 import logging
 import numpy as np
-from common import (
+from common.constants import (
     TYPE_FLOAT,
     TYPE_LABEL,
     GRADIENT_SATURATION_THRESHOLD,
-    numerical_jacobian
+)
+from common.functions import (
+    numerical_jacobian,
 )
 
 

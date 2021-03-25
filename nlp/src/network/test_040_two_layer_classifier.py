@@ -8,18 +8,27 @@ import copy
 import logging
 import cProfile
 import numpy as np
-from common import (
+from common.constants import (
     TYPE_FLOAT,
     TYPE_LABEL,
-    weights,
+    ENFORCE_STRICT_ASSERT
+)
+from common.functions import (
     softmax,
     relu,
     transform_X_T,
     softmax_cross_entropy_log_loss,
     compose,
-    check_with_numerical_gradient,
-    ENFORCE_STRICT_ASSERT
+    softmax,
+    relu,
+    transform_X_T,
+    softmax_cross_entropy_log_loss,
+    compose,
 )
+from common.validations import (
+    check_with_numerical_gradient
+)
+import common.weights as weights
 from test import (
     GRADIENT_DIFF_CHECK_TRIGGER,
     GRADIENT_DIFF_ACCEPTANCE_RATIO,

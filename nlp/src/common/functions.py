@@ -12,7 +12,7 @@ import logging
 import copy
 import numpy as np
 import numexpr as ne
-from common import (
+from common.constants import (
     TYPE_FLOAT,
     TYPE_LABEL,
     OFFSET_DELTA,

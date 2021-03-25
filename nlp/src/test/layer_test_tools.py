@@ -4,12 +4,10 @@ from typing import (
     List
 )
 import numpy as np
-from common import (
+from common.constants import (
     TYPE_FLOAT
 )
-from layer import (
-    Matmul
-)
+from layer.matmul import Matmul
 
 
 def expected_gradient_from_log_loss(

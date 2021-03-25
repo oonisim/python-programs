@@ -52,7 +52,7 @@ def uniform(M: int, D: int) -> np.ndarray:
     return np.random.uniform(low=0.0, high=1.0, size=(M, D))
 
 
-INITIALIZATION_SCHEMES = {
+SCHEMES = {
     "he": he,
     "xavier": xavier,
     "uniform": uniform

@@ -4,28 +4,26 @@ import logging
 from functools import partial
 from typing import (
     List,
+    Dict,
     Union,
     Callable,
     NoReturn
 )
 import numpy as np
-from common import (
+from common import functions
+from common.constants import (
     TYPE_FLOAT,
     TYPE_LABEL,
-    transform_X_T,
-    logistic_log_loss,
-    categorical_log_loss,
-    cross_entropy_log_loss,
-    generic_cross_entropy_log_loss,
-    sigmoid_cross_entropy_log_loss,
-    softmax_cross_entropy_log_loss,
-    softmax,
-    sigmoid
 )
-from layer import (
-    Layer,
+from layer.constants import (
     LOG_LOSS_GRADIENT_ACCEPTANCE_VALUE
 )
+from common.functions import (
+    transform_X_T,
+    generic_cross_entropy_log_loss,
+    sigmoid_cross_entropy_log_loss,
+)
+from layer.base import Layer
 
 
 class CrossEntropyLogLoss(Layer):
@@ -43,11 +41,27 @@ class CrossEntropyLogLoss(Layer):
         W in each matmul layer.
     """
     # ================================================================================
-    # Class initialization
+    # Class
     # ================================================================================
+    @staticmethod
+    def build_objective_layer(specification: Dict):
+        spec = specification
+        assert (
+            "name" in spec and
+            "num_nodes" in spec and
+            "loss_function" in spec and
+            spec["loss_function"] in functions.LOSS_FUNCTIONS
+        )
+
+        return CrossEntropyLogLoss(
+            name=spec["name"],
+            num_nodes=spec["num_nodes"],
+            log_loss_function=functions.LOSS_FUNCTIONS[spec["loss_function"]],
+            log_level=spec["log_level"] if "log_level" in spec else logging.ERROR
+        )
 
     # ================================================================================
-    # Instance initialization
+    # Instance
     # ================================================================================
     def __init__(
             self, name:

@@ -1,16 +1,17 @@
 import sys
 import logging
 import numpy as np
-from common import (
+from common.constants import (
     TYPE_FLOAT,
     TYPE_LABEL,
+    OFFSET_LOG,
+)
+from common.functions import (
     standardize,
     logarithm,
     sigmoid,
     softmax,
     cross_entropy_log_loss,
-    OFFSET_LOG,
-    OFFSET_DELTA
 )
 
 from test import (

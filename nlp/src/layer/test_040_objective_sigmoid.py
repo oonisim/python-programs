@@ -9,9 +9,12 @@ from typing import (
 import logging
 import cProfile
 import numpy as np
-from common import (
+from common.constants import (
     TYPE_FLOAT,
     TYPE_LABEL,
+    BOUNDARY_SIGMOID
+)
+from common.functions import (
     transform_X_T,
     sigmoid,
     logarithm,
@@ -20,8 +23,9 @@ from common import (
     cross_entropy_log_loss,
     sigmoid_cross_entropy_log_loss,
     numerical_jacobian,
+)
+from common.utilities import (
     random_string,
-    BOUNDARY_SIGMOID
 )
 from layer import (
     CrossEntropyLogLoss

@@ -28,7 +28,7 @@ from typing import (
 )
 import logging
 import numpy as np
-from layer import Layer
+from layer.base import Layer
 from common.functions import (
     compose
 )

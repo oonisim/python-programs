@@ -1,24 +1,22 @@
 import logging
 import numpy as np
-from common import (
+from common.constants import (
     TYPE_FLOAT,
     TYPE_LABEL,
-    standardize,
+)
+from common.functions import (
     logarithm,
     sigmoid,
-    sigmoid,
     logistic_log_loss,
-    categorical_log_loss,
     cross_entropy_log_loss,
     sigmoid_cross_entropy_log_loss,
-    transform_X_T
+    transform_X_T,
 )
-
 from test import (
     NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,
-    REFORMULA_DIFF_ACCEPTANCE_VALUE
+    REFORMULA_DIFF_ACCEPTANCE_VALUE,
 )
 
 

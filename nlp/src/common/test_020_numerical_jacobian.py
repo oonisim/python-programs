@@ -11,20 +11,21 @@ from functools import partial
 import numpy as np
 import numexpr as ne
 import pytest_check as check    # https://pypi.org/project/pytest-check/
-from common import (
+from common.constants import (
     TYPE_FLOAT,
     TYPE_LABEL,
+    OFFSET_LOG,
+    OFFSET_DELTA,
+    BOUNDARY_SIGMOID,
+)
+from common.functions import (
     numerical_jacobian,
     logarithm,
     sigmoid,
     softmax,
     cross_entropy_log_loss,
     softmax_cross_entropy_log_loss,
-    OFFSET_LOG,
-    OFFSET_DELTA,
-    BOUNDARY_SIGMOID
 )
-
 from test import (
     NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,

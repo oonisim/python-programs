@@ -12,7 +12,7 @@ from typing import (
 )
 import logging
 import numpy as np
-from common import (
+from common.constants import (
     TYPE_FLOAT
 )
 
@@ -20,11 +20,7 @@ from common import (
 class Optimizer:
     """Gradient descent optimization base class implementation"""
     # ================================================================================
-    # Class initialization
-    # ================================================================================
-
-    # ================================================================================
-    # Instance initialization
+    # Instance
     # ================================================================================
     def __init__(self, name, lr=0.01, l2: TYPE_FLOAT = 1e-3, log_level=logging.WARNING):
         """

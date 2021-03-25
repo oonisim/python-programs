@@ -10,15 +10,19 @@ from typing import (
 
 import numpy as np
 import pytest_check as check    # https://pypi.org/project/pytest-check/
-from common import (
+from common.constants import (
     TYPE_FLOAT,
     TYPE_LABEL,
-    weights,
+)
+from common.functions import (
     softmax,
     transform_X_T,
     sigmoid,
     sigmoid_cross_entropy_log_loss,
     softmax_cross_entropy_log_loss,
+)
+import common.weights as weights
+from common.validations import (
     check_with_numerical_gradient
 )
 from data import (

@@ -9,15 +9,19 @@ from typing import (
 import logging
 import cProfile
 import numpy as np
-from common import (
+from common.constants import (
     TYPE_FLOAT,
     TYPE_LABEL,
+)
+from common.functions import (
     transform_X_T,
     softmax,
     logarithm,
     cross_entropy_log_loss,
     softmax_cross_entropy_log_loss,
     numerical_jacobian,
+)
+from common.utilities import (
     random_string,
 )
 from layer import (

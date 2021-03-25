@@ -1,6 +1,6 @@
 import sys
 import numpy as np
-from common import (
+from common.constants import (
     TYPE_FLOAT,
     TYPE_LABEL
 )

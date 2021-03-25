@@ -1,4 +1,7 @@
 """Gradient descent algorithm implementations"""
+from typing import (
+    Dict
+)
 import logging
 import numpy as np
 import numexpr as ne
@@ -10,6 +13,26 @@ class SGD(Optimizer):
     # ================================================================================
     # Class initialization
     # ================================================================================
+    # ================================================================================
+    # Class
+    # ================================================================================
+    @staticmethod
+    def build(specification: Dict):
+        """Build an optimizer based on the specification.
+        Spec example:
+        {
+            "scheme": optimizer.SGD.__qualname__,
+            "parameters": {
+                "lr": 0.1,
+                "l2": 0.1
+            }
+        }
+        """
+        spec = specification
+        __optimizer = SGD(**spec["parameters"]) \
+            if "parameters" in spec else SGD()
+
+        return __optimizer
 
     # ================================================================================
     # Instance initialization

@@ -15,20 +15,22 @@ import logging
 import copy
 import numpy as np
 import numexpr as ne
-from numba import jit
-from layer import Layer
-from optimizer import (
-    Optimizer,
-    SGD,
-)
-from common import (
+from common.constants import (
     TYPE_LABEL,
     TYPE_FLOAT,
     OFFSET_DELTA,
     ENFORCE_STRICT_ASSERT,
     ENABLE_NUMBA,
-    numerical_jacobian
 )
+from common.functions import (
+    numerical_jacobian,
+)
+import common.weights as weights
+from optimizer import (
+    Optimizer,
+    SGD,
+)
+from layer.base import Layer
 
 
 class Matmul(Layer):
@@ -76,11 +78,81 @@ class Matmul(Layer):
     ]
    """
     # ================================================================================
-    # Class initialization
+    # Class
     # ================================================================================
+    @staticmethod
+    def build_weight(specification: Dict) -> np:
+        """Build layer.Matmul weights
+        Args:
+            specification: weight specification
+        Return: initialized weight
+
+        specification:
+        {
+            "scheme": "weight initialization scheme [he|xavier]"
+            "num_nodes": "number of nodes M",
+            "num_feature": "number of features in a batch X including bias"
+        }
+        """
+        spec = specification
+        assert (
+            "num_nodes" in spec and
+            "num_features" in spec["num_features"]
+        )
+
+        M = spec["num_nodes"]
+        D = spec["num_features"]
+        scheme = spec["scheme"] if "scheme" in spec else "uniform"
+        assert scheme in weights.SCHEMES
+        return weights.SCHEMES[scheme](M, D)
+
+    @staticmethod
+    def build(specification: Dict):
+        """Build a matmul layer based on the specification
+        Specification format:
+        "matmul01": {
+            "scheme": layer.Matmul.__qualname__,
+            "num_nodes": 8,
+            "num_features": 3,
+            "weights": <weight_spec>,
+            "optimizer": <optimizer_spec>
+        }
+        """
+        spec = copy.deepcopy(specification)
+        assert (
+            "num_nodes" in spec and
+            "num_features" in spec["num_features"] and
+            "weights" in spec
+        )
+
+        # Geometry
+        num_nodes = spec["num_nodes"]
+        num_features = spec["num_features"]
+
+        # Weights
+        weight_spec = spec["weights"]
+        weight_spec["num_nodes"] = num_nodes
+        weight_spec["num_features"] = num_features
+        W = Matmul.build_weight(weight_spec)
+
+        # Optimizer
+        if "optimizer" in spec:
+            __optimizer = Optimizer.build(spec["optimizer"])
+        else:
+            __optimizer = SGD()
+
+        matmul = Matmul(
+            name=spec["name"],
+            num_nodes=num_nodes,
+            W=W,
+            optimizer=__optimizer,
+            log_level=spec["log_level"] if "log_level" in spec else logging.ERROR
+        )
+
+        return matmul
 
     # ================================================================================
-    # Instance initialization
+    # Instance
     # ================================================================================
     def __init__(
             self,

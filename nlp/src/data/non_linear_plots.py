@@ -4,7 +4,7 @@ from typing import (
     List
 )
 import numpy as np
-from common import (
+from common.constants import (
     TYPE_FLOAT,
     TYPE_INT,
     TYPE_LABEL
