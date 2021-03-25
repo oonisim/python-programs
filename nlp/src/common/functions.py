@@ -1098,3 +1098,9 @@ def prediction_grid_2d(x_min, x_max, y_min, y_max, prediction_function):
     P = P.reshape(x1_grid.shape)
 
     return x1_grid, x2_grid, P
+
+
+LOSS_FUNCTIONS = {
+    "softmax_cross_entropy_log_loss": softmax_cross_entropy_log_loss,
+    "sigmoid_cross_entropy_log_loss": sigmoid_cross_entropy_log_loss
+}

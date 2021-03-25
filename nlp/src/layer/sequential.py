@@ -61,9 +61,10 @@ class Sequential(Layer):
             log_level: logging level
         """
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
+        assert \
+            isinstance(layers, List) and len(layers) > 0 and \
+            all([isinstance(layer, Layer) for layer in layers])
 
-        # Layer function
-        assert isinstance(layers, List) and len(layers) > 0
         self._layers: List[Layer] = layers
 
         # Layer function F=(fn-1 o ... o f0)
@@ -75,7 +76,7 @@ class Sequential(Layer):
 
         # Gradient function G=(g0 o g1 o ... o gn-1)
         self.gradient: [[Union[np.ndarray, float]], Union[np.ndarray, float]] = \
-            compose(*[layer.gradient for layer in self.layers[::-1]])
+            compose(*[layer.gradient for layer in layers[::-1]])
 
         # List of dSi which is List[Gradients] from each layer
         self._dS = []

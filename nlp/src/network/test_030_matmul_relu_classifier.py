@@ -29,7 +29,7 @@ from data import (
 from layer import (
     Standardization,
     Matmul,
-    Relu,
+    ReLU,
     CrossEntropyLogLoss
 )
 from optimizer import (
@@ -90,9 +90,9 @@ def train_matmul_relu_classifier(
     )
 
     # --------------------------------------------------------------------------------
-    # Instantiate a ReLu layer
+    # Instantiate a ReLU layer
     # --------------------------------------------------------------------------------
-    activation = Relu(
+    activation = ReLU(
         name="relu",
         num_nodes=M,
         log_level=log_level

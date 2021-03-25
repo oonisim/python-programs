@@ -23,7 +23,9 @@ from common import (
 from test import (
     GRADIENT_DIFF_CHECK_TRIGGER,
     GRADIENT_DIFF_ACCEPTANCE_RATIO,
-    GRADIENT_DIFF_ACCEPTANCE_VALUE
+    GRADIENT_DIFF_ACCEPTANCE_VALUE,
+    expected_gradients_from_relu_neuron,
+    expected_gradient_from_log_loss
 )
 from data import (
     spiral,
@@ -32,7 +34,7 @@ from data import (
 from layer import (
     Standardization,
     Matmul,
-    Relu,
+    ReLU,
     CrossEntropyLogLoss
 )
 from optimizer import (
@@ -65,9 +67,9 @@ def build(
     )
 
     # --------------------------------------------------------------------------------
-    # Instantiate the 2nd ReLu layer
+    # Instantiate the 2nd ReLU layer
     # --------------------------------------------------------------------------------
-    activation02 = Relu(
+    activation02 = ReLU(
         name="relu02",
         num_nodes=M2,
         log_level=log_level
@@ -87,9 +89,9 @@ def build(
     matmul02.objective = compose(activation02.function, activation02.objective)
 
     # --------------------------------------------------------------------------------
-    # Instantiate the 1st ReLu layer
+    # Instantiate the 1st ReLU layer
     # --------------------------------------------------------------------------------
-    activation01 = Relu(
+    activation01 = ReLU(
         name="relu01",
         num_nodes=M1,
         log_level=log_level
@@ -174,84 +176,21 @@ def forward(
     return L, P, A02, Y02, A01, Y01
 
 
-def __expected_gradients_relu(
-        EDA,
-        Y,
-        matmul,
-):
-    """Calculate expected gradient for ReLU"""
-    # --------------------------------------------------------------------------------
-    # Expected gradient EDY = dL/dY at the Matmul02 layer.
-    # EDY = EDA (P-T)/N if Y > 0 else 0.
-    # EDY.shape(N,M2)
-    # This should match the back-propagation dL/dY from the ReLu02 layer.
-    # --------------------------------------------------------------------------------
-    EDY = np.copy(EDA)
-    EDY[Y < 0] = TYPE_FLOAT(0)
-
-    # --------------------------------------------------------------------------------
-    # Expected gradient EDW = dL/dW02 in the Matmul02 layer.
-    # EDW = matmul.X.T @ EDY.
-    # EDW.shape(M2,M1+1):
-    #   (M1+1,N) @ (N, M2) -> (M1+1,M2)
-    #   (M1+1,M2).T        -> (M2,M1+1)
-    # EDW should match dL/dW02 in [dL/dA02, dL/dW02] from the matmul.update().
-    # --------------------------------------------------------------------------------
-    EDW = np.matmul(matmul.X.T, EDY).T  # dL/dW.T: [(M1+1,N) @ (N,M2)].T -> (M2,M1+1)
-
-    # ================================================================================
-    # Expected gradients at 1st layers
-    # Expected dL/dX = dL/dY01 @ W01 = y01 > 0 or 0 for y01 <= 0.
-    # Expected dL/dW01.T = matmal01.X.T @ dL/dY01 = matmul.X.T @ W01 for y01 > 0.
-    # Expected dL/dW01.T = matmal01.X.T:(D+1,N) @ dL/dY01:(N,M1) -> (D+1,M1)
-    #
-    # Expected dL/dX   = EDX  : dL/dY01:(N,M1) @ W01:(M1,D+1) -> (N,D+1)
-    # Expected dL/dW01 = EDW01: (D+1,M1).T -> (M1,D+1)
-    # ================================================================================
-
-    # --------------------------------------------------------------------------------
-    # Expected gradient EDX = dL/dA01 at the ReLu01 layer
-    # EDX = EDY:(N,M2) @ W02:(M2,M1+1) -> (N,M1+1).
-    # Shape of EDX must match A01:(N,M1).
-    # EDA should match the back-propagation dL/dA01 from the Matmul02 layer.
-    # --------------------------------------------------------------------------------
-    EDX = np.matmul(EDY, matmul.W)  # dL/dA01: (N,M2) @ (M2, M1+1) -> (N, M1+1)
-    EDX = EDX[
-        ::,
-        1::
-    ]  # EDX.shape(N,M1) without bias to match A01:(N,M1)
-
-    return EDY, EDW, EDX
-
-
 def expected_gradients_relu(
         N,
         T,
         P,
-        A02,
         Y02,
-        A01,
-        Y01,
-        activation02,
         matmul02,
-        activation01,
+        Y01,
         matmul01
 ):
     # --------------------------------------------------------------------------------
-    # Expected gradient EDA02 = dL/dA02 = (P-T)/N at the ReLU02 layer.
-    # EDA02.shape(N,M2)
-    # EDA02 should match the back-propagation dL/dA02 from softmax-log-loss layer.
+    # Expected gradient EDA02 = dL/dA02 = (P-T)/N at the log loss.
     # --------------------------------------------------------------------------------
-    # (P-T)/N, NOT P/N - T
-    EDA02 = np.copy(P)
-    EDA02[
-        np.arange(N),
-        T
-    ] -= TYPE_FLOAT(1)
-    EDA02 /= TYPE_FLOAT(N)
-
-    EDY02, EDW02, EDA01 = __expected_gradients_relu(EDA02, Y02, matmul02)
-    EDY01, EDW01, EDX = __expected_gradients_relu(EDA01, Y01, matmul01)
+    EDA02 = expected_gradient_from_log_loss(P=P, T=T, N=N)
+    EDY02, EDW02, EDA01 = expected_gradients_from_relu_neuron(EDA02, Y02, matmul02)
+    EDY01, EDW01, EDX = expected_gradients_from_relu_neuron(EDA01, Y01, matmul01)
 
     return EDA02, EDY02, EDW02, EDA01, EDY01, EDW01, EDX
 
@@ -290,7 +229,7 @@ def __backward(
 
     # ********************************************************************************
     # Constraint:
-    # EDY should match the gradient dL/dY back-propagated from the ReLu layer.
+    # EDY should match the gradient dL/dY back-propagated from the ReLU layer.
     # ********************************************************************************
     dY = activation.gradient(dA)  # dL/dY: (N, M2)
     assert \
@@ -425,6 +364,7 @@ def train_two_layer_classifier(
         optimizer: Optimizer,
         num_epochs: int = 100,
         test_numerical_gradient: bool = False,
+
         log_level: int = logging.ERROR,
         callback: Callable = None
 ):
@@ -447,8 +387,7 @@ def train_two_layer_classifier(
     """
     name = __name__
     assert \
-        isinstance(T, np.ndarray) and np.issubdtype(T.dtype, np.integer) and \
-        T.ndim == 1 and T.shape[0] == N
+        isinstance(T, np.ndarray) and T.ndim == 1 and T.shape[0] == N
     assert \
         isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT and \
         X.ndim == 2 and X.shape[0] == N and X.shape[1] == D
@@ -536,11 +475,7 @@ def train_two_layer_classifier(
         # Expected gradients
         # --------------------------------------------------------------------------------
         *gradients, = expected_gradients_relu(
-            N, T, P, A02, Y02, A01, Y01,
-            activation02,
-            matmul02,
-            activation01,
-            matmul01
+            N, T, P, Y02, matmul02, Y01, matmul01
         )
         EDA02, EDY02, EDW02, EDA01, EDY01, EDW01, EDX = gradients
 

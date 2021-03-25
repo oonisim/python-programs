@@ -50,3 +50,10 @@ def uniform(M: int, D: int) -> np.ndarray:
     """
     assert all([D > 0, M > 0])
     return np.random.uniform(low=0.0, high=1.0, size=(M, D))
+
+
+INITIALIZATION_SCHEMES = {
+    "he": he,
+    "xavier": xavier,
+    "uniform": uniform
+}
