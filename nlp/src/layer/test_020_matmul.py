@@ -37,7 +37,7 @@ import common.weights as weights
 from layer import (
     Matmul
 )
-from test import (
+from test.config import (
     NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,
@@ -121,7 +121,7 @@ def test_020_matmul_instance_properties():
         name = random_string(np.random.randint(1, 10))
         M: int = np.random.randint(1, NUM_MAX_NODES)
         D: int = np.random.randint(1, NUM_MAX_FEATURES)
-        layer = Matmul(
+        matmul = Matmul(
             name=name,
             num_nodes=M,
             W=weights.uniform(M, D+1),
@@ -132,34 +132,34 @@ def test_020_matmul_instance_properties():
         # To pass
         # --------------------------------------------------------------------------------
         try:
-            if not layer.name == name: raise RuntimeError("layer.name == name should be true")
+            if not matmul.name == name: raise RuntimeError("matmul.name == name should be true")
         except AssertionError:
             raise RuntimeError("Access to name should be allowed as already initialized.")
 
         try:
-            if not layer.M == M: raise RuntimeError("layer.M == M should be true")
+            if not matmul.M == M: raise RuntimeError("matmul.M == M should be true")
         except AssertionError:
             raise RuntimeError("Access to M should be allowed as already initialized.")
 
         try:
-            if not isinstance(layer.logger, logging.Logger):
-                raise RuntimeError("isinstance(layer.logger, logging.Logger) should be true")
+            if not isinstance(matmul.logger, logging.Logger):
+                raise RuntimeError("isinstance(matmul.logger, logging.Logger) should be true")
         except AssertionError:
             raise RuntimeError("Access to logger should be allowed as already initialized.")
 
         try:
-            a = layer.D
+            a = matmul.D
         except AssertionError:
             raise RuntimeError("Access to D should be allowed as already initialized.")
 
         try:
-            layer.W is not None
+            matmul.W is not None
         except AssertionError:
             raise RuntimeError("Access to W should be allowed as already initialized.")
             pass
 
         try:
-            layer.optimizer is not None
+            matmul.optimizer is not None
         except AssertionError:
             raise RuntimeError("Access to optimizer should be allowed as already initialized.")
 
@@ -167,101 +167,101 @@ def test_020_matmul_instance_properties():
         # To fail
         # --------------------------------------------------------------------------------
         try:
-            print(layer.X)
+            print(matmul.X)
             raise RuntimeError(msg)
         except AssertionError:
             pass
 
         try:
-            layer.X = int(1)
+            matmul.X = int(1)
             raise RuntimeError(msg)
         except AssertionError:
             pass
 
         try:
-            print(layer.dX)
+            print(matmul.dX)
             raise RuntimeError(msg)
         except AssertionError:
             pass
 
         try:
-            print(layer.dW)
+            print(matmul.dW)
             raise RuntimeError(msg)
         except AssertionError:
             pass
 
         try:
-            print(layer.Y)
+            print(matmul.Y)
             raise RuntimeError(msg)
         except AssertionError:
             pass
         try:
-            layer._Y = int(1)
-            print(layer.Y)
-            raise RuntimeError(msg)
-        except AssertionError:
-            pass
-
-        try:
-            print(layer.dY)
-            raise RuntimeError(msg)
-        except AssertionError:
-            pass
-        try:
-            layer._dY = int(1)
-            print(layer.dY)
+            matmul._Y = int(1)
+            print(matmul.Y)
             raise RuntimeError(msg)
         except AssertionError:
             pass
 
         try:
-            print(layer.T)
+            print(matmul.dY)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+        try:
+            matmul._dY = int(1)
+            print(matmul.dY)
             raise RuntimeError(msg)
         except AssertionError:
             pass
 
         try:
-            layer.T = float(1)
+            print(matmul.T)
             raise RuntimeError(msg)
         except AssertionError:
             pass
 
         try:
-            layer.objective(np.array(1.0))
+            matmul.T = float(1)
             raise RuntimeError(msg)
         except AssertionError:
             pass
 
         try:
-            print(layer.N)
+            matmul.objective(np.array(1.0))
             raise RuntimeError(msg)
         except AssertionError:
             pass
 
-        assert layer.name == name
-        assert layer.num_nodes == M
+        try:
+            print(matmul.N)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        assert matmul.name == name
+        assert matmul.num_nodes == M
 
         try:
-            layer = Matmul(
+            matmul = Matmul(
                 name=name,
                 num_nodes=M,
                 W=weights.xavier(M, D+1),
                 log_level=logging.DEBUG
             )
-            layer.function(int(1))
-            raise RuntimeError("Invoke layer.function(int(1)) must fail.")
+            matmul.function(int(1))
+            raise RuntimeError("Invoke matmul.function(int(1)) must fail.")
         except AssertionError:
             pass
 
         try:
-            layer = Matmul(
+            matmul = Matmul(
                 name=name,
                 num_nodes=M,
                 W=weights.xavier(M, D+1),
                 log_level=logging.DEBUG
             )
-            layer.gradient(int(1))
-            raise RuntimeError("Invoke layer.gradient(int(1)) must fail.")
+            matmul.gradient(int(1))
+            raise RuntimeError("Invoke matmul.gradient(int(1)) must fail.")
         except AssertionError:
             pass
 
@@ -285,41 +285,303 @@ def test_020_matmul_instantiation():
         M: int = np.random.randint(1, NUM_MAX_NODES)
         D: int = np.random.randint(1, NUM_MAX_FEATURES)
         name = "test_020_matmul_instantiation"
-        layer = Matmul(
+        matmul = Matmul(
             name=name,
             num_nodes=M,
             W=weights.he(M, D+1),
             log_level=logging.DEBUG
         )
-        layer.objective = objective
+        matmul.objective = objective
 
-        assert layer.name == name
-        assert layer.num_nodes == layer.M == M
+        assert matmul.name == name
+        assert matmul.num_nodes == matmul.M == M
 
-        layer._D = D
-        assert layer.D == D
+        matmul._D = D
+        assert matmul.D == D
 
         X = np.random.randn(N, D)
-        layer.X = X
-        assert np.array_equal(layer.X, X)
-        assert layer.N == N == X.shape[0]
+        matmul.X = X
+        assert np.array_equal(matmul.X, X)
+        assert matmul.N == N == X.shape[0]
 
-        layer._dX = X
-        assert np.array_equal(layer.dX, X)
+        matmul._dX = X
+        assert np.array_equal(matmul.dX, X)
 
         T = np.random.randint(0, M, N)
-        layer.T = T
-        assert np.array_equal(layer.T, T)
+        matmul.T = T
+        assert np.array_equal(matmul.T, T)
 
-        layer._Y = np.dot(X, X.T)
-        assert np.array_equal(layer.Y, np.dot(X, X.T))
+        matmul._Y = np.dot(X, X.T)
+        assert np.array_equal(matmul.Y, np.dot(X, X.T))
 
-        layer._dY = np.array(0.9)
-        assert layer._dY == np.array(0.9)
+        matmul._dY = np.array(0.9)
+        assert matmul._dY == np.array(0.9)
 
-        layer.logger.debug("This is a pytest")
+        matmul.logger.debug("This is a pytest")
 
-        assert layer.objective == objective
+        assert matmul.objective == objective
+
+
+def test_020_matmul_builder_to_fail_matmul_spec():
+    """
+    Objective:
+        Verify the Matmul.build()
+    Expected:
+        build() parse the spec and fail with invalid configurations
+    """
+    profiler = cProfile.Profile()
+    profiler.enable()
+
+    for _ in range(NUM_MAX_TEST_TIMES):
+        M = np.random.randint(1, 100)
+        D = np.random.randint(1, 100)   # NOT including bias
+
+        # ----------------------------------------------------------------------
+        # Validate the correct specification.
+        # NOTE: Invalidate one parameter at a time from the correct one.
+        # Otherwise not sure what you are testing.
+        # ----------------------------------------------------------------------
+        valid_matmul_spec = {
+            "name": "test_020_matmul_builder_to_fail_matmul_spec",
+            "num_nodes": M,
+            "num_features": D,
+            "weight": {
+                "scheme": "he",
+                "num_nodes": M,
+                "num_features": D + 1
+            },
+            "log_level": logging.ERROR
+        }
+        try:
+            Matmul.build(valid_matmul_spec)
+        except Exception as e:
+            raise RuntimeError("Matmul.build() must succeed with %s" % valid_matmul_spec)
+
+        matmul_spec = copy.deepcopy(valid_matmul_spec)
+        matmul_spec["name"] = ""
+        try:
+            Matmul.build(matmul_spec)
+            raise RuntimeError("Matmul.build() must fail with invalid name")
+        except AssertionError:
+            pass
+
+        matmul_spec = copy.deepcopy(valid_matmul_spec)
+        matmul_spec["num_nodes"] = np.random.randint(-100, 0)
+        try:
+            Matmul.build(matmul_spec)
+            raise RuntimeError("Matmul.build() must fail with num_nodes <=0")
+        except AssertionError:
+            pass
+
+        matmul_spec = copy.deepcopy(valid_matmul_spec)
+        matmul_spec["num_features"] = np.random.randint(-100, 0)
+        try:
+            Matmul.build(matmul_spec)
+            raise RuntimeError("Matmul.build() must fail with num_features <=0")
+        except AssertionError:
+            pass
+
+        matmul_spec = copy.deepcopy(valid_matmul_spec)
+        matmul_spec["log_level"] = -999
+        try:
+            Matmul.build(matmul_spec)
+            raise RuntimeError("Matmul.build() must fail with log_level <-1")
+        except KeyError:
+            pass
+
+    profiler.disable()
+    profiler.print_stats(sort="cumtime")
+
+
+def test_020_matmul_builder_to_fail_weight_spec():
+    """
+    Objective:
+        Verify the Matmul.build()
+    Expected:
+        build() parse the spec and fail with invalid weight configurations
+    """
+    profiler = cProfile.Profile()
+    profiler.enable()
+
+    for _ in range(NUM_MAX_TEST_TIMES):
+        M = np.random.randint(1, 100)
+        D = np.random.randint(1, 100)   # NOT including bias
+
+        # ----------------------------------------------------------------------
+        # Validate the correct specification.
+        # NOTE: Invalidate one parameter at a time from the correct one.
+        # Otherwise not sure what you are testing.
+        # ----------------------------------------------------------------------
+        valid_matmul_spec = {
+            "name": "test_020_matmul_builder_to_fail_matmul_spec",
+            "num_nodes": M,
+            "num_features": D,
+            "weight": {
+                "scheme": "he",
+                "num_nodes": M,
+                "num_features": D + 1
+            }
+        }
+        try:
+            Matmul.build(valid_matmul_spec)
+        except Exception as e:
+            raise RuntimeError("Matmul.build() must succeed with %s" % valid_matmul_spec)
+
+        matmul_spec = copy.deepcopy(valid_matmul_spec)
+        matmul_spec["weight"]["scheme"] = "invalid_scheme"
+        try:
+            Matmul.build(matmul_spec)
+            raise RuntimeError("Matmul.build() must fail with invalid weight scheme")
+        except AssertionError:
+            pass
+
+        matmul_spec = copy.deepcopy(valid_matmul_spec)
+        matmul_spec["weight"]["num_nodes"] = "hoge"
+        try:
+            Matmul.build(matmul_spec)
+            raise RuntimeError("Matmul.build() must fail with weight.shape != (M, D+1) scheme")
+        except AssertionError:
+            pass
+
+        matmul_spec = copy.deepcopy(valid_matmul_spec)
+        matmul_spec["weight"]["num_nodes"] = M+1
+        try:
+            Matmul.build(matmul_spec)
+            raise RuntimeError("Matmul.build() must fail with weight.shape != (M, D+1) scheme")
+        except AssertionError:
+            pass
+
+        matmul_spec = copy.deepcopy(valid_matmul_spec)
+        matmul_spec["weight"]["num_features"] = D
+        try:
+            Matmul.build(matmul_spec)
+            raise RuntimeError("Matmul.build() must fail with weight.shape != (M, D+1) scheme")
+        except AssertionError:
+            pass
+
+        matmul_spec = copy.deepcopy(valid_matmul_spec)
+        matmul_spec["weight"]["num_features"] = "hoge"
+        try:
+            Matmul.build(matmul_spec)
+            raise RuntimeError("Matmul.build() must fail with weight.shape != (M, D+1) scheme")
+        except AssertionError:
+            pass
+
+    profiler.disable()
+    profiler.print_stats(sort="cumtime")
+
+
+def test_020_matmul_builder_to_fail_optimizer_spec():
+    """
+    Objective:
+        Verify the Matmul.build()
+    Expected:
+        build() parse the spec and fail with invalid configurations
+    """
+    profiler = cProfile.Profile()
+    profiler.enable()
+
+    for _ in range(NUM_MAX_TEST_TIMES):
+        M = np.random.randint(1, 100)
+        D = np.random.randint(1, 100)   # NOT including bias
+
+        # ----------------------------------------------------------------------
+        # Validate the correct specification.
+        # NOTE: Invalidate one parameter at a time from the correct one.
+        # Otherwise not sure what you are testing.
+        # ----------------------------------------------------------------------
+        valid_matmul_spec = {
+            "name": "test_020_matmul_builder_to_fail_matmul_spec",
+            "num_nodes": M,
+            "num_features": D,
+            "weight": {
+                "scheme": "he",
+                "num_nodes": M,
+                "num_features": D + 1
+            },
+            "optimizer": {
+                "scheme": "sGd"
+            },
+            "log_level": logging.ERROR
+        }
+        try:
+            Matmul.build(valid_matmul_spec)
+        except Exception as e:
+            raise RuntimeError("Matmul.build() must succeed with %s" % valid_matmul_spec)
+
+        matmul_spec = copy.deepcopy(valid_matmul_spec)
+        matmul_spec["optimizer"] = ""
+        try:
+            Matmul.build(matmul_spec)
+            raise RuntimeError("Matmul.build() must fail with invalid optimizer spec")
+        except AssertionError:
+            pass
+
+        matmul_spec = copy.deepcopy(valid_matmul_spec)
+        matmul_spec["optimizer"]["scheme"] = "invalid"
+        try:
+            Matmul.build(matmul_spec)
+            raise RuntimeError("Matmul.build() must fail with invalid optimizer spec")
+        except AssertionError:
+            pass
+
+    profiler.disable()
+    profiler.print_stats(sort="cumtime")
+
+
+def test_020_matmul_builder_to_succeed():
+    """
+    Objective:
+        Verify the Matmul.build()
+    Expected:
+        build() parse the spec and succeed
+    """
+    profiler = cProfile.Profile()
+    profiler.enable()
+
+    for _ in range(NUM_MAX_TEST_TIMES):
+        M = np.random.randint(1, 100)
+        D = np.random.randint(1, 100)   # NOT including bias
+
+        # ----------------------------------------------------------------------
+        # Validate the correct specification.
+        # NOTE: Invalidate one parameter at a time from the correct one.
+        # Otherwise not sure what you are testing.
+        # ----------------------------------------------------------------------
+        valid_matmul_spec = {
+            "name": "test_020_matmul_builder_to_fail_matmul_spec",
+            "num_nodes": M,
+            "num_features": D,
+            "weight": {
+                "scheme": "he",
+                "num_nodes": M,
+                "num_features": D + 1
+            },
+            "optimizer": {
+                "scheme": "sGd"
+            }
+        }
+        try:
+            Matmul.build(valid_matmul_spec)
+        except Exception as e:
+            raise RuntimeError("Matmul.build() must succeed with %s" % valid_matmul_spec)
+
+        matmul_spec = copy.deepcopy(valid_matmul_spec)
+        matmul_spec["optimizer"]["scheme"] = "sgd"
+        try:
+            Matmul.build(valid_matmul_spec)
+        except Exception as e:
+            raise RuntimeError("Matmul.build() must succeed with %s" % valid_matmul_spec)
+
+        matmul_spec = copy.deepcopy(valid_matmul_spec)
+        matmul_spec["optimizer"]["scheme"] = "SGD"
+        try:
+            Matmul.build(valid_matmul_spec)
+        except Exception as e:
+            raise RuntimeError("Matmul.build() must succeed with %s" % valid_matmul_spec)
+
+    profiler.disable()
+    profiler.print_stats(sort="cumtime")
 
 
 def test_020_matmul_round_trip():
@@ -359,65 +621,83 @@ def test_020_matmul_round_trip():
             """Dummy objective function to calculate the loss L"""
             return np.sum(X)
 
-        layer = Matmul(
-            name=name,
-            num_nodes=M,
-            W=W,
-            log_level=logging.DEBUG
-        )
-        layer.objective = objective
+        # Test both static instantiation and build()
+        if np.random.uniform() < 0.5:
+            matmul = Matmul(
+                name=name,
+                num_nodes=M,
+                W=W,
+                log_level=logging.DEBUG
+            )
+        else:
+            matmul_spec = {
+                "name": "test_020_matmul_builder_to_fail_matmul_spec",
+                "num_nodes": M,
+                "num_features": D,
+                "weight": {
+                    "scheme": "he",
+                    "num_nodes": M,
+                    "num_features": D + 1
+                },
+                "optimizer": {
+                    "scheme": "sGd"
+                }
+            }
+            matmul = Matmul.build(matmul_spec)
+
+        matmul.objective = objective
 
         # ================================================================================
         # Layer forward path
         # Calculate the layer output Y=f(X), and get the loss L = objective(Y)
-        # Test the numerical gradient dL/dX=layer.gradient_numerical().
+        # Test the numerical gradient dL/dX=matmul.gradient_numerical().
         #
         # Note that bias columns are added inside the matmul layer instance, hence
-        # layer.X.shape is (N, 1+D), layer.W.shape is (M, 1+D)
+        # matmul.X.shape is (N, 1+D), matmul.W.shape is (M, 1+D)
         # ================================================================================
         X = np.random.randn(N, D)
         Logger.debug("%s: X is \n%s", name, X)
 
-        Y = layer.function(X)
-        L = layer.objective(Y)
+        Y = matmul.function(X)
+        L = matmul.objective(Y)
 
         # Constraint 1 : Matmul outputs Y should be X@W.T
-        assert np.array_equal(Y, np.matmul(layer.X, layer.W.T))
+        assert np.array_equal(Y, np.matmul(matmul.X, matmul.W.T))
 
         # Constraint 2: Numerical gradient should be the same with numerical Jacobian
-        GN = layer.gradient_numerical()         # [dL/dX, dL/dW]
+        GN = matmul.gradient_numerical()         # [dL/dX, dL/dW]
 
-        # DO NOT use layer.function() as the objective function for numerical_jacobian().
+        # DO NOT use matmul.function() as the objective function for numerical_jacobian().
         # The state of the layer will be modified.
-        # LX = lambda x: layer.objective(layer.function(x))
+        # LX = lambda x: matmul.objective(matmul.function(x))
         def LX(x):
-            y = np.matmul(x, layer.W.T)
-            return layer.objective(y)
+            y = np.matmul(x, matmul.W.T)
+            return matmul.objective(y)
 
-        EGNX = numerical_jacobian(LX, layer.X)          # Numerical dL/dX including bias
+        EGNX = numerical_jacobian(LX, matmul.X)          # Numerical dL/dX including bias
         EGNX = EGNX[::, 1::]                            # Remove bias for dL/dX
         assert np.array_equal(GN[0], EGNX), \
             "GN[0]\n%s\nEGNX=\n%s\n" % (GN[0], EGNX)
 
-        # DO NOT use layer.function() as the objective function for numerical_jacobian().
+        # DO NOT use matmul.function() as the objective function for numerical_jacobian().
         # The state of the layer will be modified.
-        # LW = lambda w: layer.objective(np.matmul(X, w.T))
+        # LW = lambda w: matmul.objective(np.matmul(X, w.T))
         def LW(w):
-            Y = np.matmul(layer.X, w.T)
-            return layer.objective(Y)
+            Y = np.matmul(matmul.X, w.T)
+            return matmul.objective(Y)
 
-        EGNW = numerical_jacobian(LW, layer.W)          # Numerical dL/dW including bias
+        EGNW = numerical_jacobian(LW, matmul.W)          # Numerical dL/dW including bias
         assert np.array_equal(GN[1], EGNW)              # No need to remove bias
 
         # ================================================================================
         # Layer backward path
-        # Calculate the analytical gradient dL/dX=layer.gradient(dL/dY) with a dummy dL/dY.
+        # Calculate the analytical gradient dL/dX=matmul.gradient(dL/dY) with a dummy dL/dY.
         # ================================================================================
         dY = np.ones_like(Y)
-        dX = layer.gradient(dY)
+        dX = matmul.gradient(dY)
 
         # Constraint 3: Matmul gradient dL/dX should be dL/dY @ W. Use a dummy dL/dY = 1.0.
-        expected_dX = np.matmul(dY, layer.W)
+        expected_dX = np.matmul(dY, matmul.W)
         expected_dX = expected_dX[
             ::,
             1::     # Omit bias
@@ -437,10 +717,10 @@ def test_020_matmul_round_trip():
         backup = copy.deepcopy(W)
 
         # Gradient descent and returns analytical dL/dX, dL/dW
-        dS = layer.update()
+        dS = matmul.update()
 
         # Constraint 6.: W has been updated by the gradient descent.
-        assert np.any(backup != layer.W), "W has not been updated "
+        assert np.any(backup != matmul.W), "W has not been updated "
 
         # Constraint 5: the numerical gradient (dL/dX, dL/dW) are closer to the analytical ones.
         assert np.allclose(
@@ -457,7 +737,7 @@ def test_020_matmul_round_trip():
         ), "dS[1]=\n%s\nGN[1]=\n%sdiff=\n%s\n" % (dS[1], GN[1], (dS[1]-GN[1]))
 
         # Constraint 7: gradient descent progressing with the new objective L(Yn+1) < L(Yn)
-        assert np.all(np.abs(objective(layer.function(X)) < L))
+        assert np.all(np.abs(objective(matmul.function(X)) < L))
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")

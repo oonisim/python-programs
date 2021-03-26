@@ -29,10 +29,12 @@ from common.validations import (
     check_with_numerical_gradient
 )
 import common.weights as weights
-from test import (
+from test.config import (
     GRADIENT_DIFF_CHECK_TRIGGER,
     GRADIENT_DIFF_ACCEPTANCE_RATIO,
     GRADIENT_DIFF_ACCEPTANCE_VALUE,
+)
+from test.layer_test_tools import (
     expected_gradients_from_relu_neuron,
     expected_gradient_from_log_loss
 )
@@ -135,9 +137,10 @@ def build(
     # --------------------------------------------------------------------------------
     objective = compose(matmul01.function, matmul01.objective)
     prediction = compose(
-        matmul01.function,
-        activation01.function,
-        matmul02.function
+        matmul01.predict,
+        activation01.predict,
+        matmul02.predict,
+        activation02.predict,
     )
 
     return objective, prediction, loss, activation02, matmul02, activation01, matmul01

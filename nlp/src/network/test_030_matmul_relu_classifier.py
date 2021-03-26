@@ -18,15 +18,7 @@ from common.functions import (
     softmax_cross_entropy_log_loss,
     compose,
 )
-from common.validations import (
-    check_with_numerical_gradient
-)
 import common.weights as weights
-from test import (
-    GRADIENT_DIFF_CHECK_TRIGGER,
-    GRADIENT_DIFF_ACCEPTANCE_RATIO,
-    GRADIENT_DIFF_ACCEPTANCE_VALUE
-)
 from data import (
     linear_separable_sectors
 )
@@ -34,11 +26,19 @@ from layer import (
     Standardization,
     Matmul,
     ReLU,
-    CrossEntropyLogLoss
+    CrossEntropyLogLoss,
+    forward_outputs,
+    backward_outputs
+)
+from layer.utilities import (
+    build_matmul_relu_objective
 )
 from optimizer import (
     Optimizer,
     SGD
+)
+from test.layer_test_tools import (
+    validate_relu_neuron_training
 )
 
 Logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ def train_matmul_relu_classifier(
         optimizer: Optimizer,
         num_epochs: int = 100,
         test_numerical_gradient: bool = False,
-        log_level: int = logging.ERROR,
+        log_level: int = logging.DEBUG,
         callback: Callable = None
 ):
     """Test case for binary classification with matmul + log loss.
@@ -84,163 +84,38 @@ def train_matmul_relu_classifier(
     )
 
     # --------------------------------------------------------------------------------
-    # Instantiate a CrossEntropyLogLoss layer
+    # Network
     # --------------------------------------------------------------------------------
-    loss = CrossEntropyLogLoss(
-        name="loss",
-        num_nodes=M,
-        log_loss_function=log_loss_function,
-        log_level=log_level
-    )
-
-    # --------------------------------------------------------------------------------
-    # Instantiate a ReLU layer
-    # --------------------------------------------------------------------------------
-    activation = ReLU(
-        name="relu",
-        num_nodes=M,
-        log_level=log_level
-    )
-    activation.objective = loss.function
-
-    # --------------------------------------------------------------------------------
-    # Instantiate a Matmul layer
-    # --------------------------------------------------------------------------------
-    matmul = Matmul(
-        name="matmul",
-        num_nodes=M,
+    *network_components, = build_matmul_relu_objective(
+        M,
+        D,
         W=W,
         optimizer=optimizer,
+        log_loss_function=softmax_cross_entropy_log_loss,
         log_level=log_level
     )
+
+    matmul: Matmul
+    activation: ReLU
+    loss: CrossEntropyLogLoss
+    matmul, activation, loss = network_components
+
+    activation.objective = loss.function
     matmul.objective = compose(activation.function, loss.function)
-
-    # --------------------------------------------------------------------------------
-    # Instantiate a Normalization layer
-    # Need to apply the same mean and std to the non-training data set.
-    # --------------------------------------------------------------------------------
-    # norm = Standardization(
-    #     name="standardization",
-    #     num_nodes=M,
-    #     log_level=log_level
-    # )
-    # X = np.copy(X)
-    # X = norm.function(X)
-
-    # Network objective function f: L=f(X)
     objective = compose(matmul.function, matmul.objective)
 
-    num_no_progress: int = 0     # how many time when loss L not decreased.
-    loss.T = T
-    history: List[np.ndarray] = [matmul.objective(matmul.function(X))]
-
-    for i in range(num_epochs):
-        # --------------------------------------------------------------------------------
-        # Layer forward path
-        # 1. Calculate the matmul output Y=matmul.f(X)
-        # 2. Calculate the ReLU output A=activation.f(Y)
-        # 3. Calculate the loss L = loss(A)
-        # Test the numerical gradient dL/dX=matmul.gradient_numerical().
-        # --------------------------------------------------------------------------------
-        Y = matmul.function(X)
-        A = activation.function(Y)
-        L = loss.function(A)
-
-        # ********************************************************************************
-        # Constraint: Network objective L must match layer-by-layer output
-        # ********************************************************************************
-        assert L == objective(X) and L.shape == (), \
-            f"Network objective L(X) %s must match layer-by-layer output %s." \
-            % (objective(X), L)
-
-        if not (i % 10): print(f"iteration {i} Loss {L}")
-        Logger.info("%s: iteration[%s]. Loss is [%s]", name, i, L)
-
-        # ********************************************************************************
-        # Constraint: Objective/Loss L(Yn+1) after gradient descent < L(Yn)
-        # ********************************************************************************
-        if L >= history[-1] and (i % 20) == 1:
-            Logger.warning(
-                "Iteration [%i]: Loss[%s] has not improved from the previous [%s].",
-                i, L, history[-1]
-            )
-            if (num_no_progress := num_no_progress+1) > 20:
-                Logger.error(
-                    "The training has no progress more than %s times.", num_no_progress
-                )
-                # break
-        else:
-            num_no_progress = 0
-
-        history.append(L)
-
-        # ================================================================================
-        # Layer backward path
-        # 1. Calculate the analytical gradient dL/dX=matmul.gradient(dL/dY) with a dL/dY.
-        # 2. Gradient descent to update Wn+1 = Wn - lr * dL/dX.
-        # ================================================================================
-        before = copy.deepcopy(matmul.W)
-        dA = loss.gradient(float(1))        # dL/dA
-        dY = activation.gradient(dA)              # dL/dY
-        dX = matmul.gradient(dY)            # dL/dX
-
-        # gradient descent and get the analytical dL/dX, dL/dW
-        dS = matmul.update()                # dL/dX, dL/dW
-
-        # ********************************************************************************
-        #  Constraint. W in the matmul has been updated by the gradient descent.
-        # ********************************************************************************
-        Logger.debug("W after is \n%s", matmul.W)
-        if np.array_equal(before, matmul.W):
-            Logger.warning("W has not been updated.dW=\n%s\n", dS[1])
-
-        # --------------------------------------------------------------------------------
-        # Expected dL/dW.T = X.T @ dL/dY = X.T @ (P-T) / N for y > 0 because of ReLU.
-        # Expected dL/dX = dL/dY @ W = (P-T) @ W / N for y > 0 or 0 for y <= 0.
-        # P = softmax(A)
-        # --------------------------------------------------------------------------------
-        P = softmax(relu(np.matmul(matmul.X, matmul.W.T)))
-        assert P.shape == Y.shape
-        # gradient dL/dA = (P-T) from softmax-log-loss
-        P[
-            np.arange(N),
-            T
-        ] -= 1
-        # dA/dY gradient at ReLU. 1 when y > 0 or 0 otherwise.
-        P[(Y <= 0)] = 0                    # Expected dL/dY
-        EDX = np.matmul(P/N, matmul.W)        # (N,M) @ (M, D) -> (N, D)
-        EDX = EDX[::, 1::]
-        assert np.array_equal(X, matmul.X[::, 1::])
-        EDW = np.matmul(matmul.X.T, P/N).T    # dL/dW.T shape(D,M) -> dL/dW shape(M, D)
-
-        # ********************************************************************************
-        # Constraint. Analytical gradients from layer close to expected gradients EDX/EDW.
-        # ********************************************************************************
-        delta_dX = np.abs(EDX-dS[0])
-        delta_dW = np.abs(EDW-dS[1])
-        if not (
-            np.all(np.abs(EDX) <= GRADIENT_DIFF_CHECK_TRIGGER) or
-            np.all(delta_dX <= GRADIENT_DIFF_ACCEPTANCE_VALUE) or
-            np.all(delta_dX <= np.abs(dS[0] * GRADIENT_DIFF_ACCEPTANCE_RATIO))
-        ):
-            Logger.error("Expected dL/dX \n%s\nDiff\n%s", EDX, EDX-dS[0])
-        if not (
-            np.all(np.abs(EDW) <= GRADIENT_DIFF_CHECK_TRIGGER) or
-            np.all(delta_dW <= GRADIENT_DIFF_ACCEPTANCE_VALUE) or
-            np.all(delta_dW <= np.abs(dS[1] * GRADIENT_DIFF_ACCEPTANCE_RATIO))
-        ):
-            Logger.error("Expected dL/dW \n%s\nDiff\n%s", EDW, EDW-dS[1])
-
-        if test_numerical_gradient:
-            # --------------------------------------------------------------------------------
-            # Numerical gradient
-            # --------------------------------------------------------------------------------
-            gn = matmul.gradient_numerical()
-            check_with_numerical_gradient(dS, gn, Logger)
-
-        if callback:
-            # if W.shape[1] == 1 else callback(W=np.average(matmul.W, axis=0))
-            callback(W=matmul.W)
+    # --------------------------------------------------------------------------------
+    # Training
+    # --------------------------------------------------------------------------------
+    history = validate_relu_neuron_training(
+        matmul=matmul,
+        activation=activation,
+        loss=loss,
+        X=X,
+        T=T,
+        num_epochs=num_epochs,
+        test_numerical_gradient=test_numerical_gradient
+    )
 
     return matmul.W
 

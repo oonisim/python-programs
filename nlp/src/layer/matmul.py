@@ -26,10 +26,7 @@ from common.functions import (
     numerical_jacobian,
 )
 import common.weights as weights
-from optimizer import (
-    Optimizer,
-    SGD,
-)
+import optimizer as optimiser
 from layer.base import Layer
 
 
@@ -87,21 +84,20 @@ class Matmul(Layer):
             specification: weight specification
         Return: initialized weight
 
-        specification:
-        {
+        Specification: {
             "scheme": "weight initialization scheme [he|xavier]"
             "num_nodes": "number of nodes M",
-            "num_feature": "number of features in a batch X including bias"
+            "num_features": "number of features in a batch X NOT including bias"
         }
         """
         spec = specification
         assert (
-            "num_nodes" in spec and
-            "num_features" in spec["num_features"]
+            ("num_nodes" in spec and spec["num_nodes"] > 0) and
+            ("num_features" in spec and spec["num_features"] > 0)
         )
 
         M = spec["num_nodes"]
-        D = spec["num_features"]
+        D = spec["num_features"]    # INCLUDING bias weight
         scheme = spec["scheme"] if "scheme" in spec else "uniform"
         assert scheme in weights.SCHEMES
         return weights.SCHEMES[scheme](M, D)
@@ -109,40 +105,57 @@ class Matmul(Layer):
     @staticmethod
     def build(specification: Dict):
         """Build a matmul layer based on the specification
-        Specification format:
-        "matmul01": {
-            "scheme": layer.Matmul.__qualname__,
+        Specification: {
             "num_nodes": 8,
-            "num_features": 3,
-            "weights": <weight_spec>,
+            "num_features": 2,  # NOT including bias
+            "weight": <weight_spec>,
             "optimizer": <optimizer_spec>
         }
         """
         spec = copy.deepcopy(specification)
         assert (
-            "num_nodes" in spec and
-            "num_features" in spec["num_features"] and
-            "weights" in spec
+            isinstance(spec, dict) and
+            ("name" in spec and len(spec["name"]) > 0) and
+            ("num_nodes" in spec and spec["num_nodes"] > 0) and
+            ("num_features" in spec and spec["num_features"] > 0) and
+            "weight" in spec
         )
 
-        # Geometry
+        name = spec["name"]
+
+        # Geometry of the matmul layer
         num_nodes = spec["num_nodes"]
         num_features = spec["num_features"]
 
         # Weights
-        weight_spec = spec["weights"]
-        weight_spec["num_nodes"] = num_nodes
-        weight_spec["num_features"] = num_features
+        weight_spec = spec["weight"]
+        if "num_nodes" not in weight_spec:
+            weight_spec["num_nodes"] = num_nodes
+        else:
+            assert weight_spec["num_nodes"] == num_nodes
+        if "num_features" not in weight_spec:
+            # +1 for bias
+            weight_spec["num_features"] = (num_features + 1)
+        else:
+            assert weight_spec["num_features"] == (num_features + 1)
+
         W = Matmul.build_weight(weight_spec)
 
         # Optimizer
         if "optimizer" in spec:
-            __optimizer = Optimizer.build(spec["optimizer"])
+            assert (
+                "scheme" in spec["optimizer"] and
+                spec["optimizer"]["scheme"].lower() in optimiser.SCHEMES
+            ), "Invalid optimizer spec %s" % spec["optimizer"]
+
+            scheme = spec["optimizer"]["scheme"].lower()
+            __optimizer = optimiser.SCHEMES[scheme].build(spec["optimizer"])
+
         else:
-            __optimizer = SGD()
+            __optimizer = optimiser.SGD()
 
         matmul = Matmul(
-            name=spec["name"],
+            name=name,
             num_nodes=num_nodes,
             W=W,
             optimizer=__optimizer,
@@ -160,14 +173,16 @@ class Matmul(Layer):
             num_nodes: int,
             W: np.ndarray,
             posteriors: Optional[List[Layer]] = None,
-            optimizer: Optimizer = SGD(),
+            optimizer: optimiser.Optimizer = optimiser.SGD(),
             log_level: int = logging.ERROR
     ):
         """Initialize a matmul layer that has 'num_nodes' nodes
+        Input X:(N,D) is a batch. D is number of features NOT including bias
+        Weight W:(M, D+1) is the layer weight including bias weight.
         Args:
             name: Layer identity name
             num_nodes: Number of nodes in the layer
-            W: Weight of shape(M=num_nodes, D). A row is a weight vector of a node.
+            W: Weight of shape(M=num_nodes, D+1). A row is a weight vector of a node.
             posteriors: Post layers to which forward the matmul layer output
             optimizer: Gradient descent implementation e.g SGD, Adam.
             log_level: logging level
@@ -193,10 +208,10 @@ class Matmul(Layer):
         )
         # --------------------------------------------------------------------------------
         # Optimizer for gradient descent
-        # Z(n+1) = optimizer.update((Z(n), dL/dZ(n)+regularization)
+        # Z(n+1) = optimiser.update((Z(n), dL/dZ(n)+regularization)
         # --------------------------------------------------------------------------------
-        assert isinstance(optimizer, Optimizer)
-        self._optimizer: Optimizer = optimizer
+        assert isinstance(optimizer, optimiser.Optimizer)
+        self._optimizer: optimiser.Optimizer = optimizer
 
     # --------------------------------------------------------------------------------
     # Instance properties
@@ -225,7 +240,7 @@ class Matmul(Layer):
             "X shape needs (%s, %s) but %s" % (self.N, self.D, self.X.shape)
 
     @property
-    def optimizer(self) -> Optimizer:
+    def optimizer(self) -> optimiser.Optimizer:
         """Optimizer instance for gradient descent
         """
         return self._optimizer
@@ -320,6 +335,22 @@ class Matmul(Layer):
         self._dY = dY
 
         # --------------------------------------------------------------------------------
+        # dL/dW of shape (M,D):  [ X.T:(D, N)  @ dL/dY:(N,M) ].T
+        # --------------------------------------------------------------------------------
+        dW = np.matmul(self.X.T, self.dY).T
+        assert dW.shape == (self.M, self.D), \
+            f"Gradient dL/dW shape needs {(self.M, self.D)} but ({dW.shape}))"
+
+        if np.all(dW[self.W != 0.0]/self.W[self.W != 0.0] < 1e-3):
+            self.logger.warning(
+                "Gradient descent looks stalling. dw=\n%s\ndY=\n%s\n",
+                dW, self.dY
+            )
+            assert ENFORCE_STRICT_ASSERT
+
+        self._dW = dW
+
+        # --------------------------------------------------------------------------------
         # dL/dX of shape (N,D):  [ dL/dY:(N,M) @ W:(M,D)) ]
         # --------------------------------------------------------------------------------
         np.matmul(self.dY, self.W, out=self._dX)
@@ -377,21 +408,6 @@ class Matmul(Layer):
             dX is dL/dX of shape (N, D-1) without the bias of the layer.
             dW is dL/dW of shape (M, D) including the bias weight w0.
        """
-        # --------------------------------------------------------------------------------
-        # dL/dW of shape (M,D):  [ X.T:(D, N)  @ dL/dY:(N,M) ].T
-        # --------------------------------------------------------------------------------
-        dW = np.matmul(self.X.T, self.dY).T
-        assert dW.shape == (self.M, self.D), \
-            f"Gradient dL/dW shape needs {(self.M, self.D)} but ({dW.shape}))"
-
-        if np.all(dW[self.W != 0.0]/self.W[self.W != 0.0] < 1e-3):
-            self.logger.warning(
-                "Gradient descent looks stalling. dw=\n%s\ndY=\n%s\n",
-                dW, self.dY
-            )
-            assert ENFORCE_STRICT_ASSERT
-
-        self._dW = dW
         self._gradient_descent(self.W, self.dW, out=self._W)
         dX = self.dX[
             ::,

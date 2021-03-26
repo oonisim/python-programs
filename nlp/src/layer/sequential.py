@@ -29,6 +29,9 @@ from typing import (
 import logging
 import numpy as np
 from layer.base import Layer
+from common.constants import (
+    TYPE_FLOAT
+)
 from common.functions import (
     compose
 )
@@ -55,28 +58,31 @@ class Sequential(Layer):
         """Initialize a matmul layer that has 'num_nodes' nodes
         Args:
             name: Layer identity name
-            num_nodes: Number of nodes in the layer
-            W: Weight of shape(M=num_nodes, D). A row is a weight vector of a node.
+            num_nodes: Number of nodes M of the first the layer
             posteriors: Post layers to which forward the matmul layer output
             log_level: logging level
         """
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
         assert \
             isinstance(layers, List) and len(layers) > 0 and \
-            all([isinstance(layer, Layer) for layer in layers])
+            all([isinstance(__layer, Layer) for __layer in layers])
+
+        assert num_nodes == layers[0].num_nodes, \
+            "The num_nodes %s must match with that of the first layer %s" \
+            % (num_nodes, layers[0].num_nodes)
 
         self._layers: List[Layer] = layers
 
         # Layer function F=(fn-1 o ... o f0)
-        self.function: Callable[[Union[np.ndarray, float]], Union[np.ndarray, float]] = \
-            compose(*[layer.function for layer in layers])
+        self.function: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = \
+            compose(*[__layer.function for __layer in layers])
 
-        self.predict: Callable[[Union[np.ndarray, float]], Union[np.ndarray, float]] = \
-            compose(*[layer.predict for layer in layers])
+        self.predict: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = \
+            compose(*[__layer.predict for __layer in layers])
 
         # Gradient function G=(g0 o g1 o ... o gn-1)
-        self.gradient: [[Union[np.ndarray, float]], Union[np.ndarray, float]] = \
-            compose(*[layer.gradient for layer in layers[::-1]])
+        self.gradient: [[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = \
+            compose(*[__layer.gradient for __layer in layers[::-1]])
 
         # List of dSi which is List[Gradients] from each layer
         self._dS = []
@@ -126,7 +132,7 @@ class Sequential(Layer):
             Li = compose(*[layer.function, Li])
 
     @property
-    def dS(self) -> List[Union[float, np.ndarray]]:
+    def dS(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
         """Gradients dL/dS that have been used to update S in each layer"""
         assert self._dS, "Gradients dL/dS of the network not initialized."
         return self._dS
@@ -134,7 +140,7 @@ class Sequential(Layer):
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
-    def update(self) -> List[Union[float, np.ndarray]]:
+    def update(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
         """Invoke the update() method of each layer in the container.
         Returns:
             [*dL/dS]: List of dL/dS form each layer update()

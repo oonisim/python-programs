@@ -1,13 +1,52 @@
 """Network layer test tools
 """
 from typing import (
-    List
+    List,
+    Callable
 )
+import copy
+import logging
 import numpy as np
 from common.constants import (
     TYPE_FLOAT
 )
-from layer.matmul import Matmul
+from common.functions import (
+    softmax,
+    relu,
+    compose
+)
+from common.validations import (
+    check_with_numerical_gradient
+)
+from layer import (
+    Matmul,
+    ReLU,
+    CrossEntropyLogLoss,
+    forward_outputs,
+    backward_outputs
+)
+from test.config import (
+    GRADIENT_DIFF_CHECK_TRIGGER,
+    GRADIENT_DIFF_ACCEPTANCE_RATIO,
+    GRADIENT_DIFF_ACCEPTANCE_VALUE
+)
+
+
+Logger = logging.getLogger(__name__)
+
+
+def validate_gradient_against_expected(
+        expected: np.ndarray,
+        actual: np.ndarray
+) -> bool:
+    return \
+        np.all(np.abs(expected) <= GRADIENT_DIFF_CHECK_TRIGGER) or \
+        np.allclose(
+            a=actual,
+            b=expected,
+            atol=GRADIENT_DIFF_ACCEPTANCE_VALUE,
+            rtol=GRADIENT_DIFF_ACCEPTANCE_RATIO
+        )
 
 
 def expected_gradient_from_log_loss(
@@ -143,3 +182,163 @@ def expected_gradients_from_relu_neurons(
         gradients_from_neurons.append([edy, edw, eda])
     assert (len(gradients_from_neurons) == len(sequentials))
     return gradients_from_neurons
+
+
+def validate_relu_neuron_round_trip(
+        matmul: Matmul,
+        activation: ReLU,
+        loss: CrossEntropyLogLoss,
+        X: np.ndarray,
+        T: np.ndarray,
+        test_numerical_gradient: bool = False
+):
+    """Validate the expected (loss, gradients) against the actual
+    DO NOT run gradient descent here.
+    Forward path:
+        Y = matmul.function(X)
+        A = ReLU.function(Y)
+        L = LogLoss.function(A)
+
+    Expected gradients:
+        dL/dA = P-T
+        dL/dY = P-T if Y > 0 else 0
+        dL/dX = (P-T) @ W if Y > 0 else 0
+        dL/dW.T = X.T @ (P-T)
+
+    Backward path:
+        dL/dA:
+        dL/dY:
+        dL/dX:
+    """
+    activation.objective = loss.function
+    matmul.objective = compose(activation.function, loss.function)
+    objective = compose(matmul.function, matmul.objective)
+
+    N = X.shape[0]
+    layers = [matmul, activation, loss]
+
+    # --------------------------------------------------------------------------------
+    # Layer forward path
+    # --------------------------------------------------------------------------------
+    Y, A, L = forward_outputs(layers, X)
+
+    # --------------------------------------------------------------------------------
+    # Expected gradients
+    # --------------------------------------------------------------------------------
+    P = softmax(relu(np.matmul(matmul.X, matmul.W.T)))
+    assert P.shape == Y.shape
+    EDA = expected_gradient_from_log_loss(P=P, T=T, N=N)
+    EDY, EDW, EDX = expected_gradients_from_relu_neuron(EDA, Y, matmul)
+
+    # ================================================================================
+    # Layer backward path
+    # 1. Calculate the analytical gradient dL/dX=matmul.gradient(dL/dY) with a dL/dY.
+    # 2. Gradient descent to update Wn+1 = Wn - lr * dL/dX.
+    # ================================================================================
+    dA, dY, dX = backward_outputs(layers, float(1))
+    dW = matmul.dW
+
+    # ********************************************************************************
+    # Constraint: Network objective L must match layer-by-layer output
+    # ********************************************************************************
+    assert np.allclose(L, objective(X), atol=1e-3) and L.shape == (), \
+        f"Network objective L(X) %s must match layer-by-layer output %s." \
+        % (objective(X), L)
+
+    # ********************************************************************************
+    # Constraint. Analytical gradients from layer close to expected gradients EDX/EDW.
+    # ********************************************************************************
+    if not validate_gradient_against_expected(dY, EDY):
+        Logger.error("Expected dL/dY \n%s\nDiff\n%s", EDY, (EDY-dY))
+    if not validate_gradient_against_expected(dX, EDX):
+        Logger.error("Expected dL/dX \n%s\nDiff\n%s", EDX, (EDX-dX))
+    if not validate_gradient_against_expected(dW, EDW):
+        Logger.error("Expected dL/dW \n%s\nDiff\n%s", EDW, (EDW-dW))
+
+    if test_numerical_gradient:
+        # --------------------------------------------------------------------------------
+        # Numerical gradient
+        # --------------------------------------------------------------------------------
+        gn = matmul.gradient_numerical()
+        check_with_numerical_gradient([dX, dW], gn, Logger)
+
+
+def validate_relu_neuron_training(
+        matmul: Matmul,
+        activation: ReLU,
+        loss: CrossEntropyLogLoss,
+        X: np.ndarray,
+        T: np.ndarray,
+        num_epochs: int = 100,
+        test_numerical_gradient: bool = False,
+        callback: Callable = None
+):
+    activation.objective = loss.function
+    matmul.objective = compose(activation.function, loss.function)
+    objective = compose(matmul.function, matmul.objective)
+
+    num_no_progress: int = 0  # how many time when loss L not decreased.
+    history: List[np.ndarray] = []
+
+    loss.T = T
+    for i in range(num_epochs):
+        L = objective(X)
+
+        # ********************************************************************************
+        # Constraint: Expected gradients must match actual
+        # ********************************************************************************
+        validate_relu_neuron_round_trip(
+            matmul=matmul,
+            activation=activation,
+            loss=loss,
+            X=X,
+            T=T,
+            test_numerical_gradient=test_numerical_gradient
+        )
+
+        # --------------------------------------------------------------------------------
+        # gradient descent and get the analytical dL/dX, dL/dW
+        # --------------------------------------------------------------------------------
+        previous_W = copy.deepcopy(matmul.W)
+        matmul.update()  # dL/dX, dL/dW
+
+        # ********************************************************************************
+        #  Constraint. W in the matmul has been updated by the gradient descent.
+        # ********************************************************************************
+        Logger.debug("W after is \n%s", matmul.W)
+        if np.array_equal(previous_W, matmul.W):
+            Logger.warning("W has not been updated")
+
+        # ********************************************************************************
+        # Constraint: Objective/Loss L(Yn+1) after gradient descent < L(Yn)
+        # ********************************************************************************
+        if i > 0 and L >= history[-1]:
+            Logger.warning(
+                "Iteration [%i]: Loss[%s] has not improved from the previous [%s] for %s times.",
+                i, L, history[-1], num_no_progress + 1
+            )
+            # --------------------------------------------------------------------------------
+            # Reduce the learning rate can make the situation worse.
+            # When reduced the lr every time L >= history, the (L >= history) became successive
+            # and eventually exceeded 50 successive non-improvement ending in failure.
+            # Keep the learning rate make the L>=history more frequent but still up to 3
+            # successive events, and the training still kept progressing.
+            # --------------------------------------------------------------------------------
+            num_no_progress += 1
+            if num_no_progress > 5:
+                matmul.lr = matmul.lr * 0.95
+
+            if num_no_progress > 50:
+                Logger.error(
+                    "The training has no progress more than %s times.", num_no_progress
+                )
+                break
+        else:
+            num_no_progress = 0
+
+        history.append(L)
+
+        if callback:
+            callback(W=matmul.W)
+
+    return history

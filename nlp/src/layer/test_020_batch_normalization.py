@@ -41,7 +41,7 @@ import common.weights as weights
 from layer import (
     BatchNormalization
 )
-from test import (
+from test.config import (
     NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,

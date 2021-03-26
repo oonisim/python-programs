@@ -11,7 +11,7 @@ import numpy as np
 from layer.base import (
     Layer
 )
-from test import (
+from test.config import (
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,
     NUM_MAX_FEATURES

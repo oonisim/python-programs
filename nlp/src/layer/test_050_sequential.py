@@ -17,27 +17,33 @@ Gradient dL/dW: shape(M, D+1)
 Same shape with W.
 """
 from typing import (
-    Optional,
-    Union,
     List,
-    Dict,
-    Tuple
+    Union,
+    Callable
 )
 import cProfile
 import copy
 import logging
 import numpy as np
-from common.functions import (
-    numerical_jacobian,
+from common.constants import (
+    TYPE_FLOAT
 )
+from common.functions import (
+    compose,
+    numerical_jacobian,
+    softmax_cross_entropy_log_loss
+)
+import common.weights as weights
 from common.utilities import (
     random_string
 )
-import common.weights as weights
 from layer import (
-    Matmul
+    Matmul,
+    ReLU,
+    CrossEntropyLogLoss,
+    Sequential
 )
-from test import (
+from test.config import (
     NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,
@@ -45,228 +51,304 @@ from test import (
     GRADIENT_DIFF_ACCEPTANCE_VALUE,
     GRADIENT_DIFF_ACCEPTANCE_RATIO
 )
-
+from layer.utilities import (
+    build_matmul_relu_objective
+)
+from test.layer_test_tools import (
+    validate_relu_neuron_training
+)
+from optimizer import (
+    Optimizer
+)
 
 Logger = logging.getLogger("test_030_objective")
 Logger.setLevel(logging.DEBUG)
 
 
-def test_020_matmul_instantiation_to_fail():
+def test_050_sequential_instantiation_to_fail():
     """
     Objective:
-        Verify the layer class validates the initialization parameter constraints.
+        Verify the layer class validates the parameters
     Expected:
-        Initialization detects parameter constraints not meet and fails.
+        Initialization parses invalid parameters and fails.
     """
-    name = "test_020_matmul_instantiation_to_fail"
-    for _ in range(NUM_MAX_TEST_TIMES):
-        M: int = np.random.randint(1, NUM_MAX_NODES)
-        D = 1
-        # Constraint: Name is string with length > 0.
-        try:
-            Matmul(
-                name="",
-                num_nodes=1,
-                W=weights.xavier(M, D+1)
-            )
-            raise RuntimeError("Matmul initialization with invalid name must fail")
-        except AssertionError:
-            pass
-
-        # Constraint: num_nodes > 1
-        try:
-            Matmul(
-                name="test_020_matmul",
-                num_nodes=0,
-                W=weights.xavier(M, D+1)
-            )
-            raise RuntimeError("Matmul(num_nodes<1) must fail.")
-        except AssertionError:
-            pass
-
-        # Constraint: logging level is correct.
-        try:
-            Matmul(
-                name="test_020_matmul",
-                num_nodes=M,
-                W=weights.xavier(M, D+1),
-                log_level=-1
-            )
-            raise RuntimeError("Matmul initialization with invalid log level must fail")
-        except (AssertionError, KeyError) as e:
-            pass
-
-        # Matmul instance creation fails as W.shape[1] != num_nodes
-        try:
-            Matmul(
-                name="",
-                num_nodes=1,
-                W=weights.xavier(2, D+1)
-            )
-            raise RuntimeError("Matmul initialization with invalid name must fail")
-        except AssertionError:
-            pass
-
-
-def test_020_matmul_instance_properties():
-    """
-    Objective:
-        Verify the layer class validates the parameters have been initialized before accessed.
-    Expected:
-        Initialization detects the access to the non-initialized parameters and fails.
-    """
-    msg = "Accessing uninitialized property of the layer must fail."
-
+    name = "test_050_instantiation_to_fail"
     for _ in range(NUM_MAX_TEST_TIMES):
         name = random_string(np.random.randint(1, 10))
-        M: int = np.random.randint(1, NUM_MAX_NODES)
+        M: int = np.random.randint(2, NUM_MAX_NODES)
         D: int = np.random.randint(1, NUM_MAX_FEATURES)
-        layer = Matmul(
-            name=name,
-            num_nodes=M,
-            W=weights.uniform(M, D+1),
-            log_level=logging.DEBUG
+
+        *network_components, = build_matmul_relu_objective(
+            M,
+            D,
+            log_loss_function=softmax_cross_entropy_log_loss
         )
 
+        matmul: Matmul
+        activation: ReLU
+        loss: CrossEntropyLogLoss
+        matmul, activation, loss = network_components
+
+        function = compose(*[matmul.function, activation.function])
+        predict = compose(*[matmul.predict, activation.predict])
+
         # --------------------------------------------------------------------------------
-        # To pass
+        # Test the valid configurations first and then change to invalid one by one.
+        # Otherwise you are not sure what you are testing.
         # --------------------------------------------------------------------------------
         try:
-            if not layer.name == name: raise RuntimeError("layer.name == name should be true")
-        except AssertionError:
-            raise RuntimeError("Access to name should be allowed as already initialized.")
+            inference = Sequential(
+                name="test_050_sequential",
+                num_nodes=M,  # NOT including bias if the 1st layer is matmul
+                layers=[matmul, activation]
+            )
+            inference.objective = loss.function
 
-        try:
-            if not layer.M == M: raise RuntimeError("layer.M == M should be true")
-        except AssertionError:
-            raise RuntimeError("Access to M should be allowed as already initialized.")
-
-        try:
-            if not isinstance(layer.logger, logging.Logger):
-                raise RuntimeError("isinstance(layer.logger, logging.Logger) should be true")
-        except AssertionError:
-            raise RuntimeError("Access to logger should be allowed as already initialized.")
-
-        try:
-            a = layer.D
-        except AssertionError:
-            raise RuntimeError("Access to D should be allowed as already initialized.")
-
-        try:
-            layer.W is not None
-        except AssertionError:
-            raise RuntimeError("Access to W should be allowed as already initialized.")
-            pass
-
-        try:
-            layer.optimizer is not None
-        except AssertionError:
-            raise RuntimeError("Access to optimizer should be allowed as already initialized.")
+        except Exception as e:
+            raise RuntimeError("Instantiation must succeed with the correct configurations")
 
         # --------------------------------------------------------------------------------
         # To fail
         # --------------------------------------------------------------------------------
         try:
-            print(layer.X)
-            raise RuntimeError(msg)
+            inference = Sequential(
+                name="",
+                num_nodes=2,  # NOT including bias if the 1st layer is matmul
+                layers=[matmul, activation]
+            )
+            raise RuntimeError("Constraint: Instantiation with a invalid name must fail")
         except AssertionError:
             pass
 
         try:
-            layer.X = int(1)
-            raise RuntimeError(msg)
+            inference = Sequential(
+                name=name,
+                num_nodes=np.random.randint(-100, 1),
+                layers=[matmul, activation]
+            )
+            raise RuntimeError("Constraint: Instantiation with a invalid num_nodes must fail")
+        except AssertionError:
+            pass
+
+        # Constraint: Number of nodes of Sequential must match the first matmul layer's
+        try:
+            inference = Sequential(
+                name=name,
+                num_nodes=M+1,
+                layers=[matmul, activation]
+            )
+            raise RuntimeError("Constraint: Instantiation with a num_nodes != matmul.M must fail")
         except AssertionError:
             pass
 
         try:
-            print(layer.dX)
-            raise RuntimeError(msg)
-        except AssertionError:
-            pass
-
-        try:
-            print(layer.dW)
-            raise RuntimeError(msg)
-        except AssertionError:
-            pass
-
-        try:
-            print(layer.Y)
-            raise RuntimeError(msg)
-        except AssertionError:
-            pass
-        try:
-            layer._Y = int(1)
-            print(layer.Y)
-            raise RuntimeError(msg)
-        except AssertionError:
-            pass
-
-        try:
-            print(layer.dY)
-            raise RuntimeError(msg)
-        except AssertionError:
-            pass
-        try:
-            layer._dY = int(1)
-            print(layer.dY)
-            raise RuntimeError(msg)
-        except AssertionError:
-            pass
-
-        try:
-            print(layer.T)
-            raise RuntimeError(msg)
-        except AssertionError:
-            pass
-
-        try:
-            layer.T = float(1)
-            raise RuntimeError(msg)
-        except AssertionError:
-            pass
-
-        try:
-            layer.objective(np.array(1.0))
-            raise RuntimeError(msg)
-        except AssertionError:
-            pass
-
-        try:
-            print(layer.N)
-            raise RuntimeError(msg)
-        except AssertionError:
-            pass
-
-        assert layer.name == name
-        assert layer.num_nodes == M
-
-        try:
-            layer = Matmul(
+            inference = Sequential(
                 name=name,
                 num_nodes=M,
-                W=weights.xavier(M, D+1),
-                log_level=logging.DEBUG
+                layers=[]
             )
-            layer.function(int(1))
-            raise RuntimeError("Invoke layer.function(int(1)) must fail.")
+            raise RuntimeError("Constraint: Instantiation with a empty layers must fail")
         except AssertionError:
             pass
 
         try:
-            layer = Matmul(
+            inference = Sequential(
                 name=name,
                 num_nodes=M,
-                W=weights.xavier(M, D+1),
-                log_level=logging.DEBUG
+                layers=[]
             )
-            layer.gradient(int(1))
-            raise RuntimeError("Invoke layer.gradient(int(1)) must fail.")
+            raise RuntimeError("Constraint: Instantiation with a empty layers must fail")
         except AssertionError:
             pass
 
 
-def test_020_matmul_instantiation():
+def test_050_sequential_instance_property_access_to_fail():
+    """
+    Objective:
+        Verify the layer class validates the parameters have been initialized before accessed.
+    Expected:
+        Instance detects the access to the non-initialized parameters and fails.
+    """
+    msg = "Access to uninitialized property must fail"
+    name = "test_050_sequential_instance_property_access_to_fail"
+    for _ in range(NUM_MAX_TEST_TIMES):
+        name = random_string(np.random.randint(1, 10))
+        M: int = np.random.randint(2, NUM_MAX_NODES)
+        D: int = np.random.randint(1, NUM_MAX_FEATURES)
+
+        *network_components, = build_matmul_relu_objective(
+            M,
+            D,
+            log_loss_function=softmax_cross_entropy_log_loss
+        )
+
+        matmul: Matmul
+        activation: ReLU
+        loss: CrossEntropyLogLoss
+        matmul, activation, loss = network_components
+
+        function = compose(*[matmul.function, activation.function])
+        predict = compose(*[matmul.predict, activation.predict])
+
+        try:
+            inference = Sequential(
+                name=name,
+                num_nodes=M,  # NOT including bias if the 1st layer is matmul
+                layers=[matmul, activation]
+            )
+
+        except Exception as e:
+            raise RuntimeError("Instantiation must succeed with the correct configurations")
+
+        # --------------------------------------------------------------------------------
+        # To fail
+        # --------------------------------------------------------------------------------
+        try:
+            print(inference.X)
+            raise RuntimeError("Access to uninitialized X must fail before calling function(X)")
+        except AssertionError:
+            pass
+
+        try:
+            inference.X = int(1)
+            raise RuntimeError("Set non-float to X must fail")
+        except AssertionError:
+            pass
+
+        try:
+            print(inference.N)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            print(inference.D)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            print(inference.dX)
+            raise RuntimeError("msg")
+        except AssertionError:
+            pass
+
+        try:
+            print(inference.Y)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+        try:
+            inference._Y = int(1)
+            print(inference.Y)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            print(inference.dY)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+        try:
+            inference._dY = int(1)
+            print(inference.dY)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            print(inference.T)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            inference.T = float(1)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            inference.objective(np.array(1.0))
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            inference.objective = "hoge"
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        assert inference.name == name
+        assert inference.num_nodes == M
+
+
+def test_050_sequential_instance_property_access_to_success():
+    """
+    Objective:
+        Verify the layer class validates the parameters have been initialized.
+    Expected:
+        Instance detects the access to the initialized parameters and succeed.
+    """
+    name = "test_050_sequential_instance_property_access_to_success"
+    for _ in range(NUM_MAX_TEST_TIMES):
+        name = random_string(np.random.randint(1, 10))
+        M: int = np.random.randint(2, NUM_MAX_NODES)
+        D: int = np.random.randint(1, NUM_MAX_FEATURES)
+
+        *network_components, = build_matmul_relu_objective(
+            M,
+            D,
+            log_loss_function=softmax_cross_entropy_log_loss
+        )
+
+        matmul: Matmul
+        activation: ReLU
+        loss: CrossEntropyLogLoss
+        matmul, activation, loss = network_components
+
+        layers = [matmul, activation]
+        function = compose(*[matmul.function, activation.function])
+        predict = compose(*[matmul.predict, activation.predict])
+
+        inference = Sequential(
+            name=name,
+            num_nodes=M,  # NOT including bias if the 1st layer is matmul
+            layers=layers
+        )
+        inference.objective = loss.function
+
+        # --------------------------------------------------------------------------------
+        # To pass
+        # --------------------------------------------------------------------------------
+        try:
+            if not inference.name == name: raise RuntimeError("inference.name == name should be true")
+        except AssertionError:
+            raise RuntimeError("Access to name should be allowed as already initialized.")
+
+        try:
+            if not inference.M == M: raise RuntimeError("inference.M == M should be true")
+        except AssertionError:
+            raise RuntimeError("Access to M should be allowed as already initialized.")
+
+        try:
+            if not isinstance(inference.logger, logging.Logger):
+                raise RuntimeError("isinstance(inference.logger, logging.Logger) should be true")
+        except AssertionError:
+            raise RuntimeError("Access to logger should be allowed as already initialized.")
+
+        try:
+            if not (
+                (len(inference.layers) == inference.num_layers == len(layers))
+            ):
+                raise RuntimeError("inference.M == M should be true")
+        except AssertionError:
+            raise RuntimeError("Access to layers should be allowed as already initialized.")
+
+
+def test_050_sequential_instantiation():
     """
     Objective:
         Verify the initialized layer instance provides its properties.
@@ -276,53 +358,148 @@ def test_020_matmul_instantiation():
         * N, M property are provided after X is set.
         * Y, dY properties are provided after they are set.
     """
-    def objective(X: np.ndarray) -> Union[float, np.ndarray]:
-        """Dummy objective function"""
-        return np.sum(X)
-
+    name = "test_050_sequential_instantiation"
     for _ in range(NUM_MAX_TEST_TIMES):
-        N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
-        M: int = np.random.randint(1, NUM_MAX_NODES)
+        name = random_string(np.random.randint(1, 10))
+        M: int = np.random.randint(2, NUM_MAX_NODES)
         D: int = np.random.randint(1, NUM_MAX_FEATURES)
-        name = "test_020_matmul_instantiation"
-        layer = Matmul(
-            name=name,
-            num_nodes=M,
-            W=weights.he(M, D+1),
-            log_level=logging.DEBUG
+        N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
+
+        *network_components, = build_matmul_relu_objective(
+            M,
+            D,
+            log_loss_function=softmax_cross_entropy_log_loss
         )
-        layer.objective = objective
 
-        assert layer.name == name
-        assert layer.num_nodes == layer.M == M
+        matmul: Matmul
+        activation: ReLU
+        loss: CrossEntropyLogLoss
+        matmul, activation, loss = network_components
 
-        layer._D = D
-        assert layer.D == D
+        layers = [matmul, activation]
+        function = compose(*[matmul.function, activation.function])
+        predict = compose(*[matmul.predict, activation.predict])
+
+        inference = Sequential(
+            name=name,
+            num_nodes=M,  # NOT including bias if the 1st layer is matmul
+            layers=layers
+        )
+        inference.objective = loss.function
+
+        assert inference.name == name
+        assert inference.num_nodes == inference.M == M
 
         X = np.random.randn(N, D)
-        layer.X = X
-        assert np.array_equal(layer.X, X)
-        assert layer.N == N == X.shape[0]
+        inference.X = X
+        assert np.array_equal(inference.X, X)
+        assert inference.N == N == X.shape[0]
 
-        layer._dX = X
-        assert np.array_equal(layer.dX, X)
+        inference._dX = X
+        assert np.array_equal(inference.dX, X)
 
         T = np.random.randint(0, M, N)
-        layer.T = T
-        assert np.array_equal(layer.T, T)
+        inference.T = T
+        assert np.array_equal(inference.T, T)
 
-        layer._Y = np.dot(X, X.T)
-        assert np.array_equal(layer.Y, np.dot(X, X.T))
+        inference._Y = np.dot(X, X.T)
+        assert np.array_equal(inference.Y, np.dot(X, X.T))
 
-        layer._dY = np.array(0.9)
-        assert layer._dY == np.array(0.9)
+        inference._dY = np.array(0.9)
+        assert inference._dY == np.array(0.9)
 
-        layer.logger.debug("This is a pytest")
+        inference.logger.debug("This is a pytest")
 
-        assert layer.objective == objective
+        assert inference.objective == loss.function
 
 
-def test_020_matmul_round_trip():
+def train_matmul_relu_classifier(
+        N: int,
+        D: int,
+        M: int,
+        X: np.ndarray,
+        T: np.ndarray,
+        W: np.ndarray,
+        log_loss_function: Callable,
+        optimizer: Optimizer,
+        num_epochs: int = 100,
+        test_numerical_gradient: bool = False,
+        log_level: int = logging.ERROR,
+        callback: Callable = None
+):
+    """Test case for binary classification with matmul + log loss.
+    Args:
+        N: Batch size
+        D: Number of features
+        M: Number of nodes. 1 for sigmoid and 2 for softmax
+        X: train data
+        T: labels
+        W: weight
+        log_loss_function: cross entropy logg loss function
+        optimizer: Optimizer
+        num_epochs: Number of epochs to run
+        test_numerical_gradient: Flag if test the analytical gradient with the numerical one.
+        log_level: logging level
+        callback: callback function to invoke at the each epoch end.
+    """
+    name = __name__
+    assert isinstance(T, np.ndarray) and np.issubdtype(T.dtype, np.integer) and T.ndim == 1 and T.shape[0] == N
+    assert isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT and X.ndim == 2 and X.shape[0] == N and X.shape[1] == D
+    assert isinstance(W, np.ndarray) and W.dtype == TYPE_FLOAT and W.ndim == 2 and W.shape[0] == M and W.shape[1] == D+1
+    assert num_epochs > 0 and N > 0 and D > 0
+
+    assert (
+        log_loss_function == softmax_cross_entropy_log_loss and M >= 2
+    )
+
+    *network_components, = build_matmul_relu_objective(
+        M,
+        D,
+        W=W,
+        optimizer=optimizer,
+        log_loss_function=softmax_cross_entropy_log_loss,
+        log_level=log_level
+    )
+
+    # --------------------------------------------------------------------------------
+    # Network
+    # --------------------------------------------------------------------------------
+    matmul: Matmul
+    activation: ReLU
+    loss: CrossEntropyLogLoss
+    matmul, activation, loss = network_components
+
+    layers = [matmul, activation]
+    function = compose(*[matmul.function, activation.function])
+    predict = compose(*[matmul.predict, activation.predict])
+
+    inference = Sequential(
+        name=name,
+        num_nodes=M,  # NOT including bias if the 1st layer is matmul
+        layers=layers
+    )
+    inference.objective = loss.function
+    objective = compose(inference.function, inference.objective)
+
+    # --------------------------------------------------------------------------------
+    # Training
+    # --------------------------------------------------------------------------------
+    history = validate_relu_neuron_training(
+        matmul=matmul,
+        activation=activation,
+        loss=loss,
+        X=X,
+        T=T,
+        num_epochs=num_epochs,
+        test_numerical_gradient=test_numerical_gradient
+    )
+    for line in history:
+        print(line)
+
+    return matmul.W
+
+
+def test_050_sequential_training():
     """
     Objective:
         Verify the forward and backward paths at matmul.
@@ -346,118 +523,52 @@ def test_020_matmul_round_trip():
     profiler.enable()
 
     for _ in range(NUM_MAX_TEST_TIMES):
-        # --------------------------------------------------------------------------------
-        # Instantiate a Matmul layer
-        # --------------------------------------------------------------------------------
-        N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
-        M: int = np.random.randint(1, NUM_MAX_NODES)
+        name = random_string(np.random.randint(1, 10))
+        M: int = np.random.randint(2, NUM_MAX_NODES)
         D: int = np.random.randint(1, NUM_MAX_FEATURES)
-        W = weights.he(M, D+1)
-        name = "test_020_matmul_methods"
+        N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
 
-        def objective(X: np.ndarray) -> Union[float, np.ndarray]:
-            """Dummy objective function to calculate the loss L"""
-            return np.sum(X)
-
-        layer = Matmul(
-            name=name,
-            num_nodes=M,
-            W=W,
-            log_level=logging.DEBUG
+        *network_components, = build_matmul_relu_objective(
+            M,
+            D,
+            log_loss_function=softmax_cross_entropy_log_loss,
+            log_level=logging.WARNING
         )
-        layer.objective = objective
-
-        # ================================================================================
-        # Layer forward path
-        # Calculate the layer output Y=f(X), and get the loss L = objective(Y)
-        # Test the numerical gradient dL/dX=layer.gradient_numerical().
-        #
-        # Note that bias columns are added inside the matmul layer instance, hence
-        # layer.X.shape is (N, 1+D), layer.W.shape is (M, 1+D)
-        # ================================================================================
-        X = np.random.randn(N, D)
-        Logger.debug("%s: X is \n%s", name, X)
-
-        Y = layer.function(X)
-        L = layer.objective(Y)
-
-        # Constraint 1 : Matmul outputs Y should be X@W.T
-        assert np.array_equal(Y, np.matmul(layer.X, layer.W.T))
-
-        # Constraint 2: Numerical gradient should be the same with numerical Jacobian
-        GN = layer.gradient_numerical()         # [dL/dX, dL/dW]
-
-        # DO NOT use layer.function() as the objective function for numerical_jacobian().
-        # The state of the layer will be modified.
-        # LX = lambda x: layer.objective(layer.function(x))
-        def LX(x):
-            y = np.matmul(x, layer.W.T)
-            return layer.objective(y)
-
-        EGNX = numerical_jacobian(LX, layer.X)          # Numerical dL/dX including bias
-        EGNX = EGNX[::, 1::]                            # Remove bias for dL/dX
-        assert np.array_equal(GN[0], EGNX), \
-            "GN[0]\n%s\nEGNX=\n%s\n" % (GN[0], EGNX)
-
-        # DO NOT use layer.function() as the objective function for numerical_jacobian().
-        # The state of the layer will be modified.
-        # LW = lambda w: layer.objective(np.matmul(X, w.T))
-        def LW(w):
-            Y = np.matmul(layer.X, w.T)
-            return layer.objective(Y)
-
-        EGNW = numerical_jacobian(LW, layer.W)          # Numerical dL/dW including bias
-        assert np.array_equal(GN[1], EGNW)              # No need to remove bias
-
-        # ================================================================================
-        # Layer backward path
-        # Calculate the analytical gradient dL/dX=layer.gradient(dL/dY) with a dummy dL/dY.
-        # ================================================================================
-        dY = np.ones_like(Y)
-        dX = layer.gradient(dY)
-
-        # Constraint 3: Matmul gradient dL/dX should be dL/dY @ W. Use a dummy dL/dY = 1.0.
-        expected_dX = np.matmul(dY, layer.W)
-        expected_dX = expected_dX[
-            ::,
-            1::     # Omit bias
-        ]
-        assert np.array_equal(dX, expected_dX)
-
-        # Constraint 5: Analytical gradient dL/dX close to the numerical gradient GN.
-        assert np.all(np.abs(dX - GN[0]) < GRADIENT_DIFF_ACCEPTANCE_VALUE), \
-            f"dX need close to GN[0] but dX \n%s\n GN[0] \n%s\n" % (dX, GN[0])
 
         # --------------------------------------------------------------------------------
-        # Gradient update.
-        # Run the gradient descent to update Wn+1 = Wn - lr * dL/dX.
+        # Network
         # --------------------------------------------------------------------------------
-        # Python passes the reference to W, hence it is directly updated by the gradient-
-        # descent to avoid a temporary copy. Backup W before to compare before/after.
-        backup = copy.deepcopy(W)
+        matmul: Matmul
+        activation: ReLU
+        loss: CrossEntropyLogLoss
+        matmul, activation, loss = network_components
 
-        # Gradient descent and returns analytical dL/dX, dL/dW
-        dS = layer.update()
+        layers = [matmul, activation]
+        function = compose(*[matmul.function, activation.function])
+        predict = compose(*[matmul.predict, activation.predict])
 
-        # Constraint 6.: W has been updated by the gradient descent.
-        assert np.any(backup != layer.W), "W has not been updated "
+        inference = Sequential(
+            name=name,
+            num_nodes=M,  # NOT including bias if the 1st layer is matmul
+            layers=layers
+        )
+        inference.objective = loss.function
+        objective = compose(inference.function, inference.objective)
 
-        # Constraint 5: the numerical gradient (dL/dX, dL/dW) are closer to the analytical ones.
-        assert np.allclose(
-            dS[0],
-            GN[0],
-            atol=GRADIENT_DIFF_ACCEPTANCE_VALUE,
-            rtol=GRADIENT_DIFF_ACCEPTANCE_RATIO
-        ), "dS[0]=\n%s\nGN[0]=\n%sdiff=\n%s\n" % (dS[0], GN[0], (dS[0]-GN[0]))
-        assert np.allclose(
-            dS[1],
-            GN[1],
-            atol=GRADIENT_DIFF_ACCEPTANCE_VALUE,
-            rtol=GRADIENT_DIFF_ACCEPTANCE_RATIO
-        ), "dS[1]=\n%s\nGN[1]=\n%sdiff=\n%s\n" % (dS[1], GN[1], (dS[1]-GN[1]))
-
-        # Constraint 7: gradient descent progressing with the new objective L(Yn+1) < L(Yn)
-        assert np.all(np.abs(objective(layer.function(X)) < L))
+        # --------------------------------------------------------------------------------
+        # Training
+        # --------------------------------------------------------------------------------
+        X = np.random.rand(N, D)
+        T = np.random.randint(0, 2, N)
+        history = validate_relu_neuron_training(
+            matmul=matmul,
+            activation=activation,
+            loss=loss,
+            X=X,
+            T=T,
+            num_epochs=5,
+            test_numerical_gradient=True,
+        )
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")

@@ -36,3 +36,8 @@ for __layer in OBJECTIVE_LAYERS:
         SCHEMES[__layer.__qualname__.lower()] = __layer
 
 assert SCHEMES
+
+from layer.utilities import (
+    forward_outputs,
+    backward_outputs
+)

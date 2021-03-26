@@ -5,17 +5,18 @@ from typing import (
     Dict,
     List,
     Tuple,
+    Union,
+    Callable,
     NoReturn
 )
 import copy
 import logging
 import numpy as np
-from common import (
-    functions,
-    weights
+from common.functions import (
+    compose
 )
 import layer
-import optimizer as optimizer
+import optimizer as optimiser
 
 
 # From Python 3.6 onwards, the standard dict type maintains
@@ -31,7 +32,7 @@ specification_template = {
             "scheme": "he"
         },
         "optimizer": {
-            "scheme": optimizer.SGD.__qualname__,
+            "scheme": optimiser.SGD.__qualname__,
             "lr": 0.1,
             "l2": 0.1
         }
@@ -123,10 +124,6 @@ class Network:
     def layers(self):
         return self._layers
 
-    @property
-    def objectives(self):
-        return self._objectives
-
     # --------------------------------------------------------------------------------
     # Initialization
     # --------------------------------------------------------------------------------
@@ -140,13 +137,39 @@ class Network:
             assert isinstance(spec, dict) and len(spec) > 0
             assert "name" in spec
 
-        __assertion(specification)
-        self._specification = specification
-        self._name = specification['name']
-        self._layers, self._objectives = Network.build(specification)
-        self._inference = layer.Sequential(
-            name=specification["name"],
+        spec = specification
+        __assertion(spec)
+
+        self._specification = spec
+        self._name = spec['name']
+        self._layers, _objectives = Network.build(spec)
+
+        # --------------------------------------------------------------------------------
+        # Network inference layer
+        # --------------------------------------------------------------------------------
+        _layer_inference = layer.Sequential(
+            name=spec["name"],
             num_nodes=self.layers[0].num_nodes,
             layers=self._layers,
-
+            log_level=spec["log_level"] if "log_level" in spec else logging.ERROR
         )
+        _layer_inference.objective = compose(*[o.function for o in _objectives])
+        self._layer_inference = _layer_inference
+
+        # --------------------------------------------------------------------------------
+        # Network function
+        # --------------------------------------------------------------------------------
+        self.function: Callable[[Union[np.ndarray, float]], Union[np.ndarray, float]] = \
+            _layer_inference.function
+
+        # --------------------------------------------------------------------------------
+        # Network prediction function
+        # --------------------------------------------------------------------------------
+        self.predict: Callable[[Union[np.ndarray, float]], Union[np.ndarray, float]] = \
+            _layer_inference.predict
+
+        # --------------------------------------------------------------------------------
+        # Network objective function
+        # --------------------------------------------------------------------------------
+        self.objective: Callable[[Union[np.ndarray, float]], Union[np.ndarray, float]] = \
+            compose(_layer_inference.function, _layer_inference.objective)

@@ -3,7 +3,7 @@ from typing import (
 )
 import numpy as np
 import logging
-from test import (
+from test.config import (
     GRADIENT_DIFF_CHECK_TRIGGER,
     GRADIENT_DIFF_ACCEPTANCE_RATIO,
     GRADIENT_DIFF_ACCEPTANCE_VALUE
