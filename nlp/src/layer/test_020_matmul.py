@@ -16,24 +16,22 @@ Gradient dL/dW: shape(M, D+1)
 --------------------
 Same shape with W.
 """
-from typing import (
-    Optional,
-    Union,
-    List,
-    Dict,
-    Tuple
-)
 import cProfile
 import copy
 import logging
+from typing import (
+    Union
+)
+
 import numpy as np
+
+import common.weights as weights
 from common.functions import (
     numerical_jacobian,
 )
 from common.utilities import (
     random_string
 )
-import common.weights as weights
 from layer import (
     Matmul
 )
@@ -45,7 +43,6 @@ from test.config import (
     GRADIENT_DIFF_ACCEPTANCE_VALUE,
     GRADIENT_DIFF_ACCEPTANCE_RATIO
 )
-
 
 Logger = logging.getLogger("test_030_objective")
 Logger.setLevel(logging.DEBUG)
@@ -133,19 +130,19 @@ def test_020_matmul_instance_properties():
         # --------------------------------------------------------------------------------
         try:
             if not matmul.name == name: raise RuntimeError("matmul.name == name should be true")
-        except AssertionError:
-            raise RuntimeError("Access to name should be allowed as already initialized.")
+        except AssertionError as e:
+            raise RuntimeError("Access to name should be allowed as already initialized.") from e
 
         try:
             if not matmul.M == M: raise RuntimeError("matmul.M == M should be true")
-        except AssertionError:
-            raise RuntimeError("Access to M should be allowed as already initialized.")
+        except AssertionError as e:
+            raise RuntimeError("Access to M should be allowed as already initialized.") from e
 
         try:
             if not isinstance(matmul.logger, logging.Logger):
                 raise RuntimeError("isinstance(matmul.logger, logging.Logger) should be true")
-        except AssertionError:
-            raise RuntimeError("Access to logger should be allowed as already initialized.")
+        except AssertionError as e:
+            raise RuntimeError("Access to logger should be allowed as already initialized.") from e
 
         try:
             a = matmul.D
@@ -156,7 +153,6 @@ def test_020_matmul_instance_properties():
             matmul.W is not None
         except AssertionError:
             raise RuntimeError("Access to W should be allowed as already initialized.")
-            pass
 
         try:
             matmul.optimizer is not None
@@ -500,7 +496,11 @@ def test_020_matmul_builder_to_fail_optimizer_spec():
                 "num_features": D + 1
             },
             "optimizer": {
-                "scheme": "sGd"
+                "scheme": "sGd",
+                "parameters": {
+                    "lr": np.random.uniform(),
+                    "l2": np.random.uniform()
+                }
             },
             "log_level": logging.ERROR
         }
@@ -522,6 +522,22 @@ def test_020_matmul_builder_to_fail_optimizer_spec():
         try:
             Matmul.build(matmul_spec)
             raise RuntimeError("Matmul.build() must fail with invalid optimizer spec")
+        except AssertionError:
+            pass
+
+        matmul_spec = copy.deepcopy(valid_matmul_spec)
+        matmul_spec["optimizer"]["parameters"]["lr"] = np.random.uniform(-1, 0)
+        try:
+            Matmul.build(matmul_spec)
+            raise RuntimeError("Matmul.build() must fail with invalid lr value")
+        except AssertionError:
+            pass
+
+        matmul_spec = copy.deepcopy(valid_matmul_spec)
+        matmul_spec["optimizer"]["parameters"]["l2"] = np.random.uniform(-1, 0)
+        try:
+            Matmul.build(matmul_spec)
+            raise RuntimeError("Matmul.build() must fail with invalid l2 value")
         except AssertionError:
             pass
 
@@ -548,6 +564,8 @@ def test_020_matmul_builder_to_succeed():
         # NOTE: Invalidate one parameter at a time from the correct one.
         # Otherwise not sure what you are testing.
         # ----------------------------------------------------------------------
+        lr = np.random.uniform()
+        l2 = np.random.uniform()
         valid_matmul_spec = {
             "name": "test_020_matmul_builder_to_fail_matmul_spec",
             "num_nodes": M,
@@ -558,11 +576,17 @@ def test_020_matmul_builder_to_succeed():
                 "num_features": D + 1
             },
             "optimizer": {
-                "scheme": "sGd"
+                "scheme": "sGd",
+                "parameters": {
+                    "lr": lr,
+                    "l2": l2
+                }
             }
         }
         try:
-            Matmul.build(valid_matmul_spec)
+            matmul:Matmul = Matmul.build(valid_matmul_spec)
+            assert matmul.optimizer.lr == lr
+            assert matmul.optimizer.l2 == l2
         except Exception as e:
             raise RuntimeError("Matmul.build() must succeed with %s" % valid_matmul_spec)
 
@@ -706,7 +730,7 @@ def test_020_matmul_round_trip():
 
         # Constraint 5: Analytical gradient dL/dX close to the numerical gradient GN.
         assert np.all(np.abs(dX - GN[0]) < GRADIENT_DIFF_ACCEPTANCE_VALUE), \
-            f"dX need close to GN[0] but dX \n%s\n GN[0] \n%s\n" % (dX, GN[0])
+            "dX need close to GN[0] but dX \n%s\n GN[0] \n%s\n" % (dX, GN[0])
 
         # --------------------------------------------------------------------------------
         # Gradient update.

@@ -47,7 +47,7 @@ def train_matmul_relu_classifier(
         optimizer: Optimizer,
         num_epochs: int = 100,
         test_numerical_gradient: bool = False,
-        log_level: int = logging.DEBUG,
+        log_level: int = logging.WARNING,
         callback: Callable = None
 ):
     """Test case for binary classification with matmul + log loss.

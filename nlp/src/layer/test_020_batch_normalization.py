@@ -355,6 +355,57 @@ def test_020_bn_instance_properties_access_to_succeed():
         assert layer.objective == objective
 
 
+def test_020_matmul_builder_to_succeed():
+    """
+    Objective:
+        Verify the Matmul.build()
+    Expected:
+        build() parse the spec and succeed
+    """
+    profiler = cProfile.Profile()
+    profiler.enable()
+
+    for _ in range(NUM_MAX_TEST_TIMES):
+        M = np.random.randint(1, 100)
+        D = np.random.randint(1, 100)  # NOT including bias
+
+        # ----------------------------------------------------------------------
+        # Validate the correct specification.
+        # NOTE: Invalidate one parameter at a time from the correct one.
+        # Otherwise not sure what you are testing.
+        # ----------------------------------------------------------------------
+        lr = np.random.uniform()
+        l2 = np.random.uniform()
+        eps = np.random.uniform(low=0, high=1e-4)
+        momentum = np.random.uniform()
+        valid_bn_spec = {
+            "name": "test_020_bn_builder_to_succeed",
+            "num_nodes": M,
+            "momentum": momentum,
+            "eps": eps,
+            "log_level": logging.DEBUG,
+            "optimizer": {
+                "scheme": "sGd",
+                "parameters": {
+                    "lr": lr,
+                    "l2": l2
+                }
+            }
+        }
+        try:
+            bn: BatchNormalization = BatchNormalization.build(specification=valid_bn_spec)
+            assert bn.optimizer.lr == lr
+            assert bn.optimizer.l2 == l2
+            assert bn.logger.getEffectiveLevel() == logging.DEBUG
+            assert bn.eps == eps
+            assert bn.momentum == momentum
+        except Exception as e:
+            raise RuntimeError("Matmul.build() must succeed with %s" % valid_bn_spec)
+
+    profiler.disable()
+    profiler.print_stats(sort="cumtime")
+
+
 def test_020_bn_function_method_to_fail():
     """
     Objective:

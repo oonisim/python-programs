@@ -105,7 +105,7 @@ def train_matmul_bn_relu_classifier(
     bn: BatchNormalization = BatchNormalization(
         name=name,
         num_nodes=M,
-        log_level=logging.DEBUG
+        log_level=logging.WARNING
     )
     bn.objective = compose(activation.function, activation.objective)
 

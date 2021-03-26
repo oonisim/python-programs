@@ -3,8 +3,10 @@
 from typing import (
     Optional,
     Union,
-    List
+    List,
+    Dict
 )
+import copy
 import logging
 import numpy as np
 import numexpr as ne
@@ -18,10 +20,7 @@ from common.functions import (
     standardize
 )
 from layer.base import Layer
-from optimizer import (
-    Optimizer,
-    SGD,
-)
+import optimizer as optimiser
 
 
 class Standardization(Layer):
@@ -150,6 +149,47 @@ class BatchNormalization(Layer):
     # ================================================================================
     # Class initialization
     # ================================================================================
+    @staticmethod
+    def build(specification: Dict):
+        """Build a matmul layer based on the specification
+        Specification: {
+            "num_nodes": 8,
+            "optimizer": <optimizer_spec>,
+            "momentum": 0.9,
+            "eps": 1e-5,
+            "log_level": 10
+        }
+        """
+        spec = copy.deepcopy(specification)
+        assert (
+            isinstance(spec, dict) and
+            ("name" in spec and len(spec["name"]) > 0) and
+            ("num_nodes" in spec and spec["num_nodes"] > 0)
+        )
+
+        # Optimizer
+        if "optimizer" in spec:
+            assert (
+                "scheme" in spec["optimizer"] and
+                spec["optimizer"]["scheme"].lower() in optimiser.SCHEMES
+            ), "Invalid optimizer spec %s" % spec["optimizer"]
+
+            scheme = spec["optimizer"]["scheme"].lower()
+            __optimizer = optimiser.SCHEMES[scheme].build(spec["optimizer"])
+
+        else:
+            __optimizer = optimiser.SGD()
+
+        spec["optimizer"] = __optimizer
+
+        if "eps" in spec:
+            spec["eps"] = TYPE_FLOAT(spec["eps"])
+        if "momentum" in spec:
+            spec["momentum"] = TYPE_FLOAT(spec["momentum"])
+
+        instance = BatchNormalization(**spec)
+
+        return instance
 
     # ================================================================================
     # Instance initialization
@@ -159,7 +199,7 @@ class BatchNormalization(Layer):
             name: str,
             num_nodes: int,
             momentum: TYPE_FLOAT = 0.9,
-            optimizer: Optimizer = SGD(),
+            optimizer: optimiser.Optimizer = optimiser.SGD(),
             eps: TYPE_FLOAT = 0.0,
             posteriors: Optional[List[Layer]] = None,
             log_level: int = logging.ERROR
@@ -181,7 +221,7 @@ class BatchNormalization(Layer):
         )
         assert TYPE_FLOAT(0) < momentum < TYPE_FLOAT(1)
         assert TYPE_FLOAT(0) <= eps < TYPE_FLOAT(1e-3)
-        assert isinstance(optimizer, Optimizer)
+        assert isinstance(optimizer, optimiser.Optimizer)
 
         # Layers to which forward the output
         self._posteriors: List[Layer] = posteriors
@@ -233,7 +273,15 @@ class BatchNormalization(Layer):
         self._beta: np.ndarray = np.zeros(num_nodes, dtype=TYPE_FLOAT)
         self._dBeta: np.ndarray = np.zeros(num_nodes, dtype=TYPE_FLOAT)
 
-        self._optimizer: Optimizer = optimizer
+        # --------------------------------------------------------------------------------
+        # Gradient descent optimizer
+        # --------------------------------------------------------------------------------
+        self._optimizer: optimiser.Optimizer = optimizer
+
+        # --------------------------------------------------------------------------------
+        # Misc
+        # --------------------------------------------------------------------------------
+        self._args = set(locals().keys())
 
     # --------------------------------------------------------------------------------
     # Instance properties
@@ -404,7 +452,7 @@ class BatchNormalization(Layer):
         return self._total_training_invocations
 
     @property
-    def optimizer(self) -> Optimizer:
+    def optimizer(self) -> optimiser.Optimizer:
         """Optimizer instance for gradient descent
         """
         return self._optimizer

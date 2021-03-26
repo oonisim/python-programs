@@ -473,7 +473,7 @@ def train_two_layer_classifier(
 def test_two_layer_classifier(caplog):
     """Test case for layer matmul class
     """
-    caplog.set_level(logging.DEBUG, logger=Logger.name)
+    caplog.set_level(logging.WARNING, logger=Logger.name)
 
     # Input X specification
     D = 2                       # Dimension of X WITHOUT bias
