@@ -22,14 +22,6 @@ import common.weights as weights
 from data import (
     linear_separable_sectors
 )
-from layer import (
-    Standardization,
-    Matmul,
-    ReLU,
-    CrossEntropyLogLoss,
-    forward_outputs,
-    backward_outputs
-)
 from layer.utilities import (
     build_matmul_relu_objective
 )
@@ -94,14 +86,17 @@ def train_matmul_relu_classifier(
         log_loss_function=softmax_cross_entropy_log_loss,
         log_level=log_level
     )
-
-    matmul: Matmul
-    activation: ReLU
-    loss: CrossEntropyLogLoss
     matmul, activation, loss = network_components
 
+    # --------------------------------------------------------------------------------
+    # Set objective functions at each layer
+    # --------------------------------------------------------------------------------
     activation.objective = loss.function
     matmul.objective = compose(activation.function, loss.function)
+
+    # --------------------------------------------------------------------------------
+    # Network objective function. L = network.objective(X)
+    # --------------------------------------------------------------------------------
     objective = compose(matmul.function, matmul.objective)
 
     # --------------------------------------------------------------------------------

@@ -29,6 +29,10 @@ from typing import (
 import logging
 import numpy as np
 from layer.base import Layer
+from layer.utilities import (
+    compose_sequential_layer_interface,
+    compose_sequential_layer_objective
+)
 from common.constants import (
     TYPE_FLOAT
 )
@@ -73,16 +77,12 @@ class Sequential(Layer):
 
         self._layers: List[Layer] = layers
 
+        # --------------------------------------------------------------------------------
         # Layer function F=(fn-1 o ... o f0)
-        self.function: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = \
-            compose(*[__layer.function for __layer in layers])
-
-        self.predict: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = \
-            compose(*[__layer.predict for __layer in layers])
-
         # Gradient function G=(g0 o g1 o ... o gn-1)
-        self.gradient: [[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = \
-            compose(*[__layer.gradient for __layer in layers[::-1]])
+        # --------------------------------------------------------------------------------
+        self.function, self.predict, self.gradient = \
+            compose_sequential_layer_interface(layers)
 
         # List of dSi which is List[Gradients] from each layer
         self._dS = []
@@ -124,12 +124,7 @@ class Sequential(Layer):
     def objective(self, objective: Callable[[np.ndarray], np.ndarray]) -> NoReturn:
         assert callable(objective)
         self._objective = objective
-        Li = objective
-
-        for layer in self.layers[::-1]:
-            layer.objective = Li
-            # Next Li is Li-1 = Li(fi)
-            Li = compose(*[layer.function, Li])
+        compose_sequential_layer_objective(self.layers, objective)
 
     @property
     def dS(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:

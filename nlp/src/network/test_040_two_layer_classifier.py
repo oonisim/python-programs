@@ -36,7 +36,8 @@ from test.config import (
 )
 from test.layer_test_tools import (
     expected_gradients_from_relu_neuron,
-    expected_gradient_from_log_loss
+    expected_gradient_from_log_loss,
+    validate_gradient_against_expected
 )
 from data import (
     spiral,
@@ -47,6 +48,10 @@ from layer import (
     Matmul,
     ReLU,
     CrossEntropyLogLoss
+)
+from layer.utilities import (
+    forward_outputs,
+    backward_outputs
 )
 from optimizer import (
     Optimizer,
@@ -146,48 +151,6 @@ def build(
     return objective, prediction, loss, activation02, matmul02, activation01, matmul01
 
 
-def forward(
-        loss,
-        activation02,
-        matmul02,
-        activation01,
-        matmul01,
-        objective,
-        X
-):
-    # ================================================================================
-    # Layer forward path
-    # 1. Calculate the matmul output Y=matmul.f(X)
-    # 2. Calculate the ReLU output A=activation.f(Y)
-    # 3. Calculate the loss L = loss(A)
-    # Test the numerical gradient dL/dX=matmul.gradient_numerical().
-    # ================================================================================
-    Y01 = matmul01.function(X)  # (N, D+1)  @ (M1, D+1).T  -> (N, M1)
-    A01 = activation01.function(Y01)  # (N, M1)
-    Y02 = matmul02.function(A01)  # (N, M1+1) @ (M2, M1+1).T -> (N, M2)
-    A02 = activation02.function(Y02)  # (N, M2)
-    L = loss.function(A02)
-
-    # ********************************************************************************
-    # Constraint: Network objective L must match layer-by-layer output
-    # ********************************************************************************
-    assert L == objective(X) and L.shape == (), \
-        "Network objective L(X) %s must match layer-by-layer output %s." \
-        % (objective(X), L)
-
-    # ================================================================================
-    # Expected gradients at 2nd layers
-    # P = softmax(A02): (N,M2)
-    # ================================================================================
-    P = softmax(relu(np.matmul(matmul02.X, matmul02.W.T)))  # (N,M2)
-    assert np.allclose(a=loss.P, b=P, atol=1e-12, rtol=0), \
-        "Loss layer P\n%s\nExpected P\n%s\n" % (loss.P, P)
-
-    assert P.shape == Y02.shape
-
-    return L, P, A02, Y02, A01, Y01
-
-
 def expected_gradients_relu(
         N,
         T,
@@ -230,12 +193,8 @@ def __backward(
     # EDA should match the gradient dL/dA back-propagated from the log-loss layer.
     # ********************************************************************************
     dA = back_propagation
-    assert np.allclose(
-        a=dA,
-        b=EDA,
-        atol=GRADIENT_DIFF_ACCEPTANCE_VALUE,
-        rtol=GRADIENT_DIFF_ACCEPTANCE_RATIO
-    ), \
+
+    assert validate_gradient_against_expected(EDA, dA), \
         "dA should match EDA. dA=\n%s\nEDA=\n%s\nDiff=\n%s\n" \
         % (dA, EDA, (dA - EDA))
 
@@ -244,13 +203,7 @@ def __backward(
     # EDY should match the gradient dL/dY back-propagated from the ReLU layer.
     # ********************************************************************************
     dY = activation.gradient(dA)  # dL/dY: (N, M2)
-    assert \
-        np.allclose(
-            a=dY,
-            b=EDY,
-            atol=GRADIENT_DIFF_ACCEPTANCE_VALUE,
-            rtol=GRADIENT_DIFF_ACCEPTANCE_RATIO
-        ), \
+    assert validate_gradient_against_expected(EDY, dY), \
         "dY should match EDY. dY=\n%s\nEDY=\n%s\nDiff=\n%s\n" \
         % (dY, EDY, (dY - EDY))
 
@@ -436,16 +389,17 @@ def train_two_layer_classifier(
         # --------------------------------------------------------------------------------
         # Forward path
         # --------------------------------------------------------------------------------
-        *outputs, = forward(
-            loss,
-            activation02,
-            matmul02,
-            activation01,
-            matmul01,
-            objective,
+        Y01, A01, Y02, A02, L = forward_outputs(
+            [
+                matmul01,
+                activation01,
+                matmul02,
+                activation02,
+                loss
+            ],
             X
         )
-        L, P, A02, Y02, A01, Y01 = outputs
+        P = softmax(relu(np.matmul(matmul02.X, matmul02.W.T)))  # (N,M2)
 
         # --------------------------------------------------------------------------------
         # Verify loss

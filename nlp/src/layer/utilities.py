@@ -9,11 +9,17 @@ from typing import (
 import logging
 import copy
 import numpy as np
+from common.constants import (
+    TYPE_FLOAT
+)
 from common.functions import (
-    softmax_cross_entropy_log_loss
+    softmax_cross_entropy_log_loss,
+    compose
+)
+from layer.base import (
+    Layer
 )
 from layer import (
-    Layer,
     Matmul,
     ReLU,
     CrossEntropyLogLoss
@@ -41,6 +47,39 @@ def backward_outputs(layers: List[Layer], dY):
         outputs.append(dX)
         dY = dX
     return outputs
+
+
+def compose_sequential_layer_interface(layers: List[Layer]):
+    # Layer function F=(fn-1 o ... o f0)
+    function: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = \
+        compose(*[__layer.function for __layer in layers])
+
+    predict: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = \
+        compose(*[__layer.predict for __layer in layers])
+
+    # Gradient function G=(g0 o g1 o ... o gn-1)
+    gradient: [[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = \
+        compose(*[__layer.gradient for __layer in layers[::-1]])
+
+    return function, predict, gradient
+
+
+def compose_sequential_layer_objective(
+        layers: List[Layer],
+        objective: Callable
+) -> Callable:
+    """Build the objective function of a sequential layer
+    Args:
+        layers: layers in the sequence
+        objective: objective function of the last layer
+    """
+    assert callable(objective)
+
+    for __layer in layers[::-1]:
+        __layer.objective = objective
+        objective = compose(*[__layer.function, objective])
+
+    return objective
 
 
 def build_matmul_relu_objective(

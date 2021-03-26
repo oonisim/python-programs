@@ -341,13 +341,6 @@ class Matmul(Layer):
         assert dW.shape == (self.M, self.D), \
             f"Gradient dL/dW shape needs {(self.M, self.D)} but ({dW.shape}))"
 
-        if np.all(dW[self.W != 0.0]/self.W[self.W != 0.0] < 1e-3):
-            self.logger.warning(
-                "Gradient descent looks stalling. dw=\n%s\ndY=\n%s\n",
-                dW, self.dY
-            )
-            assert ENFORCE_STRICT_ASSERT
-
         self._dW = dW
 
         # --------------------------------------------------------------------------------

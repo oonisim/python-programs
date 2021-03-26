@@ -2,6 +2,7 @@
 """
 from typing import (
     List,
+    Union,
     Callable
 )
 import copy
@@ -21,9 +22,13 @@ from common.validations import (
 from layer import (
     Matmul,
     ReLU,
-    CrossEntropyLogLoss,
+    CrossEntropyLogLoss
+)
+from layer.utilities import (
     forward_outputs,
-    backward_outputs
+    backward_outputs,
+    compose_sequential_layer_interface,
+    compose_sequential_layer_objective
 )
 from test.config import (
     GRADIENT_DIFF_CHECK_TRIGGER,
@@ -187,63 +192,45 @@ def expected_gradients_from_relu_neurons(
 def validate_relu_neuron_round_trip(
         matmul: Matmul,
         activation: ReLU,
-        loss: CrossEntropyLogLoss,
         X: np.ndarray,
-        T: np.ndarray,
-        test_numerical_gradient: bool = False
+        dA: np.ndarray
 ):
     """Validate the expected (loss, gradients) against the actual
     DO NOT run gradient descent here.
     Forward path:
         Y = matmul.function(X)
         A = ReLU.function(Y)
-        L = LogLoss.function(A)
 
     Expected gradients:
-        dL/dA = P-T
-        dL/dY = P-T if Y > 0 else 0
+        dL/dA = Back propagation from the post layer
+        dL/dY = dL/dA if Y > 0 else 0
         dL/dX = (P-T) @ W if Y > 0 else 0
         dL/dW.T = X.T @ (P-T)
 
     Backward path:
-        dL/dA:
         dL/dY:
         dL/dX:
     """
-    activation.objective = loss.function
-    matmul.objective = compose(activation.function, loss.function)
-    objective = compose(matmul.function, matmul.objective)
-
     N = X.shape[0]
-    layers = [matmul, activation, loss]
+    layers = [matmul, activation]
 
     # --------------------------------------------------------------------------------
     # Layer forward path
     # --------------------------------------------------------------------------------
-    Y, A, L = forward_outputs(layers, X)
+    Y, A = forward_outputs(layers, X)
 
     # --------------------------------------------------------------------------------
     # Expected gradients
     # --------------------------------------------------------------------------------
-    P = softmax(relu(np.matmul(matmul.X, matmul.W.T)))
-    assert P.shape == Y.shape
-    EDA = expected_gradient_from_log_loss(P=P, T=T, N=N)
-    EDY, EDW, EDX = expected_gradients_from_relu_neuron(EDA, Y, matmul)
+    EDY, EDW, EDX = expected_gradients_from_relu_neuron(dA, Y, matmul)
 
     # ================================================================================
     # Layer backward path
     # 1. Calculate the analytical gradient dL/dX=matmul.gradient(dL/dY) with a dL/dY.
     # 2. Gradient descent to update Wn+1 = Wn - lr * dL/dX.
     # ================================================================================
-    dA, dY, dX = backward_outputs(layers, float(1))
+    dY, dX = backward_outputs(layers, dA)
     dW = matmul.dW
-
-    # ********************************************************************************
-    # Constraint: Network objective L must match layer-by-layer output
-    # ********************************************************************************
-    assert np.allclose(L, objective(X), atol=1e-3) and L.shape == (), \
-        f"Network objective L(X) %s must match layer-by-layer output %s." \
-        % (objective(X), L)
 
     # ********************************************************************************
     # Constraint. Analytical gradients from layer close to expected gradients EDX/EDW.
@@ -254,13 +241,6 @@ def validate_relu_neuron_round_trip(
         Logger.error("Expected dL/dX \n%s\nDiff\n%s", EDX, (EDX-dX))
     if not validate_gradient_against_expected(dW, EDW):
         Logger.error("Expected dL/dW \n%s\nDiff\n%s", EDW, (EDW-dW))
-
-    if test_numerical_gradient:
-        # --------------------------------------------------------------------------------
-        # Numerical gradient
-        # --------------------------------------------------------------------------------
-        gn = matmul.gradient_numerical()
-        check_with_numerical_gradient([dX, dW], gn, Logger)
 
 
 def validate_relu_neuron_training(
@@ -283,6 +263,9 @@ def validate_relu_neuron_training(
     loss.T = T
     for i in range(num_epochs):
         L = objective(X)
+        N = X.shape[0]
+        P = softmax(relu(np.matmul(matmul.X, matmul.W.T)))
+        EDA = expected_gradient_from_log_loss(P=P, T=T, N=N)
 
         # ********************************************************************************
         # Constraint: Expected gradients must match actual
@@ -290,10 +273,8 @@ def validate_relu_neuron_training(
         validate_relu_neuron_round_trip(
             matmul=matmul,
             activation=activation,
-            loss=loss,
             X=X,
-            T=T,
-            test_numerical_gradient=test_numerical_gradient
+            dA=EDA
         )
 
         # --------------------------------------------------------------------------------

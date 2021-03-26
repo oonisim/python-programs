@@ -13,7 +13,6 @@ from layer.objective import (
 from layer.sequential import (
     Sequential
 )
-from layer.base import Layer
 
 SCHEMES = {}
 FUNCTION_LAYERS = (
@@ -32,12 +31,6 @@ OBJECTIVE_LAYERS = (
 )
 assert OBJECTIVE_LAYERS
 for __layer in OBJECTIVE_LAYERS:
-    if isinstance(__layer, Layer):
-        SCHEMES[__layer.__qualname__.lower()] = __layer
+    SCHEMES[__layer.__qualname__.lower()] = __layer
 
 assert SCHEMES
-
-from layer.utilities import (
-    forward_outputs,
-    backward_outputs
-)
