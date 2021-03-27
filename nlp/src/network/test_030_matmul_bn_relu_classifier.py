@@ -19,8 +19,8 @@ from common.functions import (
     compose,
 )
 import common.weights as weights
-from common.validations import (
-    check_with_numerical_gradient
+from test.layer_validations import (
+    validate_against_numerical_gradient
 )
 from data import (
     linear_separable_sectors
@@ -210,8 +210,8 @@ def train_matmul_bn_relu_classifier(
 
         # gradient descent and get the analytical gradients
         bn.update()
-        dS = matmul.update()                # dL/dX, dL/dW
 
+        dS = matmul.update()                # dL/dX, dL/dW
         # ********************************************************************************
         #  Constraint. W in the matmul has been updated by the gradient descent.
         # ********************************************************************************
@@ -223,7 +223,7 @@ def train_matmul_bn_relu_classifier(
             # Numerical gradient
             # --------------------------------------------------------------------------------
             gn = matmul.gradient_numerical()
-            check_with_numerical_gradient(dS, gn, Logger)
+            validate_against_numerical_gradient([dX] + dS, gn, Logger)    # prepend dL/dX
 
         if callback:
             # if W.shape[1] == 1 else callback(W=np.average(matmul.W, axis=0))

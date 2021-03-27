@@ -453,7 +453,11 @@ class Layer:
     def update(self) -> List[Union[float, np.ndarray]]:
         """Calculate the gradient dL/dS and update S with gradient descent.
         Returns:
-            dL/dS: Gradient(s) on state S. There may be multiple dL/dS.
+            dL/dS:
+                Gradient(s) on state S. There may be multiple dL/dS.
+
+                Back-propagation to the previous layer is not included as
+                it is not part of the state S of the layer.
         """
         self.logger.warning(
             "Layer base method %s not overridden but called by %s.",

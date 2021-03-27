@@ -54,7 +54,7 @@ from test.config import (
 from layer.utilities import (
     build_matmul_relu_objective
 )
-from test.layer_test_tools import (
+from test.layer_validations import (
     validate_relu_neuron_training
 )
 from optimizer import (

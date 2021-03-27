@@ -22,8 +22,8 @@ from common.functions import (
     softmax_cross_entropy_log_loss,
 )
 import common.weights as weights
-from common.validations import (
-    check_with_numerical_gradient
+from test.layer_validations import (
+    validate_against_numerical_gradient
 )
 from data import (
     linear_separable,
@@ -46,8 +46,8 @@ from test.config import (
     GRADIENT_DIFF_ACCEPTANCE_RATIO,
     GRADIENT_DIFF_ACCEPTANCE_VALUE
 )
-from test.layer_test_tools import (
-    validate_gradient_against_expected
+from test.layer_validations import (
+    validate_against_expected_gradient
 )
 
 Logger = logging.getLogger(__name__)
@@ -187,16 +187,16 @@ def train_binary_classifier(
         # dL/dX.shape = (N, D)
         # dL/dW.shape = (M, D+1)
         dS = matmul.update()
-        dX, dW = dS
+        dW = dS[0]
         # --------------------------------------------------------------------------------
         #  Constraint 1. W in the matmul has been updated by the gradient descent.
         # --------------------------------------------------------------------------------
         Logger.debug("W after is \n%s", matmul.W)
         assert not np.array_equal(before, matmul.W), "W has not been updated."
 
-        if not validate_gradient_against_expected(EDX, dX):
+        if not validate_against_expected_gradient(EDX, dX):
             Logger.warning("Expected dL/dX \n%s\nDiff\n%s", EDX, EDX-dX)
-        if not validate_gradient_against_expected(EDW, dW):
+        if not validate_against_expected_gradient(EDW, dW):
             Logger.warning("Expected dL/dW \n%s\nDiff\n%s", EDW, EDW-dW)
 
         if test_numerical_gradient:
@@ -206,7 +206,7 @@ def train_binary_classifier(
             # dL/dW.shape = (M, D+1)
             # --------------------------------------------------------------------------------
             gn = matmul.gradient_numerical()
-            check_with_numerical_gradient(dS, gn, Logger)
+            validate_against_numerical_gradient([dX] + dS, gn, Logger)
 
         if callback:
             # if W.shape[1] == 1 else callback(W=np.average(matmul.W, axis=0))

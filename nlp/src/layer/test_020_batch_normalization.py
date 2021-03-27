@@ -922,19 +922,19 @@ def test_020_bn_method_gradient_descent():
                 numexpr_enabled=numexpr_enabled,
                 numba_enabled=numba_enabled
             )
-            dX, dGamma, dBeta = layer.update()
+            dGamma, dBeta = layer.update()
 
-        # ********************************************************************************
-        # Constraint:
-        # ********************************************************************************
-        expected_dGamma = np.sum(dout * layer.Xstd, axis=0)
-        expected_dBeta = np.sum(dout, axis=0)
-        assert np.allclose(expected_dGamma, dGamma, atol=u), \
-            "Need dGamma\n%s\nbut\n%s\ndiff=\n%s\n" \
-            % (expected_dGamma, dGamma, expected_dGamma-dGamma)
-        assert np.allclose(expected_dBeta, dBeta, atol=u), \
-            "Need dBeta\n%s\nbut\n%s\ndiff=\n%s\n" \
-            % (expected_dBeta, dBeta, expected_dBeta-dBeta)
+            # ********************************************************************************
+            # Constraint: expected gradients match with actual
+            # ********************************************************************************
+            expected_dGamma = np.sum(dout * layer.Xstd, axis=0)
+            expected_dBeta = np.sum(dout, axis=0)
+            assert np.allclose(expected_dGamma, dGamma, atol=u), \
+                "Need dGamma\n%s\nbut\n%s\ndiff=\n%s\n" \
+                % (expected_dGamma, dGamma, expected_dGamma-dGamma)
+            assert np.allclose(expected_dBeta, dBeta, atol=u), \
+                "Need dBeta\n%s\nbut\n%s\ndiff=\n%s\n" \
+                % (expected_dBeta, dBeta, expected_dBeta-dBeta)
 
 
 def test_020_bn_method_predict():

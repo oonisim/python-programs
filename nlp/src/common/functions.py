@@ -22,13 +22,18 @@ from common.constants import (
     BOUNDARY_SIGMOID,
     GN_DIFF_ACCEPTANCE_RATIO,
     GRADIENT_SATURATION_THRESHOLD,
-    ENFORCE_STRICT_ASSERT,
     ENABLE_NUMBA,
     ENABLE_NUMEXPR
 )
-
+from test.config import (
+    ENFORCE_STRICT_ASSERT,
+)
 
 Logger = logging.getLogger("functions")
+
+
+def identity(x: np.ndarray):
+    return x
 
 
 def standardize(

@@ -56,9 +56,9 @@ echo "Running PyTest..."
 # conda install pytest-xdist -y
 # Then use with -n option
 NUM_CPU=6
-#  -n $NUM_CPU \
 #python3 -m cProfile -o profile -m pytest \
 pytest \
+  -n $NUM_CPU \
   --rootdir=${DIR} \
   -vv \
   --capture=tee-sys \

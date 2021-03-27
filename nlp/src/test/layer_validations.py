@@ -16,9 +16,6 @@ from common.functions import (
     relu,
     compose
 )
-from common.validations import (
-    check_with_numerical_gradient
-)
 from layer import (
     Matmul,
     ReLU,
@@ -33,14 +30,35 @@ from layer.utilities import (
 from test.config import (
     GRADIENT_DIFF_CHECK_TRIGGER,
     GRADIENT_DIFF_ACCEPTANCE_RATIO,
-    GRADIENT_DIFF_ACCEPTANCE_VALUE
+    GRADIENT_DIFF_ACCEPTANCE_VALUE,
+    ENFORCE_STRICT_ASSERT,
 )
 
 
 Logger = logging.getLogger(__name__)
 
 
-def validate_gradient_against_expected(
+def validate_against_numerical_gradient(dS: List[np.ndarray], gn: List[np.ndarray], logger: logging.Logger):
+    assert len(dS) == len(gn)
+    for ds, gn in zip(dS, gn):
+        if not (
+                np.all(gn <= GRADIENT_DIFF_CHECK_TRIGGER) or
+                np.allclose(
+                    a=ds[gn != 0],  # dL/dX: (N,M1)
+                    b=gn[gn != 0],  # dL/dX: (N,M1)
+                    atol=GRADIENT_DIFF_ACCEPTANCE_VALUE,
+                    rtol=GRADIENT_DIFF_ACCEPTANCE_RATIO
+                )
+        ):
+            logger.error(
+                "Need similar analytical and numerical ds. \n"
+                "Analytical=\n%s\nNumerical\n%s\ndifference=\n%s\n",
+                ds, gn, (ds - gn)
+            )
+            assert ENFORCE_STRICT_ASSERT
+
+
+def validate_against_expected_gradient(
         expected: np.ndarray,
         actual: np.ndarray
 ) -> bool:
@@ -235,11 +253,11 @@ def validate_relu_neuron_round_trip(
     # ********************************************************************************
     # Constraint. Analytical gradients from layer close to expected gradients EDX/EDW.
     # ********************************************************************************
-    if not validate_gradient_against_expected(dY, EDY):
+    if not validate_against_expected_gradient(dY, EDY):
         Logger.error("Expected dL/dY \n%s\nDiff\n%s", EDY, (EDY-dY))
-    if not validate_gradient_against_expected(dX, EDX):
+    if not validate_against_expected_gradient(dX, EDX):
         Logger.error("Expected dL/dX \n%s\nDiff\n%s", EDX, (EDX-dX))
-    if not validate_gradient_against_expected(dW, EDW):
+    if not validate_against_expected_gradient(dW, EDW):
         Logger.error("Expected dL/dW \n%s\nDiff\n%s", EDW, (EDW-dW))
 
 

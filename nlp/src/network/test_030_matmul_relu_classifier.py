@@ -29,7 +29,7 @@ from optimizer import (
     Optimizer,
     SGD
 )
-from test.layer_test_tools import (
+from test.layer_validations import (
     validate_relu_neuron_training
 )
 

@@ -34,7 +34,8 @@ from layer.utilities import (
     compose_sequential_layer_objective
 )
 from common.constants import (
-    TYPE_FLOAT
+    TYPE_FLOAT,
+    TYPE_LABEL
 )
 from common.functions import (
     compose
@@ -84,6 +85,11 @@ class Sequential(Layer):
         self.function, self.predict, self.gradient = \
             compose_sequential_layer_interface(layers)
 
+        # --------------------------------------------------------------------------------
+        # Layer objective to be initialized with its setter
+        # --------------------------------------------------------------------------------
+        self._objective = None
+
         # List of dSi which is List[Gradients] from each layer
         self._dS = []
 
@@ -127,6 +133,23 @@ class Sequential(Layer):
         compose_sequential_layer_objective(self.layers, objective)
 
     @property
+    def T(self) -> np.ndarray:
+        """Label in OHE or index format"""
+        assert self._T is not None and self._T.size > 0, "T is not initialized"
+        return self._T
+
+    @T.setter
+    def T(self, T: Union[np.ndarray, TYPE_LABEL]):
+        assert T is not None and (
+                (isinstance(T, np.ndarray) and np.issubdtype(T.dtype, np.integer)) or
+                (isinstance(T, int))
+            )
+        self._T = np.array(T, dtype=TYPE_LABEL) \
+            if isinstance(T, int) else T.astype(TYPE_LABEL)
+
+        self._set_label(self.T)
+
+    @property
     def dS(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
         """Gradients dL/dS that have been used to update S in each layer"""
         assert self._dS, "Gradients dL/dS of the network not initialized."
@@ -135,6 +158,15 @@ class Sequential(Layer):
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
+    def _set_label(self, T: Union[np.ndarray, TYPE_LABEL]):
+        """
+        Responsibility:
+            Set the label T to the layers in the sequence.
+            Sequential is used for objective layer(s) as well.
+        """
+        for __layer in self.layers:
+            __layer.T = T
+
     def update(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
         """Invoke the update() method of each layer in the container.
         Returns:

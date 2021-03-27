@@ -43,7 +43,9 @@ from test.config import (
     GRADIENT_DIFF_ACCEPTANCE_VALUE,
     GRADIENT_DIFF_ACCEPTANCE_RATIO
 )
-
+from test.layer_validations import (
+    validate_against_expected_gradient
+)
 Logger = logging.getLogger("test_030_objective")
 Logger.setLevel(logging.DEBUG)
 
@@ -742,23 +744,16 @@ def test_020_matmul_round_trip():
 
         # Gradient descent and returns analytical dL/dX, dL/dW
         dS = matmul.update()
+        dW = dS[0]
 
         # Constraint 6.: W has been updated by the gradient descent.
         assert np.any(backup != matmul.W), "W has not been updated "
 
         # Constraint 5: the numerical gradient (dL/dX, dL/dW) are closer to the analytical ones.
-        assert np.allclose(
-            dS[0],
-            GN[0],
-            atol=GRADIENT_DIFF_ACCEPTANCE_VALUE,
-            rtol=GRADIENT_DIFF_ACCEPTANCE_RATIO
-        ), "dS[0]=\n%s\nGN[0]=\n%sdiff=\n%s\n" % (dS[0], GN[0], (dS[0]-GN[0]))
-        assert np.allclose(
-            dS[1],
-            GN[1],
-            atol=GRADIENT_DIFF_ACCEPTANCE_VALUE,
-            rtol=GRADIENT_DIFF_ACCEPTANCE_RATIO
-        ), "dS[1]=\n%s\nGN[1]=\n%sdiff=\n%s\n" % (dS[1], GN[1], (dS[1]-GN[1]))
+        assert validate_against_expected_gradient(GN[0], dX), \
+            "dS[0]=\n%s\nGN[0]=\n%sdiff=\n%s\n" % (dX, GN[0], (dX-GN[0]))
+        assert validate_against_expected_gradient(GN[1], dW), \
+            "dS[1]=\n%s\nGN[1]=\n%sdiff=\n%s\n" % (dW, GN[1], (dW-GN[1]))
 
         # Constraint 7: gradient descent progressing with the new objective L(Yn+1) < L(Yn)
         assert np.all(np.abs(objective(matmul.function(X)) < L))

@@ -19,7 +19,6 @@ from common.constants import (
     TYPE_LABEL,
     TYPE_FLOAT,
     OFFSET_DELTA,
-    ENFORCE_STRICT_ASSERT,
     ENABLE_NUMBA,
 )
 from common.functions import (
@@ -28,6 +27,9 @@ from common.functions import (
 import common.weights as weights
 import optimizer as optimiser
 from layer.base import Layer
+from test.config import (
+    ENFORCE_STRICT_ASSERT,
+)
 
 
 class Matmul(Layer):
@@ -392,18 +394,22 @@ class Matmul(Layer):
         return self.optimizer.update(W, dW, out=out)
 
     def update(self) -> List[Union[float, np.ndarray]]:
-        """Calculate dL/dW = dL/dY * dY/dW and update W with gradient descent
-        dL/dW.T = X.T @ dL/dY is shape (D,M) as  [ X.T:(D, N)  @ dL/dY:(N,M) ].
-        Hence dL/dW of shape (M,D):  [ X.T:(D, N)  @ dL/dY:(N,M) ].T.
+        """
+        Responsibility: Update layer state with gradient descent.
+
+        1. Calculate dL/dW = (dL/dY * dY/dW).
+        2. Update W with the optimizer.
+
+        dL/dW.T:(D,M) = [ X.T:(D, N) @ dL/dY:(N,M) ].
+        dL/dW:  (M,D):  [ X.T:(D, N) @ dL/dY:(N,M) ].T.
 
         Returns:
-            [dL/dX, dL/dW]: List of dL/dX and dL/dW.
-            dX is dL/dX of shape (N, D-1) without the bias of the layer.
+            [dL/dW]: List of dL/dW.
             dW is dL/dW of shape (M, D) including the bias weight w0.
+
+        Note:
+            update() is to update the state of the layer S. Hence not
+            include dL/dX which is not part of the layer state.
        """
         self._gradient_descent(self.W, self.dW, out=self._W)
-        dX = self.dX[
-            ::,
-            1::     # Omit the bias
-        ]
-        return [dX, self.dW]
+        return [self.dW]

@@ -1,3 +1,4 @@
+from layer.base import Layer
 from layer.normalization import (
     BatchNormalization,
     Standardization
@@ -14,7 +15,6 @@ from layer.sequential import (
     Sequential
 )
 
-SCHEMES = {}
 FUNCTION_LAYERS = (
     Matmul,
     Sigmoid,
@@ -22,15 +22,19 @@ FUNCTION_LAYERS = (
     Standardization,
     BatchNormalization
 )
-assert FUNCTION_LAYERS
+FUNCTION_LAYER_SCHEMES = {}
 for __layer in FUNCTION_LAYERS:
-    SCHEMES[__layer.__qualname__.lower()] = __layer
+    FUNCTION_LAYER_SCHEMES[__layer.__qualname__.lower()] = __layer
 
 OBJECTIVE_LAYERS = (
     CrossEntropyLogLoss,
 )
-assert OBJECTIVE_LAYERS
+OBJECTIVE_LAYER_SCHEMES = {}
 for __layer in OBJECTIVE_LAYERS:
-    SCHEMES[__layer.__qualname__.lower()] = __layer
+    OBJECTIVE_LAYER_SCHEMES[__layer.__qualname__.lower()] = __layer
 
+SCHEMES = {
+    **FUNCTION_LAYER_SCHEMES,
+    **OBJECTIVE_LAYER_SCHEMES
+}
 assert SCHEMES

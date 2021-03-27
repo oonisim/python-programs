@@ -17,7 +17,8 @@ from common.constants import (
     ENABLE_NUMBA,
 )
 from common.functions import (
-    standardize
+    standardize,
+    numerical_jacobian
 )
 from layer.base import Layer
 import optimizer as optimiser
@@ -734,6 +735,32 @@ class BatchNormalization(Layer):
         else:
             return self._gradient_numpy()
 
+    def gradient_numerical(
+            self, h: float = 1e-5
+    ) -> List[Union[float, np.ndarray]]:
+        """Calculate numerical gradients
+        Args:
+            h: small number for delta to calculate the numerical gradient
+        Returns:
+            dX: [L(f(X+h) - L(f(X-h)] / 2h
+            dGamma:
+            dBeta:
+        """
+        # TODO:
+        self.logger.debug("layer[%s]:gradient_numerical", self.name)
+        L = self.objective
+
+        def objective_gamma(gamma: np.ndarray):
+            return L(gamma * self.Xstd + self.beta)
+
+        def objective_beta(beta: np.ndarray):
+            return L(self.gamma * self.Xstd + beta)
+
+        dX = super().gradient_numerical(h=h)
+        dGamma = numerical_jacobian(objective_gamma, self.gamma, delta=h)
+        dBeta = numerical_jacobian(objective_beta, self.beta, delta=h)
+        return [dX, dGamma, dBeta]
+
     def _gradient_descent(self, X, dX, out=None) -> Union[np.ndarray, TYPE_FLOAT]:
         """Gradient descent
         Directly update matrices to avoid the temporary copies
@@ -747,7 +774,8 @@ class BatchNormalization(Layer):
        """
         self._gradient_descent(self.gamma, self.dGamma, out=self._gamma)
         self._gradient_descent(self.beta, self.dBeta, out=self._beta)
-        return [self.dX, self.dGamma, self.dBeta]
+        # return [self.dX, self.dGamma, self.dBeta]
+        return [self.dGamma, self.dBeta]
 
     def predict(self, X):
         """Predict

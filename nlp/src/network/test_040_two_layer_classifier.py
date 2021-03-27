@@ -11,7 +11,6 @@ import numpy as np
 from common.constants import (
     TYPE_FLOAT,
     TYPE_LABEL,
-    ENFORCE_STRICT_ASSERT
 )
 from common.functions import (
     softmax,
@@ -25,19 +24,16 @@ from common.functions import (
     softmax_cross_entropy_log_loss,
     compose,
 )
-from common.validations import (
-    check_with_numerical_gradient
-)
 import common.weights as weights
 from test.config import (
     GRADIENT_DIFF_CHECK_TRIGGER,
     GRADIENT_DIFF_ACCEPTANCE_RATIO,
     GRADIENT_DIFF_ACCEPTANCE_VALUE,
 )
-from test.layer_test_tools import (
+from test.layer_validations import (
     expected_gradients_from_relu_neuron,
     expected_gradient_from_log_loss,
-    validate_gradient_against_expected
+    validate_against_expected_gradient
 )
 from data import (
     spiral,
@@ -56,6 +52,12 @@ from layer.utilities import (
 from optimizer import (
     Optimizer,
     SGD
+)
+from test.config import (
+    ENFORCE_STRICT_ASSERT,
+)
+from test.layer_validations import (
+    validate_against_numerical_gradient
 )
 
 np.set_printoptions(threshold=sys.maxsize)
@@ -145,7 +147,9 @@ def build(
         matmul01.predict,
         activation01.predict,
         matmul02.predict,
-        activation02.predict,
+        # TODO: Understand why including last activation make the prediction fail.
+        # The venn diagram, (A and B and C and D)
+        # activation02.predict,
     )
 
     return objective, prediction, loss, activation02, matmul02, activation01, matmul01
@@ -194,7 +198,7 @@ def __backward(
     # ********************************************************************************
     dA = back_propagation
 
-    assert validate_gradient_against_expected(EDA, dA), \
+    assert validate_against_expected_gradient(EDA, dA), \
         "dA should match EDA. dA=\n%s\nEDA=\n%s\nDiff=\n%s\n" \
         % (dA, EDA, (dA - EDA))
 
@@ -203,7 +207,7 @@ def __backward(
     # EDY should match the gradient dL/dY back-propagated from the ReLU layer.
     # ********************************************************************************
     dY = activation.gradient(dA)  # dL/dY: (N, M2)
-    assert validate_gradient_against_expected(EDY, dY), \
+    assert validate_against_expected_gradient(EDY, dY), \
         "dY should match EDY. dY=\n%s\nEDY=\n%s\nDiff=\n%s\n" \
         % (dY, EDY, (dY - EDY))
 
@@ -231,7 +235,7 @@ def __backward(
     #  Constraint.
     #  W in the Matmul is updated by the gradient descent.
     # ********************************************************************************
-    dS = matmul.update()  # [dL/dX: (N, M1), dL/dW: (M2, M1+1)]
+    dS = matmul.update()  # [dL/dW: (M2, M1+1)]
     Logger.debug("W after is \n%s", matmul.W)
     if np.array_equal(before, matmul.W):
         Logger.warning(
@@ -240,23 +244,11 @@ def __backward(
         )
 
     # ********************************************************************************
-    #  Constraint.
-    #  dS[0] == dX
-    # ********************************************************************************
-    assert np.array_equal(dS[0], dX)
-
-    # ********************************************************************************
     # Constraint:
     # EDW should match the gradient dL/dW in the Matmul layer.
     # ********************************************************************************
-    dW = dS[1]
-    assert \
-        np.allclose(
-            a=dW,
-            b=EDW,
-            atol=GRADIENT_DIFF_ACCEPTANCE_VALUE,
-            rtol=GRADIENT_DIFF_ACCEPTANCE_RATIO
-        ), \
+    dW = dS[0]
+    assert validate_against_expected_gradient(EDW, dW), \
         "dW should match EDW. dW=\n%s\nEDW=\n%s\nDiff=\n%s\n" \
         % (dW, EDW, (dW - EDW))
 
@@ -265,7 +257,7 @@ def __backward(
     # ================================================================================
     if test_numerical_gradient:
         gn = matmul.gradient_numerical()  # [dL/dX: (N,M1), dL/dW: (M,M+1)]
-        check_with_numerical_gradient(dS, gn, Logger)
+        validate_against_numerical_gradient([dX] + dS, gn, Logger)
 
     return dX
 

@@ -20,3 +20,6 @@ LOSS_DIFF_ACCEPTANCE_RATIO = 0.001
 # Accept the Numerical difference between re-formulated functions, e.g.
 # log( exp(xi) / sum(exp(X)) ) = sum(exp(X)) - xi,
 REFORMULA_DIFF_ACCEPTANCE_VALUE = 1e-10
+
+# To enforce assertion failure, set False (True -> assert True)
+ENFORCE_STRICT_ASSERT = (not False)

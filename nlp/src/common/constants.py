@@ -53,9 +53,6 @@ GRADIENT_SATURATION_THRESHOLD = TYPE_FLOAT(1e-10)
 GN_DIFF_ACCEPTANCE_VALUE = TYPE_FLOAT(2) * OFFSET_DELTA * GRADIENT_SATURATION_THRESHOLD
 GN_DIFF_ACCEPTANCE_RATIO = TYPE_FLOAT(1e-15)
 
-# To enforce assertion failure, set False (True -> assert True)
-ENFORCE_STRICT_ASSERT = (not False)
-
 # --------------------------------------------------------------------------------
 # Numpy optimization
 # conda install numexpr
@@ -67,3 +64,7 @@ ENFORCE_STRICT_ASSERT = (not False)
 # --------------------------------------------------------------------------------
 ENABLE_NUMEXPR = False
 ENABLE_NUMBA = False
+
+# --------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
+LAYER_MUX_NUM_NODES: int = 1000
