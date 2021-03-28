@@ -62,7 +62,7 @@ pytest \
   --rootdir=${DIR} \
   -vv \
   --capture=tee-sys \
-  --log-level=DEBUG \
+  --log-level=ERROR \
   -o log_cli=True -o log_cli_level=ERROR \
   --log-auto-indent=on \
   --cache-clear -x \

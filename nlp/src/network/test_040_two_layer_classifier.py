@@ -143,7 +143,7 @@ def build(
     # Network objective function f: L=f(X)
     # --------------------------------------------------------------------------------
     objective = compose(matmul01.function, matmul01.objective)
-    prediction = compose(
+    predict = compose(
         matmul01.predict,
         activation01.predict,
         matmul02.predict,
@@ -152,7 +152,7 @@ def build(
         # activation02.predict,
     )
 
-    return objective, prediction, loss, activation02, matmul02, activation01, matmul01
+    return objective, predict, loss, activation02, matmul02, activation01, matmul01
 
 
 def expected_gradients_relu(
@@ -240,7 +240,7 @@ def __backward(
     if np.array_equal(before, matmul.W):
         Logger.warning(
             "W has not been updated. Before=\n%s\nAfter=\n%s\nDiff=\n%s\ndW=\n%s\n",
-            before, matmul.W, (before - matmul.W), dS[1]
+            before, matmul.W, (before - matmul.W), dS[0]
         )
 
     # ********************************************************************************

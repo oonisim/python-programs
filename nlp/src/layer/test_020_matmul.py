@@ -720,9 +720,9 @@ def test_020_matmul_round_trip():
 
         # Constraint 5: the numerical gradient (dL/dX, dL/dW) are closer to the analytical ones.
         assert validate_against_expected_gradient(GN[0], dX), \
-            "dS[0]=\n%s\nGN[0]=\n%sdiff=\n%s\n" % (dX, GN[0], (dX-GN[0]))
+            "dX=\n%s\nGN[0]=\n%sdiff=\n%s\n" % (dX, GN[0], (dX-GN[0]))
         assert validate_against_expected_gradient(GN[1], dW), \
-            "dS[1]=\n%s\nGN[1]=\n%sdiff=\n%s\n" % (dW, GN[1], (dW-GN[1]))
+            "dW=\n%s\nGN[1]=\n%sdiff=\n%s\n" % (dW, GN[1], (dW-GN[1]))
 
         # Constraint 7: gradient descent progressing with the new objective L(Yn+1) < L(Yn)
         assert np.all(np.abs(objective(matmul.function(X)) < L))
