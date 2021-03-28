@@ -19,16 +19,70 @@ from common.functions import (
 from layer.base import (
     Layer
 )
-from layer import (
-    Matmul,
+from layer.matmul import (
+    Matmul
+)
+from layer.activation import (
     ReLU,
-    CrossEntropyLogLoss
+    Sigmoid
+)
+from layer.objective import (
+    CrossEntropyLogLoss,
+)
+from layer.normalization import (
+    Standardization,
+    BatchNormalization
 )
 from optimizer import (
     Optimizer,
     SGD
 )
 Logger = logging.getLogger("functions")
+
+
+# ================================================================================
+# Dictionaries of layer per purpose
+# ================================================================================
+FEATURE_LAYERS = (
+    Matmul,
+)
+ACTIVATION_LAYERS = (
+    Sigmoid,
+    ReLU,
+)
+NORMALIZATION_LAYERS = (
+    Standardization,
+    BatchNormalization
+)
+
+# --------------------------------------------------------------------------------
+# Inference layers
+# --------------------------------------------------------------------------------
+FUNCTION_LAYERS = \
+    FEATURE_LAYERS + \
+    NORMALIZATION_LAYERS + \
+    ACTIVATION_LAYERS
+
+FUNCTION_LAYER_SCHEMES = {}
+for __layer in FUNCTION_LAYERS:
+    FUNCTION_LAYER_SCHEMES[__layer.__qualname__.lower()] = __layer
+
+# --------------------------------------------------------------------------------
+# Objective layers
+# --------------------------------------------------------------------------------
+OBJECTIVE_LAYERS = (
+    CrossEntropyLogLoss,
+)
+OBJECTIVE_LAYER_SCHEMES = {}
+for __layer in OBJECTIVE_LAYERS:
+    OBJECTIVE_LAYER_SCHEMES[__layer.__qualname__.lower()] = __layer
+
+# All layers
+SCHEMES = {
+    **FUNCTION_LAYER_SCHEMES,
+    **OBJECTIVE_LAYER_SCHEMES
+}
+assert SCHEMES
 
 
 def forward_outputs(layers: List[Layer], X):
@@ -50,16 +104,41 @@ def backward_outputs(layers: List[Layer], dY):
 
 
 def compose_sequential_layer_interface(layers: List[Layer]):
-    # Layer function F=(fn-1 o ... o f0)
-    function: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = \
-        compose(*[__layer.function for __layer in layers])
+    """
+    Responsibility:
+        Generate function composition F=(fn-1 o ... o f0) from layers.
+        fi = layer(i).function
+    Args:
+        layers: List of layers
+    Returns:
+        F: Composed function F=(fn-1 o ... o f0)
+    """
+    assert len(layers) > 0
 
-    predict: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = \
-        compose(*[__layer.predict for __layer in layers])
+    function: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = None
+    predict: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = None
+    gradient: [[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = None
 
-    # Gradient function G=(g0 o g1 o ... o gn-1)
-    gradient: [[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = \
-        compose(*[__layer.gradient for __layer in layers[::-1]])
+    if len(layers) == 1:
+        Logger.warning("Only 1 layer provided.")
+        function = layers[0].function
+        predict = layers[0].predict
+        gradient = layers[0].gradient
+    else:
+        # Layer function F=(fn-1 o ... o f0)
+        function = compose(*[__layer.function for __layer in layers])
+        # Gradient function G=(g0 o g1 o ... o gn-1)
+        gradient = compose(*[__layer.gradient for __layer in layers[::-1]])
+
+        # --------------------------------------------------------------------------------
+        # Prediction function P=(fn-2 o ... o f0) excluding the last layer if it is
+        # an activation.
+        # TODO: Understand why including the last activation layer make the prediction fail.
+        # --------------------------------------------------------------------------------
+        if isinstance(layers[-1], ACTIVATION_LAYERS):
+            predict = compose(*[__layer.predict for __layer in layers])
+        else:
+            predict = compose(*[__layer.predict for __layer in layers[:-1]])
 
     return function, predict, gradient
 

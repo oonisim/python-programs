@@ -171,11 +171,21 @@ class Layer:
         self._Y: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)
         self._dY: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)
 
+        # --------------------------------------------------------------------------------
+        # State of the layer
+        # --------------------------------------------------------------------------------
+        self._S: List[Union[TYPE_FLOAT, np.ndarray]] = []
+        self._dS: List[Union[TYPE_FLOAT, np.ndarray]] = []
+
+        # --------------------------------------------------------------------------------
         # Layers to which forward the matmul output
+        # --------------------------------------------------------------------------------
         self._posteriors: List[Layer] = posteriors
         self._num_posteriors: int = len(posteriors) if posteriors else -1
 
+        # --------------------------------------------------------------------------------
         # Objective Li function for the layer. L = Li o fi
+        # --------------------------------------------------------------------------------
         self._objective: Callable[[np.ndarray], np.ndarray] = None
 
         self._logger = logging.getLogger(name)
@@ -302,6 +312,26 @@ class Layer:
                 "Gradient dY/dX \n[%s] may have been saturated." % self._dY[5::]
             )
         return self._dY
+
+    @property
+    def S(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
+        """State of the layer
+        For a layer which has no state, it is an empty list.
+        Hence cannot validate if initialized or not.
+        """
+        assert isinstance(self._S, list), \
+            "Gradients dL/S of the network not initialized."
+        return self._S
+
+    @property
+    def dS(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
+        """Gradients dL/dS that have been used to update S in each layer
+        For a layer which has no state, it is an empty list.
+        Hence cannot validate if initialized or not.
+        """
+        assert isinstance(self._S, list), \
+            "Gradients dL/dS of the network not initialized."
+        return self._dS
 
     @property
     def objective(self) -> Callable[[np.ndarray], np.ndarray]:
@@ -465,7 +495,7 @@ class Layer:
         )
         # Return 0 as the default for dL/dS to mark no change in case there is none
         # to update in a layer.
-        return [0.0]
+        return self.dS
 
     def predict(self, X):
         """Calculate the score for prediction

@@ -204,6 +204,12 @@ class Matmul(Layer):
         self._D = W.shape[1]                # number of features in x including bias
         self._W: np.ndarray = W             # node weight vectors
         self._dW: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)
+
+        # --------------------------------------------------------------------------------
+        # State of the layer
+        # --------------------------------------------------------------------------------
+        self._S = [self.W]
+
         self.logger.debug(
             "Matmul[%s] W.shape is [%s], number of nodes is [%s]",
             name, W.shape, num_nodes
@@ -240,6 +246,12 @@ class Matmul(Layer):
         super(Matmul, type(self)).X.fset(self, X)
         assert self.X.shape[1] == self.D, \
             "X shape needs (%s, %s) but %s" % (self.N, self.D, self.X.shape)
+
+    @property
+    def S(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
+        """State of the layer"""
+        self._S = [self.W]
+        return self._S
 
     @property
     def optimizer(self) -> optimiser.Optimizer:
@@ -412,4 +424,6 @@ class Matmul(Layer):
             include dL/dX which is not part of the layer state.
        """
         self._gradient_descent(self.W, self.dW, out=self._W)
-        return [self.dW]
+        self._dS = [self.dW]
+
+        return self.dS

@@ -3,16 +3,15 @@ import cProfile
 import copy
 import logging
 from typing import (
-    Union,
     List,
     Callable
 )
 
 import numpy as np
-import pytest_check as check    # https://pypi.org/project/pytest-check/
+
+import common.weights as weights
 from common.constants import (
     TYPE_FLOAT,
-    TYPE_LABEL,
 )
 from common.functions import (
     softmax,
@@ -20,10 +19,6 @@ from common.functions import (
     sigmoid,
     sigmoid_cross_entropy_log_loss,
     softmax_cross_entropy_log_loss,
-)
-import common.weights as weights
-from test.layer_validations import (
-    validate_against_numerical_gradient
 )
 from data import (
     linear_separable,
@@ -37,17 +32,11 @@ from optimizer import (
     Optimizer,
     SGD
 )
-from test.config import (
-    NUM_MAX_TEST_TIMES,
-    NUM_MAX_NODES,
-    NUM_MAX_BATCH_SIZE,
-    MAX_ACTIVATION_VALUE,
-    GRADIENT_DIFF_CHECK_TRIGGER,
-    GRADIENT_DIFF_ACCEPTANCE_RATIO,
-    GRADIENT_DIFF_ACCEPTANCE_VALUE
-)
 from test.layer_validations import (
     validate_against_expected_gradient
+)
+from test.layer_validations import (
+    validate_against_numerical_gradient
 )
 
 Logger = logging.getLogger(__name__)
@@ -137,12 +126,12 @@ def train_binary_classifier(
         # --------------------------------------------------------------------------------
         if L >= history[-1] and (i % 20) == 1:
             Logger.warning(
-                "Iteration [%i]: Loss[%s] has not improved from the previous [%s]."
-                % (i, L, history[-1])
+                "Iteration [%i]: Loss[%s] has not improved from the previous [%s].",
+                i, L, history[-1]
             )
             if (num_no_progress:= num_no_progress+1) > 20:
                 Logger.error(
-                    "The training has no progress more than %s times." % num_no_progress
+                    "The training has no progress more than %s times.", num_no_progress
                 )
                 # break
         else:
@@ -230,7 +219,7 @@ def _test_binary_classifier(
     # X, T = transform_X_T(X, T)
 
     def callback(W):
-        W
+        return W
 
     train_binary_classifier(
         N=N,

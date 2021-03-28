@@ -70,18 +70,6 @@ class Standardization(Layer):
     # --------------------------------------------------------------------------------
     # Instance properties
     # --------------------------------------------------------------------------------
-    @property
-    def X(self) -> np.ndarray:
-        """Latest batch input to the layer"""
-        return super().X
-
-    @X.setter
-    def X(self, X: np.ndarray):
-        """Set X"""
-        super(Standardization, type(self)).X.fset(self, X)
-        # Cannot check. Setting _D can be done using weight shape.
-        # assert self.X.shape[1] == self.D, \
-        #     "X shape needs (%s, %s) but %s" % (self.N, self.D, self.X.shape)
 
     # --------------------------------------------------------------------------------
     # Instance methods
@@ -275,6 +263,11 @@ class BatchNormalization(Layer):
         self._dBeta: np.ndarray = np.zeros(num_nodes, dtype=TYPE_FLOAT)
 
         # --------------------------------------------------------------------------------
+        # State of the layer
+        # --------------------------------------------------------------------------------
+        self._S = [self.gamma, self.beta]
+
+        # --------------------------------------------------------------------------------
         # Gradient descent optimizer
         # --------------------------------------------------------------------------------
         self._optimizer: optimiser.Optimizer = optimizer
@@ -287,18 +280,18 @@ class BatchNormalization(Layer):
     # --------------------------------------------------------------------------------
     # Instance properties
     # --------------------------------------------------------------------------------
-    @property
-    def X(self) -> np.ndarray:
-        """Latest batch input to the layer"""
-        return super().X
+    # @property
+    # def X(self) -> np.ndarray:
+    #     """Latest batch input to the layer"""
+    #     return super().X
 
-    @X.setter
-    def X(self, X: np.ndarray):
-        """Batch X in shape:(N,M)"""
-        super(BatchNormalization, type(self)).X.fset(self, X)
-        # Cannot check. Setting _D can be done using weight shape.
-        # assert self.X.shape[1] == self.D, \
-        #     "X shape needs (%s, %s) but %s" % (self.N, self.D, self.X.shape)
+    # @X.setter
+    # def X(self, X: np.ndarray):
+    #     """Batch X in shape:(N,M)"""
+    #     super(BatchNormalization, type(self)).X.fset(self, X)
+    #     # Cannot check. Setting _D can be done using weight shape.
+    #     # assert self.X.shape[1] == self.D, \
+    #     #     "X shape needs (%s, %s) but %s" % (self.N, self.D, self.X.shape)
 
     @property
     def U(self) -> np.ndarray:
@@ -436,6 +429,12 @@ class BatchNormalization(Layer):
         assert self._RSD.size > 0 and self._RSD.shape == (self.M,), \
             "RSD is not initialized or invalid"
         return self._RSD
+
+    @property
+    def S(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
+        """State of the layer"""
+        self._S = [self.gamma, self.beta]
+        return self._S
 
     @property
     def momentum(self) -> TYPE_FLOAT:

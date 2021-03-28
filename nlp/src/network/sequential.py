@@ -256,6 +256,11 @@ class SequentialNetwork(Network):
     ):
         """Build a neural network instance from the specification
         """
+        # --------------------------------------------------------------------------------
+        # Validate the specification and generate specifications respectively for
+        # - inference
+        # - objective
+        # --------------------------------------------------------------------------------
         inference_layer_specs, objective_layer_specs = \
             SequentialNetwork._parse_network_specs(
                 network_spec=network_spec,
@@ -263,6 +268,9 @@ class SequentialNetwork(Network):
                 log_level=log_level
             )
 
+        # --------------------------------------------------------------------------------
+        # Build a sequential inference layer and a objective layer
+        # --------------------------------------------------------------------------------
         inference_layers = SequentialNetwork._build_network_layers(
             inference_layer_specs
         )
@@ -270,6 +278,9 @@ class SequentialNetwork(Network):
             objective_layer_specs
         )
 
+        # --------------------------------------------------------------------------------
+        # Wire the layers to function as a network
+        # --------------------------------------------------------------------------------
         *layers, = SequentialNetwork._wire_network_layers(
             inference_layers=inference_layers,
             objective_layers=objective_layers,
@@ -317,13 +328,27 @@ class SequentialNetwork(Network):
         self._layers_all = [self.layer_inference, self.layer_objective]
 
         # --------------------------------------------------------------------------------
-        # Wire network functions
+        # Expose the network training functions.
         # --------------------------------------------------------------------------------
-        self._function: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = \
-            self.layer_inference.function
+        # train() invokes L = objective(function(X))
+        self._function: Callable[
+            [Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]
+        ] = self.layer_inference.function
 
-        self._predict: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = \
-            self.layer_inference.predict
+        self._objective: Callable[
+            [Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]
+        ] = self.layer_objective.function
 
-        self._gradient: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = \
-            self.layer_inference.gradient
+        # train() invokes gradient(dL/dA).
+        # Needs composing gradients of objective and inference layers.
+        self._gradient: Callable[
+            [Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]
+        ] = compose(self.layer_objective.gradient, self.layer_inference.gradient)
+
+        # --------------------------------------------------------------------------------
+        # Expose the network prediction function.
+        # --------------------------------------------------------------------------------
+        self._predict: Callable[
+            [Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]
+        ] = self.layer_inference.predict
+

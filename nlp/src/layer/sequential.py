@@ -37,9 +37,6 @@ from common.constants import (
     TYPE_FLOAT,
     TYPE_LABEL
 )
-from common.functions import (
-    compose
-)
 
 
 class Sequential(Layer):
@@ -79,6 +76,11 @@ class Sequential(Layer):
         self._layers: List[Layer] = layers
 
         # --------------------------------------------------------------------------------
+        # State of the layer
+        # --------------------------------------------------------------------------------
+        self._S = [__layer.S for __layer in self.layers]
+
+        # --------------------------------------------------------------------------------
         # Layer function F=(fn-1 o ... o f0)
         # Gradient function G=(g0 o g1 o ... o gn-1)
         # --------------------------------------------------------------------------------
@@ -90,15 +92,32 @@ class Sequential(Layer):
         # --------------------------------------------------------------------------------
         self._objective = None
 
-        # List of dSi which is List[Gradients] from each layer
-        self._dS = []
-
         self._logger = logging.getLogger(name)
         self._logger.setLevel(logging._levelToName[log_level])
 
     # --------------------------------------------------------------------------------
     # Instance properties
     # --------------------------------------------------------------------------------
+    @property
+    def T(self) -> np.ndarray:
+        """Label in OHE or index format"""
+        return super().T
+
+    @T.setter
+    def T(self, T: Union[np.ndarray, TYPE_LABEL]):
+        super(Sequential, type(self)).T.fset(self, T)
+        self._set_label(self.T)
+
+    @property
+    def S(self) -> List[
+            List[Union[float, np.ndarray]]
+    ]:
+        """List of the states of from each layer [ S0, S1, ..., Sn-1]
+        where each Si is a list of states in the layer Si.
+        """
+        self._S = [__layer.S for __layer in self.layers]
+        return self._S
+
     @property
     def layers(self) -> List[Layer]:
         """Inference layers"""
@@ -132,29 +151,6 @@ class Sequential(Layer):
         self._objective = objective
         compose_sequential_layer_objective(self.layers, objective)
 
-    @property
-    def T(self) -> np.ndarray:
-        """Label in OHE or index format"""
-        assert self._T is not None and self._T.size > 0, "T is not initialized"
-        return self._T
-
-    @T.setter
-    def T(self, T: Union[np.ndarray, TYPE_LABEL]):
-        assert T is not None and (
-                (isinstance(T, np.ndarray) and np.issubdtype(T.dtype, np.integer)) or
-                (isinstance(T, int))
-            )
-        self._T = np.array(T, dtype=TYPE_LABEL) \
-            if isinstance(T, int) else T.astype(TYPE_LABEL)
-
-        self._set_label(self.T)
-
-    @property
-    def dS(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
-        """Gradients dL/dS that have been used to update S in each layer"""
-        assert self._dS, "Gradients dL/dS of the network not initialized."
-        return self._dS
-
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
@@ -172,5 +168,5 @@ class Sequential(Layer):
         Returns:
             [*dL/dS]: List of dL/dS form each layer update()
         """
-        self._dS = [layer.update() for layer in self.layers]
+        self._dS = [__layer.update() for __layer in self.layers]
         return self.dS

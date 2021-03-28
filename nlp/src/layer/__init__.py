@@ -14,27 +14,10 @@ from layer.objective import (
 from layer.sequential import (
     Sequential
 )
-
-FUNCTION_LAYERS = (
-    Matmul,
-    Sigmoid,
-    ReLU,
-    Standardization,
-    BatchNormalization
+from layer.utilities import (
+    FEATURE_LAYERS,
+    ACTIVATION_LAYERS,
+    OBJECTIVE_LAYER_SCHEMES,
+    FUNCTION_LAYER_SCHEMES,
+    SCHEMES
 )
-FUNCTION_LAYER_SCHEMES = {}
-for __layer in FUNCTION_LAYERS:
-    FUNCTION_LAYER_SCHEMES[__layer.__qualname__.lower()] = __layer
-
-OBJECTIVE_LAYERS = (
-    CrossEntropyLogLoss,
-)
-OBJECTIVE_LAYER_SCHEMES = {}
-for __layer in OBJECTIVE_LAYERS:
-    OBJECTIVE_LAYER_SCHEMES[__layer.__qualname__.lower()] = __layer
-
-SCHEMES = {
-    **FUNCTION_LAYER_SCHEMES,
-    **OBJECTIVE_LAYER_SCHEMES
-}
-assert SCHEMES

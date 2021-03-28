@@ -1,6 +1,34 @@
 """Base for neural network implementations
 G=g0(g1(...(gn-1(X))...) = (g0 o ... o gi o ... gn-1)
-    Back-propagation passes the gradient dL/dX backwards from the last layer in the network.
+    Back-propagation passes the gradient dL/dX backwards from the last layer.
+
+What is "function" of a "network".
+    Have a clear separation between
+    1. function at training on the sample q0(X)
+    2. function at inference (including test) on the population q1(x).
+
+    "Function at training" generates an estimate or approximation of the
+    population q1(x) based on the sample q0(X). The objective function
+    evaluates the estimation to improve the estimate by the model on q0(X).
+    We treat q0(X) as "X" during the training.
+
+    * network.function(q0(X)) is Estimation of q0(X)
+    * network.objective(q0(X)) is Evaluation of the estimation on q0(X)
+
+    "Function at inference" generates a belief on the general population q1(X)
+    and we treat q1(X) as "X".
+
+    * network.prediction(q1(X)) is Belief.
+
+    To avoid confusions, not use "**function** at inference" but simply use
+    "prediction" to represent it.
+
+Interfaces:
+    train(q0(X), T):
+        Estimate AND evaluate..
+
+    predict(q1(X)):
+        Infer the population.
 
 """
 from typing import (
@@ -31,44 +59,8 @@ class Network(Layer):
     # ================================================================================
 
     # ================================================================================
-    # Instance initialization
+    # Instance
     # ================================================================================
-    def __init__(
-            self,
-            name: str,
-            num_nodes: int,
-            log_level: int = logging.ERROR
-    ):
-        """
-        Args:
-            name: network ID
-            num_nodes: Number of nodes in the first layer
-            log_level: logging level
-        """
-        super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
-
-        assert name
-        self._L: Union[TYPE_FLOAT, np.ndarray] = -np.inf
-        self._history: List[Union[TYPE_FLOAT, np.ndarray]] = []
-        self._history: List[TYPE_FLOAT]
-        self._GN: List[Union[TYPE_FLOAT, np.ndarray]] = []   # Numerical gradients GN of layers
-        self._dS: List[Union[TYPE_FLOAT, np.ndarray]] = []   # Gradients dL/dS of layers
-
-        # --------------------------------------------------------------------------------
-        # Inference layers in the network
-        # --------------------------------------------------------------------------------
-        self._layer_inference: Layer = None
-        self._layer_objective: Layer = None
-        self._function: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = None
-        self._predict: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = None
-        self._gradient: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = None
-        self._update: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = None
-
-        self._layers_all = List[Layer] = []
-
-        self._logger = logging.getLogger(name)
-        self._logger.setLevel(logging._levelToName[log_level])
-
     # --------------------------------------------------------------------------------
     # Instance properties
     # --------------------------------------------------------------------------------
@@ -79,9 +71,11 @@ class Network(Layer):
 
     @T.setter
     def T(self, T: Union[np.ndarray, int]):
-        self._T = np.array(T, dtype=TYPE_LABEL) if isinstance(T, int) else T.astype(int)
         super(Network, type(self)).T.fset(self, T)
-
+        # --------------------------------------------------------------------------------
+        # Although only the objective layer needs the label(s),
+        # make it available to all layers.
+        # --------------------------------------------------------------------------------
         for __layer in self.layers_all:
             __layer.T = T
 
@@ -138,6 +132,45 @@ class Network(Layer):
         return len(self._layers_all)
 
     # --------------------------------------------------------------------------------
+    # Initialization
+    # --------------------------------------------------------------------------------
+    def __init__(
+            self,
+            name: str,
+            num_nodes: int,
+            log_level: int = logging.ERROR
+    ):
+        """
+        Args:
+            name: network ID
+            num_nodes: Number of nodes in the first layer
+            log_level: logging level
+        """
+        super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
+
+        assert name
+        self._L: Union[TYPE_FLOAT, np.ndarray] = -np.inf
+        self._history: List[Union[TYPE_FLOAT, np.ndarray]] = []
+        self._history: List[TYPE_FLOAT]
+        self._GN: List[Union[TYPE_FLOAT, np.ndarray]] = []   # Numerical gradients GN of layers
+        self._dS: List[Union[TYPE_FLOAT, np.ndarray]] = []   # Gradients dL/dS of layers
+
+        # --------------------------------------------------------------------------------
+        # Inference layers in the network
+        # --------------------------------------------------------------------------------
+        self._layer_inference: Layer = None
+        self._layer_objective: Layer = None
+        self._function: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = None
+        self._predict: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = None
+        self._gradient: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = None
+        self._update: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = None
+
+        self._layers_all = List[Layer] = []
+
+        self._logger = logging.getLogger(name)
+        self._logger.setLevel(logging._levelToName[log_level])
+
+    # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
     def function(self, X: Union[TYPE_FLOAT, np.ndarray]) -> Union[TYPE_FLOAT, np.ndarray]:
@@ -158,7 +191,7 @@ class Network(Layer):
             self, h: TYPE_FLOAT = 1e-5
     ) -> List[Union[TYPE_FLOAT, np.ndarray]]:
         """Numerical Gradients GN"""
-        self._GN = [layer.gradient_numerical() for layer in self.layers_all]
+        self._GN = [__layer.gradient_numerical() for __layer in self.layers_all]
         return self.GN
 
     def gradient(self, dY: Union[np.ndarray, TYPE_FLOAT]) -> Union[TYPE_FLOAT, np.ndarray]:
@@ -166,12 +199,18 @@ class Network(Layer):
         return self._gradient(np.array(1.0))
 
     def update(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
-        """Layer state S updates"""
-        __dS = []
-        for __layer in self.layers_all:
-            __dS += __layer.update()
+        """
+        Responsibility:
+            Update layer state S by the gradient descent
 
-        self._dS = __dS
+            Run on the inference layer only because the objective layer should be
+            stateless except T. T is stateful but constant during a cycle, hence
+            regarded as state-less during the cycle in which update() is called.
+
+        Returns:
+            dS: List of the gradients on layer state(s)
+        """
+        self._dS = self.layer_inference.update()
         return self.dS
 
     def validate(self):
@@ -189,15 +228,41 @@ class Network(Layer):
             differences[index] = avgs
             return differences
 
-    def train(self, X: Union[TYPE_FLOAT, np.ndarray], T: Union[TYPE_FLOAT, np.ndarray]):
+    def train(
+            self, X: Union[TYPE_FLOAT, np.ndarray],
+            T: Union[TYPE_FLOAT, np.ndarray],
+            run_validations: bool = False
+    ):
+        """
+        Args:
+            X: batch training data in shape (N,M)
+            T: label of shape (N,) in the index format
+            run_validations: Flat if run the validations e.g. numerical gradient check
+        Returns:
+            Model S: States of the model layers
+        """
         self.T = T
-        self._L = self.objective(self.function(X))
+        self.X = X
+
+        self._Y = self.function(self.X)
+        self._L = self.objective(self.Y)
         self.history.append(self.L)
+
         self._dX = self.gradient(TYPE_FLOAT(1))
         self.update()
-        # D = self.validate()
 
-        print(f"L is network loss is {L}")
-        print(f"Gradient dL/dX is {self.dX}")
-        print(f"Numerical gradients GN are {self.GN}")
-        print(f"Analytical gradients dS are {self.dS}")
+        if run_validations:
+            D = self.validate()
+
+        self.logger.info("Loss is %s", self.L)
+        self.logger.info(f"Gradient dL/dX is {self.dX}")
+        self.logger.info(f"Numerical gradients GN are {self.GN}")
+        self.logger.info(f"Analytical gradients dS are {self.dS}")
+
+        return self.S
+
+    def predict(
+            self,
+            X: np.ndarray
+    ):
+        return self.predict(X)
