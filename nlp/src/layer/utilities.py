@@ -2,6 +2,7 @@ import logging
 from typing import (
     Union,
     List,
+    Dict,
     Callable
 )
 
@@ -99,5 +100,3 @@ def compose_sequential_layer_objective(
         objective = compose(*[__layer.function, objective])
 
     return objective
-
-

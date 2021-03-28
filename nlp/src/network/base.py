@@ -183,12 +183,9 @@ class Network(Layer):
         Returns:
             L: Objective value of the network (Loss)
         """
-        X = np.array(X).reshape((1, -1)) if isinstance(X, TYPE_FLOAT) else X
-        self._X = np.array(X) if isinstance(X, TYPE_FLOAT) else X
-        assert self.X.shape[0] == self.N, \
-            f"Batch size of X needs to be {self.N} but {self.X.shape}."
-        self._L = self._function(X)
-        return self.L
+        self.X = X
+        self._Y = self._function(X)
+        return self.Y
 
     def gradient_numerical(
             self, h: TYPE_FLOAT = 1e-5

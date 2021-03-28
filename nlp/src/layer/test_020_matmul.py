@@ -355,9 +355,7 @@ def test_020_matmul_builder_to_fail_matmul_spec():
             _NUM_NODES: M,
             _NUM_FEATURES: D,
             _WEIGHTS: {
-                _SCHEME: "he",
-                _NUM_NODES: M,
-                _NUM_FEATURES: D + 1
+                _SCHEME: "he"
             },
             "log_level": logging.ERROR
         }
@@ -426,9 +424,7 @@ def test_020_matmul_builder_to_fail_weight_spec():
             _NUM_NODES: M,
             _NUM_FEATURES: D,
             _WEIGHTS: {
-                _SCHEME: "he",
-                _NUM_NODES: M,
-                _NUM_FEATURES: D + 1
+                _SCHEME: "he"
             }
         }
         try:
@@ -441,38 +437,6 @@ def test_020_matmul_builder_to_fail_weight_spec():
         try:
             Matmul.build(matmul_spec)
             raise RuntimeError("Matmul.build() must fail with invalid weight scheme")
-        except AssertionError:
-            pass
-
-        matmul_spec = copy.deepcopy(valid_matmul_spec)
-        matmul_spec[_WEIGHTS][_NUM_NODES] = "hoge"
-        try:
-            Matmul.build(matmul_spec)
-            raise RuntimeError("Matmul.build() must fail with weight.shape != (M, D+1) scheme")
-        except AssertionError:
-            pass
-
-        matmul_spec = copy.deepcopy(valid_matmul_spec)
-        matmul_spec[_WEIGHTS][_NUM_NODES] = M+1
-        try:
-            Matmul.build(matmul_spec)
-            raise RuntimeError("Matmul.build() must fail with weight.shape != (M, D+1) scheme")
-        except AssertionError:
-            pass
-
-        matmul_spec = copy.deepcopy(valid_matmul_spec)
-        matmul_spec[_WEIGHTS][_NUM_FEATURES] = D
-        try:
-            Matmul.build(matmul_spec)
-            raise RuntimeError("Matmul.build() must fail with weight.shape != (M, D+1) scheme")
-        except AssertionError:
-            pass
-
-        matmul_spec = copy.deepcopy(valid_matmul_spec)
-        matmul_spec[_WEIGHTS][_NUM_FEATURES] = "hoge"
-        try:
-            Matmul.build(matmul_spec)
-            raise RuntimeError("Matmul.build() must fail with weight.shape != (M, D+1) scheme")
         except AssertionError:
             pass
 
@@ -504,9 +468,7 @@ def test_020_matmul_builder_to_fail_optimizer_spec():
             _NUM_NODES: M,
             _NUM_FEATURES: D,
             _WEIGHTS: {
-                _SCHEME: "he",
-                _NUM_NODES: M,
-                _NUM_FEATURES: D + 1
+                _SCHEME: "he"
             },
             _OPTIMIZER: {
                 _SCHEME: "sGd",
@@ -585,8 +547,6 @@ def test_020_matmul_builder_to_succeed():
             _NUM_FEATURES: D,
             _WEIGHTS: {
                 _SCHEME: "he",
-                _NUM_NODES: M,
-                _NUM_FEATURES: D + 1
             },
             _OPTIMIZER: {
                 _SCHEME: "sGd",
@@ -673,8 +633,6 @@ def test_020_matmul_round_trip():
                 _NUM_FEATURES: D,
                 _WEIGHTS: {
                     _SCHEME: "he",
-                    _NUM_NODES: M,
-                    _NUM_FEATURES: D + 1
                 },
                 _OPTIMIZER: {
                     _SCHEME: "sGd"

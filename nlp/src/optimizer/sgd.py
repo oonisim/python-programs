@@ -31,18 +31,12 @@ class SGD(Optimizer):
         """Build an optimizer based on the specification.
         Spec example:
         {
-            "scheme": optimizer.SGD.__qualname__,
-            "parameters": {
-                "lr": 0.1,
-                "l2": 0.1
-            }
+            "name": "sgd",  # optional
+            "lr": 0.1,
+            "l2": 0.1
         }
         """
-        spec = specification
-        __optimizer = SGD(**spec["parameters"]) \
-            if "parameters" in spec else SGD()
-
-        return __optimizer
+        return SGD(**specification)
 
     # ================================================================================
     # Instance initialization

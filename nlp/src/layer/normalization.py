@@ -21,6 +21,9 @@ from common.functions import (
     numerical_jacobian
 )
 from layer.base import Layer
+from layer.utilities_builder import (
+    build_optimizer_from_layer_specification
+)
 import optimizer as optimiser
 
 
@@ -157,19 +160,8 @@ class BatchNormalization(Layer):
         )
 
         # Optimizer
-        if "optimizer" in spec:
-            assert (
-                "scheme" in spec["optimizer"] and
-                spec["optimizer"]["scheme"].lower() in optimiser.SCHEMES
-            ), "Invalid optimizer spec %s" % spec["optimizer"]
-
-            scheme = spec["optimizer"]["scheme"].lower()
-            __optimizer = optimiser.SCHEMES[scheme].build(spec["optimizer"])
-
-        else:
-            __optimizer = optimiser.SGD()
-
-        spec["optimizer"] = __optimizer
+        _optimizer = build_optimizer_from_layer_specification(spec)
+        spec["optimizer"] = _optimizer
 
         if "eps" in spec:
             spec["eps"] = TYPE_FLOAT(spec["eps"])

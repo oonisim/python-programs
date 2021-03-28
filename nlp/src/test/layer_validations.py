@@ -260,6 +260,8 @@ def validate_relu_neuron_round_trip(
     if not validate_against_expected_gradient(dW, EDW):
         Logger.error("Expected dL/dW \n%s\nDiff\n%s", EDW, (EDW-dW))
 
+    return Y, A, EDY, EDW, EDX, dY, dX, dW
+
 
 def validate_relu_neuron_training(
         matmul: Matmul,

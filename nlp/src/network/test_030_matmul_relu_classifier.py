@@ -116,10 +116,10 @@ def train_matmul_relu_classifier(
 
 
 def test_matmul_relu_classifier(
-        M: int = 3
 ):
     """Test case for layer matmul class
     """
+    M: int = 3
     N = 10
     D = 2
     W = weights.he(M, D+1)

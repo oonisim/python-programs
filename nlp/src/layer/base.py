@@ -120,6 +120,15 @@ from common.constants import (
 from common.functions import (
     numerical_jacobian,
 )
+from layer.constants import (
+    _WEIGHTS,
+    _NAME,
+    _SCHEME,
+    _OPTIMIZER,
+    _NUM_NODES,
+    _NUM_FEATURES,
+    _PARAMETERS
+)
 
 
 class Layer:

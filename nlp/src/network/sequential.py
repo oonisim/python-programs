@@ -180,8 +180,8 @@ class SequentialNetwork(Network):
             "The number of nodes in the last inference layer [%s] "\
             "must match that of the first objective layer [%s]." \
             % (
-                inference_layer_specs[-1][_PARAMETERS][_NUM_NODES],
-                objective_layer_specs[0][_PARAMETERS][_NUM_NODES]
+                list(inference_layer_specs.values())[-1][_PARAMETERS][_NUM_NODES],
+                list(objective_layer_specs.values())[0][_PARAMETERS][_NUM_NODES]
             )
 
         return inference_layer_specs, objective_layer_specs

@@ -34,6 +34,11 @@ from layer.constants import (
     _OPTIMIZER,
     _NUM_NODES,
     _NUM_FEATURES,
+    _PARAMETERS
+)
+from layer.utilities_builder import (
+    build_optimizer_from_layer_specification,
+    build_weights_from_layer_specification
 )
 
 
@@ -95,31 +100,12 @@ class Matmul(Layer):
             },
             _OPTIMIZER: {
                 _SCHEME: optimiser.SGD.__qualname__,
-                "lr": 0.01,
-                "l2": 1e-3
+                _PARAMETERS: {
+                    "lr": 0.01,
+                    "l2": 1e-3
+                }
             }
         }
-
-    @staticmethod
-    def build_weight(specification: Dict) -> np:
-        """Build layer.Matmul weights
-        Args:
-            specification: weight specification
-        Return: initialized weight
-
-        Specification: {
-            "scheme": "weight initialization scheme [he|xavier]"
-            "num_nodes": "number of nodes M",
-            "num_features": "number of features in a batch X NOT including bias"
-        }
-        """
-        spec = specification
-        M = spec[_NUM_NODES]
-        D = spec[_NUM_FEATURES]    # INCLUDING bias weight
-        scheme = spec[_SCHEME] \
-            if _SCHEME in spec else "uniform"
-        assert scheme in weights.SCHEMES
-        return weights.SCHEMES[scheme](M, D)
 
     @staticmethod
     def build(specification: Dict):
@@ -142,43 +128,20 @@ class Matmul(Layer):
            % ((_NAME, _NUM_NODES, _NUM_FEATURES, _WEIGHTS), spec)
 
         name = spec[_NAME]
-
-        # Geometry of the matmul layer
         num_nodes = spec[_NUM_NODES]
         num_features = spec[_NUM_FEATURES]
 
         # Weights
-        weight_spec = spec[_WEIGHTS]
-        if _NUM_NODES not in weight_spec:
-            weight_spec[_NUM_NODES] = num_nodes
-        else:
-            assert weight_spec[_NUM_NODES] == num_nodes
-        if _NUM_FEATURES not in weight_spec:
-            # +1 for bias
-            weight_spec[_NUM_FEATURES] = (num_features + 1)
-        else:
-            assert weight_spec[_NUM_FEATURES] == (num_features + 1)
-
-        W = Matmul.build_weight(weight_spec)
+        W = build_weights_from_layer_specification(spec)
 
         # Optimizer
-        if _OPTIMIZER in spec:
-            assert (
-                _SCHEME in spec[_OPTIMIZER] and
-                spec[_OPTIMIZER][_SCHEME].lower() in optimiser.SCHEMES
-            ), "Invalid optimizer spec %s" % spec[_OPTIMIZER]
-
-            scheme = spec[_OPTIMIZER][_SCHEME].lower()
-            __optimizer = optimiser.SCHEMES[scheme].build(spec[_OPTIMIZER])
-
-        else:
-            __optimizer = optimiser.SGD()
+        _optimizer = build_optimizer_from_layer_specification(spec)
 
         matmul = Matmul(
             name=name,
             num_nodes=num_nodes,
             W=W,
-            optimizer=__optimizer,
+            optimizer=_optimizer,
             log_level=spec["log_level"] if "log_level" in spec else logging.ERROR
         )
 
