@@ -24,6 +24,12 @@ from common.functions import (
     sigmoid_cross_entropy_log_loss,
 )
 from layer.base import Layer
+from layer.constants import (
+    _NAME,
+    _NUM_NODES,
+    _LOSS_FUNCTION,
+    _LOG_LEVEL
+)
 
 
 class CrossEntropyLogLoss(Layer):
@@ -44,20 +50,28 @@ class CrossEntropyLogLoss(Layer):
     # Class
     # ================================================================================
     @staticmethod
-    def build_objective_layer(specification: Dict):
+    def build_specification_template():
+        return {
+            _NAME: "<layer name>",
+            _NUM_NODES: 3,
+            _LOSS_FUNCTION: "softmax_cross_entropy_log_loss"
+        }
+
+    @staticmethod
+    def build(specification: Dict):
         spec = specification
         assert (
-            "name" in spec and
-            "num_nodes" in spec and
-            "loss_function" in spec and
-            spec["loss_function"] in functions.LOSS_FUNCTIONS
+            _NAME in spec and
+            _NUM_NODES in spec and
+            _LOSS_FUNCTION in spec and
+            spec[_LOSS_FUNCTION] in functions.LOSS_FUNCTIONS
         )
 
         return CrossEntropyLogLoss(
-            name=spec["name"],
-            num_nodes=spec["num_nodes"],
-            log_loss_function=functions.LOSS_FUNCTIONS[spec["loss_function"]],
-            log_level=spec["log_level"] if "log_level" in spec else logging.ERROR
+            name=spec[_NAME],
+            num_nodes=spec[_NUM_NODES],
+            log_loss_function=functions.LOSS_FUNCTIONS[spec[_LOSS_FUNCTION]],
+            log_level=spec[_LOG_LEVEL] if _LOG_LEVEL in spec else logging.ERROR
         )
 
     # ================================================================================

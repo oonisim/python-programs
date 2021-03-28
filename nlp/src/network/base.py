@@ -49,6 +49,11 @@ from common.constants import (
     TYPE_LABEL
 )
 from layer.base import Layer
+from layer.schemes import (
+    FUNCTION_LAYERS,
+    OBJECTIVE_LAYERS,
+    SEQUENTIAL_LAYERS
+)
 
 
 class Network(Layer):
@@ -89,33 +94,28 @@ class Network(Layer):
     @property
     def history(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
         """Network objective value (Loss) history"""
-        assert self._history, \
+        assert isinstance(self._history, list) and len(self._history) > 0, \
             "Objective value L not initialized or an invalid value."
         return self._history
 
     @property
     def GN(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
         """Numerical gradients of layers"""
-        assert self._GN, "Numerical gradients GN of the network not initialized."
+        assert isinstance(self._GN, list) and len(self._GN) > 0, \
+            "Numerical gradients GN of the network not initialized."
         return self._GN
-
-    @property
-    def dS(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
-        """Gradients dL/dS that have been used to update S in each layer"""
-        assert self._dS, "Gradients dL/dS of the network not initialized."
-        return self._dS
 
     @property
     def layer_inference(self) -> Layer:
         """Inference layers"""
-        assert isinstance(self._layer_inference, Layer), \
-            "Inference layers not initialized"
+        assert isinstance(self._layer_inference, FUNCTION_LAYERS + SEQUENTIAL_LAYERS), \
+            "Inference layer not initialized"
         return self._layer_inference
 
     @property
     def layer_objective(self) -> Layer:
         """Objective layers"""
-        assert isinstance(self._layer_objective, Layer), \
+        assert isinstance(self._layer_objective, OBJECTIVE_LAYERS + SEQUENTIAL_LAYERS), \
             "Objective layers not initialized"
         return self._layer_objective
 
@@ -148,12 +148,18 @@ class Network(Layer):
         """
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
 
-        assert name
+        assert isinstance(name, str) and len(name) > 0
+
+        self._logger = logging.getLogger(name)
+        self._logger.setLevel(logging._levelToName[log_level])
+
+        # --------------------------------------------------------------------------------
+        # Objective (Loss)
+        # --------------------------------------------------------------------------------
         self._L: Union[TYPE_FLOAT, np.ndarray] = -np.inf
         self._history: List[Union[TYPE_FLOAT, np.ndarray]] = []
-        self._history: List[TYPE_FLOAT]
+
         self._GN: List[Union[TYPE_FLOAT, np.ndarray]] = []   # Numerical gradients GN of layers
-        self._dS: List[Union[TYPE_FLOAT, np.ndarray]] = []   # Gradients dL/dS of layers
 
         # --------------------------------------------------------------------------------
         # Inference layers in the network
@@ -165,10 +171,7 @@ class Network(Layer):
         self._gradient: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = None
         self._update: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = None
 
-        self._layers_all = List[Layer] = []
-
-        self._logger = logging.getLogger(name)
-        self._logger.setLevel(logging._levelToName[log_level])
+        self._layers_all: List[Layer] = []
 
     # --------------------------------------------------------------------------------
     # Instance methods
@@ -213,21 +216,6 @@ class Network(Layer):
         self._dS = self.layer_inference.update()
         return self.dS
 
-    def validate(self):
-        """Validate the gradient G with the numerical gradient GN"""
-        assert len(self.dS) == len(self.GN)
-
-        differences: Dict[int, np.ndarray] = {}
-        for index, (dS, GN) in enumerate(zip(self.dS, self.GN)):
-            deltas = np.array(dS) - np.array(GN)
-            avgs = np.average(deltas, axis=0)
-
-            self.logger.debug("--------------------------------------------------------------------------------")
-            self.logger.debug("validate: layer[%s] dS=\n%s GN=\n%s", index, dS, GN)
-            self.logger.debug("validate: layer[%s] deltas=\n%s avg=\n%s", index, deltas, avgs)
-            differences[index] = avgs
-            return differences
-
     def train(
             self, X: Union[TYPE_FLOAT, np.ndarray],
             T: Union[TYPE_FLOAT, np.ndarray],
@@ -250,9 +238,6 @@ class Network(Layer):
 
         self._dX = self.gradient(TYPE_FLOAT(1))
         self.update()
-
-        if run_validations:
-            D = self.validate()
 
         self.logger.info("Loss is %s", self.L)
         self.logger.info(f"Gradient dL/dX is {self.dX}")

@@ -22,7 +22,7 @@ import common.weights as weights
 from data import (
     linear_separable_sectors
 )
-from layer.utilities import (
+from test.utilities import (
     build_matmul_relu_objective
 )
 from optimizer import (

@@ -51,7 +51,7 @@ from test.config import (
     GRADIENT_DIFF_ACCEPTANCE_VALUE,
     GRADIENT_DIFF_ACCEPTANCE_RATIO
 )
-from layer.utilities import (
+from test.utilities import (
     build_matmul_relu_objective
 )
 from test.layer_validations import (

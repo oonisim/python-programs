@@ -14,7 +14,7 @@ from layer.objective import (
 from layer.sequential import (
     Sequential
 )
-from layer.utilities import (
+from layer.schemes import (
     FEATURE_LAYERS,
     ACTIVATION_LAYERS,
     OBJECTIVE_LAYER_SCHEMES,

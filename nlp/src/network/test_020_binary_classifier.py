@@ -1,4 +1,4 @@
-"""Matmul layer test cases"""
+"""Binary classifier test cases"""
 import cProfile
 import copy
 import logging

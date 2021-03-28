@@ -15,7 +15,7 @@ import numpy as np
 from common.constants import (
     TYPE_FLOAT,
     TYPE_LABEL,
-    LAYER_MUX_NUM_NODES
+    LAYER_MAX_NUM_NODES
 )
 from common.functions import (
     compose
@@ -23,64 +23,17 @@ from common.functions import (
 import layer
 import optimizer as optimiser
 from network.base import Network
-
-
-# From Python 3.6 onwards, the standard dict type maintains
-# insertion order by default.
-specification_template = {
-    "matmul01": {
-        "scheme": layer.Matmul.__qualname__,
-        "arguments": {
-            "num_nodes": 8,
-            "num_features": 3,
-            "weights": {
-                "scheme": "he"
-            },
-            "optimizer": {
-                "scheme": optimiser.SGD.__qualname__,
-                "lr": 0.1,
-                "l2": 0.1
-            }
-        },
-    },
-    "activation01": {
-        "scheme": layer.ReLU.__qualname__,
-        "arguments": {
-            "num_nodes": 8
-        }
-    },
-    "matmul02": {
-        "scheme": layer.Matmul.__qualname__,
-        "parameters": {
-            "num_nodes": 3,
-            "num_features": 3,
-            "weights": {
-                "scheme": "he"
-            }
-        }
-    },
-    "activation02": {
-        "scheme": layer.ReLU.__qualname__,
-        "parameters": {
-            "num_nodes": 3
-        }
-    },
-    "objective": {
-        "scheme": layer.CrossEntropyLogLoss.__qualname__,
-        "parameters": {
-            "num_nodes": 3,
-            "loss_function": "softmax_cross_entropy_log_loss"
-        }
-    }
-}
-
-
-SCHEME = "scheme"
-NAME = "name"
-NUM_NODES = "num_nodes"
-ARGUMENTS = "arguments"
-LOG_LEVEL = "log_level"
-LAYER_CLASS = "layer_class"
+from layer.constants import (
+    _WEIGHTS,
+    _NAME,
+    _SCHEME,
+    _OPTIMIZER,
+    _NUM_NODES,
+    _NUM_FEATURES,
+    _PARAMETERS,
+    _LAYER_CLASS,
+    _LOG_LEVEL
+)
 
 
 class SequentialNetwork(Network):
@@ -91,10 +44,70 @@ class SequentialNetwork(Network):
         - a specific number of training epochs to run
         - a specific performance metrics achieved (recall, precision, etc).
     """
-
     # ================================================================================
     # Class
     # ================================================================================
+    @staticmethod
+    def place_layer_spec(
+            container: dict,
+            layer_name: str,
+            layer_scheme: str,
+            layer_spec: dict,
+            schemes: dict,
+            log_level: int
+    ):
+        """Generate a specification to instantiate a Layer e.g. Matmul
+        The spec format is {
+            _LAYER_CLASS: "<class> e.g Matmul",
+            _PARAMETERS: {
+                "name": "<layer name>",
+                "num_nodes": <number of nodes in the layer>,
+                "log_level": <log level>,
+                <other mandatory arguments for the layer>
+            }
+        }
+        """
+        # --------------------------------------------------------------------------------
+        # Detect duplicated layer names (unique in inference and unique in objective)
+        # _LAYER_CLASS cannot be used as the layer name.
+        # --------------------------------------------------------------------------------
+        assert not (
+                layer_name in container or
+                layer_name == _LAYER_CLASS
+        ), "Cannot have duplicate name [%s] or [%s] as a dictionary key.\nspec is %s." \
+           % (layer_name, _LAYER_CLASS, layer_spec)
+
+        container[layer_name] = {}
+
+        # --------------------------------------------------------------------------------
+        # Layer class to instantiate
+        # --------------------------------------------------------------------------------
+        container[layer_name][_LAYER_CLASS] = schemes[layer_scheme]
+
+        # --------------------------------------------------------------------------------
+        # Arguments to pass to the layer class __init__() method
+        # --------------------------------------------------------------------------------
+        assert _PARAMETERS in layer_spec, \
+            "%s is mandatory in a layer specification.\nspec is %s" \
+            % (_PARAMETERS, layer_spec)
+
+        args = copy.deepcopy(layer_spec[_PARAMETERS]) \
+
+        # Mandatory "name" arg. Use the layer_spec key when not specified
+        args[_NAME] = layer_name \
+            if _NAME not in args else args[_NAME].lower()
+
+        # Mandatory "num_nodes" arg.
+        assert _NUM_NODES in args, \
+            "%s is mandatory in a layer specification.\nspec is %s" \
+            % (_NUM_NODES, layer_spec)
+
+        # Logging default level
+        args[_LOG_LEVEL] = log_level \
+            if _LOG_LEVEL not in args else args[_LOG_LEVEL]
+
+        container[layer_name][_PARAMETERS] = args
+
     @staticmethod
     def _parse_network_specs(
             network_spec: Dict,
@@ -120,56 +133,38 @@ class SequentialNetwork(Network):
             objective e.g. the loss. Objective layer can be single but to
             allow cascading, it is a list.
         """
-        assert isinstance(network_spec, dict) and len(network_spec) > 0
-        assert 0 < num_nodes < LAYER_MUX_NUM_NODES, \
-            "0 < num_nodes %s required" % LAYER_MUX_NUM_NODES
-
         inference_layer_specs = {}
         objective_layer_specs = {}
         for layer_name, layer_spec in network_spec.items():
             assert isinstance(layer_name, str) and isinstance(layer_spec, dict)
-            if SCHEME in layer_spec:
+            if _SCHEME in layer_spec:
                 layer_name = layer_name.lower()
-                layer_scheme = layer_spec[SCHEME].lower()     # Layer class, e.g. Matmul
-
-                # --------------------------------------------------------------------------------
-                # Compose the arguments to pass to the layer __init__()
-                # --------------------------------------------------------------------------------
-                args = layer_spec[ARGUMENTS] \
-                    if ARGUMENTS in layer_spec else {}
-
-                # Mandatory "name" arg. Use the layer_spec key when not specified
-                args[NAME] = layer_name \
-                    if NAME not in args else args[NAME].lower()
-
-                # Mandatory "num_nodes" arg.
-                assert NUM_NODES in args, "%s is mandatory" % NUM_NODES
-
-                # Logging default level
-                args[LOG_LEVEL] = log_level \
-                    if LOG_LEVEL not in args else args[LOG_LEVEL]
+                layer_scheme = layer_spec[_SCHEME].lower()     # Layer class, e.g. Matmul
 
                 # --------------------------------------------------------------------------------
                 # Compose a layer spec
                 # --------------------------------------------------------------------------------
                 if layer_scheme in layer.FUNCTION_LAYER_SCHEMES:
-                    target_layer_spec = inference_layer_specs
+                    target_layer_specs = inference_layer_specs
+                    schemes = layer.FUNCTION_LAYER_SCHEMES
                 elif layer_scheme in layer.OBJECTIVE_LAYER_SCHEMES:
-                    target_layer_spec = objective_layer_specs
+                    target_layer_specs = objective_layer_specs
+                    schemes = layer.OBJECTIVE_LAYER_SCHEMES
                 else:
                     assert False, \
                         "Invalid layer %s. Must be one of %s." \
                         % (layer_scheme, layer.SCHEMES.keys())
 
-                assert not (
-                    layer_name in target_layer_spec or layer_name == LAYER_CLASS
-                ), "Duplicated layer name [%s] or do not use [%s] as a dictionary key" \
-                   % (layer_name, LAYER_CLASS)
-
-                target_layer_spec[layer_name][LAYER_CLASS] = \
-                    layer.FUNCTION_LAYER_SCHEMES[layer_scheme]
-                target_layer_spec[layer_name][ARGUMENTS] = \
-                    copy.deepcopy(args)
+                SequentialNetwork.place_layer_spec(
+                    container=target_layer_specs,
+                    layer_name=layer_name,
+                    layer_scheme=layer_scheme,
+                    layer_spec=layer_spec,
+                    schemes=schemes,
+                    log_level=log_level
+                )
+                assert set(target_layer_specs[layer_name].keys()) == \
+                       {_LAYER_CLASS, _PARAMETERS}
 
         assert \
             len(inference_layer_specs) > 0 and \
@@ -179,18 +174,15 @@ class SequentialNetwork(Network):
             % (len(inference_layer_specs), len(objective_layer_specs))
 
         assert \
-            inference_layer_specs[-1][ARGUMENTS][NUM_NODES] == \
-            objective_layer_specs[0][ARGUMENTS][NUM_NODES] == \
+            list(inference_layer_specs.values())[-1][_PARAMETERS][_NUM_NODES] == \
+            list(objective_layer_specs.values())[0][_PARAMETERS][_NUM_NODES] == \
             num_nodes, \
             "The number of nodes in the last inference layer [%s] "\
             "must match that of the first objective layer [%s]." \
             % (
-                inference_layer_specs[-1][ARGUMENTS][NUM_NODES],
-                objective_layer_specs[0][ARGUMENTS][NUM_NODES]
+                inference_layer_specs[-1][_PARAMETERS][_NUM_NODES],
+                objective_layer_specs[0][_PARAMETERS][_NUM_NODES]
             )
-
-        assert set(inference_layer_specs.keys()) == {LAYER_CLASS, ARGUMENTS}
-        assert set(objective_layer_specs.keys()) == {LAYER_CLASS, ARGUMENTS}
 
         return inference_layer_specs, objective_layer_specs
 
@@ -199,7 +191,7 @@ class SequentialNetwork(Network):
             layer_specs: Dict
     ) -> List[layer.Layer]:
         return [
-            spec[LAYER_CLASS].build(spec[ARGUMENTS])
+            spec[_LAYER_CLASS].build(spec[_PARAMETERS])
             for spec in layer_specs.values()
         ]
 
@@ -231,6 +223,7 @@ class SequentialNetwork(Network):
             name=name + "_objective",
             num_nodes=num_nodes,
             layers=objective_layers,
+            omit_last_activation_for_prediction=True,
             log_level=log_level
         )
         # Sequential objective is initialized upon its setter call.
@@ -243,7 +236,10 @@ class SequentialNetwork(Network):
             layers=inference_layers,
             log_level=log_level
         )
-        layer_inference.objective = layer_objective.function
+        # Explicitly set "compose(objective.function o objective.objective)"
+        # although it is the same with setting (objective.function)
+        layer_inference.objective = \
+            compose(layer_objective.function, layer_objective.objective)
 
         return layer_inference, layer_objective
 
@@ -271,10 +267,10 @@ class SequentialNetwork(Network):
         # --------------------------------------------------------------------------------
         # Build a sequential inference layer and a objective layer
         # --------------------------------------------------------------------------------
-        inference_layers = SequentialNetwork._build_network_layers(
+        inference_layers: List[layer.Layer] = SequentialNetwork._build_network_layers(
             inference_layer_specs
         )
-        objective_layers = SequentialNetwork._build_network_layers(
+        objective_layers: List[layer.Layer] = SequentialNetwork._build_network_layers(
             objective_layer_specs
         )
 
@@ -312,6 +308,11 @@ class SequentialNetwork(Network):
             num_nodes: Number of nodes
             specification: Network specification in JSON.
         """
+        assert isinstance(name, str) and len(name) > 0
+        assert isinstance(specification, dict) and len(specification) > 0
+        assert 0 < num_nodes < LAYER_MAX_NUM_NODES, \
+            "0 < num_nodes %s required" % LAYER_MAX_NUM_NODES
+
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
         spec = copy.deepcopy(specification)
 
@@ -339,8 +340,9 @@ class SequentialNetwork(Network):
             [Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]
         ] = self.layer_objective.function
 
-        # train() invokes gradient(dL/dA).
-        # Needs composing gradients of objective and inference layers.
+        # train() invokes gradient(dL/dL=1.0). Beware gradient is for training.
+        # Needs composing gradients of objective and inference layers to let
+        # the back propagation flow from the objective to the input.
         self._gradient: Callable[
             [Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]
         ] = compose(self.layer_objective.gradient, self.layer_inference.gradient)
@@ -351,4 +353,3 @@ class SequentialNetwork(Network):
         self._predict: Callable[
             [Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]
         ] = self.layer_inference.predict
-

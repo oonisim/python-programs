@@ -32,6 +32,15 @@ from common.functions import (
 from common.utilities import (
     random_string
 )
+from layer.constants import (
+    _WEIGHTS,
+    _NAME,
+    _SCHEME,
+    _OPTIMIZER,
+    _NUM_NODES,
+    _NUM_FEATURES,
+    _PARAMETERS
+)
 from layer import (
     Matmul
 )
@@ -46,6 +55,8 @@ from test.config import (
 from test.layer_validations import (
     validate_against_expected_gradient
 )
+
+
 Logger = logging.getLogger("test_030_objective")
 Logger.setLevel(logging.DEBUG)
 
@@ -340,13 +351,13 @@ def test_020_matmul_builder_to_fail_matmul_spec():
         # Otherwise not sure what you are testing.
         # ----------------------------------------------------------------------
         valid_matmul_spec = {
-            "name": "test_020_matmul_builder_to_fail_matmul_spec",
-            "num_nodes": M,
-            "num_features": D,
-            "weight": {
-                "scheme": "he",
-                "num_nodes": M,
-                "num_features": D + 1
+            _NAME: "test_020_matmul_builder_to_fail_matmul_spec",
+            _NUM_NODES: M,
+            _NUM_FEATURES: D,
+            _WEIGHTS: {
+                _SCHEME: "he",
+                _NUM_NODES: M,
+                _NUM_FEATURES: D + 1
             },
             "log_level": logging.ERROR
         }
@@ -356,7 +367,7 @@ def test_020_matmul_builder_to_fail_matmul_spec():
             raise RuntimeError("Matmul.build() must succeed with %s" % valid_matmul_spec)
 
         matmul_spec = copy.deepcopy(valid_matmul_spec)
-        matmul_spec["name"] = ""
+        matmul_spec[_NAME] = ""
         try:
             Matmul.build(matmul_spec)
             raise RuntimeError("Matmul.build() must fail with invalid name")
@@ -364,7 +375,7 @@ def test_020_matmul_builder_to_fail_matmul_spec():
             pass
 
         matmul_spec = copy.deepcopy(valid_matmul_spec)
-        matmul_spec["num_nodes"] = np.random.randint(-100, 0)
+        matmul_spec[_NUM_NODES] = np.random.randint(-100, 0)
         try:
             Matmul.build(matmul_spec)
             raise RuntimeError("Matmul.build() must fail with num_nodes <=0")
@@ -372,7 +383,7 @@ def test_020_matmul_builder_to_fail_matmul_spec():
             pass
 
         matmul_spec = copy.deepcopy(valid_matmul_spec)
-        matmul_spec["num_features"] = np.random.randint(-100, 0)
+        matmul_spec[_NUM_FEATURES] = np.random.randint(-100, 0)
         try:
             Matmul.build(matmul_spec)
             raise RuntimeError("Matmul.build() must fail with num_features <=0")
@@ -411,13 +422,13 @@ def test_020_matmul_builder_to_fail_weight_spec():
         # Otherwise not sure what you are testing.
         # ----------------------------------------------------------------------
         valid_matmul_spec = {
-            "name": "test_020_matmul_builder_to_fail_matmul_spec",
-            "num_nodes": M,
-            "num_features": D,
-            "weight": {
-                "scheme": "he",
-                "num_nodes": M,
-                "num_features": D + 1
+            _NAME: "test_020_matmul_builder_to_fail_matmul_spec",
+            _NUM_NODES: M,
+            _NUM_FEATURES: D,
+            _WEIGHTS: {
+                _SCHEME: "he",
+                _NUM_NODES: M,
+                _NUM_FEATURES: D + 1
             }
         }
         try:
@@ -426,7 +437,7 @@ def test_020_matmul_builder_to_fail_weight_spec():
             raise RuntimeError("Matmul.build() must succeed with %s" % valid_matmul_spec)
 
         matmul_spec = copy.deepcopy(valid_matmul_spec)
-        matmul_spec["weight"]["scheme"] = "invalid_scheme"
+        matmul_spec[_WEIGHTS][_SCHEME] = "invalid_scheme"
         try:
             Matmul.build(matmul_spec)
             raise RuntimeError("Matmul.build() must fail with invalid weight scheme")
@@ -434,7 +445,7 @@ def test_020_matmul_builder_to_fail_weight_spec():
             pass
 
         matmul_spec = copy.deepcopy(valid_matmul_spec)
-        matmul_spec["weight"]["num_nodes"] = "hoge"
+        matmul_spec[_WEIGHTS][_NUM_NODES] = "hoge"
         try:
             Matmul.build(matmul_spec)
             raise RuntimeError("Matmul.build() must fail with weight.shape != (M, D+1) scheme")
@@ -442,7 +453,7 @@ def test_020_matmul_builder_to_fail_weight_spec():
             pass
 
         matmul_spec = copy.deepcopy(valid_matmul_spec)
-        matmul_spec["weight"]["num_nodes"] = M+1
+        matmul_spec[_WEIGHTS][_NUM_NODES] = M+1
         try:
             Matmul.build(matmul_spec)
             raise RuntimeError("Matmul.build() must fail with weight.shape != (M, D+1) scheme")
@@ -450,7 +461,7 @@ def test_020_matmul_builder_to_fail_weight_spec():
             pass
 
         matmul_spec = copy.deepcopy(valid_matmul_spec)
-        matmul_spec["weight"]["num_features"] = D
+        matmul_spec[_WEIGHTS][_NUM_FEATURES] = D
         try:
             Matmul.build(matmul_spec)
             raise RuntimeError("Matmul.build() must fail with weight.shape != (M, D+1) scheme")
@@ -458,7 +469,7 @@ def test_020_matmul_builder_to_fail_weight_spec():
             pass
 
         matmul_spec = copy.deepcopy(valid_matmul_spec)
-        matmul_spec["weight"]["num_features"] = "hoge"
+        matmul_spec[_WEIGHTS][_NUM_FEATURES] = "hoge"
         try:
             Matmul.build(matmul_spec)
             raise RuntimeError("Matmul.build() must fail with weight.shape != (M, D+1) scheme")
@@ -489,17 +500,17 @@ def test_020_matmul_builder_to_fail_optimizer_spec():
         # Otherwise not sure what you are testing.
         # ----------------------------------------------------------------------
         valid_matmul_spec = {
-            "name": "test_020_matmul_builder_to_fail_matmul_spec",
-            "num_nodes": M,
-            "num_features": D,
-            "weight": {
-                "scheme": "he",
-                "num_nodes": M,
-                "num_features": D + 1
+            _NAME: "test_020_matmul_builder_to_fail_matmul_spec",
+            _NUM_NODES: M,
+            _NUM_FEATURES: D,
+            _WEIGHTS: {
+                _SCHEME: "he",
+                _NUM_NODES: M,
+                _NUM_FEATURES: D + 1
             },
-            "optimizer": {
-                "scheme": "sGd",
-                "parameters": {
+            _OPTIMIZER: {
+                _SCHEME: "sGd",
+                _PARAMETERS: {
                     "lr": np.random.uniform(),
                     "l2": np.random.uniform()
                 }
@@ -512,7 +523,7 @@ def test_020_matmul_builder_to_fail_optimizer_spec():
             raise RuntimeError("Matmul.build() must succeed with %s" % valid_matmul_spec)
 
         matmul_spec = copy.deepcopy(valid_matmul_spec)
-        matmul_spec["optimizer"] = ""
+        matmul_spec[_OPTIMIZER] = ""
         try:
             Matmul.build(matmul_spec)
             raise RuntimeError("Matmul.build() must fail with invalid optimizer spec")
@@ -520,7 +531,7 @@ def test_020_matmul_builder_to_fail_optimizer_spec():
             pass
 
         matmul_spec = copy.deepcopy(valid_matmul_spec)
-        matmul_spec["optimizer"]["scheme"] = "invalid"
+        matmul_spec[_OPTIMIZER][_SCHEME] = "invalid"
         try:
             Matmul.build(matmul_spec)
             raise RuntimeError("Matmul.build() must fail with invalid optimizer spec")
@@ -528,7 +539,7 @@ def test_020_matmul_builder_to_fail_optimizer_spec():
             pass
 
         matmul_spec = copy.deepcopy(valid_matmul_spec)
-        matmul_spec["optimizer"]["parameters"]["lr"] = np.random.uniform(-1, 0)
+        matmul_spec[_OPTIMIZER][_PARAMETERS]["lr"] = np.random.uniform(-1, 0)
         try:
             Matmul.build(matmul_spec)
             raise RuntimeError("Matmul.build() must fail with invalid lr value")
@@ -536,7 +547,7 @@ def test_020_matmul_builder_to_fail_optimizer_spec():
             pass
 
         matmul_spec = copy.deepcopy(valid_matmul_spec)
-        matmul_spec["optimizer"]["parameters"]["l2"] = np.random.uniform(-1, 0)
+        matmul_spec[_OPTIMIZER][_PARAMETERS]["l2"] = np.random.uniform(-1, 0)
         try:
             Matmul.build(matmul_spec)
             raise RuntimeError("Matmul.build() must fail with invalid l2 value")
@@ -569,17 +580,17 @@ def test_020_matmul_builder_to_succeed():
         lr = np.random.uniform()
         l2 = np.random.uniform()
         valid_matmul_spec = {
-            "name": "test_020_matmul_builder_to_fail_matmul_spec",
-            "num_nodes": M,
-            "num_features": D,
-            "weight": {
-                "scheme": "he",
-                "num_nodes": M,
-                "num_features": D + 1
+            _NAME: "test_020_matmul_builder_to_fail_matmul_spec",
+            _NUM_NODES: M,
+            _NUM_FEATURES: D,
+            _WEIGHTS: {
+                _SCHEME: "he",
+                _NUM_NODES: M,
+                _NUM_FEATURES: D + 1
             },
-            "optimizer": {
-                "scheme": "sGd",
-                "parameters": {
+            _OPTIMIZER: {
+                _SCHEME: "sGd",
+                _PARAMETERS: {
                     "lr": lr,
                     "l2": l2
                 }
@@ -593,14 +604,14 @@ def test_020_matmul_builder_to_succeed():
             raise RuntimeError("Matmul.build() must succeed with %s" % valid_matmul_spec)
 
         matmul_spec = copy.deepcopy(valid_matmul_spec)
-        matmul_spec["optimizer"]["scheme"] = "sgd"
+        matmul_spec[_OPTIMIZER][_SCHEME] = "sgd"
         try:
             Matmul.build(valid_matmul_spec)
         except Exception as e:
             raise RuntimeError("Matmul.build() must succeed with %s" % valid_matmul_spec)
 
         matmul_spec = copy.deepcopy(valid_matmul_spec)
-        matmul_spec["optimizer"]["scheme"] = "SGD"
+        matmul_spec[_OPTIMIZER][_SCHEME] = "SGD"
         try:
             Matmul.build(valid_matmul_spec)
         except Exception as e:
@@ -657,16 +668,16 @@ def test_020_matmul_round_trip():
             )
         else:
             matmul_spec = {
-                "name": "test_020_matmul_builder_to_fail_matmul_spec",
-                "num_nodes": M,
-                "num_features": D,
-                "weight": {
-                    "scheme": "he",
-                    "num_nodes": M,
-                    "num_features": D + 1
+                _NAME: "test_020_matmul_builder_to_fail_matmul_spec",
+                _NUM_NODES: M,
+                _NUM_FEATURES: D,
+                _WEIGHTS: {
+                    _SCHEME: "he",
+                    _NUM_NODES: M,
+                    _NUM_FEATURES: D + 1
                 },
-                "optimizer": {
-                    "scheme": "sGd"
+                _OPTIMIZER: {
+                    _SCHEME: "sGd"
                 }
             }
             matmul = Matmul.build(matmul_spec)

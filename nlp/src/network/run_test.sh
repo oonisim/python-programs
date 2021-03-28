@@ -62,8 +62,8 @@ echo "Running PyTest..."
 #--------------------------------------------------------------------------------
 NUM_CPU=6
 #python3 -m cProfile -o profile -m pytest \
-#  -n $NUM_CPU \
 pytest \
+  -n $NUM_CPU \
   --rootdir=${DIR} \
   -vv \
   --capture=tee-sys \

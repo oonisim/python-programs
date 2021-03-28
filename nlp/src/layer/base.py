@@ -125,71 +125,12 @@ from common.functions import (
 class Layer:
     """Neural network layer base class"""
     # ================================================================================
-    # Class initialization
+    # Class
     # ================================================================================
 
     # ================================================================================
-    # Instance initialization
+    # Instance
     # ================================================================================
-    def __init__(
-            self,
-            name: str,
-            num_nodes: int,
-            posteriors: Optional[List] = None,
-            log_level: int = logging.WARNING
-    ):
-        """
-        Args:
-            name: layer ID name
-            num_nodes: number of nodes in a layer
-        """
-        assert name
-        self._name: str = name
-
-        # number of nodes in the layer
-        assert num_nodes > 0
-        self._num_nodes = num_nodes
-        self._M: int = num_nodes
-
-        # --------------------------------------------------------------------------------
-        # X: batch input of shape(N, D)
-        # Gradient dL/dX of has the same shape(N,D) with X because L is scalar.
-        # --------------------------------------------------------------------------------
-        self._X: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)
-        self._N: int = -1
-        self._dX: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)
-        self._D: int = -1
-
-        # Labels of shape(N, M) for OHE or (N,) for index.
-        self._T: np.ndarray = np.empty(0, dtype=TYPE_LABEL)
-
-        # --------------------------------------------------------------------------------
-        # layer output Y of shape(N, M)
-        # Gradient dL/dY has the same shape (N, M) with Y because the L is scalar.
-        # dL/dY is the sum of all the impact on L by dY.
-        # --------------------------------------------------------------------------------
-        self._Y: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)
-        self._dY: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)
-
-        # --------------------------------------------------------------------------------
-        # State of the layer
-        # --------------------------------------------------------------------------------
-        self._S: List[Union[TYPE_FLOAT, np.ndarray]] = []
-        self._dS: List[Union[TYPE_FLOAT, np.ndarray]] = []
-
-        # --------------------------------------------------------------------------------
-        # Layers to which forward the matmul output
-        # --------------------------------------------------------------------------------
-        self._posteriors: List[Layer] = posteriors
-        self._num_posteriors: int = len(posteriors) if posteriors else -1
-
-        # --------------------------------------------------------------------------------
-        # Objective Li function for the layer. L = Li o fi
-        # --------------------------------------------------------------------------------
-        self._objective: Callable[[np.ndarray], np.ndarray] = None
-
-        self._logger = logging.getLogger(name)
-        self._logger.setLevel(logging._levelToName[log_level])
 
     # --------------------------------------------------------------------------------
     # Instance properties
@@ -314,7 +255,13 @@ class Layer:
         return self._dY
 
     @property
-    def S(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
+    def S(self) -> \
+            Union[
+                List[Union[TYPE_FLOAT, np.ndarray]],
+                List[
+                    List[Union[float, np.ndarray]]
+                ]
+            ]:
         """State of the layer
         For a layer which has no state, it is an empty list.
         Hence cannot validate if initialized or not.
@@ -324,7 +271,13 @@ class Layer:
         return self._S
 
     @property
-    def dS(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
+    def dS(self) -> \
+            Union[
+                List[Union[TYPE_FLOAT, np.ndarray]],
+                List[
+                    List[Union[float, np.ndarray]]
+                ]
+            ]:
         """Gradients dL/dS that have been used to update S in each layer
         For a layer which has no state, it is an empty list.
         Hence cannot validate if initialized or not.
@@ -335,7 +288,18 @@ class Layer:
 
     @property
     def objective(self) -> Callable[[np.ndarray], np.ndarray]:
-        """Objective function L=fn-1 o fn-2 o ... o fi"""
+        """Objective function L=fn-1 o fn-2 o ... o fi
+        Layer i has its objective function Li = (fn-1 o ... o fi+1) for i < n-1
+        that calculates L=Li(Yi) from its output Yi=fi(Xi). L = Li(fi) i < n-1.
+
+        Li   = (fn-1 o ... o fi+1)
+        Li-1 = (fn-1 o ... o fi+1 o fi) = Li(fi) = Li o fi
+        L = Li-1(fi-1(Xi-1)) = Li(fi(Yi-1)) where Yi-1=fi-1(Xi-1)
+        #
+        Set Li to each inference layer i in the reverse order.
+        Ln-2 for the last inference layer n-2 is fn-1 of the objective layer.
+        Ln-2 = fn-1 by the definition Li = (fn-1 o ... o fi+1).
+        """
         assert callable(self._objective), "Objective function L has not been initialized."
         return self._objective
 
@@ -347,8 +311,81 @@ class Layer:
     @property
     def logger(self) -> logging.Logger:
         """Instance logger"""
-        assert self._logger, "logger is not initialized"
+        assert isinstance(self._logger, logging.Logger), "logger is not initialized"
         return self._logger
+
+    # --------------------------------------------------------------------------------
+    # Initialization
+    # --------------------------------------------------------------------------------
+    def __init__(
+            self,
+            name: str,
+            num_nodes: int,
+            posteriors: Optional[List] = None,
+            log_level: int = logging.WARNING
+    ):
+        """
+        Args:
+            name: layer ID name
+            num_nodes: number of nodes in a layer
+        """
+        assert name
+        self._name: str = name
+
+        # number of nodes in the layer
+        assert num_nodes > 0
+        self._num_nodes = num_nodes
+        self._M: int = num_nodes
+
+        # --------------------------------------------------------------------------------
+        # X: batch input of shape(N, D)
+        # Gradient dL/dX of has the same shape(N,D) with X because L is scalar.
+        # --------------------------------------------------------------------------------
+        self._X: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)
+        self._N: int = -1
+        self._dX: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)
+        self._D: int = -1
+
+        # Labels of shape(N, M) for OHE or (N,) for index.
+        self._T: np.ndarray = np.empty(0, dtype=TYPE_LABEL)
+
+        # --------------------------------------------------------------------------------
+        # layer output Y of shape(N, M)
+        # Gradient dL/dY has the same shape (N, M) with Y because the L is scalar.
+        # dL/dY is the sum of all the impact on L by dY.
+        # --------------------------------------------------------------------------------
+        self._Y: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)
+        self._dY: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)
+
+        # --------------------------------------------------------------------------------
+        # State of the layer
+        # --------------------------------------------------------------------------------
+        self._S: Union[
+            List[Union[TYPE_FLOAT, np.ndarray]],
+            List[
+                List[Union[float, np.ndarray]]
+            ]
+        ] = []   # Gradients dL/dS of layers
+        self._dS: Union[
+            List[Union[TYPE_FLOAT, np.ndarray]],
+            List[
+                List[Union[float, np.ndarray]]
+            ]
+        ] = []   # Gradients dL/dS of layers
+
+        # --------------------------------------------------------------------------------
+        # Layers to which forward the matmul output
+        # --------------------------------------------------------------------------------
+        self._posteriors: List[Layer] = posteriors
+        self._num_posteriors: int = len(posteriors) if posteriors else -1
+
+        # --------------------------------------------------------------------------------
+        # Objective Li function for the layer. L = Li o fi
+        # --------------------------------------------------------------------------------
+        self._objective: Callable[[np.ndarray], np.ndarray] = None
+
+        self._logger = logging.getLogger(name)
+        self._logger.setLevel(logging._levelToName[log_level])
 
     # --------------------------------------------------------------------------------
     # Instance methods
@@ -387,7 +424,8 @@ class Layer:
         Returns:
             Y: layer output
         """
-        assert self._posteriors, "forward(): No post layer exists."
+        assert isinstance(self._posteriors, list) and len(self._posteriors) > 0, \
+            "forward(): No post layer exists."
 
         def _forward(Y: np.ndarray, layer: Layer) -> None:
             """Forward the matmul output Y to a post layer
@@ -434,7 +472,8 @@ class Layer:
     def backward(self) -> Union[np.ndarray, float]:
         """Calculate the gradient dL/dX to back-propagate
         """
-        assert self._posteriors, "backward() called when no post layer exist."
+        assert isinstance(self._posteriors, list) and len(self._posteriors) > 0, \
+            "backward() called when no post layer exist."
 
         def _backward(layer: Layer) -> np.ndarray:
             """Get gradient dL/dY from a post layer
@@ -504,7 +543,4 @@ class Layer:
         Returns:
             Y: score
         """
-        self.logger.warning(
-            "Layer base method predict not overridden but called by %s."
-        )
         return self.function(X)

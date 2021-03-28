@@ -41,7 +41,7 @@ class Optimizer:
     @property
     def name(self) -> str:
         """Learning rate of the gradient descent"""
-        assert self._name
+        assert isinstance(self._name, str) and len(self._name) > 0
         return self._name
 
     @property
@@ -79,7 +79,8 @@ class Optimizer:
     @property
     def logger(self) -> logging.Logger:
         """Instance logger"""
-        assert self._logger, "logger is not initialized"
+        assert isinstance(self._logger, logging.Logger), \
+            "logger is not initialized"
         return self._logger
 
     # --------------------------------------------------------------------------------

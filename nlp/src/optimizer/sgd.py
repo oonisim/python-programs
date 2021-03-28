@@ -17,6 +17,16 @@ class SGD(Optimizer):
     # Class
     # ================================================================================
     @staticmethod
+    def template(specification: Dict):
+        return {
+            "scheme": SGD.__qualname__,
+            "parameters": {
+                "lr": 0.01,
+                "l2": 1e-3
+            }
+        }
+
+    @staticmethod
     def build(specification: Dict):
         """Build an optimizer based on the specification.
         Spec example:

@@ -54,6 +54,7 @@ class Sequential(Layer):
             name: str,
             num_nodes: int,
             layers: List[Layer],
+            omit_last_activation_for_prediction: bool = False,
             posteriors: Optional[List[Layer]] = None,
             log_level: int = logging.ERROR
     ):
@@ -61,6 +62,9 @@ class Sequential(Layer):
         Args:
             name: Layer identity name
             num_nodes: Number of nodes M of the first the layer
+            layers: Layers to sequence
+            omit_last_activation_for_prediction:
+                flag to omit the last activation at compositing prediction.
             posteriors: Post layers to which forward the matmul layer output
             log_level: logging level
         """
@@ -69,31 +73,46 @@ class Sequential(Layer):
             isinstance(layers, List) and len(layers) > 0 and \
             all([isinstance(__layer, Layer) for __layer in layers])
 
-        assert num_nodes == layers[0].num_nodes, \
-            "The num_nodes %s must match with that of the first layer %s" \
-            % (num_nodes, layers[0].num_nodes)
+        self._logger = logging.getLogger(name)
+        self._logger.setLevel(logging._levelToName[log_level])
+
+        # --------------------------------------------------------------------------------
+        # num_nodes is to specify the number of outputs from the layer.
+        # For objective layer(s), num_nodes are the same at input and output.
+        # Hence the input number into the objective layer will match the
+        # output number from the inference layer by checking num_nodes with
+        # the number of the last layer output.
+        # --------------------------------------------------------------------------------
+        assert num_nodes == layers[-1].num_nodes, \
+            "The num_nodes %s must match with that of the last layer %s" \
+            % (num_nodes, layers[-1].num_nodes)
 
         self._layers: List[Layer] = layers
 
         # --------------------------------------------------------------------------------
-        # State of the layer
-        # --------------------------------------------------------------------------------
-        self._S = [__layer.S for __layer in self.layers]
-
-        # --------------------------------------------------------------------------------
         # Layer function F=(fn-1 o ... o f0)
+        # Layer prediction function F=(fn-1 o ... o f0)
         # Gradient function G=(g0 o g1 o ... o gn-1)
         # --------------------------------------------------------------------------------
         self.function, self.predict, self.gradient = \
-            compose_sequential_layer_interface(layers)
+            compose_sequential_layer_interface(
+                self.layers, omit_last_activation_for_prediction
+            )
 
         # --------------------------------------------------------------------------------
         # Layer objective to be initialized with its setter
         # --------------------------------------------------------------------------------
         self._objective = None
 
-        self._logger = logging.getLogger(name)
-        self._logger.setLevel(logging._levelToName[log_level])
+        # --------------------------------------------------------------------------------
+        # State of the layer
+        # --------------------------------------------------------------------------------
+        self._S: List[
+            List[Union[float, np.ndarray]]
+        ] = [__layer.S for __layer in self.layers]
+        self._dS: List[
+            List[Union[float, np.ndarray]]
+        ] = []
 
     # --------------------------------------------------------------------------------
     # Instance properties
@@ -119,34 +138,43 @@ class Sequential(Layer):
         return self._S
 
     @property
+    def dS(self) -> List[
+            List[Union[float, np.ndarray]]
+    ]:
+        """List of the state gradients from each layer [ dS0, dS1, ..., dSn-1]
+        Layers may not have state e.g. ReLU, hence cannot check if initialized
+        """
+        return self._dS
+
+    @property
     def layers(self) -> List[Layer]:
-        """Inference layers"""
+        """Layers in the sequence"""
         return self._layers
 
     @property
     def num_layers(self) -> int:
-        """Number of layers"""
+        """Number of layers in the sequence"""
         return len(self.layers)
 
     @property
-    def objective(self) -> Callable[[np.ndarray], np.ndarray]:
-        """Layer objective function
-        Layer i has its objective function Li = (fn-1 o ... o fi+1) for i < n-1
-        that calculates L=Li(Yi) from its output Yi=fi(Xi). L = Li(fi) i < n-1.
+    def layer_names(self) -> List[str]:
+        """Inference layers"""
+        return [__layer.name for __layer in self.layers]
 
-        Li   = (fn-1 o ... o fi+1)
-        Li-1 = (fn-1 o ... o fi+1 o fi) = Li(fi) = Li o fi
-        L = Li-1(fi-1(Xi-1)) = Li(fi(Yi-1)) where Yi-1=fi-1(Xi-1)
-        #
-        Set Li to each inference layer i in the reverse order.
-        Ln-2 for the last inference layer n-2 is fn-1 of the objective layer.
-        Ln-2 = fn-1 by the definition Li = (fn-1 o ... o fi+1).
-        """
-        assert callable(self._objective), "Objective function L not initialized."
-        return self._objective
+    @property
+    def objective(self) -> Callable[[np.ndarray], np.ndarray]:
+        return super().objective
 
     @objective.setter
     def objective(self, objective: Callable[[np.ndarray], np.ndarray]) -> NoReturn:
+        """
+        Responsibility:
+            Set objective function Li=(fn-1 o fn-2 o ... o fi) to each layer i
+            in the sequence.
+
+            Layer i has its objective function Li = (fn-1 o ... o fi+1) for i < n-1
+            that calculates L=Li(Yi) from its output Yi=fi(Xi). L = Li(fi) i < n-1.
+        """
         assert callable(objective)
         self._objective = objective
         compose_sequential_layer_objective(self.layers, objective)
@@ -163,10 +191,13 @@ class Sequential(Layer):
         for __layer in self.layers:
             __layer.T = T
 
-    def update(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
+    def update(self) -> List[
+            List[Union[float, np.ndarray]]
+    ]:
         """Invoke the update() method of each layer in the container.
         Returns:
             [*dL/dS]: List of dL/dS form each layer update()
         """
-        self._dS = [__layer.update() for __layer in self.layers]
-        return self.dS
+        dS = [__layer.update() for __layer in self.layers]
+        self._dS = dS
+        return dS
