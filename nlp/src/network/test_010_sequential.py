@@ -7,7 +7,6 @@ from typing import (
     Callable
 )
 import numpy as np
-import common.weights as weights
 from common.constants import (
     TYPE_FLOAT,
 )
@@ -52,171 +51,135 @@ from data import (
     linear_separable_sectors
 )
 
-
 Logger = logging.getLogger(__name__)
 # Logger.setLevel(logging.DEBUG)
 
 
-def test_010_sequential_instantiation_to_fail():
-    lr = np.random.uniform()
-    l2 = np.random.uniform()
-
-    valid_network_specification = {
-        "matmul01": {
-            _SCHEME: layer.Matmul.__qualname__,
-            _PARAMETERS: {
-                _NUM_NODES: 8,
-                _NUM_FEATURES: 2,  # NOT including bias
-                _WEIGHTS: {
-                    _SCHEME: "he"
-                },
-                _OPTIMIZER: {
-                    _SCHEME: optimiser.SGD.__qualname__,
-                    _PARAMETERS: {
-                        "lr": lr,
-                        "l2": l2
-                    }
-                }
-            },
-        },
-        "activation01": {
-            _SCHEME: layer.ReLU.__qualname__,
-            _PARAMETERS: {
-                _NUM_NODES: 8
-            }
-        },
-        "matmul02": {
-            _SCHEME: layer.Matmul.__qualname__,
-            _PARAMETERS: {
-                _NUM_NODES: 3,
-                _NUM_FEATURES: 8,  # NOT including bias
-                _WEIGHTS: {
-                    _SCHEME: "he"
-                }
-            }
-        },
-        "activation02": {
-            _SCHEME: layer.ReLU.__qualname__,
-            _PARAMETERS: {
-                _NUM_NODES: 3
-            }
-        },
-        "objective": {
-            _SCHEME: layer.CrossEntropyLogLoss.__qualname__,
-            _PARAMETERS: {
-                _NUM_NODES: 3,
-                _LOSS_FUNCTION: "softmax_cross_entropy_log_loss"
-            }
-        }
-    }
-
-    # ----------------------------------------------------------------------
-    # Validate the correct specification.
-    # NOTE: Invalidate one parameter at a time from the correct one.
-    # Otherwise not sure what you are testing.
-    # ----------------------------------------------------------------------
+def _must_fail(
+        name,
+        M,
+        network_specification,
+        message
+):
     try:
         network = SequentialNetwork(
-            name="test_010_base_instantiation_to_fail",
-            num_nodes=3,    # number of the last layer output,
-            specification=valid_network_specification,
-            log_level=logging.DEBUG
-        )
-
-        inference_layer: layer.Sequential = network.layer_inference
-        matmul_layer: layer.Matmul = inference_layer.layers[0]
-        assert matmul_layer.optimizer.lr == lr
-        assert matmul_layer.optimizer.l2 == l2
-
-    except Exception as e:
-        raise RuntimeError(
-            "SequentialNetwork() must succeed with %s"
-            % valid_network_specification
-        )
-
-    network_specification = copy.deepcopy(valid_network_specification)
-    network_specification["matmul01"][_PARAMETERS][_OPTIMIZER][_PARAMETERS]["lr"] = \
-        -np.random.uniform()
-    try:
-        network = SequentialNetwork(
-            name="test_010_base_instantiation_to_fail",
-            num_nodes=3,    # number of the last layer output,
+            name=name,
+            num_nodes=M,    # number of the last layer output,
             specification=network_specification,
             log_level=logging.DEBUG
         )
-        raise RuntimeError("SequentialNetwork() must fail with invalid lr value")
+        raise RuntimeError(message)
     except AssertionError:
         pass
 
 
-def test_010_sequential_train():
-    # --------------------------------------------------------------------------------
-    # Network without sequential layer
-    # --------------------------------------------------------------------------------
-    N = 10
-    D = 2
-    M: int = 3
-    lr = 0.01
-    l2 = 1e-3
+def _must_succeed(
+        name,
+        num_nodes,
+        specification,
+        log_level,
+        message
+):
+    try:
+        network = SequentialNetwork(
+            name=name,
+            num_nodes=num_nodes,    # number of the last layer output,
+            specification=specification,
+            log_level=log_level
+        )
+        return network
+    except Exception as e:
+        raise RuntimeError(message)
 
-    # --------------------------------------------------------------------------------
-    # Network using sequential
-    # --------------------------------------------------------------------------------
-    valid_network_specification = {
-        "matmul01": {
-            _SCHEME: layer.Matmul.__qualname__,
-            _PARAMETERS: {
-                _NUM_NODES: M,
-                _NUM_FEATURES: D,  # NOT including bias
-                _WEIGHTS: {
-                    _SCHEME: "he"
-                },
-                _OPTIMIZER: {
-                    _SCHEME: optimiser.SGD.__qualname__,
-                    _PARAMETERS: {
-                        "lr": lr,
-                        "l2": l2
-                    }
-                }
-            },
-        },
-        "activation01": {
-            _SCHEME: layer.ReLU.__qualname__,
-            _PARAMETERS: {
-                _NUM_NODES: M
-            }
-        },
-        "objective": {
-            _SCHEME: layer.CrossEntropyLogLoss.__qualname__,
-            _PARAMETERS: {
-                _NUM_NODES: M,
-                _LOSS_FUNCTION: "softmax_cross_entropy_log_loss"
-            }
-        }
-    }
+
+def test_010_sequential_instantiation_to_fail():
+    name = "test_010_base_instantiation_to_fail"
+
     # ----------------------------------------------------------------------
     # Validate the correct specification.
     # NOTE: Invalidate one parameter at a time from the correct one.
     # Otherwise not sure what you are testing.
     # ----------------------------------------------------------------------
-    try:
-        network = SequentialNetwork(
-            name="test_010_base_instantiation_to_fail",
-            num_nodes=M,    # number of the last layer output,
-            specification=valid_network_specification,
-            log_level=logging.DEBUG
-        )
+    from config_test_010_sequential_config import (
+        valid_network_specification_mamao,
+        M
+    )
+    lr = np.random.uniform()
+    l2 = np.random.uniform()
+    valid_network_specification_mamao["matmul01"][_PARAMETERS][_OPTIMIZER][_PARAMETERS]["lr"] = lr
+    valid_network_specification_mamao["matmul01"][_PARAMETERS][_OPTIMIZER][_PARAMETERS]["l2"] = l2
+    network = _must_succeed(
+        name="test_010_base_instantiation_to_fail",
+        num_nodes=M,  # number of the last layer output,
+        specification=valid_network_specification_mamao,
+        log_level=logging.DEBUG,
+        message="SequentialNetwork() must succeed with %s"
+                % valid_network_specification_mamao
+    )
+    inference_layer: layer.Sequential = network.layer_inference
+    matmul_layer: layer.Matmul = inference_layer.layers[0]
+    assert matmul_layer.optimizer.lr == lr
+    assert matmul_layer.optimizer.l2 == l2
 
-        inference_layer: layer.Sequential = network.layer_inference
-        sequential_matmul_layer: layer.Matmul = inference_layer.layers[0]
-        assert sequential_matmul_layer.optimizer.lr == lr
-        assert sequential_matmul_layer.optimizer.l2 == l2
+    # ********************************************************************************
+    # Constraint: 0 < lr < 1 and 0 < l2 < 1
+    # ********************************************************************************
+    msg = "SequentialNetwork() must fail with invalid lr value"
+    network_specification = copy.deepcopy(valid_network_specification_mamao)
+    network_specification["matmul01"][_PARAMETERS][_OPTIMIZER][_PARAMETERS]["lr"] = \
+        -np.random.uniform()
+    _must_fail(name=name, M=M, network_specification=network_specification, message=msg)
 
-    except Exception as e:
-        raise RuntimeError(
-            "SequentialNetwork() must succeed with %s"
-            % valid_network_specification
-        )
+    msg = "SequentialNetwork() must fail with invalid l2 value"
+    network_specification = copy.deepcopy(valid_network_specification_mamao)
+    network_specification["matmul01"][_PARAMETERS][_OPTIMIZER][_PARAMETERS]["l2"] = \
+        -np.random.uniform()
+    _must_fail(name=name, M=M, network_specification=network_specification, message=msg)
+
+    # ********************************************************************************
+    # Constraint: must match
+    # 1. Number of outputs from the inference
+    # 2. Number of inputs = number of outputs of the objective layer
+    # 3. num_nodes parameter of SequentialNetwork(arg)
+    # ********************************************************************************
+    msg = "SequentialNetwork() must fail when num_nodes does not match that of last inference layer"
+    network_specification = copy.deepcopy(valid_network_specification_mamao)
+    network_specification["activation02"][_PARAMETERS][_NUM_NODES] = (M-1)
+    _must_fail(name=name, M=M, network_specification=network_specification, message=msg)
+
+    msg = "SequentialNetwork() must fail when num_nodes does not match that of the objective layer"
+    network_specification = copy.deepcopy(valid_network_specification_mamao)
+    network_specification["objective"][_PARAMETERS][_NUM_NODES] = (M-1)
+    _must_fail(name=name, M=M, network_specification=network_specification, message=msg)
+
+
+def test_010_validate_sequential_matmul_relu_training():
+    # --------------------------------------------------------------------------------
+    # Network using sequential
+    # --------------------------------------------------------------------------------
+    # ----------------------------------------------------------------------
+    # Validate the correct specification.
+    # NOTE: Invalidate one parameter at a time from the correct one.
+    # Otherwise not sure what you are testing.
+    # ----------------------------------------------------------------------
+    from config_test_010_sequential_config import (
+        valid_network_specification_mao,
+        M,
+        N,
+        D,
+        _lr,
+        _l2
+    )
+    network = _must_succeed(
+        name="test_010_base_instantiation_to_fail",
+        num_nodes=M,  # number of the last layer output,
+        specification=valid_network_specification_mao,
+        log_level=logging.DEBUG,
+        message="SequentialNetwork() must succeed with %s"
+                % valid_network_specification_mao
+    )
+    inference_layer: layer.Sequential = network.layer_inference
+    sequential_matmul_layer: layer.Matmul = inference_layer.layers[0]
 
     # --------------------------------------------------------------------------------
     # Network without sequential
@@ -225,7 +188,7 @@ def test_010_sequential_train():
     W = sequential_matmul_layer.W
     W_non_sequential = copy.deepcopy(W)
 
-    optimizer_non_sequential = optimiser.SGD(lr=lr, l2=l2)
+    optimizer_non_sequential = optimiser.SGD(lr=_lr, l2=_l2)
     *network_components, = build_matmul_relu_objective(
         M,
         D,
@@ -286,10 +249,8 @@ def test_010_sequential_train():
         # ********************************************************************************
         assert np.allclose(A_sequential, A, atol=0.0, rtol=0.01), \
             "Expected A is \n%s\nactual is \n%s\ndiff %s\n" % (A, A_sequential, A-A_sequential)
-
         assert np.allclose(L_sequential, L, atol=0.0, rtol=0.01), \
             "Expected L is \n%s\nactual is %s\ndiff %s\n" % (L, L_sequential, L-L_sequential)
-
         assert np.allclose(dX_sequential, dX, atol=0.0, rtol=0.01), \
             "Expected dX is \n%s\nactual is %s\ndiff %s\n" % (dX, dX_sequential, dX-dX_sequential)
 
@@ -306,141 +267,33 @@ def test_010_sequential_train2():
     # --------------------------------------------------------------------------------
     # Network without sequential layer
     # --------------------------------------------------------------------------------
-    N = 16
-    D = 2
-    M: int = 3
-    lr = 0.1
-    l2 = 1e-3
     num_epochs = 100
 
     # --------------------------------------------------------------------------------
     # Network using sequential
     # --------------------------------------------------------------------------------
-    valid_network_specification = {
-        "matmul01": {
-            _SCHEME: layer.Matmul.__qualname__,
-            _PARAMETERS: {
-                _NUM_NODES: 16,
-                _NUM_FEATURES: 2,  # NOT including bias
-                _WEIGHTS: {
-                    _SCHEME: "he"
-                },
-                _OPTIMIZER: {
-                    _SCHEME: optimiser.SGD.__qualname__,
-                    _PARAMETERS: {
-                        "lr": lr,
-                        "l2": l2
-                    }
-                }
-            },
-        },
-        "bn01": {
-            _SCHEME: layer.BatchNormalization.__qualname__,
-            _PARAMETERS: {
-                _NUM_NODES: 16,
-                "momentum": 0.9,
-            }
-        },
-        "activation01": {
-            _SCHEME: layer.ReLU.__qualname__,
-            _PARAMETERS: {
-                _NUM_NODES: 16
-            }
-        },
-        "matmul02": {
-            _SCHEME: layer.Matmul.__qualname__,
-            _PARAMETERS: {
-                _NUM_NODES: 32,
-                _NUM_FEATURES: 16,  # NOT including bias
-                _WEIGHTS: {
-                    _SCHEME: "he"
-                },
-                _OPTIMIZER: {
-                    _SCHEME: optimiser.SGD.__qualname__,
-                    _PARAMETERS: {
-                        "lr": lr,
-                        "l2": l2
-                    }
-                }
-            },
-        },
-        "bn02": {
-            _SCHEME: layer.BatchNormalization.__qualname__,
-            _PARAMETERS: {
-                _NUM_NODES: 32,
-            }
-        },
-        "activation02": {
-            _SCHEME: layer.ReLU.__qualname__,
-            _PARAMETERS: {
-                _NUM_NODES: 32
-            }
-        },
-        "matmul03": {
-            _SCHEME: layer.Matmul.__qualname__,
-            _PARAMETERS: {
-                _NUM_NODES: 16,
-                _NUM_FEATURES: 32,  # NOT including bias
-                _WEIGHTS: {
-                    _SCHEME: "he"
-                },
-                _OPTIMIZER: {
-                    _SCHEME: optimiser.SGD.__qualname__,
-                    _PARAMETERS: {
-                        "lr": lr,
-                        "l2": l2
-                    }
-                }
-            },
-        },
-        "activation03": {
-            _SCHEME: layer.ReLU.__qualname__,
-            _PARAMETERS: {
-                _NUM_NODES: 16
-            }
-        },
-        "matmul04": {
-            _SCHEME: layer.Matmul.__qualname__,
-            _PARAMETERS: {
-                _NUM_NODES: 3,
-                _NUM_FEATURES: 16,  # NOT including bias
-                _WEIGHTS: {
-                    _SCHEME: "he"
-                }
-            }
-        },
-        "objective": {
-            _SCHEME: layer.CrossEntropyLogLoss.__qualname__,
-            _PARAMETERS: {
-                _NUM_NODES: M,
-                _LOSS_FUNCTION: "softmax_cross_entropy_log_loss"
-            }
-        }
-    }
+    from config_test_010_sequential_config import (
+        valid_network_specification_mbambamamo,
+        N,
+        M,
+        D,
+    )
 
     # ----------------------------------------------------------------------
     # Validate the correct specification.
     # NOTE: Invalidate one parameter at a time from the correct one.
     # Otherwise not sure what you are testing.
     # ----------------------------------------------------------------------
-    try:
-        network = SequentialNetwork(
-            name="test_010_base_instantiation_to_fail",
-            num_nodes=M,    # number of the last layer output,
-            specification=valid_network_specification,
-            log_level=logging.ERROR
-        )
-
-        inference_layer: layer.Sequential = network.layer_inference
-        sequential_matmul_layer: layer.Matmul = inference_layer.layers[0]
-        assert sequential_matmul_layer.optimizer.lr == lr
-        assert sequential_matmul_layer.optimizer.l2 == l2
-
-    except Exception as e:
-        raise RuntimeError(
-            "SequentialNetwork() must succeed with %s"
-            % valid_network_specification
-        )
+    network = _must_succeed(
+        name="test_010_base_instantiation_to_fail",
+        num_nodes=M,  # number of the last layer output,
+        specification=valid_network_specification_mbambamamo,
+        log_level=logging.ERROR,
+        message="SequentialNetwork() must succeed with %s"
+                % valid_network_specification_mbambamamo
+    )
+    inference_layer: layer.Sequential = network.layer_inference
+    sequential_matmul_layer: layer.Matmul = inference_layer.layers[0]
 
     # --------------------------------------------------------------------------------
     # Training data

@@ -173,10 +173,10 @@ class SequentialNetwork(Network):
             "Inference count %s objective count is %s" \
             % (len(inference_layer_specs), len(objective_layer_specs))
 
+        last_inference_num_nodes = inference_layer_specs[list(inference_layer_specs.keys())[-1]][_PARAMETERS][_NUM_NODES]
+        first_objective_num_nodes = objective_layer_specs[list(objective_layer_specs.keys())[0]][_PARAMETERS][_NUM_NODES]
         assert \
-            list(inference_layer_specs.values())[-1][_PARAMETERS][_NUM_NODES] == \
-            list(objective_layer_specs.values())[0][_PARAMETERS][_NUM_NODES] == \
-            num_nodes, \
+            last_inference_num_nodes == first_objective_num_nodes == num_nodes, \
             "The number of nodes in the last inference layer [%s] "\
             "must match that of the first objective layer [%s]." \
             % (
