@@ -1,8 +1,32 @@
 """Base for neural network implementations
-G=g0(g1(...(gn-1(X))...) = (g0 o ... o gi o ... gn-1)
-    Back-propagation passes the gradient dL/dX backwards from the last layer.
+Network is a higher order composite of (inference, objective) each of which
+can be a network itself. Hence network class is subclass of Layer.
 
-What is "function" of a "network".
+objective:
+    It is a replaceable trainer who e-valuates the performance of "inference".
+    The objective setter of the Layer class sets an objective layer of the
+    network. It would be a MSE layer or a cross entropy log loss layer, but
+    also it can be a network.
+
+inference:
+    It can be either
+    1. a stateful terminal layer (e.g. Matmul)
+    2. a stateless terminal layer (e.g. ReLU)
+    3. a composite (non-network) layer (e.g Sequential)
+    4. a network, creating a higher-order recursive composite
+
+    A stateful layer can learn to estimate q0(X) via the e-valuation from
+    the objective and generates a belief on the population q1(X).
+
+    A network has interfaces, besides those of Layer, which a terminal and
+    a composite layer does not have.
+
+    - train
+    - L/Loss
+    - history
+
+
+"function" of a "network".
     Have a clear separation between
     1. function at training on the sample q0(X)
     2. function at inference (including test) on the population q1(x).
@@ -71,16 +95,16 @@ class Network(Layer):
     # --------------------------------------------------------------------------------
     @property
     def T(self) -> np.ndarray:
-        """Label in OHE or index format"""
+        """Label in index format"""
         return super().T
 
     @T.setter
     def T(self, T: Union[np.ndarray, int]):
+        """Label setter
+        The inference layer can be a network which needs T. Hence set on both
+        inference and objective layers.
+        """
         super(Network, type(self)).T.fset(self, T)
-        # --------------------------------------------------------------------------------
-        # Although only the objective layer needs the label(s),
-        # make it available to all layers.
-        # --------------------------------------------------------------------------------
         for __layer in self.layers_all:
             __layer.T = T
 
@@ -121,15 +145,12 @@ class Network(Layer):
 
     @property
     def layers_all(self) -> List[Layer]:
-        """all layers"""
-        assert self._layers_all and len(self._layers_all) > 1, \
-            "Network need to have at least 1 objective and 1 inference layer."
+        """(inference, objective) in the network.
+        Keep the structure simple (inf, obj) only. Use currying to compose a complex.
+        """
+        assert self._layers_all and len(self._layers_all) == 2, \
+            "Network need to have 1 inference layer and 1 objective layer."
         return self._layers_all
-
-    @property
-    def num_layers(self) -> int:
-        """Number of layers"""
-        return len(self._layers_all)
 
     # --------------------------------------------------------------------------------
     # Initialization
@@ -196,16 +217,22 @@ class Network(Layer):
 
     def gradient(self, dY: Union[np.ndarray, TYPE_FLOAT]) -> Union[TYPE_FLOAT, np.ndarray]:
         """Back propagate gradients"""
-        return self._gradient(np.array(1.0))
+        dY = np.array(dY).astype(TYPE_FLOAT) if isinstance(dY, TYPE_FLOAT) else dY
+        assert isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT
+        return self._gradient(dY)
 
     def update(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
         """
         Responsibility:
-            Update layer state S by the gradient descent
+            Update network state S via the gradient descent on the inference layer.
 
-            Run on the inference layer only because the objective layer should be
-            stateless except T. T is stateful but constant during a cycle, hence
-            regarded as state-less during the cycle in which update() is called.
+            The objective may have a state (e.g. change e-valuation method/value)
+            based on the performance of the inference. However, for now, the state
+            is to do the prediction, which is done by the inference layer, not the
+            objective.
+
+            T. T is stateful but it is constant during a cycle, hence regarded as
+            state-less during the cycle in which update() is called.
 
         Returns:
             dS: List of the gradients on layer state(s)
@@ -214,7 +241,8 @@ class Network(Layer):
         return self.dS
 
     def train(
-            self, X: Union[TYPE_FLOAT, np.ndarray],
+            self,
+            X: Union[TYPE_FLOAT, np.ndarray],
             T: Union[TYPE_FLOAT, np.ndarray],
             run_validations: bool = False
     ):
@@ -224,27 +252,45 @@ class Network(Layer):
             T: label of shape (N,) in the index format
             run_validations: Flat if run the validations e.g. numerical gradient check
         Returns:
-            Model S: States of the model layers
+            Model S: Updated state of the network
         """
-        self.T = T
-        self.X = X
+        self.X = X.astype(TYPE_FLOAT)
+        self.T = T.astype(TYPE_LABEL)
 
-        self._Y = self.function(self.X)
-        self._L = self.objective(self.Y)
-        self.history.append(self.L)
+        # --------------------------------------------------------------------------------
+        # Forward path
+        # --------------------------------------------------------------------------------
+        self._Y = self.function(self.X).astype(TYPE_FLOAT)
+        self._L = self.objective(self.Y).astype(TYPE_FLOAT)
+        self._history.append(self.L)
 
-        self._dX = self.gradient(TYPE_FLOAT(1))
+        # --------------------------------------------------------------------------------
+        # Backward path
+        # --------------------------------------------------------------------------------
+        self._dX = self.gradient(TYPE_FLOAT(1)).astype(TYPE_FLOAT)
+
+        # --------------------------------------------------------------------------------
+        # Gradient descent
+        # --------------------------------------------------------------------------------
         self.update()
 
-        self.logger.info("Loss is %s", self.L)
-        self.logger.info(f"Gradient dL/dX is {self.dX}")
-        self.logger.info(f"Numerical gradients GN are {self.GN}")
-        self.logger.info(f"Analytical gradients dS are {self.dS}")
+        # --------------------------------------------------------------------------------
+        # Info
+        # --------------------------------------------------------------------------------
+        self.logger.info("Network[%s]: Loss is %s", self.name, self.L)
+        self.logger.info("Gradient dL/dX is %s", self.dX)
+        self.logger.info("Analytical gradients dS are %s\n", self.dS)
 
         return self.S
 
     def predict(
             self,
             X: np.ndarray
-    ):
-        return self.predict(X)
+    ) -> np.ndarray:
+        """Calculate the prediction on X
+        TODO: Research if put through softmax, etc. The same used by the objective.
+        Since the gradient descent process includes dL/dA at the softmax etc at the
+        objective layer, the state should be depending on what the softmax has done.
+        Hence it seems rational to incorporate the same activation at the objective.
+        """
+        return self.predict(X).astype(TYPE_FLOAT)

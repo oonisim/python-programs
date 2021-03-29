@@ -109,7 +109,6 @@ from typing import (
     NoReturn,
     Final
 )
-import inspect
 import logging
 import numpy as np
 from common.constants import (
@@ -254,7 +253,9 @@ class Layer:
     @property
     def dY(self) -> np.ndarray:
         """Latest gradient dL/dY (impact on L by dY) given from the post layer(s)"""
-        assert isinstance(self._dY, np.ndarray) and self._dY.dtype == TYPE_FLOAT \
+        assert \
+            isinstance(self._dY, np.ndarray) and \
+            self._dY.dtype == TYPE_FLOAT \
             and self._dY.size > 0, "dY is not initialized or invalid"
 
         if np.all(np.abs(self._dY) < GRADIENT_SATURATION_THRESHOLD):
@@ -408,8 +409,7 @@ class Layer:
         """
         assert isinstance(X, float) or (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT)
         self.logger.warning(
-            "Layer base method %s not overridden but called by %s.",
-            inspect.stack()[0][3], inspect.stack()[1][3]
+            "Layer base method %s not overridden but called.",
         )
 
         # In case for the layer is a repeater, pass X through as the default behavior.
@@ -464,8 +464,7 @@ class Layer:
 
         # In case the layer is a repeater or no gradient, pass dY through.
         self.logger.warning(
-            "Layer base method %s not overridden but called by %s.",
-            inspect.stack()[0][3], inspect.stack()[1][3]
+            "Layer base method %s not overridden but called",
         )
         assert isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT
         return dY
@@ -538,8 +537,7 @@ class Layer:
                 it is not part of the state S of the layer.
         """
         self.logger.warning(
-            "Layer base method %s not overridden but called by %s.",
-            inspect.stack()[0][3], inspect.stack()[1][3]
+            "Layer base method %s not overridden but called."
         )
         # Return 0 as the default for dL/dS to mark no change in case there is none
         # to update in a layer.
