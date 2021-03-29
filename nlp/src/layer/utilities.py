@@ -3,7 +3,8 @@ from typing import (
     Union,
     List,
     Dict,
-    Callable
+    Callable,
+    NoReturn
 )
 
 import numpy as np
@@ -58,7 +59,7 @@ def compose_sequential_layer_interface(
 
     function: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = None
     predict: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = None
-    gradient: [[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = None
+    gradient: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = None
 
     if len(layers) == 1:
         Logger.warning("Only 1 layer provided.")
@@ -100,3 +101,81 @@ def compose_sequential_layer_objective(
         objective = compose(*[__layer.function, objective])
 
     return objective
+
+
+def map_parallel_layer_interface(
+        layers: List[Layer],
+        omit_last_activation_for_prediction: bool = False
+):
+    """
+    Responsibility:
+        Generate function composition F=(fn-1 o ... o f0) from layers.
+        fi = layer(i).function
+    Args:
+        layers: List of layers
+        omit_last_activation_for_prediction:
+            flag to omit the last activation at compositing prediction function.
+    Returns:
+        F: Composed function F=(fn-1 o ... o f0)
+    """
+    assert len(layers) > 0
+
+    function: List[
+        Callable[
+            [Union[np.ndarray, TYPE_FLOAT]],
+            Union[np.ndarray, TYPE_FLOAT]
+        ]
+    ] = None
+    predict: List[
+        Callable[
+            [Union[np.ndarray, TYPE_FLOAT]],
+            Union[np.ndarray, TYPE_FLOAT]
+        ]
+    ] = None
+    gradient: List[
+        Callable[
+            [Union[np.ndarray, TYPE_FLOAT]],
+            Union[np.ndarray, TYPE_FLOAT]
+        ]
+    ] = None
+
+    if len(layers) == 1:
+        Logger.warning("Only 1 layer provided.")
+        function = [layers[0].function]
+        predict = [layers[0].predict]
+        gradient = [layers[0].gradient]
+    else:
+        def apply_function(_layer: Layer):
+            return _layer.function
+
+        def apply_gradient(_layer: Layer):
+            return _layer.function
+
+        def apply_predict(_layer: Layer):
+            return _layer.function
+
+        # Layer function F=(fn-1 o ... o f0)
+        function = list(map(apply_function, layers))
+        # Gradient function G=(g0 o g1 o ... o gn-1)
+        gradient = list(map(apply_gradient, layers)[::-1])
+        predict = list(map(apply_predict, layers))
+
+    return function, predict, gradient
+
+
+def map_parallel_layer_objective(
+        layers: List[Layer],
+        objective: Callable
+) -> List[Callable]:
+    """Build the objective function of a sequential layer
+    Args:
+        layers: layers in the sequence
+        objective: objective function of the last layer
+    """
+    assert callable(objective)
+
+    def apply(_layer: Layer):
+        _layer.objective = objective
+        return _layer.objective
+
+    return list(map(apply, layers))
