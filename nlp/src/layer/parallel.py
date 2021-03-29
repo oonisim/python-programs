@@ -30,7 +30,7 @@ import logging
 import numpy as np
 from layer.base import Layer
 from layer.utilities import (
-    compose_sequential_layer_interface,
+    map_parallel_layer_interface,
     map_parallel_layer_objective
 )
 from common.constants import (
@@ -95,7 +95,7 @@ class Parallel(Layer):
         # Gradient function G=(g0 o g1 o ... o gn-1)
         # --------------------------------------------------------------------------------
         self.function, self.predict, self.gradient = \
-            compose_sequential_layer_interface(
+            map_parallel_layer_interface(
                 self.layers, omit_last_activation_for_prediction
             )
 
