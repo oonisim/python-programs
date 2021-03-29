@@ -54,7 +54,7 @@ from data import (
 
 
 Logger = logging.getLogger(__name__)
-Logger.setLevel(logging.DEBUG)
+# Logger.setLevel(logging.DEBUG)
 
 
 def test_010_sequential_instantiation_to_fail():
@@ -428,7 +428,7 @@ def test_010_sequential_train2():
             name="test_010_base_instantiation_to_fail",
             num_nodes=M,    # number of the last layer output,
             specification=valid_network_specification,
-            log_level=logging.DEBUG
+            log_level=logging.ERROR
         )
 
         inference_layer: layer.Sequential = network.layer_inference
@@ -449,14 +449,15 @@ def test_010_sequential_train2():
     X, T = transform_X_T(X, T)
     assert X.shape == (N, D)
 
-    for i in range(num_epochs):
-        # --------------------------------------------------------------------------------
-        # Run sequential
-        # --------------------------------------------------------------------------------
-        network.T = T
-        A_sequential = network.function(X)
-        L_sequential = network.objective(A_sequential)
-        dX_sequential = network.gradient(TYPE_FLOAT(1))
+    profiler = cProfile.Profile()
+    profiler.enable()
 
-        dS = network.update()
-        print(L_sequential)
+    for i in range(num_epochs):
+        network.train(X=X, T=T)
+
+    profiler.disable()
+    profiler.print_stats(sort="cumtime")
+
+    for loss in network.history:
+        print(loss)
+
