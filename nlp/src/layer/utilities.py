@@ -149,15 +149,18 @@ def map_parallel_layer_interface(
             return _layer.function
 
         def apply_gradient(_layer: Layer):
-            return _layer.function
+            return _layer.gradient
+
+        def apply_sum(x):
+            return np.sum(x, axis=0)
 
         def apply_predict(_layer: Layer):
-            return _layer.function
+            return _layer.predict
 
-        # Layer function F=(fn-1 o ... o f0)
         function = list(map(apply_function, layers))
-        # Gradient function G=(g0 o g1 o ... o gn-1)
-        gradient = list(map(apply_gradient, layers)[::-1])
+        # Back propagation of a parallel layer is sum(gradients, axis=0)
+        gradient = list(map(apply_gradient, layers))
+        gradient = compose(gradient, apply_sum)
         predict = list(map(apply_predict, layers))
 
     return function, predict, gradient
