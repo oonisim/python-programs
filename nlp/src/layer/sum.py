@@ -43,21 +43,47 @@ class Sum(Layer):
     # ================================================================================
     # Instance
     # ================================================================================
-    def __init__(self, name: str, num_nodes: int, log_level: int = logging.ERROR):
+    @property
+    def is_averaged(self) -> int:
+        """Flat if the output Y is averaged by N"""
+        return self._is_averaged
+
+    def __init__(
+            self,
+            name: str,
+            num_nodes: int,
+            is_averaged: bool = False,
+            log_level: int = logging.ERROR
+    ):
+        """
+        Args:
+            name: layer name
+            num_nodes: number of nodes in the layer
+            is_averaged: flag to average the output
+            log_level: logging level
+        """
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
 
         self.mask: np.ndarray = np.empty(())    # To zero clear the outputs where x <= 0
         self._M = num_nodes                     # Number of nodes alias
+        self._shape_X = ()                      # Original shape of X
+        self._is_averaged = is_averaged
 
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
     def function(self, X) -> np.ndarray:
+        self._shape_X = X.shape
         self.X = X
-        if self._Y.size <= 0:
-            self._Y = np.empty((1, X.shape[1]), dtype=TYPE_FLOAT)
 
-        np.sum(X, axis=0, keepdims=True, out=self._Y)
+        if self._Y.size <= 0:
+            shape_Y = X[0].shape if X.ndim > 0 else ()
+            self._Y = np.empty(shape_Y, dtype=TYPE_FLOAT)
+
+        np.sum(X, axis=0, out=self._Y) \
+            if self.is_averaged \
+            else np.sum(X/self.N, out=self._Y)
+
         return self.Y
 
     def gradient(self, dY: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
@@ -70,9 +96,14 @@ class Sum(Layer):
             dL/dX: impact on L by the layer input dX
         """
         dY = np.array(dY).reshape((1, -1)) if isinstance(dY, float) else dY
-        assert dY.shape == (1, self.M) or dY.shape == (self.M,), \
-            f"dY shape should be {(self.N, self.M)} but {dY.shape}."
-        self.dX[:] = TYPE_FLOAT(1)
-        np.multiply(self.dX, dY)
+        assert dY.shape == self.Y.shape, \
+            f"dY shape should be {self.Y.shape} but {dY.shape}."
 
+        self._dX[:] = (TYPE_FLOAT(1) / self.N) \
+            if self.is_averaged else TYPE_FLOAT(1)
+        np.multiply(self.dX, dY, out=self._dX)
+
+        assert self.dX.shape == self._shape_X, \
+            "dX.shape %s must match original X shape %s" \
+            % (self.dX.shape, self._shape_X)
         return self.dX

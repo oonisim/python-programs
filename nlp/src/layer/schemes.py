@@ -7,6 +7,9 @@ from layer.matmul import (
 from layer.sum import (
     Sum
 )
+from layer.identity import (
+    Identity
+)
 from layer.activation import (
     ReLU,
     Sigmoid

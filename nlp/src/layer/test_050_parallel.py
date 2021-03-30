@@ -1,11 +1,13 @@
+"""Sequenctial layer test cases
+"""
 import cProfile
 import logging
 from typing import (
     Callable
 )
-
+import copy
 import numpy as np
-
+from common.weights import he
 from common.constants import (
     TYPE_FLOAT
 )
@@ -16,10 +18,14 @@ from common.functions import (
 from common.utilities import (
     random_string
 )
+from layer.identity import Identity
 from layer import (
     Matmul,
+    Sum,
+    Identity,
     ReLU,
     CrossEntropyLogLoss,
+    Sequential,
     Parallel
 )
 from optimizer import (
@@ -32,14 +38,300 @@ from test.config import (
     NUM_MAX_FEATURES
 )
 from test.layer_validations import (
-    validate_relu_neuron_training
+    validate_relu_neuron_training,
+    validate_against_expected_gradient,
+    forward_outputs,
+    backward_outputs
 )
 from test.utilities import (
-    build_matmul_relu_objective
+    build_matmul_relu_objective,
 )
-
+from optimizer import SGD
 Logger = logging.getLogger("test_030_objective")
 Logger.setLevel(logging.DEBUG)
+
+
+def test_050_parallel_instantiation_to_fail():
+    """
+    Objective:
+        Verify the layer class validates the parameters
+    Expected:
+        Initialization parses invalid parameters and fails.
+    """
+    name = "test_050_instantiation_to_fail"
+    for _ in range(NUM_MAX_TEST_TIMES):
+        name = random_string(np.random.randint(1, 10))
+        M: int = np.random.randint(2, NUM_MAX_NODES)
+        D: int = np.random.randint(1, NUM_MAX_FEATURES)
+
+        *network_components, = build_matmul_relu_objective(
+            M,
+            D,
+            log_loss_function=softmax_cross_entropy_log_loss
+        )
+
+        matmul: Matmul
+        activation: ReLU
+        loss: CrossEntropyLogLoss
+        matmul, activation, loss = network_components
+
+        function = compose(*[matmul.function, activation.function])
+        predict = compose(*[matmul.predict, activation.predict])
+
+        # --------------------------------------------------------------------------------
+        # Test the valid configurations first and then change to invalid one by one.
+        # Otherwise you are not sure what you are testing.
+        # --------------------------------------------------------------------------------
+        try:
+            inference = Parallel(
+                name="test_050_parallel",
+                num_nodes=M,  # NOT including bias if the 1st layer is matmul
+                layers=[matmul, activation]
+            )
+            inference.objective = loss.function
+
+        except Exception as e:
+            raise RuntimeError("Instantiation must succeed with the correct configurations")
+
+        # --------------------------------------------------------------------------------
+        # To fail
+        # --------------------------------------------------------------------------------
+        try:
+            inference = Parallel(
+                name="",
+                num_nodes=2,  # NOT including bias if the 1st layer is matmul
+                layers=[matmul, activation]
+            )
+            raise RuntimeError("Constraint: Instantiation with a invalid name must fail")
+        except AssertionError:
+            pass
+
+        try:
+            inference = Parallel(
+                name=name,
+                num_nodes=np.random.randint(-100, 1),
+                layers=[matmul, activation]
+            )
+            raise RuntimeError("Constraint: Instantiation with a invalid num_nodes must fail")
+        except AssertionError:
+            pass
+
+        # Constraint: Number of nodes of Parallel must match the first matmul layer's
+        try:
+            inference = Parallel(
+                name=name,
+                num_nodes=M+1,
+                layers=[matmul, activation]
+            )
+            raise RuntimeError("Constraint: Instantiation with a num_nodes != matmul.M must fail")
+        except AssertionError:
+            pass
+
+        try:
+            inference = Parallel(
+                name=name,
+                num_nodes=M,
+                layers=[]
+            )
+            raise RuntimeError("Constraint: Instantiation with a empty layers must fail")
+        except AssertionError:
+            pass
+
+        try:
+            inference = Parallel(
+                name=name,
+                num_nodes=M,
+                layers=[]
+            )
+            raise RuntimeError("Constraint: Instantiation with a empty layers must fail")
+        except AssertionError:
+            pass
+
+
+def test_050_parallel_instance_property_access_to_fail():
+    """
+    Objective:
+        Verify the layer class validates the parameters have been initialized before accessed.
+    Expected:
+        Instance detects the access to the non-initialized parameters and fails.
+    """
+    msg = "Access to uninitialized property must fail"
+    name = "test_050_parallel_instance_property_access_to_fail"
+    for _ in range(NUM_MAX_TEST_TIMES):
+        name = random_string(np.random.randint(1, 10))
+        M: int = np.random.randint(2, NUM_MAX_NODES)
+        D: int = np.random.randint(1, NUM_MAX_FEATURES)
+
+        *network_components, = build_matmul_relu_objective(
+            M,
+            D,
+            log_loss_function=softmax_cross_entropy_log_loss
+        )
+
+        matmul: Matmul
+        activation: ReLU
+        loss: CrossEntropyLogLoss
+        matmul, activation, loss = network_components
+
+        function = compose(*[matmul.function, activation.function])
+        predict = compose(*[matmul.predict, activation.predict])
+
+        try:
+            inference = Parallel(
+                name=name,
+                num_nodes=M,  # NOT including bias if the 1st layer is matmul
+                layers=[matmul, activation]
+            )
+
+        except Exception as e:
+            raise RuntimeError("Instantiation must succeed with the correct configurations")
+
+        # --------------------------------------------------------------------------------
+        # To fail
+        # --------------------------------------------------------------------------------
+        try:
+            print(inference.X)
+            raise RuntimeError("Access to uninitialized X must fail before calling function(X)")
+        except AssertionError:
+            pass
+
+        try:
+            inference.X = int(1)
+            raise RuntimeError("Set non-float to X must fail")
+        except AssertionError:
+            pass
+
+        try:
+            print(inference.N)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            print(inference.D)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            print(inference.dX)
+            raise RuntimeError("msg")
+        except AssertionError:
+            pass
+
+        try:
+            print(inference.Y)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+        try:
+            inference._Y = int(1)
+            print(inference.Y)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            print(inference.dY)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+        try:
+            inference._dY = int(1)
+            print(inference.dY)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            print(inference.T)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            inference.T = float(1)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            inference.objective(np.array(1.0))
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            inference.objective = "hoge"
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        assert inference.name == name
+        assert inference.num_nodes == M
+
+
+def test_050_parallel_instance_property_access_to_success():
+    """
+    Objective:
+        Verify the layer class validates the parameters have been initialized.
+    Expected:
+        Instance detects the access to the initialized parameters and succeed.
+    """
+    name = "test_050_parallel_instance_property_access_to_success"
+    for _ in range(NUM_MAX_TEST_TIMES):
+        name = random_string(np.random.randint(1, 10))
+        M: int = np.random.randint(2, NUM_MAX_NODES)
+        D: int = np.random.randint(1, NUM_MAX_FEATURES)
+
+        *network_components, = build_matmul_relu_objective(
+            M,
+            D,
+            log_loss_function=softmax_cross_entropy_log_loss
+        )
+
+        matmul: Matmul
+        activation: ReLU
+        loss: CrossEntropyLogLoss
+        matmul, activation, loss = network_components
+
+        layers = [matmul, activation]
+        function = compose(*[matmul.function, activation.function])
+        predict = compose(*[matmul.predict, activation.predict])
+
+        inference = Parallel(
+            name=name,
+            num_nodes=M,  # NOT including bias if the 1st layer is matmul
+            layers=layers
+        )
+        inference.objective = loss.function
+
+        # --------------------------------------------------------------------------------
+        # To pass
+        # --------------------------------------------------------------------------------
+        try:
+            if not inference.name == name: raise RuntimeError("inference.name == name should be true")
+        except AssertionError:
+            raise RuntimeError("Access to name should be allowed as already initialized.")
+
+        try:
+            if not inference.M == M: raise RuntimeError("inference.M == M should be true")
+        except AssertionError:
+            raise RuntimeError("Access to M should be allowed as already initialized.")
+
+        try:
+            if not isinstance(inference.logger, logging.Logger):
+                raise RuntimeError("isinstance(inference.logger, logging.Logger) should be true")
+        except AssertionError:
+            raise RuntimeError("Access to logger should be allowed as already initialized.")
+
+        try:
+            if not (
+                (len(inference.layers) == inference.num_layers == len(layers))
+            ):
+                raise RuntimeError("inference.M == M should be true")
+        except AssertionError:
+            raise RuntimeError("Access to layers should be allowed as already initialized.")
 
 
 def test_050_parallel_instantiation():
@@ -133,6 +425,32 @@ def test_050_parallel_builder_to_succeed():
     profiler.print_stats(sort="cumtime")
 
 
+def _build_parallel(name, M, D, W, optimizer, log_loss_function, log_level):
+    *parallel_network_components, = build_matmul_relu_objective(
+        M,
+        D,
+        W=W,
+        optimizer=optimizer,
+        log_loss_function=log_loss_function,
+        log_level=log_level
+    )
+
+    matmul, _, loss = parallel_network_components
+    parallel = Parallel(
+        name=name,
+        num_nodes=M,  # NOT including bias if the 1st layer is matmul
+        layers=[matmul, matmul, matmul]
+    )
+    sequence = Sequential(
+        name=name,
+        num_nodes=M,  # NOT including bias if the 1st layer is matmul
+        layers=[parallel, Sum(name="sum", num_nodes=M), loss]
+    )
+    sequence.objective = lambda x: np.sum(x)
+
+    return parallel, sequence
+
+
 def train_matmul_relu_classifier(
         N: int,
         D: int,
@@ -171,49 +489,71 @@ def train_matmul_relu_classifier(
     assert (
         log_loss_function == softmax_cross_entropy_log_loss and M >= 2
     )
+    X_seq = np.copy(X)
+    X_non_seq = np.copy(X)
 
-    *network_components, = build_matmul_relu_objective(
+    # --------------------------------------------------------------------------------
+    # Network with parallel
+    # --------------------------------------------------------------------------------
+    parallel, sequence = _build_parallel(name, M, D, W, optimizer, log_loss_function, log_level)
+
+    # --------------------------------------------------------------------------------
+    # Network without parallel
+    # --------------------------------------------------------------------------------
+    *non_parallel_network_components, = build_matmul_relu_objective(
         M,
         D,
-        W=W,
+        W,
         optimizer=optimizer,
-        log_loss_function=softmax_cross_entropy_log_loss,
+        log_loss_function=log_loss_function,
         log_level=log_level
     )
-
-    # --------------------------------------------------------------------------------
-    # Network
-    # --------------------------------------------------------------------------------
-    matmul: Matmul
-    activation: ReLU
-    loss: CrossEntropyLogLoss
-    matmul, activation, loss = network_components
-
-    layers = [matmul]
-    inference = Parallel(
-        name=name,
-        num_nodes=M,  # NOT including bias if the 1st layer is matmul
-        layers=layers
-    )
-    inference.objective = loss.function
-    objective = compose(inference.function, inference.objective)
+    matmul_non_seq, _, loss_non_seq = non_parallel_network_components
+    layers_non_seq = [matmul_non_seq, loss_non_seq]
 
     # --------------------------------------------------------------------------------
     # Training
     # --------------------------------------------------------------------------------
-    history = validate_relu_neuron_training(
-        matmul=matmul,
-        activation=activation,
-        loss=loss,
-        X=X,
-        T=T,
-        num_epochs=num_epochs,
-        test_numerical_gradient=test_numerical_gradient
-    )
-    for line in history:
-        print(line)
+    history = []
+    for _ in range(num_epochs):
+        loss_non_seq.T = T
+        sequence.T = T
 
-    return matmul.W
+        # --------------------------------------------------------------------------------
+        # Forward
+        # --------------------------------------------------------------------------------
+        EY, EL = forward_outputs(layers=layers_non_seq, X=X_non_seq)
+        L = sequence.function(X_seq)
+        history.append(L)
+
+        Y = sequence.layers[0].Y
+        Logger.debug("Loss is %s", L)
+
+        assert validate_against_expected_gradient(expected=EL, actual=L), \
+            "Expected L \n%s\nDiff\n%s" % (EL, EL-L)
+        assert validate_against_expected_gradient(expected=EY, actual=Y), \
+            "Expected dL/dY \n%s\nDiff\n%s" % (EY, EY-Y)
+
+        # --------------------------------------------------------------------------------
+        # Backward
+        # --------------------------------------------------------------------------------
+        dX = sequence.gradient(TYPE_FLOAT(1))
+        EDA, EDX = backward_outputs(layers=layers_non_seq, dY=TYPE_FLOAT(1))
+        assert validate_against_expected_gradient(EDX, dX), \
+            "Expected dL/dX \n%s\nDiff\n%s" % (EDX, EDX-dX)
+
+        # --------------------------------------------------------------------------------
+        # Gradient descent
+        # --------------------------------------------------------------------------------
+        EDS = matmul_non_seq.update()
+        EDW = EDS[0]
+
+        dS = sequence.update()
+        dW = dS[0][0]
+        assert validate_against_expected_gradient(EDW, dW), \
+            "Expected dL/dW \n%s\nDiff\n%s" % (EDW, EDW-dW)
+
+    return sequence.layers[0].W
 
 
 def test_050_parallel_training():
@@ -244,47 +584,24 @@ def test_050_parallel_training():
         M: int = np.random.randint(2, NUM_MAX_NODES)
         D: int = np.random.randint(1, NUM_MAX_FEATURES)
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
-
-        *network_components, = build_matmul_relu_objective(
-            M,
-            D,
-            log_loss_function=softmax_cross_entropy_log_loss,
-            log_level=logging.WARNING
-        )
-
-        # --------------------------------------------------------------------------------
-        # Network
-        # --------------------------------------------------------------------------------
-        matmul: Matmul
-        activation: ReLU
-        loss: CrossEntropyLogLoss
-        matmul, activation, loss = network_components
-
-        layers = [matmul, activation]
-        function = compose(*[matmul.function, activation.function])
-        predict = compose(*[matmul.predict, activation.predict])
-
-        inference = Parallel(
-            name=name,
-            num_nodes=M,  # NOT including bias if the 1st layer is matmul
-            layers=layers
-        )
-        inference.objective = loss.function
-        objective = compose(inference.function, inference.objective)
+        optimizer = SGD(lr=1e-3, l2=1e-4)
+        W = he(M, D+1)
 
         # --------------------------------------------------------------------------------
         # Training
         # --------------------------------------------------------------------------------
         X = np.random.rand(N, D)
         T = np.random.randint(0, 2, N)
-        history = validate_relu_neuron_training(
-            matmul=matmul,
-            activation=activation,
-            loss=loss,
+        train_matmul_relu_classifier(
+            N=N,
+            D=D,
+            M=M,
             X=X,
             T=T,
-            num_epochs=5,
-            test_numerical_gradient=True,
+            W=W,
+            log_loss_function=softmax_cross_entropy_log_loss,
+            optimizer=optimizer,
+            num_epochs=10
         )
 
     profiler.disable()

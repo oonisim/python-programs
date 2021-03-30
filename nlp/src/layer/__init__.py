@@ -4,6 +4,8 @@ from layer.normalization import (
     Standardization
 )
 from layer.matmul import Matmul
+from layer.sum import Sum
+from layer.identity import Identity
 from layer.activation import (
     Sigmoid,
     ReLU
