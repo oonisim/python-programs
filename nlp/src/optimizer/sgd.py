@@ -27,7 +27,7 @@ class SGD(Optimizer):
         }
 
     @staticmethod
-    def build(specification: Dict):
+    def build(parameters: Dict):
         """Build an optimizer based on the specification.
         Spec example:
         {
@@ -36,7 +36,7 @@ class SGD(Optimizer):
             "l2": 0.1
         }
         """
-        return SGD(**specification)
+        return SGD(**parameters)
 
     # ================================================================================
     # Instance initialization

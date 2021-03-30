@@ -8,5 +8,7 @@ _PARAMETERS = "parameters"
 _LOG_LEVEL = "log_level"
 _LAYER_CLASS = "layer_class"
 _LOSS_FUNCTION = "loss_function"
+_LAYERS = "layers"
+_COMPOSITE_LAYER_SPEC = "composite_layer_specification"
 
 LOG_LOSS_GRADIENT_ACCEPTANCE_VALUE = float(1.2)

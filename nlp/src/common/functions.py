@@ -219,12 +219,14 @@ def sigmoid_reverse(y):
 
 def sigmoid(
     X: Union[TYPE_FLOAT, np.ndarray],
-    boundary: Optional[Union[np.ndarray, TYPE_FLOAT]] = BOUNDARY_SIGMOID
+    boundary: Optional[Union[np.ndarray, TYPE_FLOAT]] = BOUNDARY_SIGMOID,
+    out=None
 ) -> Union[TYPE_FLOAT, np.ndarray]:
     """Sigmoid activate function
     Args:
         X: > domain value for log
         boundary: The lower boundary of acceptable X value.
+        out: A location into which the result is stored
 
     NOTE:
         epsilon to prevent causing inf e.g. log(X+e) has a consequence of clipping
@@ -244,16 +246,22 @@ def sigmoid(
         Logger.warning(
             "sigmoid: X value exceeded the boundary %s, hence clipping.", boundary
         )
-        _X = copy.deepcopy(X)
+        _X = np.copy(X)
         _X[X > boundary] = boundary
         _X[X < -boundary] = -boundary
-    else:
+    else:   # Scalar
+        assert isinstance(X, TYPE_FLOAT)
         Logger.warning(
             "sigmoid: X value exceeded the boundary %s, hence clipping.", boundary
         )
         _X = np.sign(X) * boundary
 
-    return 1 / (1 + np.exp(-1 * _X))
+    if ENABLE_NUMEXPR:
+        Y = ne.evaluate("1 / (1 + exp(-1 * _X))", out=out)
+    else:
+        Y = 1 / (1 + np.exp(-1 * _X))
+
+    return Y
 
 
 def sigmoid_gradient(X: Union[TYPE_FLOAT, np.ndarray]) -> Union[TYPE_FLOAT, np.ndarray]:

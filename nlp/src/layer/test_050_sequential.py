@@ -1,66 +1,49 @@
-"""Matmul layer test cases
-Batch X: shape(N, D):
---------------------
-X is the input data into a Matmul layer, hence it does NOT include the bias.
-
-Gradient dL/dX: shape(N, D)
---------------------
-Same shape of X because L is scalar.
-
-Weights W: shape(M, D+1)
---------------------
-W includes the bias weight because we need to control the weight initializations
-including the bias weight.
-
-Gradient dL/dW: shape(M, D+1)
---------------------
-Same shape with W.
+"""Sequenctial layer test cases
 """
+import cProfile
+import logging
 from typing import (
-    List,
-    Union,
     Callable
 )
-import cProfile
 import copy
-import logging
 import numpy as np
+from common.weights import he
 from common.constants import (
     TYPE_FLOAT
 )
 from common.functions import (
     compose,
-    numerical_jacobian,
     softmax_cross_entropy_log_loss
 )
-import common.weights as weights
 from common.utilities import (
     random_string
 )
+from layer.identity import Identity
 from layer import (
     Matmul,
     ReLU,
     CrossEntropyLogLoss,
     Sequential
 )
+from optimizer import (
+    Optimizer
+)
 from test.config import (
     NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,
-    NUM_MAX_FEATURES,
-    GRADIENT_DIFF_ACCEPTANCE_VALUE,
-    GRADIENT_DIFF_ACCEPTANCE_RATIO
-)
-from test.utilities import (
-    build_matmul_relu_objective
+    NUM_MAX_FEATURES
 )
 from test.layer_validations import (
-    validate_relu_neuron_training
+    validate_relu_neuron_training,
+    validate_against_expected_gradient,
+    forward_outputs,
+    backward_outputs
 )
-from optimizer import (
-    Optimizer
+from test.utilities import (
+    build_matmul_relu_objective,
 )
-
+from optimizer import SGD
 Logger = logging.getLogger("test_030_objective")
 Logger.setLevel(logging.DEBUG)
 
@@ -377,8 +360,6 @@ def test_050_sequential_instantiation():
         matmul, activation, loss = network_components
 
         layers = [matmul, activation]
-        function = compose(*[matmul.function, activation.function])
-        predict = compose(*[matmul.predict, activation.predict])
 
         inference = Sequential(
             name=name,
@@ -411,6 +392,57 @@ def test_050_sequential_instantiation():
         inference.logger.debug("This is a pytest")
 
         assert inference.objective == loss.function
+
+
+def test_050_sequential_builder_to_succeed():
+    """
+    Objective:
+        Verify the Matmul.build()
+    Expected:
+        build() parse the spec and succeed
+    """
+    profiler = cProfile.Profile()
+    profiler.enable()
+
+    for _ in range(NUM_MAX_TEST_TIMES):
+        # ----------------------------------------------------------------------
+        # Validate the correct specification.
+        # NOTE: Invalidate one parameter at a time from the correct one.
+        # Otherwise not sure what you are testing.
+        # ----------------------------------------------------------------------
+        valid_spec = Sequential.build_specification_template()
+        try:
+            Sequential.build(parameters=valid_spec)
+        except Exception as e:
+            raise \
+                RuntimeError("Matmul.build() must succeed with %s" % valid_spec) \
+                from e
+
+    profiler.disable()
+    profiler.print_stats(sort="cumtime")
+
+
+def _build_sequential(name, M, D, W, optimizer, log_loss_function, log_level):
+    *sequential_network_components, = build_matmul_relu_objective(
+        M,
+        D,
+        W=W,
+        optimizer=optimizer,
+        log_loss_function=log_loss_function,
+        log_level=log_level
+    )
+
+    matmul_seq: Matmul
+    loss_seq: CrossEntropyLogLoss
+    matmul_seq, _, loss_seq = sequential_network_components
+    sequence = Sequential(
+        name=name,
+        num_nodes=M,  # NOT including bias if the 1st layer is matmul
+        layers=[matmul_seq, Identity(name="identity", num_nodes=M), loss_seq]
+    )
+    sequence.objective = lambda x: np.sum(x)
+
+    return sequence
 
 
 def train_matmul_relu_classifier(
@@ -451,52 +483,71 @@ def train_matmul_relu_classifier(
     assert (
         log_loss_function == softmax_cross_entropy_log_loss and M >= 2
     )
+    X_seq = np.copy(X)
+    X_non_seq = np.copy(X)
 
-    *network_components, = build_matmul_relu_objective(
+    # --------------------------------------------------------------------------------
+    # Network with sequential
+    # --------------------------------------------------------------------------------
+    sequence = _build_sequential(name, M, D, W, optimizer, log_loss_function, log_level)
+
+    # --------------------------------------------------------------------------------
+    # Network without sequential
+    # --------------------------------------------------------------------------------
+    *non_sequential_network_components, = build_matmul_relu_objective(
         M,
         D,
-        W=W,
+        W,
         optimizer=optimizer,
-        log_loss_function=softmax_cross_entropy_log_loss,
+        log_loss_function=log_loss_function,
         log_level=log_level
     )
-
-    # --------------------------------------------------------------------------------
-    # Network
-    # --------------------------------------------------------------------------------
-    matmul: Matmul
-    activation: ReLU
-    loss: CrossEntropyLogLoss
-    matmul, activation, loss = network_components
-
-    layers = [matmul, activation]
-    function = compose(*[matmul.function, activation.function])
-    predict = compose(*[matmul.predict, activation.predict])
-
-    inference = Sequential(
-        name=name,
-        num_nodes=M,  # NOT including bias if the 1st layer is matmul
-        layers=layers
-    )
-    inference.objective = loss.function
-    objective = compose(inference.function, inference.objective)
+    matmul_non_seq, _, loss_non_seq = non_sequential_network_components
+    layers_non_seq = [matmul_non_seq, loss_non_seq]
 
     # --------------------------------------------------------------------------------
     # Training
     # --------------------------------------------------------------------------------
-    history = validate_relu_neuron_training(
-        matmul=matmul,
-        activation=activation,
-        loss=loss,
-        X=X,
-        T=T,
-        num_epochs=num_epochs,
-        test_numerical_gradient=test_numerical_gradient
-    )
-    for line in history:
-        print(line)
+    history = []
+    for _ in range(num_epochs):
+        loss_non_seq.T = T
+        sequence.T = T
 
-    return matmul.W
+        # --------------------------------------------------------------------------------
+        # Forward
+        # --------------------------------------------------------------------------------
+        EY, EL = forward_outputs(layers=layers_non_seq, X=X_non_seq)
+        L = sequence.function(X_seq)
+        history.append(L)
+
+        Y = sequence.layers[0].Y
+        Logger.debug("Loss is %s", L)
+
+        assert validate_against_expected_gradient(expected=EL, actual=L), \
+            "Expected L \n%s\nDiff\n%s" % (EL, EL-L)
+        assert validate_against_expected_gradient(expected=EY, actual=Y), \
+            "Expected dL/dY \n%s\nDiff\n%s" % (EY, EY-Y)
+
+        # --------------------------------------------------------------------------------
+        # Backward
+        # --------------------------------------------------------------------------------
+        dX = sequence.gradient(TYPE_FLOAT(1))
+        EDA, EDX = backward_outputs(layers=layers_non_seq, dY=TYPE_FLOAT(1))
+        assert validate_against_expected_gradient(EDX, dX), \
+            "Expected dL/dX \n%s\nDiff\n%s" % (EDX, EDX-dX)
+
+        # --------------------------------------------------------------------------------
+        # Gradient descent
+        # --------------------------------------------------------------------------------
+        EDS = matmul_non_seq.update()
+        EDW = EDS[0]
+
+        dS = sequence.update()
+        dW = dS[0][0]
+        assert validate_against_expected_gradient(EDW, dW), \
+            "Expected dL/dW \n%s\nDiff\n%s" % (EDW, EDW-dW)
+
+    return sequence.layers[0].W
 
 
 def test_050_sequential_training():
@@ -527,47 +578,24 @@ def test_050_sequential_training():
         M: int = np.random.randint(2, NUM_MAX_NODES)
         D: int = np.random.randint(1, NUM_MAX_FEATURES)
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
-
-        *network_components, = build_matmul_relu_objective(
-            M,
-            D,
-            log_loss_function=softmax_cross_entropy_log_loss,
-            log_level=logging.WARNING
-        )
-
-        # --------------------------------------------------------------------------------
-        # Network
-        # --------------------------------------------------------------------------------
-        matmul: Matmul
-        activation: ReLU
-        loss: CrossEntropyLogLoss
-        matmul, activation, loss = network_components
-
-        layers = [matmul, activation]
-        function = compose(*[matmul.function, activation.function])
-        predict = compose(*[matmul.predict, activation.predict])
-
-        inference = Sequential(
-            name=name,
-            num_nodes=M,  # NOT including bias if the 1st layer is matmul
-            layers=layers
-        )
-        inference.objective = loss.function
-        objective = compose(inference.function, inference.objective)
+        optimizer = SGD(lr=1e-3, l2=1e-4)
+        W = he(M, D+1)
 
         # --------------------------------------------------------------------------------
         # Training
         # --------------------------------------------------------------------------------
         X = np.random.rand(N, D)
         T = np.random.randint(0, 2, N)
-        history = validate_relu_neuron_training(
-            matmul=matmul,
-            activation=activation,
-            loss=loss,
+        train_matmul_relu_classifier(
+            N=N,
+            D=D,
+            M=M,
             X=X,
             T=T,
-            num_epochs=5,
-            test_numerical_gradient=True,
+            W=W,
+            log_loss_function=softmax_cross_entropy_log_loss,
+            optimizer=optimizer,
+            num_epochs=10
         )
 
     profiler.disable()

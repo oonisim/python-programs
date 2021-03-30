@@ -1,31 +1,23 @@
 """Matmul layer implementation
 """
+import copy
+import logging
 from typing import (
     Optional,
     Union,
     List,
-    Dict,
-    Tuple,
-    Final,
-    Generator,
-    Iterator,
-    Callable
+    Dict
 )
-import logging
-import copy
+
 import numpy as np
-import numexpr as ne
+
+import optimizer as optimiser
 from common.constants import (
-    TYPE_LABEL,
     TYPE_FLOAT,
-    OFFSET_DELTA,
-    ENABLE_NUMBA,
 )
 from common.functions import (
     numerical_jacobian,
 )
-import common.weights as weights
-import optimizer as optimiser
 from layer.base import Layer
 from layer.constants import (
     _WEIGHTS,
@@ -37,8 +29,8 @@ from layer.constants import (
     _PARAMETERS
 )
 from layer.utilities_builder import (
-    build_optimizer_from_layer_specification,
-    build_weights_from_layer_specification
+    build_optimizer_from_layer_parameters,
+    build_weights_from_layer_parameters
 )
 
 
@@ -90,59 +82,62 @@ class Matmul(Layer):
     # Class
     # ================================================================================
     @staticmethod
-    def build_specification_template(specification: Dict):
+    def build_specification_template():
         return {
-            _NAME: "matmul01",
-            _NUM_NODES: 8,
-            _NUM_FEATURES: 2,  # NOT including bias
-            _WEIGHTS: {
-                _SCHEME: "he"
-            },
-            _OPTIMIZER: {
-                _SCHEME: optimiser.SGD.__qualname__,
-                _PARAMETERS: {
-                    "lr": 0.01,
-                    "l2": 1e-3
+            _SCHEME: Matmul.__qualname__,
+            _PARAMETERS: {
+                _NAME: "matmul01",
+                _NUM_NODES: 8,
+                _NUM_FEATURES: 2,  # NOT including bias
+                _WEIGHTS: {
+                    _SCHEME: "he"
+                },
+                _OPTIMIZER: {
+                    _SCHEME: optimiser.SGD.__qualname__,
+                    _PARAMETERS: {
+                        "lr": 1e-2,
+                        "l2": 1e-3
+                    }
                 }
             }
         }
 
     @staticmethod
-    def build(specification: Dict):
-        """Build a matmul layer based on the specification
-        Specification: {
+    def build(parameters: Dict):
+        """Build a matmul layer based on the parameters
+        parameters: {
             "num_nodes": 8,
             "num_features": 2,  # NOT including bias
             "weight": <weight_spec>,
             "optimizer": <optimizer_spec>
         }
         """
-        spec = copy.deepcopy(specification)
+        parameters = copy.deepcopy(parameters)
         assert (
-            isinstance(spec, dict) and
-            (_NAME in spec and len(spec[_NAME]) > 0) and
-            (_NUM_NODES in spec and spec[_NUM_NODES] > 0) and
-            (_NUM_FEATURES in spec and spec[_NUM_FEATURES] > 0) and
-            _WEIGHTS in spec
-        ), "Matmul.build(): missing mandatory elements %s in the spec\n%s" \
-           % ((_NAME, _NUM_NODES, _NUM_FEATURES, _WEIGHTS), spec)
+            isinstance(parameters, dict) and
+            (_NAME in parameters and len(parameters[_NAME]) > 0) and
+            (_NUM_NODES in parameters and parameters[_NUM_NODES] > 0) and
+            (_NUM_FEATURES in parameters and parameters[_NUM_FEATURES] > 0) and
+            _WEIGHTS in parameters
+        ), "Matmul.build(): missing mandatory elements %s in the parameters\n%s" \
+           % ((_NAME, _NUM_NODES, _NUM_FEATURES, _WEIGHTS), parameters)
 
-        name = spec[_NAME]
-        num_nodes = spec[_NUM_NODES]
-        num_features = spec[_NUM_FEATURES]
+        name = parameters[_NAME]
+        num_nodes = parameters[_NUM_NODES]
+        num_features = parameters[_NUM_FEATURES]
 
         # Weights
-        W = build_weights_from_layer_specification(spec)
+        W = build_weights_from_layer_parameters(parameters)
 
         # Optimizer
-        _optimizer = build_optimizer_from_layer_specification(spec)
+        _optimizer = build_optimizer_from_layer_parameters(parameters)
 
         matmul = Matmul(
             name=name,
             num_nodes=num_nodes,
             W=W,
             optimizer=_optimizer,
-            log_level=spec["log_level"] if "log_level" in spec else logging.ERROR
+            log_level=parameters["log_level"] if "log_level" in parameters else logging.ERROR
         )
 
         return matmul
@@ -240,8 +235,8 @@ class Matmul(Layer):
         # --------------------------------------------------------------------------------
         assert W.shape[0] == num_nodes, \
             f"W shape needs to be ({num_nodes}, D) but {W.shape}."
-        self._D = W.shape[1]                # number of features in x including bias
-        self._W: np.ndarray = W             # node weight vectors
+        self._D = W.shape[1]                    # number of features in x including bias
+        self._W: np.ndarray = copy.deepcopy(W)  # node weight vectors
         self._dW: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)
 
         # --------------------------------------------------------------------------------

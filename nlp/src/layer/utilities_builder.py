@@ -1,60 +1,59 @@
 from typing import (
     Dict,
 )
+
 import numpy as np
+
+import common.weights as weights
+import optimizer as optimiser
 from layer.constants import (
     _WEIGHTS,
-    _NAME,
     _SCHEME,
     _OPTIMIZER,
     _NUM_NODES,
     _NUM_FEATURES,
     _PARAMETERS
 )
-import optimizer as optimiser
-import common.weights as weights
 
 
-def build_optimizer_from_layer_specification(specification: Dict):
-    spec = specification
-
-    if _OPTIMIZER in spec:
+def build_optimizer_from_layer_parameters(layer_parameters: Dict):
+    if _OPTIMIZER not in layer_parameters:
+        _optimizer = optimiser.SGD()    # Use SGD() as default
+    else:
+        optimizer_spec = layer_parameters[_OPTIMIZER]
         assert \
-            _SCHEME in spec[_OPTIMIZER], \
-            "Invalid optimizer spec %s" % spec[_OPTIMIZER]
+            _SCHEME in optimizer_spec, \
+            "Invalid optimizer specification %s" % optimizer_spec
 
-    if _OPTIMIZER in spec and _SCHEME in spec[_OPTIMIZER]:
-        optimizer_spec = spec[_OPTIMIZER]
         optimizer_scheme = optimizer_spec[_SCHEME].lower()
         assert optimizer_scheme in optimiser.SCHEMES, \
             "Invalid optimizer scheme %s. Scheme must be one of %s." \
             % (optimizer_scheme, optimiser.SCHEMES)
 
-        parameters = optimizer_spec[_PARAMETERS] \
-            if _PARAMETERS in optimizer_spec else {}
-        parameters[_NAME] = parameters[_NAME] \
-            if _NAME in parameters else spec[_NAME]
-        _optimizer = optimiser.SCHEMES[optimizer_scheme].build(parameters)
-    else:
-        _optimizer = optimiser.SGD()
-
+        _optimizer = \
+            optimiser.SCHEMES[optimizer_scheme].build(optimizer_spec[_PARAMETERS]) \
+            if _PARAMETERS in optimizer_spec else optimiser.SGD()
     return _optimizer
 
 
-def build_weights_from_layer_specification(specification: Dict) -> np.ndarray:
+def build_weights_from_layer_parameters(parameters: Dict) -> np.ndarray:
     """Build layer.Matmul weights
     Args:
-        specification: layer specification
+        parameters: layer parameter
     Return: initialized weight
 
     Weight Specification: {
         "scheme": "weight initialization scheme [he|xavier]"
     }
     """
-    layer_spec = specification
-    num_nodes = layer_spec[_NUM_NODES]
-    num_features = layer_spec[_NUM_FEATURES]
-    weight_spec = layer_spec[_WEIGHTS]
+    assert \
+        _NUM_NODES in parameters and \
+        _NUM_FEATURES in parameters and \
+        _WEIGHTS in parameters
+
+    num_nodes = parameters[_NUM_NODES]
+    num_features = parameters[_NUM_FEATURES]
+    weight_spec = parameters[_WEIGHTS]
 
     M = num_nodes
     D = num_features + 1    # Add bias

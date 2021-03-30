@@ -16,17 +16,14 @@ Gradient dL/dW: shape(M, D+1)
 --------------------
 Same shape with W.
 """
-from typing import (
-    Optional,
-    Union,
-    List,
-    Dict,
-    Tuple
-)
 import cProfile
-import copy
 import logging
+from typing import (
+    Union
+)
+
 import numpy as np
+
 from common.constants import (
     TYPE_FLOAT,
 )
@@ -36,25 +33,25 @@ from common.functions import (
 from common.utilities import (
     random_string
 )
-import common.weights as weights
-
+from frederik_kratzert import (
+    batchnorm_forward,
+    batchnorm_backward
+)
 from layer import (
     BatchNormalization
 )
-from test.config import (
-    NUM_MAX_TEST_TIMES,
-    NUM_MAX_NODES,
-    NUM_MAX_BATCH_SIZE,
-    NUM_MAX_FEATURES,
-    GRADIENT_DIFF_ACCEPTANCE_VALUE,
-    GRADIENT_DIFF_ACCEPTANCE_RATIO
+from layer.constants import (
+    _OPTIMIZER,
+    _PARAMETERS,
+    _LOG_LEVEL
 )
 from optimizer import (
     Optimizer
 )
-from frederik_kratzert import (
-    batchnorm_forward,
-    batchnorm_backward
+from test.config import (
+    NUM_MAX_TEST_TIMES,
+    NUM_MAX_NODES,
+    NUM_MAX_BATCH_SIZE
 )
 
 Logger = logging.getLogger("test_030_objective")
@@ -374,29 +371,17 @@ def test_020_matmul_builder_to_succeed():
         # NOTE: Invalidate one parameter at a time from the correct one.
         # Otherwise not sure what you are testing.
         # ----------------------------------------------------------------------
-        lr = np.random.uniform()
-        l2 = np.random.uniform()
-        eps = np.random.uniform(low=0, high=1e-4)
-        momentum = np.random.uniform()
-        valid_bn_spec = {
-            "name": "test_020_bn_builder_to_succeed",
-            "num_nodes": M,
-            "momentum": momentum,
-            "eps": eps,
-            "log_level": logging.DEBUG,
-            "optimizer": {
-                "scheme": "sGd",
-                "parameters": {
-                    "lr": lr,
-                    "l2": l2
-                }
-            }
-        }
+        valid_bn_spec = BatchNormalization.build_specification_template()
+        eps = valid_bn_spec["eps"]
+        momentum = valid_bn_spec["momentum"]
+        lr = valid_bn_spec[_OPTIMIZER][_PARAMETERS]["lr"]
+        l2 = valid_bn_spec[_OPTIMIZER][_PARAMETERS]["l2"]
+        log_level = valid_bn_spec[_LOG_LEVEL]
         try:
-            bn: BatchNormalization = BatchNormalization.build(specification=valid_bn_spec)
+            bn: BatchNormalization = BatchNormalization.build(parameters=valid_bn_spec)
             assert bn.optimizer.lr == lr
             assert bn.optimizer.l2 == l2
-            assert bn.logger.getEffectiveLevel() == logging.DEBUG
+            assert bn.logger.getEffectiveLevel() == log_level
             assert bn.eps == eps
             assert bn.momentum == momentum
         except Exception as e:

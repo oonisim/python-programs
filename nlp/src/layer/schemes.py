@@ -1,5 +1,11 @@
+"""Non composite layer class information"
+DO NOT import composite layer classes in this file.
+"""
 from layer.matmul import (
     Matmul
+)
+from layer.sum import (
+    Sum
 )
 from layer.activation import (
     ReLU,
@@ -12,16 +18,21 @@ from layer.normalization import (
     Standardization,
     BatchNormalization
 )
-from layer.sequential import (
-    Sequential
-)
 
+# DO NOT import these
+# from layer.sequential import (
+#     Sequential
+# )
+# from layer.parallel import (
+#     Parallel
+# )
 
 # ================================================================================
 # Dictionaries of layer per purpose
 # ================================================================================
 FEATURE_LAYERS = (
     Matmul,
+    Sum
 )
 ACTIVATION_LAYERS = (
     Sigmoid,
@@ -30,9 +41,6 @@ ACTIVATION_LAYERS = (
 NORMALIZATION_LAYERS = (
     Standardization,
     BatchNormalization
-)
-SEQUENTIAL_LAYERS = (
-    Sequential,
 )
 
 # --------------------------------------------------------------------------------
@@ -44,8 +52,8 @@ FUNCTION_LAYERS = \
     ACTIVATION_LAYERS
 
 FUNCTION_LAYER_SCHEMES = {}
-for __a_layer in FUNCTION_LAYERS:
-    FUNCTION_LAYER_SCHEMES[__a_layer.__qualname__.lower()] = __a_layer
+for _layer in FUNCTION_LAYERS:
+    FUNCTION_LAYER_SCHEMES[_layer.__qualname__] = _layer
 
 # --------------------------------------------------------------------------------
 # Objective layers
@@ -54,8 +62,8 @@ OBJECTIVE_LAYERS = (
     CrossEntropyLogLoss,
 )
 OBJECTIVE_LAYER_SCHEMES = {}
-for __a_layer in OBJECTIVE_LAYERS:
-    OBJECTIVE_LAYER_SCHEMES[__a_layer.__qualname__.lower()] = __a_layer
+for _layer in OBJECTIVE_LAYERS:
+    OBJECTIVE_LAYER_SCHEMES[_layer.__qualname__] = _layer
 
 # All layers
 SCHEMES = {

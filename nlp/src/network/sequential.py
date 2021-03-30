@@ -21,7 +21,9 @@ from common.functions import (
     compose
 )
 import layer
-import optimizer as optimiser
+from layer.utilities_composite import (
+    build_layers_from_composite_layer_specification
+)
 from network.base import Network
 from layer.constants import (
     _WEIGHTS,
@@ -32,7 +34,8 @@ from layer.constants import (
     _NUM_FEATURES,
     _PARAMETERS,
     _LAYER_CLASS,
-    _LOG_LEVEL
+    _LOG_LEVEL,
+    _COMPOSITE_LAYER_SPEC
 )
 
 
@@ -48,160 +51,92 @@ class SequentialNetwork(Network):
     # Class
     # ================================================================================
     @staticmethod
-    def place_layer_spec(
-            container: dict,
-            layer_name: str,
-            layer_scheme: str,
-            layer_spec: dict,
-            schemes: dict,
-            log_level: int
-    ):
-        """Generate a specification to instantiate a Layer e.g. Matmul
-        The spec format is {
-            _LAYER_CLASS: "<class> e.g Matmul",
-            _PARAMETERS: {
-                "name": "<layer name>",
-                "num_nodes": <number of nodes in the layer>,
-                "log_level": <log level>,
-                <other mandatory arguments for the layer>
-            }
-        }
-        """
-        # --------------------------------------------------------------------------------
-        # Detect duplicated layer names (unique in inference and unique in objective)
-        # _LAYER_CLASS cannot be used as the layer name.
-        # --------------------------------------------------------------------------------
-        assert not (
-                layer_name in container or
-                layer_name == _LAYER_CLASS
-        ), "Cannot have duplicate name [%s] or [%s] as a dictionary key.\nspec is %s." \
-           % (layer_name, _LAYER_CLASS, layer_spec)
-
-        container[layer_name] = {}
-
-        # --------------------------------------------------------------------------------
-        # Layer class to instantiate
-        # --------------------------------------------------------------------------------
-        container[layer_name][_LAYER_CLASS] = schemes[layer_scheme]
-
-        # --------------------------------------------------------------------------------
-        # Arguments to pass to the layer class __init__() method
-        # --------------------------------------------------------------------------------
-        assert _PARAMETERS in layer_spec, \
-            "%s is mandatory in a layer specification.\nspec is %s" \
-            % (_PARAMETERS, layer_spec)
-
-        args = copy.deepcopy(layer_spec[_PARAMETERS]) \
-
-        # Mandatory "name" arg. Use the layer_spec key when not specified
-        args[_NAME] = layer_name \
-            if _NAME not in args else args[_NAME].lower()
-
-        # Mandatory "num_nodes" arg.
-        assert _NUM_NODES in args, \
-            "%s is mandatory in a layer specification.\nspec is %s" \
-            % (_NUM_NODES, layer_spec)
-
-        # Logging default level
-        args[_LOG_LEVEL] = log_level \
-            if _LOG_LEVEL not in args else args[_LOG_LEVEL]
-
-        container[layer_name][_PARAMETERS] = args
-
-    @staticmethod
-    def _parse_network_specs(
-            network_spec: Dict,
-            num_nodes: int,
-            log_level: int
-    ) -> Tuple[Dict, Dict]:
-        """
-        Responsibility
-            1. Validate the network specification
-            2. Generate inference layer specifications
-            3. Generate objective layer specifications
-
-        Args:
-            network_spec: Network specification
-            num_nodes: Number of nodes (outputs) of the network.
-            log_level: logging level
-
-        Returns:
-            (inference_layer_specs, objective_layer_specs)
-
-            inference_layer_specs defines the layers to produce an inference.
-            objective_layer_specs defines the layer to produce the network
-            objective e.g. the loss. Objective layer can be single but to
-            allow cascading, it is a list.
-        """
-        inference_layer_specs = {}
-        objective_layer_specs = {}
-        for layer_name, layer_spec in network_spec.items():
-            assert isinstance(layer_name, str) and isinstance(layer_spec, dict)
-            if _SCHEME in layer_spec:
-                layer_name = layer_name.lower()
-                layer_scheme = layer_spec[_SCHEME].lower()     # Layer class, e.g. Matmul
-
-                # --------------------------------------------------------------------------------
-                # Compose a layer spec
-                # --------------------------------------------------------------------------------
-                if layer_scheme in layer.FUNCTION_LAYER_SCHEMES:
-                    target_layer_specs = inference_layer_specs
-                    schemes = layer.FUNCTION_LAYER_SCHEMES
-                elif layer_scheme in layer.OBJECTIVE_LAYER_SCHEMES:
-                    target_layer_specs = objective_layer_specs
-                    schemes = layer.OBJECTIVE_LAYER_SCHEMES
-                else:
-                    assert False, \
-                        "Invalid layer %s. Must be one of %s." \
-                        % (layer_scheme, layer.SCHEMES.keys())
-
-                SequentialNetwork.place_layer_spec(
-                    container=target_layer_specs,
-                    layer_name=layer_name,
-                    layer_scheme=layer_scheme,
-                    layer_spec=layer_spec,
-                    schemes=schemes,
-                    log_level=log_level
-                )
-                assert set(target_layer_specs[layer_name].keys()) == \
-                       {_LAYER_CLASS, _PARAMETERS}
+    def _validate_network_specification(network_spec: dict):
+        assert \
+            isinstance(network_spec, dict) and \
+            len(network_spec) > 0
 
         assert \
-            len(inference_layer_specs) > 0 and \
-            len(objective_layer_specs) > 0, \
-            "There must be at least 1 inference and 1 objective layer. " \
-            "Inference count %s objective count is %s" \
-            % (len(inference_layer_specs), len(objective_layer_specs))
+            _NAME in network_spec and \
+            isinstance(network_spec[_NAME], str) and \
+            len(network_spec[_NAME]) > 0
+        name = network_spec[_NAME].lower()
 
-        last_inference_num_nodes = inference_layer_specs[list(inference_layer_specs.keys())[-1]][_PARAMETERS][_NUM_NODES]
-        first_objective_num_nodes = objective_layer_specs[list(objective_layer_specs.keys())[0]][_PARAMETERS][_NUM_NODES]
         assert \
-            last_inference_num_nodes == first_objective_num_nodes == num_nodes, \
-            "The number of nodes in the last inference layer [%s] "\
-            "must match that of the first objective layer [%s]." \
-            % (
-                list(inference_layer_specs.values())[-1][_PARAMETERS][_NUM_NODES],
-                list(objective_layer_specs.values())[0][_PARAMETERS][_NUM_NODES]
-            )
+            _NUM_NODES in network_spec and \
+            isinstance(network_spec[_NUM_NODES], int) and \
+            0 < network_spec[_NUM_NODES] < LAYER_MAX_NUM_NODES, \
+            "0 < num_nodes %s required" % LAYER_MAX_NUM_NODES
+        num_nodes = network_spec[_NUM_NODES]
 
-        return inference_layer_specs, objective_layer_specs
+        assert \
+            _COMPOSITE_LAYER_SPEC in network_spec and \
+            isinstance(network_spec[_COMPOSITE_LAYER_SPEC], dict) and \
+            len(network_spec[_COMPOSITE_LAYER_SPEC]) > 0, \
+            "Invalid %s\n%s\n" % (_COMPOSITE_LAYER_SPEC, network_spec)
+
+        log_level = network_spec[_LOG_LEVEL] \
+            if _LOG_LEVEL in network_spec else logging.ERROR
+
+        return name, num_nodes, log_level
 
     @staticmethod
     def _build_network_layers(
-            layer_specs: Dict
-    ) -> List[layer.Layer]:
-        return [
-            spec[_LAYER_CLASS].build(spec[_PARAMETERS])
-            for spec in layer_specs.values()
-        ]
+            network_spec: dict,
+    ) -> Tuple[List[layer.Layer], List[layer.Layer]]:
+        """
+        Responsibility
+            1. Instantiate network layers
+            2. Classify them into inference and objective
+        Args:
+
+        Returns:
+            (inference_layers, objective_layers)
+        """
+        num_nodes = network_spec[_NUM_NODES]
+        log_level = network_spec[_LOG_LEVEL]
+        inference_layers: List[layer.Layer] = []
+        objective_layers: List[layer.Layer] = []
+
+        layers = build_layers_from_composite_layer_specification(
+            specification=network_spec[_COMPOSITE_LAYER_SPEC],
+            log_level=log_level
+        )
+        assert len(layers) > 0
+
+        for _layer in layers:
+            if isinstance(_layer, layer.FUNCTION_LAYERS):
+                inference_layers.append(_layer)
+            elif isinstance(_layer, layer.OBJECTIVE_LAYERS):
+                objective_layers.append(_layer)
+            else:
+                assert False, \
+                    "Invalid layer scheme %s. Must be one of %s." \
+                    % (type(_layer), layer.SCHEMES.keys())
+
+        assert \
+            len(inference_layers) > 0 and \
+            len(objective_layers) > 0, \
+            "There must be at least 1 inference and 1 objective layer. " \
+            "Inference count %s objective count is %s" \
+            % (len(inference_layers), len(objective_layers))
+
+        last_inference_num_nodes = inference_layers[-1].num_nodes
+        first_objective_num_nodes = objective_layers[0].num_nodes
+        assert \
+            last_inference_num_nodes == first_objective_num_nodes == num_nodes, \
+            "The number of nodes in the last inference layer [%s] and "\
+            "that of the first objective layer [%s]. "\
+            "must match num_nodes %s in the network_spec " \
+            % (last_inference_num_nodes, first_objective_num_nodes, num_nodes)
+
+        return inference_layers, objective_layers
 
     @staticmethod
     def _wire_network_layers(
+            network_spec: dict,
             inference_layers: List[layer.Layer],
             objective_layers: List[layer.Layer],
-            name: str,
-            num_nodes: int,
-            log_level: int,
     ):
         """
         Responsibility:
@@ -215,6 +150,10 @@ class SequentialNetwork(Network):
             layer_inference, layer_objective
 
         """
+        name: str = network_spec[_NAME]
+        num_nodes: int = network_spec[_NUM_NODES]
+        log_level: int = network_spec[_LOG_LEVEL]
+
         def identity(x: np.ndarray):
             assert x.ndim == 0, "The output of the log loss should be of shape ()"
             return x
@@ -223,7 +162,6 @@ class SequentialNetwork(Network):
             name=name + "_objective",
             num_nodes=num_nodes,
             layers=objective_layers,
-            omit_last_activation_for_prediction=True,
             log_level=log_level
         )
         # Sequential objective is initialized upon its setter call.
@@ -245,44 +183,25 @@ class SequentialNetwork(Network):
 
     @staticmethod
     def build(
-            name: str,
-            num_nodes: int,
             network_spec: Dict,
-            log_level: int
     ):
         """Build a neural network instance from the specification
         """
         # --------------------------------------------------------------------------------
-        # Validate the specification and generate specifications respectively for
-        # - inference
-        # - objective
+        # Build layers in the network
         # --------------------------------------------------------------------------------
-        inference_layer_specs, objective_layer_specs = \
-            SequentialNetwork._parse_network_specs(
-                network_spec=network_spec,
-                num_nodes=num_nodes,
-                log_level=log_level
+        inference_layers, objective_layers = \
+            SequentialNetwork._build_network_layers(
+                network_spec=network_spec
             )
-
-        # --------------------------------------------------------------------------------
-        # Build a sequential inference layer and a objective layer
-        # --------------------------------------------------------------------------------
-        inference_layers: List[layer.Layer] = SequentialNetwork._build_network_layers(
-            inference_layer_specs
-        )
-        objective_layers: List[layer.Layer] = SequentialNetwork._build_network_layers(
-            objective_layer_specs
-        )
 
         # --------------------------------------------------------------------------------
         # Wire the layers to function as a network
         # --------------------------------------------------------------------------------
         *layers, = SequentialNetwork._wire_network_layers(
+            network_spec=network_spec,
             inference_layers=inference_layers,
             objective_layers=objective_layers,
-            name=name,
-            num_nodes=num_nodes,
-            log_level=log_level
         )
         layer_inference, layer_objective = layers
 
@@ -291,40 +210,34 @@ class SequentialNetwork(Network):
     # ================================================================================
     # Instance
     # ================================================================================
+    @property
+    def specification(self) -> Dict:
+        """Network specification"""
+        return self._specification
 
     # --------------------------------------------------------------------------------
     # Initialization
     # --------------------------------------------------------------------------------
     def __init__(
             self,
-            name: str,
-            num_nodes: int,
-            specification: Dict,
-            log_level: int = logging.ERROR
+            specification: Dict
     ):
         """Initialize the network instance
         Args:
-            name: Network ID
-            num_nodes: Number of nodes
             specification: Network specification in JSON.
         """
-        assert isinstance(name, str) and len(name) > 0
-        assert isinstance(specification, dict) and len(specification) > 0
-        assert 0 < num_nodes < LAYER_MAX_NUM_NODES, \
-            "0 < num_nodes %s required" % LAYER_MAX_NUM_NODES
+        name, num_nodes, log_level = \
+            SequentialNetwork._validate_network_specification(specification)
 
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
-        spec = copy.deepcopy(specification)
+        network_spec = copy.deepcopy(specification)
+        self._specification = network_spec
 
         # --------------------------------------------------------------------------------
         # Build network
         # --------------------------------------------------------------------------------
-        self._specification = spec
         self._layer_inference, self._layer_objective = SequentialNetwork.build(
-            name=name,
-            num_nodes=num_nodes,
-            network_spec=spec,
-            log_level=log_level
+            network_spec=self.specification
         )
         self._layers_all = [self.layer_inference, self.layer_objective]
 

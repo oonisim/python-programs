@@ -76,7 +76,9 @@ from layer.base import Layer
 from layer.schemes import (
     FUNCTION_LAYERS,
     OBJECTIVE_LAYERS,
-    SEQUENTIAL_LAYERS
+)
+from layer.schemes_composite import (
+    COMPOSITE_LAYERS
 )
 
 
@@ -132,14 +134,14 @@ class Network(Layer):
     @property
     def layer_inference(self) -> Layer:
         """Inference layers"""
-        assert isinstance(self._layer_inference, FUNCTION_LAYERS + SEQUENTIAL_LAYERS), \
+        assert isinstance(self._layer_inference, FUNCTION_LAYERS + COMPOSITE_LAYERS), \
             "Inference layer not initialized"
         return self._layer_inference
 
     @property
     def layer_objective(self) -> Layer:
         """Objective layers"""
-        assert isinstance(self._layer_objective, OBJECTIVE_LAYERS + SEQUENTIAL_LAYERS), \
+        assert isinstance(self._layer_objective, OBJECTIVE_LAYERS + COMPOSITE_LAYERS), \
             "Objective layers not initialized"
         return self._layer_objective
 

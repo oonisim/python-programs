@@ -4,22 +4,26 @@ Note:
     Matrices can take up lage storage, hence to avoid temporary copies,
     directly update the target storage area.
 """
-from typing import (
-    Optional,
-    Union,
-    List,
-    Dict,
-    Final,
-    Generator,
-    Iterator,
-    Callable
-)
 import logging
-import copy
+from typing import (
+    Union,
+    Dict
+)
+
 import numpy as np
-from layer.base import Layer
+import numexpr as ne
+from common.constants import (
+    TYPE_FLOAT,
+    ENABLE_NUMEXPR
+)
 from common.functions import (
     sigmoid
+)
+from layer.base import Layer
+from layer.constants import (
+    _NAME,
+    _NUM_NODES,
+    _LOG_LEVEL
 )
 
 
@@ -28,17 +32,17 @@ class ReLU(Layer):
     # Class
     # ================================================================================
     @staticmethod
-    def build(specification: Dict):
-        spec = specification
+    def build(parameters: Dict):
         assert (
-            "name" in spec and
-            "num_nodes" in spec
+            _NAME in parameters and
+            _NUM_NODES in parameters
         )
 
         return ReLU(
-            name="relu01",
-            num_nodes=spec["num_nodes"],
-            log_level=spec["log_level"] if "log_level" in spec else logging.ERROR
+            name=parameters[_NAME],
+            num_nodes=parameters[_NUM_NODES],
+            log_level=parameters[_LOG_LEVEL] 
+            if _LOG_LEVEL in parameters else logging.ERROR
         )
 
     # ================================================================================
@@ -60,12 +64,15 @@ class ReLU(Layer):
             f"Number of node X {X.shape[1] } does not match {self.M}."
 
         self.X = X
-        self.mask = (X <= 0)
-        # Y = copy.deepcopy(X)
-        Y = np.copy(X)
-        Y[self.mask] = 0
+        if self._Y.size <= 0 or self.Y.shape[0] != self.N:
+            self._Y = np.empty(X.shape, dtype=TYPE_FLOAT)
 
-        self._Y = Y
+        self.mask = (X <= 0)
+        # Y = np.copy(X)
+        # Y[self.mask] = 0
+        # self._Y = Y
+        np.copyto(self._Y, X)
+        self._Y[self.mask] = 0
         return self.Y
 
     def gradient(self, dA: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
@@ -82,11 +89,11 @@ class ReLU(Layer):
             f"dA shape should be {(self.N, self.M)} but {dA.shape}."
         self._dY = dA
 
-        # dX: np.ndarray = copy.deepcopy(dA)
-        dX = np.copy(dA)
-        dX[self.mask] = 0
-
-        self._dX = dX
+        # dX = np.copy(dA)
+        # dX[self.mask] = 0
+        # self._dX = dX
+        np.copyto(self._dX, dA)
+        self._dX[self.mask] = 0
         return self.dX
 
 
@@ -94,6 +101,18 @@ class Sigmoid(Layer):
     # ================================================================================
     # Class initialization
     # ================================================================================
+    @staticmethod
+    def build(parameters: Dict):
+        assert (
+            _NAME in parameters and
+            _NUM_NODES in parameters
+        )
+
+        return Sigmoid(
+            name=parameters[_NAME],
+            num_nodes=parameters[_NUM_NODES],
+            log_level=parameters[_LOG_LEVEL] if _LOG_LEVEL in parameters else logging.ERROR
+        )
 
     # ================================================================================
     # Instance initialization
@@ -117,7 +136,10 @@ class Sigmoid(Layer):
             f"Number of node X {X.shape[1] } does not match {self.M}."
 
         self._X = X
-        self._Y = sigmoid(X)
+        if self._Y.size <= 0 or self.Y.shape[0] != self.N:
+            self._Y = np.empty(X.shape, dtype=TYPE_FLOAT)
+
+        self._Y = sigmoid(X, out=self._Y)
         return self.Y
 
     def gradient(self, dA: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
@@ -134,6 +156,11 @@ class Sigmoid(Layer):
             f"dA shape should be {(self.N, self.M)} but {dA.shape}."
 
         self._dY = dA
-        self._dX = dA * (1.0 - self.Y) * self.Y
+        if ENABLE_NUMEXPR:
+            Y = self.Y
+            ne.evaluate("dA * (1.0 - Y) * Y", out=self._dX)
+        else:
+            self._dX = dA * (1.0 - self.Y) * self.Y
+
         return self.dX
 

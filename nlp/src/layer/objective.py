@@ -58,20 +58,19 @@ class CrossEntropyLogLoss(Layer):
         }
 
     @staticmethod
-    def build(specification: Dict):
-        spec = specification
+    def build(parameters: Dict):
         assert (
-            _NAME in spec and
-            _NUM_NODES in spec and
-            _LOSS_FUNCTION in spec and
-            spec[_LOSS_FUNCTION] in functions.LOSS_FUNCTIONS
+            _NAME in parameters and
+            _NUM_NODES in parameters and
+            _LOSS_FUNCTION in parameters and
+            parameters[_LOSS_FUNCTION] in functions.LOSS_FUNCTIONS
         )
 
         return CrossEntropyLogLoss(
-            name=spec[_NAME],
-            num_nodes=spec[_NUM_NODES],
-            log_loss_function=functions.LOSS_FUNCTIONS[spec[_LOSS_FUNCTION]],
-            log_level=spec[_LOG_LEVEL] if _LOG_LEVEL in spec else logging.ERROR
+            name=parameters[_NAME],
+            num_nodes=parameters[_NUM_NODES],
+            log_loss_function=functions.LOSS_FUNCTIONS[parameters[_LOSS_FUNCTION]],
+            log_level=parameters[_LOG_LEVEL] if _LOG_LEVEL in parameters else logging.ERROR
         )
 
     # ================================================================================

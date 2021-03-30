@@ -135,6 +135,15 @@ class Layer:
     # ================================================================================
     # Class
     # ================================================================================
+    @staticmethod
+    def build(parameters: Dict):
+        """Build a matmul layer based on the specification
+        parameters: {
+            "name": "name
+            "num_nodes": 8
+        }
+        """
+        assert False, "Must override"
 
     # ================================================================================
     # Instance
@@ -415,16 +424,6 @@ class Layer:
         # In case for the layer is a repeater, pass X through as the default behavior.
         X = np.array(X).reshape((1, -1)) if isinstance(X, float) else X
         return X
-
-    # def forward(self, X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
-    #     # In case for the layer is a repeater, pass X through as the default behavior.
-    #     self.logger.warning(
-    #         "Layer base method %s not overridden but called by %s.",
-    #         inspect.stack()[0][3], inspect.stack()[1][3]
-    #     )
-    #     X = np.array(X) if isinstance(X, float) else X
-    #     assert isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT
-    #     return X
 
     def forward(self, X: np.ndarray) -> Union[np.ndarray, float]:
         """Calculate and forward-propagate the matmul output Y to post layers if exist.

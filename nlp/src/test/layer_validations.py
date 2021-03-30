@@ -24,8 +24,6 @@ from layer import (
 from layer.utilities import (
     forward_outputs,
     backward_outputs,
-    compose_sequential_layer_interface,
-    compose_sequential_layer_objective
 )
 from test.config import (
     GRADIENT_DIFF_CHECK_TRIGGER,

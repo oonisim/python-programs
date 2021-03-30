@@ -2,11 +2,11 @@
 import cProfile
 import copy
 import logging
-from typing import (
-    List,
-    Callable
-)
+
 import numpy as np
+
+import layer
+import optimizer as optimiser
 from common.constants import (
     TYPE_FLOAT,
 )
@@ -17,56 +17,45 @@ from common.functions import (
     softmax_cross_entropy_log_loss,
     compose,
 )
-import layer
+from data import (
+    linear_separable_sectors
+)
 from layer.constants import (
-    _WEIGHTS,
-    _NAME,
-    _SCHEME,
     _OPTIMIZER,
     _NUM_NODES,
-    _NUM_FEATURES,
     _PARAMETERS,
-    _LOSS_FUNCTION,
+    _COMPOSITE_LAYER_SPEC
 )
-from layer.utilities import (
-    forward_outputs,
-    backward_outputs,
-)
-import optimizer as optimiser
 from network.sequential import (
     SequentialNetwork
+)
+from test.layer_validations import (
+    expected_gradient_from_log_loss,
+    validate_relu_neuron_round_trip
 )
 from test.utilities import (
     build_matmul_relu_objective
 )
-from test.layer_validations import (
-    validate_against_expected_gradient,
-    validate_against_numerical_gradient,
-    expected_gradient_from_log_loss,
-    expected_gradients_from_relu_neuron,
-    validate_relu_neuron_round_trip
-)
-from data import (
-    linear_separable,
-    linear_separable_sectors
+from config_test_010_sequential_config import (
+    valid_network_specification_mao,
+    valid_network_specification_mamao,
+    _N,
+    _M,
+    _D,
+    _lr,
+    _l2
 )
 
 Logger = logging.getLogger(__name__)
-# Logger.setLevel(logging.DEBUG)
 
 
 def _must_fail(
-        name,
-        M,
         network_specification,
         message
 ):
     try:
         network = SequentialNetwork(
-            name=name,
-            num_nodes=M,    # number of the last layer output,
             specification=network_specification,
-            log_level=logging.DEBUG
         )
         raise RuntimeError(message)
     except AssertionError:
@@ -74,18 +63,12 @@ def _must_fail(
 
 
 def _must_succeed(
-        name,
-        num_nodes,
-        specification,
-        log_level,
+        network_specification,
         message
 ):
     try:
         network = SequentialNetwork(
-            name=name,
-            num_nodes=num_nodes,    # number of the last layer output,
-            specification=specification,
-            log_level=log_level
+            specification=network_specification,
         )
         return network
     except Exception as e:
@@ -100,19 +83,13 @@ def test_010_sequential_instantiation_to_fail():
     # NOTE: Invalidate one parameter at a time from the correct one.
     # Otherwise not sure what you are testing.
     # ----------------------------------------------------------------------
-    from config_test_010_sequential_config import (
-        valid_network_specification_mamao,
-        M
-    )
     lr = np.random.uniform()
     l2 = np.random.uniform()
-    valid_network_specification_mamao["matmul01"][_PARAMETERS][_OPTIMIZER][_PARAMETERS]["lr"] = lr
-    valid_network_specification_mamao["matmul01"][_PARAMETERS][_OPTIMIZER][_PARAMETERS]["l2"] = l2
+    composite_layer_spec = valid_network_specification_mamao[_COMPOSITE_LAYER_SPEC]
+    composite_layer_spec["matmul01"][_PARAMETERS][_OPTIMIZER][_PARAMETERS]["lr"] = lr
+    composite_layer_spec["matmul01"][_PARAMETERS][_OPTIMIZER][_PARAMETERS]["l2"] = l2
     network = _must_succeed(
-        name="test_010_base_instantiation_to_fail",
-        num_nodes=M,  # number of the last layer output,
-        specification=valid_network_specification_mamao,
-        log_level=logging.DEBUG,
+        network_specification=valid_network_specification_mamao,
         message="SequentialNetwork() must succeed with %s"
                 % valid_network_specification_mamao
     )
@@ -126,15 +103,17 @@ def test_010_sequential_instantiation_to_fail():
     # ********************************************************************************
     msg = "SequentialNetwork() must fail with invalid lr value"
     network_specification = copy.deepcopy(valid_network_specification_mamao)
-    network_specification["matmul01"][_PARAMETERS][_OPTIMIZER][_PARAMETERS]["lr"] = \
+    composite_layer_spec = network_specification[_COMPOSITE_LAYER_SPEC]
+    composite_layer_spec["matmul01"][_PARAMETERS][_OPTIMIZER][_PARAMETERS]["lr"] = \
         -np.random.uniform()
-    _must_fail(name=name, M=M, network_specification=network_specification, message=msg)
+    _must_fail(network_specification=network_specification, message=msg)
 
     msg = "SequentialNetwork() must fail with invalid l2 value"
     network_specification = copy.deepcopy(valid_network_specification_mamao)
-    network_specification["matmul01"][_PARAMETERS][_OPTIMIZER][_PARAMETERS]["l2"] = \
+    composite_layer_spec = network_specification[_COMPOSITE_LAYER_SPEC]
+    composite_layer_spec["matmul01"][_PARAMETERS][_OPTIMIZER][_PARAMETERS]["l2"] = \
         -np.random.uniform()
-    _must_fail(name=name, M=M, network_specification=network_specification, message=msg)
+    _must_fail(network_specification=network_specification, message=msg)
 
     # ********************************************************************************
     # Constraint: must match
@@ -144,13 +123,15 @@ def test_010_sequential_instantiation_to_fail():
     # ********************************************************************************
     msg = "SequentialNetwork() must fail when num_nodes does not match that of last inference layer"
     network_specification = copy.deepcopy(valid_network_specification_mamao)
-    network_specification["activation02"][_PARAMETERS][_NUM_NODES] = (M-1)
-    _must_fail(name=name, M=M, network_specification=network_specification, message=msg)
+    composite_layer_spec = network_specification[_COMPOSITE_LAYER_SPEC]
+    composite_layer_spec["activation02"][_PARAMETERS][_NUM_NODES] = (_M-1)
+    _must_fail(network_specification=network_specification, message=msg)
 
     msg = "SequentialNetwork() must fail when num_nodes does not match that of the objective layer"
     network_specification = copy.deepcopy(valid_network_specification_mamao)
-    network_specification["objective"][_PARAMETERS][_NUM_NODES] = (M-1)
-    _must_fail(name=name, M=M, network_specification=network_specification, message=msg)
+    composite_layer_spec = network_specification[_COMPOSITE_LAYER_SPEC]
+    composite_layer_spec["objective"][_PARAMETERS][_NUM_NODES] = (_M-1)
+    _must_fail(network_specification=network_specification, message=msg)
 
 
 def test_010_validate_sequential_matmul_relu_training():
@@ -162,19 +143,8 @@ def test_010_validate_sequential_matmul_relu_training():
     # NOTE: Invalidate one parameter at a time from the correct one.
     # Otherwise not sure what you are testing.
     # ----------------------------------------------------------------------
-    from config_test_010_sequential_config import (
-        valid_network_specification_mao,
-        M,
-        N,
-        D,
-        _lr,
-        _l2
-    )
     network = _must_succeed(
-        name="test_010_base_instantiation_to_fail",
-        num_nodes=M,  # number of the last layer output,
-        specification=valid_network_specification_mao,
-        log_level=logging.DEBUG,
+        network_specification=valid_network_specification_mao,
         message="SequentialNetwork() must succeed with %s"
                 % valid_network_specification_mao
     )
@@ -190,8 +160,8 @@ def test_010_validate_sequential_matmul_relu_training():
 
     optimizer_non_sequential = optimiser.SGD(lr=_lr, l2=_l2)
     *network_components, = build_matmul_relu_objective(
-        M,
-        D,
+        _M,
+        _D,
         W=W_non_sequential,
         optimizer=optimizer_non_sequential,
         log_loss_function=softmax_cross_entropy_log_loss,
@@ -212,11 +182,11 @@ def test_010_validate_sequential_matmul_relu_training():
     # --------------------------------------------------------------------------------
     # Training data
     # --------------------------------------------------------------------------------
-    X, T, V = linear_separable_sectors(n=N, d=D, m=M)
+    X, T, V = linear_separable_sectors(n=_N, d=_D, m=_M)
     X, T = transform_X_T(X, T)
-    assert X.shape == (N, D)
+    assert X.shape == (_N, _D)
 
-    num_epochs = 1000
+    num_epochs = 100
 
     loss.T = T
     for i in range(num_epochs):
@@ -226,7 +196,7 @@ def test_010_validate_sequential_matmul_relu_training():
         # Expected outputs and gradients from the non-sequential
         # --------------------------------------------------------------------------------
         P = softmax(relu(np.matmul(matmul.X, matmul.W.T)))
-        EDA = expected_gradient_from_log_loss(P=P, T=T, N=N)
+        EDA = expected_gradient_from_log_loss(P=P, T=T, N=_N)
         Y, A, EDY, EDW, EDX, dY, dX, dW = validate_relu_neuron_round_trip(
             matmul=matmul,
             activation=activation,
@@ -274,9 +244,9 @@ def test_010_sequential_train2():
     # --------------------------------------------------------------------------------
     from config_test_010_sequential_config import (
         valid_network_specification_mbambamamo,
-        N,
-        M,
-        D,
+        _N,
+        _M,
+        _D,
     )
 
     # ----------------------------------------------------------------------
@@ -285,10 +255,7 @@ def test_010_sequential_train2():
     # Otherwise not sure what you are testing.
     # ----------------------------------------------------------------------
     network = _must_succeed(
-        name="test_010_base_instantiation_to_fail",
-        num_nodes=M,  # number of the last layer output,
-        specification=valid_network_specification_mbambamamo,
-        log_level=logging.ERROR,
+        network_specification=valid_network_specification_mbambamamo,
         message="SequentialNetwork() must succeed with %s"
                 % valid_network_specification_mbambamamo
     )
@@ -298,9 +265,9 @@ def test_010_sequential_train2():
     # --------------------------------------------------------------------------------
     # Training data
     # --------------------------------------------------------------------------------
-    X, T, V = linear_separable_sectors(n=N, d=D, m=M)
+    X, T, V = linear_separable_sectors(n=_N, d=_D, m=_M)
     X, T = transform_X_T(X, T)
-    assert X.shape == (N, D)
+    assert X.shape == (_N, _D)
 
     profiler = cProfile.Profile()
     profiler.enable()

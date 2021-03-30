@@ -14,9 +14,14 @@ from layer.objective import (
 from layer.sequential import (
     Sequential
 )
+from layer.parallel import (
+    Parallel
+)
 from layer.schemes import (
     FEATURE_LAYERS,
     ACTIVATION_LAYERS,
+    FUNCTION_LAYERS,
+    OBJECTIVE_LAYERS,
     OBJECTIVE_LAYER_SCHEMES,
     FUNCTION_LAYER_SCHEMES,
     SCHEMES

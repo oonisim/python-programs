@@ -1,16 +1,18 @@
 """Normalization layer implementation
 """
+import copy
+import logging
 from typing import (
     Optional,
     Union,
     List,
     Dict
 )
-import copy
-import logging
-import numpy as np
+
 import numexpr as ne
+import numpy as np
 from numba import jit
+
 from common.constants import (
     TYPE_FLOAT,
     ENABLE_NUMEXPR,
@@ -21,8 +23,15 @@ from common.functions import (
     numerical_jacobian
 )
 from layer.base import Layer
+from layer.constants import (
+    _NAME,
+    _SCHEME,
+    _OPTIMIZER,
+    _NUM_NODES,
+    _PARAMETERS
+)
 from layer.utilities_builder import (
-    build_optimizer_from_layer_specification
+    build_optimizer_from_layer_parameters
 )
 import optimizer as optimiser
 
@@ -142,33 +151,44 @@ class BatchNormalization(Layer):
     # Class initialization
     # ================================================================================
     @staticmethod
-    def build(specification: Dict):
-        """Build a matmul layer based on the specification
-        Specification: {
-            "num_nodes": 8,
-            "optimizer": <optimizer_spec>,
-            "momentum": 0.9,
-            "eps": 1e-5,
-            "log_level": 10
+    def build_specification_template():
+        return {
+            _NAME: "bn01",
+            _NUM_NODES: 16,
+            "momentum": np.random.uniform(),
+            _OPTIMIZER: {
+                _SCHEME: optimiser.SGD.__qualname__,
+                _PARAMETERS: {
+                    "lr": np.random.uniform(),
+                    "l2": np.random.uniform()
+                }
+            },
+            # must be smaller than 1e-3 to be small enough
+            "eps": np.random.uniform(low=0, high=1e-4),
+            "log_level": logging.ERROR
         }
+
+    @staticmethod
+    def build(parameters: Dict):
+        """Build a matmul layer based on the parameters
         """
-        spec = copy.deepcopy(specification)
+        parameters = copy.deepcopy(parameters)
         assert (
-            isinstance(spec, dict) and
-            ("name" in spec and len(spec["name"]) > 0) and
-            ("num_nodes" in spec and spec["num_nodes"] > 0)
+            isinstance(parameters, dict) and
+            (_NAME in parameters and len(parameters[_NAME]) > 0) and
+            (_NUM_NODES in parameters and parameters[_NUM_NODES] > 0)
         )
 
         # Optimizer
-        _optimizer = build_optimizer_from_layer_specification(spec)
-        spec["optimizer"] = _optimizer
+        _optimizer = build_optimizer_from_layer_parameters(parameters)
+        parameters[_OPTIMIZER] = _optimizer
 
-        if "eps" in spec:
-            spec["eps"] = TYPE_FLOAT(spec["eps"])
-        if "momentum" in spec:
-            spec["momentum"] = TYPE_FLOAT(spec["momentum"])
+        if "eps" in parameters:
+            parameters["eps"] = TYPE_FLOAT(parameters["eps"])
+        if "momentum" in parameters:
+            parameters["momentum"] = TYPE_FLOAT(parameters["momentum"])
 
-        instance = BatchNormalization(**spec)
+        instance = BatchNormalization(**parameters)
 
         return instance
 

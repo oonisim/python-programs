@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import layer
 import optimizer as optimiser
@@ -10,101 +11,126 @@ from layer.constants import (
     _NUM_FEATURES,
     _PARAMETERS,
     _LOSS_FUNCTION,
+    _COMPOSITE_LAYER_SPEC,
+    _LOG_LEVEL
 )
 _lr = np.random.uniform()
 _l2 = np.random.uniform()
-M = 3  # Number of output/classes
-N = 10
-D = 2
+_N = 10
+_M = 3  # Number of output/classes
+_D = 2
+_eps = np.random.uniform(low=0, high=1e-4)
+_momentum = np.random.uniform(low=0.9, high=1.0)
+
 
 valid_network_specification_mamao = {
-    "matmul01": {
-        _SCHEME: layer.Matmul.__qualname__,
-        _PARAMETERS: {
-            _NUM_NODES: 8,
-            _NUM_FEATURES: 2,  # NOT including bias
-            _WEIGHTS: {
-                _SCHEME: "he"
+    _NAME: "network_mamao",
+    _NUM_NODES: _M,
+    _LOG_LEVEL: logging.ERROR,
+    _COMPOSITE_LAYER_SPEC: {
+        "matmul01": {
+            _SCHEME: layer.Matmul.__qualname__,
+            _PARAMETERS: {
+                _NAME: "matmul01",
+                _NUM_NODES: 8,
+                _NUM_FEATURES: _D,  # NOT including bias
+                _WEIGHTS: {
+                    _SCHEME: "he"
+                },
+                _OPTIMIZER: {
+                    _SCHEME: optimiser.SGD.__qualname__,
+                    _PARAMETERS: {
+                        "lr": _lr,
+                        "l2": _l2
+                    }
+                }
             },
-            _OPTIMIZER: {
-                _SCHEME: optimiser.SGD.__qualname__,
-                _PARAMETERS: {
-                    "lr": _lr,
-                    "l2": _l2
+        },
+        "activation01": {
+            _SCHEME: layer.ReLU.__qualname__,
+            _PARAMETERS: {
+                _NAME: "relu01",
+                _NUM_NODES: 8
+            }
+        },
+        "matmul02": {
+            _SCHEME: layer.Matmul.__qualname__,
+            _PARAMETERS: {
+                _NAME: "matmul02",
+                _NUM_NODES: _M,
+                _NUM_FEATURES: 8,  # NOT including bias
+                _WEIGHTS: {
+                    _SCHEME: "he"
                 }
             }
         },
-    },
-    "activation01": {
-        _SCHEME: layer.ReLU.__qualname__,
-        _PARAMETERS: {
-            _NUM_NODES: 8
-        }
-    },
-    "matmul02": {
-        _SCHEME: layer.Matmul.__qualname__,
-        _PARAMETERS: {
-            _NUM_NODES: 3,
-            _NUM_FEATURES: 8,  # NOT including bias
-            _WEIGHTS: {
-                _SCHEME: "he"
+        "activation02": {
+            _SCHEME: layer.ReLU.__qualname__,
+            _PARAMETERS: {
+                _NAME: "relu01",
+                _NUM_NODES: _M
             }
-        }
-    },
-    "activation02": {
-        _SCHEME: layer.ReLU.__qualname__,
-        _PARAMETERS: {
-            _NUM_NODES: M
-        }
-    },
-    "objective": {
-        _SCHEME: layer.CrossEntropyLogLoss.__qualname__,
-        _PARAMETERS: {
-            _NUM_NODES: M,
-            _LOSS_FUNCTION: "softmax_cross_entropy_log_loss"
+        },
+        "objective": {
+            _SCHEME: layer.CrossEntropyLogLoss.__qualname__,
+            _PARAMETERS: {
+                _NAME: "loss",
+                _NUM_NODES: _M,
+                _LOSS_FUNCTION: "softmax_cross_entropy_log_loss"
+            }
         }
     }
 }
 
 valid_network_specification_mao = {
-    "matmul01": {
-        _SCHEME: layer.Matmul.__qualname__,
-        _PARAMETERS: {
-            _NUM_NODES: M,
-            _NUM_FEATURES: D,  # NOT including bias
-            _WEIGHTS: {
-                _SCHEME: "he"
-            },
-            _OPTIMIZER: {
-                _SCHEME: optimiser.SGD.__qualname__,
-                _PARAMETERS: {
-                    "lr": _lr,
-                    "l2": _l2
+    _NAME: "valid_network_mao",
+    _NUM_NODES: _M,
+    _LOG_LEVEL: logging.ERROR,
+    _COMPOSITE_LAYER_SPEC: {
+        "matmul01": {
+            _SCHEME: layer.Matmul.__qualname__,
+            _PARAMETERS: {
+                _NAME: "matmul01",
+                _NUM_NODES: _M,
+                _NUM_FEATURES: _D,  # NOT including bias
+                _WEIGHTS: {
+                    _SCHEME: "he"
+                },
+                _OPTIMIZER: {
+                    _SCHEME: optimiser.SGD.__qualname__,
+                    _PARAMETERS: {
+                        "lr": _lr,
+                        "l2": _l2
+                    }
                 }
+            },
+        },
+        "activation01": {
+            _SCHEME: layer.ReLU.__qualname__,
+            _PARAMETERS: {
+                _NAME: "relu01",
+                _NUM_NODES: _M
             }
         },
-    },
-    "activation01": {
-        _SCHEME: layer.ReLU.__qualname__,
-        _PARAMETERS: {
-            _NUM_NODES: M
-        }
-    },
-    "objective": {
-        _SCHEME: layer.CrossEntropyLogLoss.__qualname__,
-        _PARAMETERS: {
-            _NUM_NODES: M,
-            _LOSS_FUNCTION: "softmax_cross_entropy_log_loss"
+        "objective": {
+            _SCHEME: layer.CrossEntropyLogLoss.__qualname__,
+            _PARAMETERS: {
+                _NAME: "loss",
+                _NUM_NODES: _M,
+                _LOSS_FUNCTION: "softmax_cross_entropy_log_loss"
+            }
         }
     }
 }
 
-valid_network_specification_mbambamamo = {
+
+composite_layer_specification_mbambamamo = {
     "matmul01": {
         _SCHEME: layer.Matmul.__qualname__,
         _PARAMETERS: {
+            _NAME: "matmul01",
             _NUM_NODES: 16,
-            _NUM_FEATURES: 2,  # NOT including bias
+            _NUM_FEATURES: _D,  # NOT including bias
             _WEIGHTS: {
                 _SCHEME: "he"
             },
@@ -120,19 +146,31 @@ valid_network_specification_mbambamamo = {
     "bn01": {
         _SCHEME: layer.BatchNormalization.__qualname__,
         _PARAMETERS: {
+            _NAME: "bn01",
             _NUM_NODES: 16,
-            "momentum": 0.9,
+            _OPTIMIZER: {
+                _SCHEME: optimiser.SGD.__qualname__,
+                _PARAMETERS: {
+                    "lr": _lr,
+                    "l2": _l2
+                }
+            },
+            "momentum": _momentum,
+            "eps": _eps,
+            "log_level": logging.ERROR
         }
     },
     "activation01": {
         _SCHEME: layer.ReLU.__qualname__,
         _PARAMETERS: {
+            _NAME: "relu01",
             _NUM_NODES: 16
         }
     },
     "matmul02": {
         _SCHEME: layer.Matmul.__qualname__,
         _PARAMETERS: {
+            _NAME: "matmul02",
             _NUM_NODES: 32,
             _NUM_FEATURES: 16,  # NOT including bias
             _WEIGHTS: {
@@ -150,18 +188,21 @@ valid_network_specification_mbambamamo = {
     "bn02": {
         _SCHEME: layer.BatchNormalization.__qualname__,
         _PARAMETERS: {
+            _NAME: "bn01",
             _NUM_NODES: 32,
         }
     },
     "activation02": {
         _SCHEME: layer.ReLU.__qualname__,
         _PARAMETERS: {
+            _NAME: "relu02",
             _NUM_NODES: 32
         }
     },
     "matmul03": {
         _SCHEME: layer.Matmul.__qualname__,
         _PARAMETERS: {
+            _NAME: "matmul03",
             _NUM_NODES: 16,
             _NUM_FEATURES: 32,  # NOT including bias
             _WEIGHTS: {
@@ -179,13 +220,15 @@ valid_network_specification_mbambamamo = {
     "activation03": {
         _SCHEME: layer.ReLU.__qualname__,
         _PARAMETERS: {
+            _NAME: "relu03",
             _NUM_NODES: 16
         }
     },
     "matmul04": {
         _SCHEME: layer.Matmul.__qualname__,
         _PARAMETERS: {
-            _NUM_NODES: 3,
+            _NAME: "matmul04",
+            _NUM_NODES: _M,
             _NUM_FEATURES: 16,  # NOT including bias
             _WEIGHTS: {
                 _SCHEME: "he"
@@ -195,8 +238,16 @@ valid_network_specification_mbambamamo = {
     "objective": {
         _SCHEME: layer.CrossEntropyLogLoss.__qualname__,
         _PARAMETERS: {
-            _NUM_NODES: M,
+            _NAME: "loss",
+            _NUM_NODES: _M,
             _LOSS_FUNCTION: "softmax_cross_entropy_log_loss"
         }
     }
+}
+
+valid_network_specification_mbambamamo = {
+    _NAME: "valid_network_mao",
+    _NUM_NODES: _M,
+    _LOG_LEVEL: logging.ERROR,
+    _COMPOSITE_LAYER_SPEC: composite_layer_specification_mbambamamo
 }
