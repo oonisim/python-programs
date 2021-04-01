@@ -28,7 +28,9 @@ from layer.constants import (
     _NAME,
     _NUM_NODES,
     _LOSS_FUNCTION,
-    _LOG_LEVEL
+    _LOG_LEVEL,
+    _SCHEME,
+    _PARAMETERS
 )
 
 
@@ -50,11 +52,32 @@ class CrossEntropyLogLoss(Layer):
     # Class
     # ================================================================================
     @staticmethod
-    def build_specification_template():
+    def specification_template():
+        return CrossEntropyLogLoss.specification(name="loss001", num_nodes=3)
+
+    @staticmethod
+    def specification(
+            name: str,
+            num_nodes: int,
+            loss_function: str = functions.softmax_cross_entropy_log_loss.__qualname__
+    ):
+        """Generate ReLU specification
+        Args:
+            name: layer name
+            num_nodes: number of nodes (outputs) in the layer
+            loss_function: cross entropy log loss function
+        """
+        assert loss_function in functions.LOSS_FUNCTIONS, \
+            "Invalid loss function %s. Must be one of %s" \
+            % (loss_function, list(functions.LOSS_FUNCTIONS.keys()))
+
         return {
-            _NAME: "<layer name>",
-            _NUM_NODES: 3,
-            _LOSS_FUNCTION: "softmax_cross_entropy_log_loss"
+            _SCHEME: CrossEntropyLogLoss.__qualname__,
+            _PARAMETERS: {
+                _NAME: name,
+                _NUM_NODES: num_nodes,
+                _LOSS_FUNCTION: loss_function
+            }
         }
 
     @staticmethod

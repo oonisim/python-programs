@@ -55,6 +55,9 @@ from test.config import (
 from test.layer_validations import (
     validate_against_expected_gradient
 )
+from optimizer import (
+    SGD
+)
 
 
 Logger = logging.getLogger("test_030_objective")
@@ -518,6 +521,34 @@ def test_020_matmul_builder_to_fail_optimizer_spec():
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")
+
+
+def test_020_matmul_build_specification():
+    name = "matmul01"
+    num_nodes = 8
+    num_features = 2
+    weights_initialization_scheme = "he"
+    expected_spec = {
+        _SCHEME: Matmul.__qualname__,
+        _PARAMETERS: {
+            _NAME: name,
+            _NUM_NODES: num_nodes,
+            _NUM_FEATURES: num_features,  # NOT including bias
+            _WEIGHTS: {
+                _SCHEME: weights_initialization_scheme
+            },
+            _OPTIMIZER: SGD.specification(name="sgd")
+        }
+    }
+    actual_spec = Matmul.specification(
+        name=name,
+        num_nodes=num_nodes,
+        num_features=num_features,
+        weights_initialization_scheme=weights_initialization_scheme,
+
+    )
+    assert expected_spec == actual_spec, \
+        "expected\n%s\nactual\n%s\n" % (expected_spec, actual_spec)
 
 
 def test_020_matmul_builder_to_succeed():

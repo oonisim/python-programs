@@ -38,7 +38,7 @@ class Composite(Layer):
     # Class initialization
     # ================================================================================
     @staticmethod
-    def build_specification_template():
+    def specification_template():
         return _composite_layer_specification
 
     @staticmethod

@@ -413,7 +413,7 @@ def test_050_parallel_builder_to_succeed():
         # NOTE: Invalidate one parameter at a time from the correct one.
         # Otherwise not sure what you are testing.
         # ----------------------------------------------------------------------
-        valid_spec = Parallel.build_specification_template()
+        valid_spec = Parallel.specification_template()
         try:
             Parallel.build(parameters=valid_spec)
         except Exception as e:

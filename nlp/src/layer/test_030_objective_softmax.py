@@ -1,14 +1,12 @@
 """Objective (loss) layer test cases"""
-from typing import (
-    Optional,
-    Union,
-    List,
-    Dict,
-    Tuple
-)
-import logging
 import cProfile
+import logging
+from typing import (
+    Union
+)
+
 import numpy as np
+
 from common.constants import (
     TYPE_FLOAT,
     TYPE_LABEL,
@@ -24,8 +22,13 @@ from common.functions import (
 from common.utilities import (
     random_string,
 )
-from layer import (
-    CrossEntropyLogLoss
+import layer
+from layer.constants import (
+    _NAME,
+    _NUM_NODES,
+    _SCHEME,
+    _LOSS_FUNCTION,
+    _PARAMETERS
 )
 from test.config import (
     NUM_MAX_TEST_TIMES,
@@ -37,8 +40,25 @@ from test.config import (
     LOSS_DIFF_ACCEPTANCE_VALUE
 )
 
-
 Logger = logging.getLogger(__name__)
+
+
+def _must_fail(
+        name: str,
+        num_nodes: int,
+        log_level: int = logging.ERROR,
+        msg: str = ""
+):
+    assert msg
+    try:
+        layer.CrossEntropyLogLoss(
+            name=name,
+            num_nodes=num_nodes,
+            log_level=log_level
+        )
+        raise RuntimeError(msg)
+    except AssertionError:
+        pass
 
 
 def test_030_objective_instantiation_to_fail():
@@ -52,42 +72,31 @@ def test_030_objective_instantiation_to_fail():
     for _ in range(NUM_MAX_TEST_TIMES):
         M: int = np.random.randint(1, NUM_MAX_NODES)
         # Constraint: Name is string with length > 0.
-        try:
-            CrossEntropyLogLoss(
-                name="",
-                num_nodes=1
-            )
-            raise RuntimeError("CrossEntropyLogLoss initialization with invalid name must fail")
-        except AssertionError:
-            pass
+        _must_fail(
+            name="",
+            num_nodes=1,
+            msg="CrossEntropyLogLoss initialization with invalid name must fail"
+        )
 
         # Constraint: num_nodes > 1
-        try:
-            CrossEntropyLogLoss(
-                name="test_030_objective",
-                num_nodes=0
-            )
-            raise RuntimeError("CrossEntropyLogLoss(num_nodes<1) must fail.")
-        except AssertionError:
-            pass
-
-        try:
-            CrossEntropyLogLoss(
-                name="test_030_objective",
-                num_nodes=1
-            )
-            raise RuntimeError("CrossEntropyLogLoss(num_nodes<2) must fail.")
-        except AssertionError:
-            pass
-
+        _must_fail(
+            name=name,
+            num_nodes=0,
+            msg="CrossEntropyLogLoss(num_nodes<1) must fail."
+        )
+        _must_fail(
+            name=name,
+            num_nodes=1,
+            msg="CrossEntropyLogLoss(num_nodes<2) must fail."
+        )
         # Constraint: logging level is correct.
         try:
-            CrossEntropyLogLoss(
+            layer.CrossEntropyLogLoss(
                 name="test_030_objective",
                 num_nodes=M,
                 log_level=-1
             )
-            raise RuntimeError("CrossEntropyLogLoss initialization with invalid log level must fail")
+            raise RuntimeError()
         except (AssertionError, KeyError):
             pass
 
@@ -103,7 +112,7 @@ def test_030_objective_instance_properties():
     name = random_string(np.random.randint(1, 10))
     for _ in range(NUM_MAX_TEST_TIMES):
         M: int = np.random.randint(2, NUM_MAX_NODES)
-        layer = CrossEntropyLogLoss(
+        layer = layer.CrossEntropyLogLoss(
             name=name,
             num_nodes=M,
             log_level=logging.DEBUG
@@ -245,7 +254,7 @@ def test_030_objective_instantiation():
 
         # For softmax log loss layer, the number of features N in X is the same with node number.
         D: int = M
-        layer = CrossEntropyLogLoss(
+        layer = layer.CrossEntropyLogLoss(
             name=name,
             num_nodes=M,
             log_level=logging.DEBUG
@@ -285,8 +294,23 @@ def test_030_objective_instantiation():
 
         layer.logger.debug("This is a pytest")
 
+        assert layer.objective(np.array(1.0)) == np.array(1.0)
 
-        layer.objective(np.array(1.0)) == np.array(1.0)
+
+def test_030_objective_specification():
+    name = "loss001"
+    num_nodes = 16
+    expected_spec = {
+        _SCHEME: layer.CrossEntropyLogLoss.__qualname__,
+        _PARAMETERS: {
+            _NAME: name,
+            _NUM_NODES: num_nodes,
+            _LOSS_FUNCTION: softmax_cross_entropy_log_loss.__qualname__
+        }
+    }
+    actual_spec = layer.CrossEntropyLogLoss.specification(name=name, num_nodes=num_nodes)
+    assert expected_spec == actual_spec, \
+        "expected\n%s\nactual\n%s\n" % (expected_spec, actual_spec)
 
 
 def test_030_objective_methods_1d_ohe():
@@ -321,7 +345,7 @@ def test_030_objective_methods_1d_ohe():
         assert M >= 2, "Softmax is for multi label classification. "\
                        " Use Sigmoid for binary classification."
 
-        layer = CrossEntropyLogLoss(
+        layer = layer.CrossEntropyLogLoss(
             name=name,
             num_nodes=M,
             log_level=logging.DEBUG
@@ -435,7 +459,7 @@ def test_030_objective_methods_2d_ohe():
         assert M >= 2, "Softmax is for multi label classification. "\
                        " Use Sigmoid for binary classification."
 
-        layer = CrossEntropyLogLoss(
+        layer = layer.CrossEntropyLogLoss(
             name=name,
             num_nodes=M,
             log_level=logging.DEBUG
@@ -533,7 +557,7 @@ def test_040_softmax_log_loss_2d(caplog):
     for _ in range(NUM_MAX_TEST_TIMES):
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)    # number of node > 1
-        layer = CrossEntropyLogLoss(
+        layer = layer.CrossEntropyLogLoss(
             name=name,
             num_nodes=M,
             log_loss_function=softmax_cross_entropy_log_loss,

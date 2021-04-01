@@ -14,6 +14,7 @@ from layer.constants import (
     _COMPOSITE_LAYER_SPEC,
     _LOG_LEVEL
 )
+
 _lr = np.random.uniform()
 _l2 = np.random.uniform()
 _N = 10
@@ -67,7 +68,7 @@ valid_network_specification_mamao = {
         "activation02": {
             _SCHEME: layer.ReLU.__qualname__,
             _PARAMETERS: {
-                _NAME: "relu01",
+                _NAME: "relu02",
                 _NUM_NODES: _M
             }
         },
@@ -251,3 +252,79 @@ valid_network_specification_mbambamamo = {
     _LOG_LEVEL: logging.ERROR,
     _COMPOSITE_LAYER_SPEC: composite_layer_specification_mbambamamo
 }
+
+
+def invalid_network_specification_with_duplicated_names():
+    N = 10
+    M = 4
+    D = 2
+    M01 = 8
+    M02: int = M  # Number of categories to classify
+
+    MAX_TEST_TIMES = 3
+
+    X = np.random.rand(N, 2)
+    T = np.random.randint(0, 4, N)
+
+    sequential_layer_specification = {
+        "matmul01": layer.Matmul.specification(
+            name="matmul01",
+            num_nodes=M01,
+            num_features=D,
+            weights_initialization_scheme="he",
+            weights_optimizer_specification=optimiser.SGD.specification(
+                lr=0.05,
+                l2=1e-3
+            )
+        ),
+        "bn01": layer.BatchNormalization.specification(
+            name="bn01",
+            num_nodes=M01,
+            gamma_optimizer_specification=optimiser.SGD.specification(
+                lr=0.05,
+                l2=1e-3
+            ),
+            beta_optimizer_specification=optimiser.SGD.specification(
+                lr=0.05,
+                l2=1e-3,
+            ),
+            momentum=0.9
+        ),
+        "relu01": layer.ReLU.specification(
+            name="relu01",
+            num_nodes=M01,
+        ),
+        "matmul02": layer.Matmul.specification(
+            name="matmul02",
+            num_nodes=M02,
+            num_features=M01,
+            weights_initialization_scheme="he",
+            weights_optimizer_specification=optimiser.SGD.specification(
+                lr=0.05,
+                l2=1e-3
+            )
+        ),
+        "bn02": layer.BatchNormalization.specification(
+            name="bn01",
+            num_nodes=M02,
+            gamma_optimizer_specification=optimiser.SGD.specification(
+                lr=0.05,
+                l2=1e-3
+            ),
+            beta_optimizer_specification=optimiser.SGD.specification(
+                lr=0.05,
+                l2=1e-3,
+            ),
+            momentum=0.9
+        ),
+        "loss": layer.CrossEntropyLogLoss.specification(
+            name="loss001", num_nodes=M
+        )
+    }
+
+    network_specification = {
+        _NAME: "two_layer_classifier_with_batch_normalization",
+        _NUM_NODES: M,
+        _LOG_LEVEL: logging.ERROR,
+        _COMPOSITE_LAYER_SPEC: sequential_layer_specification
+    }

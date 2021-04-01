@@ -295,4 +295,4 @@ class Network(Layer):
         objective layer, the state should be depending on what the softmax has done.
         Hence it seems rational to incorporate the same activation at the objective.
         """
-        return self.predict(X).astype(TYPE_FLOAT)
+        return self._predict(X).astype(TYPE_FLOAT)

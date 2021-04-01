@@ -5,43 +5,64 @@ from typing import (
 import logging
 import numpy as np
 import numexpr as ne
+from common.constants import (
+    TYPE_FLOAT
+)
 from . base import Optimizer
+
+_SGD_NAME_DEFAULT = "sgd"
+_SGD_LR_DEFAULT = 1e-2
+_SGD_L2_DEFAULT = 1e-3
 
 
 class SGD(Optimizer):
     """Stochastic gradient descent """
     # ================================================================================
-    # Class initialization
-    # ================================================================================
-    # ================================================================================
     # Class
     # ================================================================================
     @staticmethod
-    def template(specification: Dict):
+    def specification_template():
+        return SGD.specification()
+
+    @staticmethod
+    def specification(
+            name: str = _SGD_NAME_DEFAULT,
+            lr: TYPE_FLOAT = _SGD_LR_DEFAULT,
+            l2: TYPE_FLOAT = _SGD_L2_DEFAULT
+    ):
+        """Generate SGD specification
+        Args:
+            name: optimizer name
+            lr: learning rate
+            l2: L2 regularization parameter
+        Returns:
+            specification
+        """
         return {
             "scheme": SGD.__qualname__,
             "parameters": {
-                "lr": 0.01,
-                "l2": 1e-3
+                "name": name,
+                "lr": lr,
+                "l2": l2
             }
         }
 
     @staticmethod
     def build(parameters: Dict):
         """Build an optimizer based on the specification.
-        Spec example:
-        {
-            "name": "sgd",  # optional
-            "lr": 0.1,
-            "l2": 0.1
-        }
         """
         return SGD(**parameters)
 
     # ================================================================================
-    # Instance initialization
+    # Instance
     # ================================================================================
-    def __init__(self, name="SGD", lr=0.01, l2: float = 1e-3, log_level=logging.ERROR):
+    def __init__(
+            self,
+            name=_SGD_NAME_DEFAULT,
+            lr=0.01,
+            l2: float = 1e-3,
+            log_level=logging.ERROR
+    ):
         super().__init__(name=name, lr=lr, l2=l2, log_level=log_level)
 
     # --------------------------------------------------------------------------------

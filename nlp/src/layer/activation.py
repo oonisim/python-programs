@@ -21,8 +21,13 @@ from common.functions import (
 )
 from layer.base import Layer
 from layer.constants import (
+    _WEIGHTS,
     _NAME,
+    _SCHEME,
+    _OPTIMIZER,
     _NUM_NODES,
+    _NUM_FEATURES,
+    _PARAMETERS,
     _LOG_LEVEL
 )
 
@@ -31,6 +36,28 @@ class ReLU(Layer):
     # ================================================================================
     # Class
     # ================================================================================
+    @staticmethod
+    def specification_template():
+        return ReLU.specification(name="relu001", num_nodes=3)
+
+    @staticmethod
+    def specification(
+            name: str,
+            num_nodes: int,
+    ):
+        """Generate ReLU specification
+        Args:
+            name: layer name
+            num_nodes: number of nodes (outputs) in the layer
+        """
+        return {
+            _SCHEME: ReLU.__qualname__,
+            _PARAMETERS: {
+                _NAME: name,
+                _NUM_NODES: num_nodes
+            }
+        }
+
     @staticmethod
     def build(parameters: Dict):
         assert (

@@ -1,10 +1,13 @@
 """Node weight initializations
 """
 from typing import (
-    List
+    List,
+    Dict
 )
 import numpy as np
-
+from common.constants import (
+    TYPE_FLOAT
+)
 
 def xavier(M: int, D: int) -> np.ndarray:
     """Xavier weight initialization for base-symmetric activations e.g. sigmoid/tanh
@@ -53,7 +56,73 @@ def uniform(M: int, D: int) -> np.ndarray:
 
 
 SCHEMES = {
+    "uniform": uniform,
     "he": he,
     "xavier": xavier,
-    "uniform": uniform
 }
+
+
+class Weights:
+    # ================================================================================
+    # Class
+    # ================================================================================
+    @staticmethod
+    def specification_template():
+        return Weights.specification(M=3, D=3)
+
+    @staticmethod
+    def specification(
+            M: int,
+            D: int
+    ):
+        """Generate Weights specification
+        Args:
+            M: Number of nodes
+            D: Number of features
+        Returns:
+            specification
+        """
+        return {
+            "scheme": Weights.__qualname__,
+            "parameters": {
+                "M": M,
+                "D": D
+            }
+        }
+
+    @staticmethod
+    def build(parameters: Dict):
+        """Build weights based on the parameter.
+        """
+        return Weights(**parameters)
+
+    # ================================================================================
+    # Instance
+    # ================================================================================
+    def __init__(
+            self,
+            M: int,
+            D: int,
+            initialization_scheme: str = "uniform"
+    ):
+        assert M > 0, D > 0 and initialization_scheme in SCHEMES
+        self._initialization_scheme = list(SCHEMES.keys())[0]
+        self._M = M
+        self._D = D
+        self._weights = SCHEMES[self.initialization_scheme](M, D)
+
+    @property
+    def M(self):
+        return self._M
+
+    @property
+    def D(self):
+        return self._M
+
+    @property
+    def initialization_scheme(self):
+        return self._initialization_scheme
+
+    @property
+    def weights(self):
+        return self._weights

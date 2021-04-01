@@ -371,7 +371,7 @@ def test_020_matmul_builder_to_succeed():
         # NOTE: Invalidate one parameter at a time from the correct one.
         # Otherwise not sure what you are testing.
         # ----------------------------------------------------------------------
-        valid_bn_spec = BatchNormalization.build_specification_template()
+        valid_bn_spec = BatchNormalization.specification_template()
         eps = valid_bn_spec["eps"]
         momentum = valid_bn_spec["momentum"]
         lr = valid_bn_spec[_OPTIMIZER][_PARAMETERS]["lr"]

@@ -82,23 +82,42 @@ class Matmul(Layer):
     # Class
     # ================================================================================
     @staticmethod
-    def build_specification_template():
+    def specification_template():
+        return Matmul.specification(
+            name="matmul001",
+            num_nodes=3,
+            num_features=2,     # without bias
+        )
+
+    @staticmethod
+    def specification(
+            name: str,
+            num_nodes: int,
+            num_features: int,
+            weights_initialization_scheme: str = "uniform",
+            weights_optimizer_specification: dict = None
+    ):
+        """Generate Matmul specification
+        Args:
+            name: layer name
+            num_nodes: number of nodes (outputs) in the layer
+            num_features: number of features in the layer input (without bias)
+            weights_initialization_scheme: weight initialization scheme e.g. he
+            weights_optimizer_specification:
+                optimizer specification. Default to  SGD
+        """
         return {
             _SCHEME: Matmul.__qualname__,
             _PARAMETERS: {
-                _NAME: "matmul01",
-                _NUM_NODES: 8,
-                _NUM_FEATURES: 2,  # NOT including bias
+                _NAME: name,
+                _NUM_NODES: num_nodes,
+                _NUM_FEATURES: num_features,  # NOT including bias
                 _WEIGHTS: {
-                    _SCHEME: "he"
+                    _SCHEME: weights_initialization_scheme
                 },
-                _OPTIMIZER: {
-                    _SCHEME: optimiser.SGD.__qualname__,
-                    _PARAMETERS: {
-                        "lr": 1e-2,
-                        "l2": 1e-3
-                    }
-                }
+                _OPTIMIZER: weights_optimizer_specification
+                if weights_optimizer_specification is not None
+                else optimiser.SGD.specification_template()
             }
         }
 

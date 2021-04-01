@@ -102,6 +102,7 @@ Composite layer specification:
 """
 from typing import (
     List,
+    Dict,
     Callable,
     Union
 )
@@ -155,11 +156,15 @@ def compose_sequential_layer_interface(
     gradient: Callable[[Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]] = None
 
     if len(layers) == 1:
-        Logger.warning("Only 1 layer provided.")
+        Logger.info(
+            "compose_sequential_layer_interface: Only 1 layer in sequence. "
+            "Layer names=%s", [_layer.name for _layer in layers])
+
         function = layers[0].function
         predict = layers[0].predict
         gradient = layers[0].gradient
     else:
+        Logger.debug("Layer names=%s", [_layer.name for _layer in layers])
         # Layer function F=(fn-1 o ... o f0)
         function = compose(*[__layer.function for __layer in layers])
         # Gradient function G=(g0 o g1 o ... o gn-1)
@@ -228,7 +233,10 @@ def map_parallel_layer_interface(
     ] = None
 
     if len(layers) == 1:
-        Logger.warning("Only 1 layer provided.")
+        Logger.info(
+            "map_parallel_layer_interface: Only 1 layer in sequence. "
+            "Layer names=%s", [_layer.name for _layer in layers])
+
         function = [layers[0].function]
         predict = [layers[0].predict]
         gradient = [layers[0].gradient]
@@ -346,7 +354,8 @@ def build_layer_from_layer_specification(
 
 def build_layers_from_composite_layer_specification(
         specification: dict,
-        log_level: int
+        log_level: int,
+        inspect_layer_spec=True
 ) -> List[Layer]:
     assert isinstance(specification, dict) and len(specification) > 0, \
         "composite specification must have elements. \n%s\n" % specification
@@ -357,7 +366,7 @@ def build_layers_from_composite_layer_specification(
                 build_layer_from_layer_specification(
                     specification=layer_spec,
                     log_level=log_level,
-                    inspect_layer_spec=True
+                    inspect_layer_spec=inspect_layer_spec
                 )
             )
         except AssertionError as e:

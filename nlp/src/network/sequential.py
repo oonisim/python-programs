@@ -104,7 +104,11 @@ class SequentialNetwork(Network):
         )
         assert len(layers) > 0
 
+        layer_names: set = set()
         for _layer in layers:
+            assert _layer.name not in layer_names, "Duplicated layer name %s" % _layer.name
+            layer_names.add(_layer.name)
+
             if isinstance(_layer, layer.FUNCTION_LAYERS):
                 inference_layers.append(_layer)
             elif isinstance(_layer, layer.OBJECTIVE_LAYERS):

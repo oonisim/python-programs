@@ -2,27 +2,25 @@
 Those marked as "From deep-learning-from-scratch" is copied from the github.
 https://github.com/oreilly-japan/deep-learning-from-scratch
 """
+import logging
 from typing import (
     Optional,
     Union,
     Tuple,
     Callable
 )
-import logging
-import copy
-import numpy as np
+
 import numexpr as ne
+import numpy as np
+
 from common.constants import (
     TYPE_FLOAT,
     TYPE_LABEL,
     OFFSET_DELTA,
     OFFSET_LOG,
-    OFFSET_STD,
     OFFSET_MODE_ELEMENT_WISE,
     BOUNDARY_SIGMOID,
-    GN_DIFF_ACCEPTANCE_RATIO,
     GRADIENT_SATURATION_THRESHOLD,
-    ENABLE_NUMBA,
     ENABLE_NUMEXPR
 )
 from test.config import (

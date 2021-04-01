@@ -151,21 +151,31 @@ class BatchNormalization(Layer):
     # Class initialization
     # ================================================================================
     @staticmethod
-    def build_specification_template():
+    def specification_template():
+        return BatchNormalization.specification(name="bn001", num_nodes=3)
+
+    @staticmethod
+    def specification(
+            name: str,
+            num_nodes: int,
+            gamma_optimizer_specification: dict = None,
+            beta_optimizer_specification: dict = None,
+            momentum: TYPE_FLOAT = 0.9
+    ):
+        """Generate Matmul specification
+        """
         return {
-            _NAME: "bn01",
-            _NUM_NODES: 16,
-            "momentum": np.random.uniform(),
-            _OPTIMIZER: {
-                _SCHEME: optimiser.SGD.__qualname__,
-                _PARAMETERS: {
-                    "lr": np.random.uniform(),
-                    "l2": np.random.uniform()
-                }
-            },
-            # must be smaller than 1e-3 to be small enough
-            "eps": np.random.uniform(low=0, high=1e-4),
-            "log_level": logging.ERROR
+            _SCHEME: BatchNormalization.__qualname__,
+            _PARAMETERS: {
+                _NAME: name,
+                _NUM_NODES: num_nodes,
+                "momentum": momentum,
+                # Use same optimizer for gamma and beta unless it is proven not sufficient
+                _OPTIMIZER: gamma_optimizer_specification
+                if gamma_optimizer_specification is not None
+                else optimiser.SGD.specification(),
+                "log_level": logging.ERROR
+            }
         }
 
     @staticmethod
@@ -466,6 +476,20 @@ class BatchNormalization(Layer):
     @property
     def optimizer(self) -> optimiser.Optimizer:
         """Optimizer instance for gradient descent
+        """
+        return self._optimizer
+
+    @property
+    def gamma_optimizer(self) -> optimiser.Optimizer:
+        """Optimizer instance for gamma gradient descent
+        For now use the same instance for gamma and beta
+        """
+        return self._optimizer
+
+    @property
+    def beta_optimizer(self) -> optimiser.Optimizer:
+        """Optimizer instance for beta gradient descent
+        For now use the same instance for gamma and beta
         """
         return self._optimizer
 
@@ -772,19 +796,19 @@ class BatchNormalization(Layer):
         dBeta = numerical_jacobian(objective_beta, self.beta, delta=h)
         return [dX, dGamma, dBeta]
 
-    def _gradient_descent(self, X, dX, out=None) -> Union[np.ndarray, TYPE_FLOAT]:
+    def _gradient_descent(self, optimizer, X, dX, out=None) -> Union[np.ndarray, TYPE_FLOAT]:
         """Gradient descent
         Directly update matrices to avoid the temporary copies
         """
-        return self.optimizer.update(X, dX, out=out)
+        return optimizer.update(X, dX, out=out)
 
     def update(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
         """Run gradient descent
         Returns:
             [dL/dX, dL/dGamma, dL/dBeta]: List of gradients.
        """
-        self._gradient_descent(self.gamma, self.dGamma, out=self._gamma)
-        self._gradient_descent(self.beta, self.dBeta, out=self._beta)
+        self._gradient_descent(self.gamma_optimizer, self.gamma, self.dGamma, out=self._gamma)
+        self._gradient_descent(self.beta_optimizer, self.beta, self.dBeta, out=self._beta)
         # return [self.dX, self.dGamma, self.dBeta]
         return [self.dGamma, self.dBeta]
 
