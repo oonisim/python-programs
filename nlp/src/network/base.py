@@ -295,4 +295,7 @@ class Network(Layer):
         objective layer, the state should be depending on what the softmax has done.
         Hence it seems rational to incorporate the same activation at the objective.
         """
+        assert isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT, \
+            f"Only np array of type {TYPE_FLOAT} is accepted"
+
         return self._predict(X).astype(TYPE_FLOAT)

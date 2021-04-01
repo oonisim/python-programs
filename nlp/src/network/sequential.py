@@ -106,7 +106,8 @@ class SequentialNetwork(Network):
 
         layer_names: set = set()
         for _layer in layers:
-            assert _layer.name not in layer_names, "Duplicated layer name %s" % _layer.name
+            assert _layer.name not in layer_names, \
+                "Duplicated layer name %s" % _layer.name
             layer_names.add(_layer.name)
 
             if isinstance(_layer, layer.FUNCTION_LAYERS):
@@ -269,4 +270,4 @@ class SequentialNetwork(Network):
         # --------------------------------------------------------------------------------
         self._predict: Callable[
             [Union[np.ndarray, TYPE_FLOAT]], Union[np.ndarray, TYPE_FLOAT]
-        ] = self.layer_inference.predict
+        ] = compose(self.layer_inference.predict, self.layer_objective.predict)

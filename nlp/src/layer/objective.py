@@ -20,6 +20,8 @@ from layer.constants import (
 )
 from common.functions import (
     transform_X_T,
+    sigmoid,
+    softmax,
     generic_cross_entropy_log_loss,
     sigmoid_cross_entropy_log_loss,
 )
@@ -362,3 +364,28 @@ class CrossEntropyLogLoss(Layer):
             % (f"Layer[{self.name}].gradient_numerical()", GN)
 
         return [GN]
+
+    def predict(self, X):
+        """
+        Responsibility:
+            Generate a concrete prediction 0/1 for binary classification
+            and an index for categorical classification
+
+            For binary classification where M=1, 1/True if Xi > 0 else 0.
+
+            For categorical classification, argmax(X, axis=1) that identifies
+            the class that gives the max probability.
+        Args:
+            X: scores
+        Returns:
+            Predictions
+        """
+        assert isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT, \
+            f"Only np array of type {TYPE_FLOAT} is accepted"
+        if X.ndim <= 1:
+            X = np.array(X).reshape(1, -1)
+
+        if self._log_loss_function == sigmoid_cross_entropy_log_loss:
+            return (X > 0).astype(TYPE_LABEL)
+        else:
+            return np.argmax(softmax(X), axis=1).astype(TYPE_LABEL)

@@ -12,6 +12,7 @@ import numpy as np
 import common.weights as weights
 from common.constants import (
     TYPE_FLOAT,
+    TYPE_LABEL
 )
 from common.functions import (
     softmax,
@@ -286,3 +287,64 @@ def test_categorical_classifier(
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")
+
+
+from layer.constants import (
+    _WEIGHTS,
+    _NAME,
+    _SCHEME,
+    _OPTIMIZER,
+    _NUM_NODES,
+    _NUM_FEATURES,
+    _PARAMETERS,
+    _LOSS_FUNCTION,
+    _COMPOSITE_LAYER_SPEC,
+    _LOG_LEVEL
+)
+from optimizer import (
+    SGD
+)
+from network.sequential import (
+    SequentialNetwork
+)
+def test():
+    M = 1
+    D = 2
+    N = 100
+
+    X, T, V = linear_separable(d=D, n=N)
+    x_min, x_max = X[:, 0].min(), X[:, 0].max()
+    y_min, y_max = X[:, 1].min(), X[:, 1].max()
+
+    sigmoid_classifier_specification = {
+        _NAME: "softmax_classifier",
+        _NUM_NODES: M,
+        _LOG_LEVEL: logging.ERROR,
+        _COMPOSITE_LAYER_SPEC: {
+            "matmul01": Matmul.specification(
+                name="matmul",
+                num_nodes=M,
+                num_features=D,
+                weights_initialization_scheme="he",
+                weights_optimizer_specification=SGD.specification(
+                    lr=0.2,
+                    l2=1e-3
+                )
+            ),
+            "loss": CrossEntropyLogLoss.specification(
+                name="loss",
+                num_nodes=M,
+                loss_function=sigmoid_cross_entropy_log_loss.__qualname__
+            )
+        }
+    }
+    logistic_classifier = SequentialNetwork(
+        specification=sigmoid_classifier_specification,
+    )
+
+    for i in range(50):
+        logistic_classifier.train(X=X, T=T)
+
+    prediction = logistic_classifier.predict(np.array([-1., -1.]))
+    np.isin(prediction, [0, 1])
+    print(prediction)

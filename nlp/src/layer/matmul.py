@@ -291,6 +291,9 @@ class Matmul(Layer):
         # --------------------------------------------------------------------------------
         # Y = (W@X + b) could be efficient
         # --------------------------------------------------------------------------------
+        if X.ndim <= 1:
+            X = np.array(X).reshape(1, -1)
+
         self.X = np.c_[
             np.ones(X.shape[0], dtype=TYPE_FLOAT),  # Add bias
             X

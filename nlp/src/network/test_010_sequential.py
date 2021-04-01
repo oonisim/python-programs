@@ -386,6 +386,12 @@ def test_train():
     network = SequentialNetwork(
         specification=network_specification,
     )
+
+    prev = ""
+    for _layer in network.layer_inference.layers:
+        print(_layer.name)
+        assert prev != _layer.name, "prev is %s now is %s" % (prev, _layer.name)
+
     for i in range(MAX_TEST_TIMES):
         network.train(X=X, T=T)
 

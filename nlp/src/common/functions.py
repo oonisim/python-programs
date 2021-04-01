@@ -1099,16 +1099,33 @@ def prediction_grid_2d(x_min, x_max, y_min, y_max, prediction_function):
     )
     x1 = x1_grid.ravel()
     x2 = x2_grid.ravel()
-    _P = prediction_function(
+    P = prediction_function(
         np.c_[
             x1,
             x2
         ]
     )
-    P = np.argmax(_P, axis=1)
     P = P.reshape(x1_grid.shape)
 
     return x1_grid, x2_grid, P
+
+
+def shuffle(X):
+    assert isinstance(X, np.ndarray) and X.ndim > 0
+    indices = np.random.permutation(range(X.shape[0]))
+    return X[indices]
+
+
+def shuffle_X_T(X, T):
+    assert \
+        isinstance(X, np.ndarray) and X.ndim > 0 and \
+        isinstance(T, np.ndarray) and T.ndim > 0 and \
+        X.shape[0] == T.shape[0]
+
+    indices = np.random.permutation(range(T.shape[0]))
+    X = X[indices]
+    T = T[indices]
+    return X, T
 
 
 LOSS_FUNCTIONS = {
