@@ -174,6 +174,7 @@ class BatchNormalization(Layer):
                 _OPTIMIZER: gamma_optimizer_specification
                 if gamma_optimizer_specification is not None
                 else optimiser.SGD.specification(),
+                "eps": 0.0,
                 "log_level": logging.ERROR
             }
         }

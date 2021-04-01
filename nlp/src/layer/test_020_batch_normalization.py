@@ -371,21 +371,21 @@ def test_020_matmul_builder_to_succeed():
         # NOTE: Invalidate one parameter at a time from the correct one.
         # Otherwise not sure what you are testing.
         # ----------------------------------------------------------------------
-        valid_bn_spec = BatchNormalization.specification_template()
-        eps = valid_bn_spec["eps"]
-        momentum = valid_bn_spec["momentum"]
-        lr = valid_bn_spec[_OPTIMIZER][_PARAMETERS]["lr"]
-        l2 = valid_bn_spec[_OPTIMIZER][_PARAMETERS]["l2"]
-        log_level = valid_bn_spec[_LOG_LEVEL]
+        valid_bn_parameters = BatchNormalization.specification_template()[_PARAMETERS]
+        eps = valid_bn_parameters["eps"]
+        momentum = valid_bn_parameters["momentum"]
+        lr = valid_bn_parameters[_OPTIMIZER][_PARAMETERS]["lr"]
+        l2 = valid_bn_parameters[_OPTIMIZER][_PARAMETERS]["l2"]
+        log_level = valid_bn_parameters[_LOG_LEVEL]
         try:
-            bn: BatchNormalization = BatchNormalization.build(parameters=valid_bn_spec)
+            bn: BatchNormalization = BatchNormalization.build(parameters=valid_bn_parameters)
             assert bn.optimizer.lr == lr
             assert bn.optimizer.l2 == l2
             assert bn.logger.getEffectiveLevel() == log_level
             assert bn.eps == eps
             assert bn.momentum == momentum
         except Exception as e:
-            raise RuntimeError("Matmul.build() must succeed with %s" % valid_bn_spec)
+            raise RuntimeError("Matmul.build() must succeed with %s" % valid_bn_parameters)
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")

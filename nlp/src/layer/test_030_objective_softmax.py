@@ -112,7 +112,7 @@ def test_030_objective_instance_properties():
     name = random_string(np.random.randint(1, 10))
     for _ in range(NUM_MAX_TEST_TIMES):
         M: int = np.random.randint(2, NUM_MAX_NODES)
-        layer = layer.CrossEntropyLogLoss(
+        _layer = layer.CrossEntropyLogLoss(
             name=name,
             num_nodes=M,
             log_level=logging.DEBUG
@@ -122,17 +122,17 @@ def test_030_objective_instance_properties():
         # To pass
         # --------------------------------------------------------------------------------
         try:
-            if not layer.name == name: raise RuntimeError("layer.name == name should be true")
+            if not _layer.name == name: raise RuntimeError("layer.name == name should be true")
         except AssertionError:
             raise RuntimeError("Access to name should be allowed as already initialized.")
 
         try:
-            if not layer.M == M: raise RuntimeError("layer.M == M should be true")
+            if not _layer.M == M: raise RuntimeError("layer.M == M should be true")
         except AssertionError:
             raise RuntimeError("Access to M should be allowed as already initialized.")
 
         try:
-            if not isinstance(layer.logger, logging.Logger):
+            if not isinstance(_layer.logger, logging.Logger):
                 raise RuntimeError("isinstance(layer.logger, logging.Logger) should be true")
         except AssertionError:
             raise RuntimeError("Access to logger should be allowed as already initialized.")
@@ -141,96 +141,96 @@ def test_030_objective_instance_properties():
         # To fail
         # --------------------------------------------------------------------------------
         try:
-            print(layer.X)
+            print(_layer.X)
             raise RuntimeError(msg)
         except AssertionError:
             pass
 
         try:
-            layer.X = int(1)
+            _layer.X = int(1)
             raise RuntimeError(msg)
         except AssertionError:
             pass
 
         try:
-            print(layer.N)
+            print(_layer.N)
             raise RuntimeError(msg)
         except AssertionError:
             pass
 
         try:
-            print(layer.dX)
+            print(_layer.dX)
             raise RuntimeError(msg)
         except AssertionError:
             pass
 
         try:
-            print(layer.Y)
+            print(_layer.Y)
             raise RuntimeError(msg)
         except AssertionError:
             pass
         try:
-            print(layer.P)
+            print(_layer.P)
             raise RuntimeError(msg)
         except AssertionError:
             pass
         try:
-            layer._Y = int(1)
-            print(layer.Y)
-            raise RuntimeError(msg)
-        except AssertionError:
-            pass
-
-        try:
-            print(layer.dY)
-            raise RuntimeError(msg)
-        except AssertionError:
-            pass
-        try:
-            layer._dY = int(1)
-            print(layer.dY)
+            _layer._Y = int(1)
+            print(_layer.Y)
             raise RuntimeError(msg)
         except AssertionError:
             pass
 
         try:
-            print(layer.T)
+            print(_layer.dY)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+        try:
+            _layer._dY = int(1)
+            print(_layer.dY)
             raise RuntimeError(msg)
         except AssertionError:
             pass
 
         try:
-            print(layer.L)
+            print(_layer.T)
             raise RuntimeError(msg)
         except AssertionError:
             pass
 
         try:
-            print(layer.J)
+            print(_layer.L)
             raise RuntimeError(msg)
         except AssertionError:
             pass
 
         try:
-            layer.T = float(1)
+            print(_layer.J)
             raise RuntimeError(msg)
         except AssertionError:
             pass
 
         try:
-            layer.function(int(1))
+            _layer.T = float(1)
+            raise RuntimeError(msg)
+        except AssertionError:
+            pass
+
+        try:
+            _layer.function(int(1))
             raise RuntimeError("Invoke layer.function(int(1)) must fail.")
         except AssertionError:
             pass
 
         try:
-            layer.function(1.0)
-            layer.gradient(int(1))
+            _layer.function(1.0)
+            _layer.gradient(int(1))
             raise RuntimeError("Invoke layer.gradient(int(1)) must fail.")
         except AssertionError:
             pass
 
-        del layer
+        del _layer
 
 
 def test_030_objective_instantiation():
@@ -254,7 +254,7 @@ def test_030_objective_instantiation():
 
         # For softmax log loss layer, the number of features N in X is the same with node number.
         D: int = M
-        layer = layer.CrossEntropyLogLoss(
+        _layer = layer.CrossEntropyLogLoss(
             name=name,
             num_nodes=M,
             log_level=logging.DEBUG
@@ -263,38 +263,38 @@ def test_030_objective_instantiation():
         # --------------------------------------------------------------------------------
         # Properties
         # --------------------------------------------------------------------------------
-        assert layer.name == name
-        assert layer.num_nodes == layer.M == M
+        assert _layer.name == name
+        assert _layer.num_nodes == _layer.M == M
 
-        layer._D = D
-        assert layer.D == D
+        _layer._D = D
+        assert _layer.D == D
 
         X = np.random.randn(N, D)
-        layer.X = X
-        assert np.array_equal(layer.X, X)
-        assert layer.N == N == X.shape[0]
-        # For softmax log loss layer, the number of features N in X is the same with node number.
-        assert layer.M == X.shape[1]
+        _layer.X = X
+        assert np.array_equal(_layer.X, X)
+        assert _layer.N == N == X.shape[0]
+        # For softmax log loss _layer, the number of features N in X is the same with node number.
+        assert _layer.M == X.shape[1]
 
-        layer._dX = X
-        assert np.array_equal(layer.dX, X)
+        _layer._dX = X
+        assert np.array_equal(_layer.dX, X)
 
         T = np.random.randint(0, M, N)
-        layer.T = T
-        assert np.array_equal(layer.T, T)
+        _layer.T = T
+        assert np.array_equal(_layer.T, T)
 
         # Once T is set, objective() is available and callable
-        assert layer.objective(layer.function(X))
+        assert _layer.objective(_layer.function(X))
 
-        layer._Y = np.dot(X, X.T)
-        assert np.array_equal(layer.Y, np.dot(X, X.T))
+        _layer._Y = np.dot(X, X.T)
+        assert np.array_equal(_layer.Y, np.dot(X, X.T))
 
-        layer._dY = np.array(0.9)
-        assert layer._dY == np.array(0.9)
+        _layer._dY = np.array(0.9)
+        assert _layer._dY == np.array(0.9)
 
-        layer.logger.debug("This is a pytest")
+        _layer.logger.debug("This is a pytest")
 
-        assert layer.objective(np.array(1.0)) == np.array(1.0)
+        assert _layer.objective(np.array(1.0)) == np.array(1.0)
 
 
 def test_030_objective_specification():
@@ -345,7 +345,7 @@ def test_030_objective_methods_1d_ohe():
         assert M >= 2, "Softmax is for multi label classification. "\
                        " Use Sigmoid for binary classification."
 
-        layer = layer.CrossEntropyLogLoss(
+        _layer = layer.CrossEntropyLogLoss(
             name=name,
             num_nodes=M,
             log_level=logging.DEBUG
@@ -359,7 +359,7 @@ def test_030_objective_methods_1d_ohe():
         T[
             np.random.randint(0, M)
         ] = int(1)
-        layer.T = T
+        _layer.T = T
 
         P = softmax(X)
         EG = ((P - T) / N).reshape(1, -1)     # Expected analytical gradient dL/dX = (P-T)/N
@@ -372,16 +372,16 @@ def test_030_objective_methods_1d_ohe():
         # --------------------------------------------------------------------------------
         # constraint: L/loss == np.sum(cross_entropy_log_loss(softmax(X), T)) / N.
         # --------------------------------------------------------------------------------
-        L = layer.function(X)
+        L = _layer.function(X)
         Z = np.array(np.sum(cross_entropy_log_loss(softmax(X), T))) / N
         assert np.array_equal(L, Z), f"SoftmaxLogLoss output should be {L} but {Z}."
 
         # --------------------------------------------------------------------------------
         # constraint: gradient_numerical() == numerical Jacobian numerical_jacobian(O, X)
-        # Use a dummy layer for the objective function because using the "layer"
-        # updates the X, Y which can interfere the independence of the layer.
+        # Use a dummy _layer for the objective function because using the "_layer"
+        # updates the X, Y which can interfere the independence of the _layer.
         # --------------------------------------------------------------------------------
-        GN = layer.gradient_numerical()                     # [dL/dX] from the layer
+        GN = _layer.gradient_numerical()                     # [dL/dX] from the _layer
 
         # --------------------------------------------------------------------------------
         # Cannot use CrossEntropyLogLoss.function() to simulate the objective function L.
@@ -418,7 +418,7 @@ def test_030_objective_methods_1d_ohe():
         # constraint: Analytical gradient G: gradient() == (P-1)/N.
         # --------------------------------------------------------------------------------
         dY = float(1)
-        G = layer.gradient(dY)
+        G = _layer.gradient(dY)
         assert np.all(np.abs(G-EG) <= GRADIENT_DIFF_ACCEPTANCE_VALUE), \
             f"Layer gradient dL/dX \n{G} \nneeds to be \n{EG} but G-EG \n{np.abs(G-EG)}\n"
 
@@ -459,12 +459,12 @@ def test_030_objective_methods_2d_ohe():
         assert M >= 2, "Softmax is for multi label classification. "\
                        " Use Sigmoid for binary classification."
 
-        layer = layer.CrossEntropyLogLoss(
+        _layer = layer.CrossEntropyLogLoss(
             name=name,
             num_nodes=M,
             log_level=logging.DEBUG
         )
-        layer.objective = objective
+        _layer.objective = objective
 
         # ================================================================================
         # Layer forward path
@@ -475,7 +475,7 @@ def test_030_objective_methods_2d_ohe():
             np.arange(N),
             np.random.randint(0, M, N)
         ] = int(1)
-        layer.T = T
+        _layer.T = T
 
         Logger.debug("%s: X is \n%s\nT is \n%s", name, X, T)
 
@@ -485,14 +485,14 @@ def test_030_objective_methods_2d_ohe():
         # --------------------------------------------------------------------------------
         # constraint: L/loss == np.sum(cross_entropy_log_loss(softmax(X), T)) / N.
         # --------------------------------------------------------------------------------
-        L = layer.function(X)
+        L = _layer.function(X)
         Z = np.array(np.sum(cross_entropy_log_loss(softmax(X), T))) / N
         assert np.array_equal(L, Z), f"SoftmaxLogLoss output should be {L} but {Z}."
 
         # --------------------------------------------------------------------------------
         # constraint: gradient_numerical() == numerical Jacobian numerical_jacobian(O, X)
         # --------------------------------------------------------------------------------
-        GN = layer.gradient_numerical()                     # [dL/dX] from the layer
+        GN = _layer.gradient_numerical()                     # [dL/dX] from the _layer
 
         # --------------------------------------------------------------------------------
         # DO not use CrossEntropyLogLoss.function() to simulate the objective function for
@@ -520,7 +520,7 @@ def test_030_objective_methods_2d_ohe():
         # constraint: Analytical gradient G: gradient() == (P-1)/N.
         # --------------------------------------------------------------------------------
         dY = float(1)
-        G = layer.gradient(dY)
+        G = _layer.gradient(dY)
         assert np.all(abs(G-EG) <= GRADIENT_DIFF_ACCEPTANCE_VALUE), \
             f"Layer gradient dL/dX \n{G} \nneeds to be \n{EG}."
 
@@ -557,7 +557,7 @@ def test_040_softmax_log_loss_2d(caplog):
     for _ in range(NUM_MAX_TEST_TIMES):
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)    # number of node > 1
-        layer = layer.CrossEntropyLogLoss(
+        _layer = layer.CrossEntropyLogLoss(
             name=name,
             num_nodes=M,
             log_loss_function=softmax_cross_entropy_log_loss,
@@ -576,7 +576,7 @@ def test_040_softmax_log_loss_2d(caplog):
 
         # log_loss function require (X, T) in X(N, M), and T(N, M) in index label format.
         X, T = transform_X_T(X, T)
-        layer.T = T
+        _layer.T = T
         Logger.debug("%s: X is \n%s\nT is \n%s", name, X, T)
 
         # --------------------------------------------------------------------------------
@@ -596,7 +596,7 @@ def test_040_softmax_log_loss_2d(caplog):
         # (J, P) = softmax_cross_entropy_log_loss(X, T) and J:shape(N,) where J:shape(N,)
         # is loss for each input and P is activation by sigmoid(X).
         # --------------------------------------------------------------------------------
-        L = layer.function(X)
+        L = _layer.function(X)
         J, P = softmax_cross_entropy_log_loss(X, T)
         EL = np.array(-np.sum(logarithm(A[np.arange(N), T])) / N, dtype=TYPE_FLOAT)
 
@@ -615,7 +615,7 @@ def test_040_softmax_log_loss_2d(caplog):
 
         # constraint: gradient_numerical() == numerical_jacobian(objective, X)
         # TODO: compare the diff to accommodate numerical errors.
-        GN = layer.gradient_numerical()                     # [dL/dX] from the layer
+        GN = _layer.gradient_numerical()                     # [dL/dX] from the layer
 
         def objective(x):
             """Function to calculate the scalar loss L for cross entropy log loss"""
@@ -632,7 +632,7 @@ def test_040_softmax_log_loss_2d(caplog):
 
         # constraint: Analytical gradient G: gradient() == EG == (P-1)/N.
         dY = float(1)
-        G = layer.gradient(dY)
+        G = _layer.gradient(dY)
         assert np.all(np.abs(G-EG) <= GRADIENT_DIFF_ACCEPTANCE_VALUE), \
             f"Layer gradient dL/dX \n{G} \nneeds to be \n{EG}."
 

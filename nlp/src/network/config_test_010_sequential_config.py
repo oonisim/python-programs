@@ -189,7 +189,7 @@ composite_layer_specification_mbambamamo = {
     "bn02": {
         _SCHEME: layer.BatchNormalization.__qualname__,
         _PARAMETERS: {
-            _NAME: "bn01",
+            _NAME: "bn02",
             _NUM_NODES: 32,
         }
     },
