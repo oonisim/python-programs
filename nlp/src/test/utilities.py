@@ -11,7 +11,7 @@ import numpy as np
 from common.constants import (
     TYPE_FLOAT
 )
-from common.functions import (
+from common.function import (
     softmax_cross_entropy_log_loss,
     compose
 )

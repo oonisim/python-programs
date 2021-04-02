@@ -1,5 +1,5 @@
 """Tools to use from composite layer classes
-DO NOT import composite layer classes in this file.
+DO NOT import composite layer classes from this Python module.
 
 Layer specification:
     A layer specification is a dictionary object which identifies:
@@ -23,7 +23,7 @@ Layer specification:
                 _SCHEME: "he"
             },
             _OPTIMIZER: {
-                _SCHEME: optimiser.SGD.__qualname__,
+                _SCHEME: optimiser.optimizer.SGD.__qualname__,
                 _PARAMETERS: {
                     "lr": 1e-2,
                     "l2": 1e-3
@@ -63,7 +63,7 @@ Composite layer specification:
                     _SCHEME: "he"
                 },
                 _OPTIMIZER: {
-                    _SCHEME: optimiser.SGD.__qualname__,
+                    _SCHEME: optimiser.optimizer.SGD.__qualname__,
                     _PARAMETERS: {
                         "lr": _lr,
                         "l2": _l2
@@ -100,38 +100,35 @@ Composite layer specification:
     }
 
 """
+import copy
+import logging
 from typing import (
     List,
-    Dict,
     Callable,
     Union
 )
-import copy
-import logging
 
 import numpy as np
 
 from common.constants import (
     TYPE_FLOAT,
 )
-from common.functions import (
+from common.function import (
     compose
 )
 from layer.base import (
-    Layer
+    Layer,
 )
 from layer.constants import (
     _NAME,
     _SCHEME,
     _NUM_NODES,
     _PARAMETERS,
-    _LOG_LEVEL,
-    _COMPOSITE_LAYER_SPEC
+    _LOG_LEVEL
 )
 from layer.schemes import (  # Non composite layer classes only
     SCHEMES
 )
-
 
 Logger = logging.getLogger(__name__)
 

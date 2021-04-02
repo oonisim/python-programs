@@ -116,7 +116,7 @@ from common.constants import (
     TYPE_LABEL,
     GRADIENT_SATURATION_THRESHOLD,
 )
-from common.functions import (
+from common.function import (
     numerical_jacobian,
 )
 from layer.constants import (

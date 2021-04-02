@@ -1,1 +1,1 @@
-from drawing.functions import *
+from drawing.function import *

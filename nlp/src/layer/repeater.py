@@ -17,7 +17,7 @@ from layer.constants import (
     _NUM_NODES,
     _LOG_LEVEL,
 )
-from layer.utilities_composite import (
+from layer.utility_builder_layer import (
     map_parallel_layer_interface,
     map_parallel_layer_objective
 )

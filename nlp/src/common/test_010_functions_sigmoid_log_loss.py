@@ -4,7 +4,7 @@ from common.constants import (
     TYPE_FLOAT,
     TYPE_LABEL,
 )
-from common.functions import (
+from common.function import (
     logarithm,
     sigmoid,
     logistic_log_loss,

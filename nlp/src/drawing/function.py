@@ -29,13 +29,15 @@ COLOR_LABELS = np.array([
 ])
 
 
-def plot(X, Y, color=None, title=None, figsize=(5, 4), xlabel=None, ylabel=None):
+def plot(X, Y, label=None, color=None, title=None, figsize=(5, 4), xlabel=None, ylabel=None, scale=None):
     fig, ax = plt.subplots(figsize=figsize)
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    ax.set_title(title)
+    ax.set_xlabel(xlabel) if xlabel else ...
+    ax.set_ylabel(ylabel) if ylabel else ...
+    ax.set_title(title) if title is not None else ...
+    ax.plot(X, Y, color=color, label=label)
     ax.grid()
-    ax.plot(X, Y, color=color)
+    ax.legend()
+    ax.set_xscale(scale) if scale else ...
     return fig, ax
 
 

@@ -16,7 +16,7 @@ from common.constants import (
     TYPE_FLOAT,
     ENABLE_NUMEXPR
 )
-from common.functions import (
+from common.function import (
     sigmoid
 )
 from layer.base import Layer

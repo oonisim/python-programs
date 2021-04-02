@@ -11,7 +11,7 @@ import numpy as np
 from common.constants import (
     TYPE_FLOAT
 )
-from common.functions import (
+from common.function import (
     softmax,
     relu,
     compose
@@ -21,7 +21,7 @@ from layer import (
     ReLU,
     CrossEntropyLogLoss
 )
-from layer.utilities import (
+from layer.utility import (
     forward_outputs,
     backward_outputs,
 )

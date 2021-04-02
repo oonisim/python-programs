@@ -11,11 +11,11 @@ from common.weights import he
 from common.constants import (
     TYPE_FLOAT
 )
-from common.functions import (
+from common.function import (
     compose,
     softmax_cross_entropy_log_loss
 )
-from common.utilities import (
+from common.utility import (
     random_string
 )
 from layer.identity import Identity

@@ -1,3 +1,14 @@
+"""
+Responsibility:
+    Factory to create non-layer instances e.g. weights, optimizer.
+
+Consumer:
+    Layer classes.
+
+Note:
+    DO NOT import this file from those classes that are used from
+    the layer classes.
+"""
 from typing import (
     Dict,
 )

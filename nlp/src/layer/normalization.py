@@ -18,7 +18,7 @@ from common.constants import (
     ENABLE_NUMEXPR,
     ENABLE_NUMBA,
 )
-from common.functions import (
+from common.function import (
     standardize,
     numerical_jacobian
 )
@@ -30,7 +30,7 @@ from layer.constants import (
     _NUM_NODES,
     _PARAMETERS
 )
-from layer.utilities_builder import (
+from layer._utility_builder_non_layer import (
     build_optimizer_from_layer_parameters
 )
 import optimizer as optimiser

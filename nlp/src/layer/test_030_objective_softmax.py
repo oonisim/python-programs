@@ -11,7 +11,7 @@ from common.constants import (
     TYPE_FLOAT,
     TYPE_LABEL,
 )
-from common.functions import (
+from common.function import (
     transform_X_T,
     softmax,
     logarithm,
@@ -19,7 +19,7 @@ from common.functions import (
     softmax_cross_entropy_log_loss,
     numerical_jacobian,
 )
-from common.utilities import (
+from common.utility import (
     random_string,
 )
 import layer
@@ -69,6 +69,9 @@ def test_030_objective_instantiation_to_fail():
         Initialization detects parameter constraints not meet and fails.
     """
     name = "test_030_objective_instantiation_to_fail"
+    profiler = cProfile.Profile()
+    profiler.enable()
+
     for _ in range(NUM_MAX_TEST_TIMES):
         M: int = np.random.randint(1, NUM_MAX_NODES)
         # Constraint: Name is string with length > 0.
@@ -99,6 +102,9 @@ def test_030_objective_instantiation_to_fail():
             raise RuntimeError()
         except (AssertionError, KeyError):
             pass
+
+    profiler.disable()
+    profiler.print_stats(sort="cumtime")
 
 
 def test_030_objective_instance_properties():

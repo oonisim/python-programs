@@ -11,7 +11,7 @@ from common.constants import (
     TYPE_FLOAT,
     TYPE_LABEL,
 )
-from common.functions import (
+from common.function import (
     softmax,
     relu,
     transform_X_T,

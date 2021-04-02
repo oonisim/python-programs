@@ -27,10 +27,10 @@ import numpy as np
 from common.constants import (
     TYPE_FLOAT,
 )
-from common.functions import (
+from common.function import (
     standardize,
 )
-from common.utilities import (
+from common.utility import (
     random_string
 )
 from frederik_kratzert import (

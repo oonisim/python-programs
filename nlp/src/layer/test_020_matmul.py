@@ -26,10 +26,10 @@ from typing import (
 import numpy as np
 
 import common.weights as weights
-from common.functions import (
+from common.function import (
     numerical_jacobian,
 )
-from common.utilities import (
+from common.utility import (
     random_string
 )
 from layer.constants import (

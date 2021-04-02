@@ -10,7 +10,7 @@ import optimizer as optimiser
 from common.constants import (
     TYPE_FLOAT,
 )
-from common.functions import (
+from common.function import (
     softmax,
     relu,
     transform_X_T,
@@ -42,7 +42,7 @@ from test.layer_validations import (
 from test.utilities import (
     build_matmul_relu_objective
 )
-from config_test_010_sequential_config import (
+from config_test_010_sequential import (
     valid_network_specification_mao,
     valid_network_specification_mamao,
     _N,
@@ -50,7 +50,8 @@ from config_test_010_sequential_config import (
     _D,
     _lr,
     _l2,
-    invalid_network_specification_with_duplicated_names
+    invalid_network_specification_with_duplicated_names,
+    multilayer_network_specification_bn_to_fail
 )
 
 Logger = logging.getLogger(__name__)
@@ -145,6 +146,15 @@ def test_010_sequential_instantiation_to_fail():
         network_specification=invalid_network_specification_with_duplicated_names,
         message=msg
     )
+    D = 10
+    M01 = 32
+    M02 = 32
+    M = 10
+    _must_fail(
+        network_specification=multilayer_network_specification_bn_to_fail(D, M01, M02, M),
+        message=msg
+    )
+
 
 
 def test_010_validate_sequential_matmul_relu_training():
@@ -255,7 +265,7 @@ def test_010_sequential_train2():
     # --------------------------------------------------------------------------------
     # Network using sequential
     # --------------------------------------------------------------------------------
-    from config_test_010_sequential_config import (
+    from config_test_010_sequential import (
         valid_network_specification_mbambamamo,
         _N,
         _M,
@@ -294,105 +304,3 @@ def test_010_sequential_train2():
     for loss in network.history:
         print(loss)
 
-
-from layer import (
-    Matmul,
-    CrossEntropyLogLoss,
-    ReLU,
-    BatchNormalization
-)
-from optimizer import (
-    SGD
-)
-
-
-def test_train():
-    N = 10
-    M = 4
-    D = 2
-    M01 = 8
-    M02: int = M  # Number of categories to classify
-
-    MAX_TEST_TIMES = 3
-
-    X = np.random.rand(N, 2)
-    T = np.random.randint(0, 4, N)
-
-    sequential_layer_specification = {
-        "matmul01": Matmul.specification(
-            name="matmul01",
-            num_nodes=M01,
-            num_features=D,
-            weights_initialization_scheme="he",
-            weights_optimizer_specification=SGD.specification(
-                lr=0.05,
-                l2=1e-3
-            )
-        ),
-        "bn01": BatchNormalization.specification(
-            name="bn01",
-            num_nodes=M01,
-            gamma_optimizer_specification=SGD.specification(
-                lr=0.05,
-                l2=1e-3
-            ),
-            beta_optimizer_specification=SGD.specification(
-                lr=0.05,
-                l2=1e-3,
-            ),
-            momentum=0.9
-        ),
-        "relu01": ReLU.specification(
-            name="relu01",
-            num_nodes=M01,
-        ),
-        "matmul02": Matmul.specification(
-            name="matmul02",
-            num_nodes=M02,
-            num_features=M01,
-            weights_initialization_scheme="he",
-            weights_optimizer_specification=SGD.specification(
-                lr=0.05,
-                l2=1e-3
-            )
-        ),
-        "bn02": BatchNormalization.specification(
-            name="bn02",
-            num_nodes=M02,
-            gamma_optimizer_specification=SGD.specification(
-                lr=0.05,
-                l2=1e-3
-            ),
-            beta_optimizer_specification=SGD.specification(
-                lr=0.05,
-                l2=1e-3,
-            ),
-            momentum=0.9
-        ),
-        "loss": CrossEntropyLogLoss.specification(
-            name="loss001", num_nodes=M
-        )
-    }
-
-    network_specification = {
-        _NAME: "two_layer_classifier_with_batch_normalization",
-        _NUM_NODES: M,
-        _LOG_LEVEL: logging.ERROR,
-        _COMPOSITE_LAYER_SPEC: sequential_layer_specification
-    }
-    import json
-    print(json.dumps(network_specification, indent=4))
-
-    network = SequentialNetwork(
-        specification=network_specification,
-    )
-
-    prev = ""
-    for _layer in network.layer_inference.layers:
-        print(_layer.name)
-        assert prev != _layer.name, "prev is %s now is %s" % (prev, _layer.name)
-
-    for i in range(MAX_TEST_TIMES):
-        network.train(X=X, T=T)
-
-    network.predict(X)

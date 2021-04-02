@@ -1,7 +1,16 @@
 import logging
 import numpy as np
 import layer
+from layer import (
+    BatchNormalization,
+    Matmul,
+    ReLU,
+    CrossEntropyLogLoss
+)
 import optimizer as optimiser
+from optimizer import (
+    SGD
+)
 from layer.constants import (
     _WEIGHTS,
     _NAME,
@@ -327,4 +336,96 @@ def invalid_network_specification_with_duplicated_names():
         _NUM_NODES: M,
         _LOG_LEVEL: logging.ERROR,
         _COMPOSITE_LAYER_SPEC: sequential_layer_specification
+    }
+
+
+def multilayer_network_specification_bn_to_fail(D, M01, M02, M):
+    sequential_layer_specification_bn_to_fail = {
+        "matmul01": Matmul.specification(
+            name="matmul01",
+            num_nodes=M01,
+            num_features=D,
+            weights_initialization_scheme="he",
+            weights_optimizer_specification=SGD.specification(
+                lr=0.05,
+                l2=1e-3
+            )
+        ),
+        "bn01": BatchNormalization.specification(
+            name="bn01",
+            num_nodes=M01,
+            gamma_optimizer_specification=SGD.specification(
+                lr=0.05,
+                l2=1e-3
+            ),
+            beta_optimizer_specification=SGD.specification(
+                lr=0.05,
+                l2=1e-3,
+            ),
+            momentum=0.9
+        ),
+        "relu01": ReLU.specification(
+            name="relu01",
+            num_nodes=M01,
+        ),
+        "matmul02": Matmul.specification(
+            name="matmul01",
+            num_nodes=M02,
+            num_features=M01,
+            weights_initialization_scheme="he",
+            weights_optimizer_specification=SGD.specification(
+                lr=0.05,
+                l2=1e-3
+            )
+        ),
+        "bn02": BatchNormalization.specification(
+            name="bn02",
+            num_nodes=M02,
+            gamma_optimizer_specification=SGD.specification(
+                lr=0.05,
+                l2=1e-3
+            ),
+            beta_optimizer_specification=SGD.specification(
+                lr=0.05,
+                l2=1e-3,
+            ),
+            momentum=0.9
+        ),
+        "relu02": ReLU.specification(
+            name="relu02",
+            num_nodes=M02,
+        ),
+        "matmul03": Matmul.specification(
+            name="matmul03",
+            num_nodes=M,
+            num_features=M02,
+            weights_initialization_scheme="he",
+            weights_optimizer_specification=SGD.specification(
+                lr=0.05,
+                l2=1e-3
+            )
+        ),
+        "bn03": BatchNormalization.specification(
+            name="bn03",
+            num_nodes=M,
+            gamma_optimizer_specification=SGD.specification(
+                lr=0.05,
+                l2=1e-3
+            ),
+            beta_optimizer_specification=SGD.specification(
+                lr=0.05,
+                l2=1e-3,
+            ),
+            momentum=0.9
+        ),
+        "loss": CrossEntropyLogLoss.specification(
+            name="loss001", num_nodes=M
+        )
+    }
+
+    return {
+        _NAME: "two_layer_classifier_with_batch_normalization",
+        _NUM_NODES: M,
+        _LOG_LEVEL: logging.ERROR,
+        _COMPOSITE_LAYER_SPEC: sequential_layer_specification_bn_to_fail
     }

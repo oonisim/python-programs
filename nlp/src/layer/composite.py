@@ -23,7 +23,7 @@ from layer.constants import (
     _LOG_LEVEL,
     _COMPOSITE_LAYER_SPEC
 )
-from layer.utilities_composite import (
+from layer.utility_builder_layer import (
     build_layers_from_composite_layer_specification
 )
 from layer.composite_layer_specification_template import (

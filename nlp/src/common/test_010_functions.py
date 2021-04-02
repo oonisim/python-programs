@@ -6,7 +6,7 @@ from common.constants import (
     TYPE_LABEL,
     OFFSET_LOG,
 )
-from common.functions import (
+from common.function import (
     standardize,
     logarithm,
     sigmoid,

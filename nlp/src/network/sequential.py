@@ -17,11 +17,11 @@ from common.constants import (
     TYPE_LABEL,
     LAYER_MAX_NUM_NODES
 )
-from common.functions import (
+from common.function import (
     compose
 )
 import layer
-from layer.utilities_composite import (
+from layer.utility_builder_layer import (
     build_layers_from_composite_layer_specification
 )
 from network.base import Network

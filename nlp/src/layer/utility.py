@@ -12,7 +12,7 @@ import numpy as np
 from common.constants import (
     TYPE_FLOAT
 )
-from common.functions import (
+from common.function import (
     compose
 )
 from layer.base import (

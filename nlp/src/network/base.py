@@ -179,7 +179,7 @@ class Network(Layer):
         # --------------------------------------------------------------------------------
         # Objective (Loss)
         # --------------------------------------------------------------------------------
-        self._L: Union[TYPE_FLOAT, np.ndarray] = -np.inf
+        self._L: Union[TYPE_FLOAT, np.ndarray] = []
         self._history: List[Union[TYPE_FLOAT, np.ndarray]] = []
 
         self._GN: List[Union[TYPE_FLOAT, np.ndarray]] = []   # Numerical gradients GN of layers

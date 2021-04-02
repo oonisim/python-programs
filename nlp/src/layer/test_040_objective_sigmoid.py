@@ -14,7 +14,7 @@ from common.constants import (
     TYPE_LABEL,
     BOUNDARY_SIGMOID
 )
-from common.functions import (
+from common.function import (
     transform_X_T,
     sigmoid,
     logarithm,
@@ -24,7 +24,7 @@ from common.functions import (
     sigmoid_cross_entropy_log_loss,
     numerical_jacobian,
 )
-from common.utilities import (
+from common.utility import (
     random_string,
 )
 from layer import (
@@ -52,6 +52,9 @@ def test_040_objective_instantiation_to_fail():
     Expected:
         Initialization detects parameter constraints not meet and fails.
     """
+    profiler = cProfile.Profile()
+    profiler.enable()
+
     for _ in range(NUM_MAX_TEST_TIMES):
         M: int = np.random.randint(1, NUM_MAX_NODES)
         # Constraint: Name is string with length > 0.
@@ -97,6 +100,9 @@ def test_040_objective_instantiation_to_fail():
             raise RuntimeError("CrossEntropyLogLoss initialization with invalid log level must fail")
         except (AssertionError, KeyError):
             pass
+
+    profiler.disable()
+    profiler.print_stats(sort="cumtime")
 
 
 def test_040_objective_instance_properties():

@@ -38,7 +38,7 @@ from layer.constants import (
     _LOG_LEVEL,
     _COMPOSITE_LAYER_SPEC
 )
-from layer.utilities_composite import (
+from layer.utility_builder_layer import (
     compose_sequential_layer_interface,
     compose_sequential_layer_objective
 )

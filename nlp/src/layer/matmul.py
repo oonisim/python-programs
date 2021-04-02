@@ -15,7 +15,7 @@ import optimizer as optimiser
 from common.constants import (
     TYPE_FLOAT,
 )
-from common.functions import (
+from common.function import (
     numerical_jacobian,
 )
 from layer.base import Layer
@@ -28,7 +28,7 @@ from layer.constants import (
     _NUM_FEATURES,
     _PARAMETERS
 )
-from layer.utilities_builder import (
+from layer._utility_builder_non_layer import (
     build_optimizer_from_layer_parameters,
     build_weights_from_layer_parameters
 )

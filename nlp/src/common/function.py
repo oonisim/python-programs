@@ -1,6 +1,14 @@
 """DNN functions
-Those marked as "From deep-learning-from-scratch" is copied from the github.
-https://github.com/oreilly-japan/deep-learning-from-scratch
+Responsibility:
+    Functions to construct the neural network.
+
+NOT:
+    This is not the place to define non-neural network related utilities.
+    For common utilities, use utility.py.
+
+NOTE:
+    Those marked as "From deep-learning-from-scratch" is copied from the github.
+    https://github.com/oreilly-japan/deep-learning-from-scratch
 """
 import logging
 from typing import (

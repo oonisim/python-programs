@@ -18,7 +18,7 @@ from common.constants import (
     OFFSET_DELTA,
     BOUNDARY_SIGMOID,
 )
-from common.functions import (
+from common.function import (
     numerical_jacobian,
     logarithm,
     sigmoid,
