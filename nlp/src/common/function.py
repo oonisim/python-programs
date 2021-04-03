@@ -90,6 +90,23 @@ def standardize(
     mean = np.mean(X, axis=0, keepdims=keepdims, out=out_mean)
     deviation = ne.evaluate("X - mean", out_md) \
         if ENABLE_NUMEXPR else np.subtract(X, mean, out=out_md)
+
+    # --------------------------------------------------------------------------------
+    # Using MD instead of SD
+    # --------------------------------------------------------------------------------
+    # TODO remove from here
+    # md = np.sum(np.abs(deviation), axis=0) / N
+    # mask = (md < 1e-8)
+    # if np.any(mask):
+    #     md[mask] = TYPE_FLOAT(1.0)
+    #     standardized = np.divide(deviation, md, out)
+    # else:
+    #     standardized = np.divide(deviation, md, out)
+    #
+    # return standardized, mean, md, deviation
+    # # To here
+    # --------------------------------------------------------------------------------
+
     if eps > 0:
         # Re-use the storage of buffer for standardized.
         buffer = ne.evaluate("deviation ** 2")
