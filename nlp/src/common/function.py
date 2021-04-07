@@ -78,6 +78,8 @@ def standardize(
         deviation: X-mean
     """
     assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT and X.size > 0)
+    assert np.all(np.isfinite(X)), f"{X}"
+
     if X.ndim <= 1:
         X = X.reshape(1, -1)
 
@@ -147,7 +149,7 @@ def standardize(
         # Hence regard the SD as 0 when the value is less than a small value k. e.g. 1e-8.
         # If the distribution is such skewed around the mean, regard it as (X-mean) == 0.
         # --------------------------------------------------------------------------------
-        mask = (sd < 1e-8)
+        mask = (sd < 1e-5)
         if np.any(mask):
             # Temporary replace the zero elements with one
             sd[mask] = TYPE_FLOAT(1.0)
@@ -175,7 +177,7 @@ def standardize(
             standardized = np.divide(deviation, sd, out)
 
     assert np.all(sd != TYPE_FLOAT(0.0))
-    assert np.all(np.isfinite(standardized))
+    assert np.all(np.isfinite(standardized)), f"{standardized}"
     return standardized, mean, sd, deviation
 
 
@@ -192,6 +194,7 @@ def logarithm(
     Returns:
         np.log(X)
     """
+    assert np.all(np.isfinite(X)), f"{X}"
     if isinstance(X, TYPE_FLOAT):
         return np.log(X + offset, out=out)
 
@@ -260,6 +263,8 @@ def sigmoid(
         To prevent such instability, limit the value range of X with boundary.
     """
     assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) or isinstance(X, TYPE_FLOAT)
+    assert np.all(np.isfinite(X)), f"{X}"
+
     boundary = BOUNDARY_SIGMOID if (boundary is None or boundary <= TYPE_FLOAT(0)) else boundary
     assert boundary > 0
 
@@ -337,6 +342,7 @@ def softmax(X: np.ndarray, out=None) -> np.ndarray:
     name = "softmax"
     assert isinstance(X, TYPE_FLOAT) or (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT), \
         "X must be float or ndarray(dtype=TYPE_FLOAT)"
+    assert np.all(np.isfinite(X)), f"{X}"
 
     # --------------------------------------------------------------------------------
     # exp(x-c) to prevent the infinite exp(x) for a large value x, with c = max(x).
@@ -671,6 +677,11 @@ def softmax_cross_entropy_log_loss(
         j = -log(pi) = -log( exp(xi) / sum(exp(x0),...,exp(xd-1) )
           = log(sum(exp(X))) - xi  : X=[x0,x1,...xi,...xd-1]
 
+        UPDATE:
+            Happened as expected with MNIST because the data was not standardized.
+            ssertionError: log(X) caused nan for X
+            X=[            inf             inf 4.59048475e+210             inf             inf
+
     Args:
         X: Input data of shape (N,M) to go through softmax where:
             N is Batch size
@@ -686,6 +697,8 @@ def softmax_cross_entropy_log_loss(
         J: Loss value of shape (N,), a loss value per batch.
         P: Activation value softmax(X)
     """
+    assert np.all(np.isfinite(X)), f"{X}"
+
     name = "softmax_cross_entropy_log_loss"
     X, T = transform_scalar_X_T(X, T)
     check_categorical_classification_X_T(X, T)

@@ -613,6 +613,7 @@ class BatchNormalization(Layer):
         self._total_training_invocations += 1
         self._total_rows_processed += self.N
 
+        assert np.all(np.isfinite(self.Y)), f"{self.Y}"
         return self.Y
 
     def _gradient_numpy(self):
@@ -767,9 +768,12 @@ class BatchNormalization(Layer):
         self._dY = dY
 
         if numexpr_enabled:
-            return self._gradient_numexpr()
+            self._gradient_numexpr()
         else:
-            return self._gradient_numpy()
+            self._gradient_numpy()
+
+        assert np.all(np.isfinite(self.dX)), f"{self.dX}"
+        return self.dX
 
     def gradient_numerical(
             self, h: float = 1e-5
@@ -811,6 +815,9 @@ class BatchNormalization(Layer):
         self._gradient_descent(self.gamma_optimizer, self.gamma, self.dGamma, out=self._gamma)
         self._gradient_descent(self.beta_optimizer, self.beta, self.dBeta, out=self._beta)
         # return [self.dX, self.dGamma, self.dBeta]
+
+        assert np.all(np.isfinite(self.dGamma)), f"{self.dGamma}"
+        assert np.all(np.isfinite(self.dBeta)), f"{self.dBeta}"
         return [self.dGamma, self.dBeta]
 
     def predict(self, X):

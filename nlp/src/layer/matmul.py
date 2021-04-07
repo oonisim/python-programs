@@ -327,6 +327,7 @@ class Matmul(Layer):
         # in column order format.
         # --------------------------------------------------------------------------------
         np.matmul(self.X, self.W.T, out=self._Y)
+        assert np.all(np.isfinite(self.Y)), f"{self.Y}"
         return self.Y
 
     def gradient(self, dY: Union[np.ndarray, float] = 1.0) -> Union[np.ndarray, float]:
@@ -354,6 +355,7 @@ class Matmul(Layer):
             f"Gradient dL/dW shape needs {(self.M, self.D)} but ({dW.shape}))"
 
         self._dW = dW
+        assert np.all(np.isfinite(self.dW)), f"{self.dW}"
 
         # --------------------------------------------------------------------------------
         # dL/dX of shape (N,D):  [ dL/dY:(N,M) @ W:(M,D)) ]
@@ -362,6 +364,7 @@ class Matmul(Layer):
         assert self.dX.shape == (self.N, self.D), \
             "dL/dX shape needs (%s, %s) but %s" % (self.N, self.D, self.dX.shape)
 
+        assert np.all(np.isfinite(self.dX)), f"{self.dX}"
         return self.dX[
             ::,
             1::     # Omit bias column 0
