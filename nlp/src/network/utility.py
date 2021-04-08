@@ -91,11 +91,16 @@ def multilayer_network_specification(num_nodes):
         }
 
     sequential_layer_specification = {}
+    # --------------------------------------------------------------------------------
+    # Matmul W.shape == (D:dimension, M:number of nodes in a layer)
+    # Matmul layer i outputs Yi:(Ni,Mi), which is the input Xi+1:(Ni+1, Di+1) to the
+    # next layer i+1. Hence Mi == Di+1.
+    # --------------------------------------------------------------------------------
     D_M = [
         (num_nodes[index], num_nodes[index + 1])
         for index in range(len(num_nodes)-2)
     ]
-    for index, (d,m) in enumerate(D_M):
+    for index, (d, m) in enumerate(D_M):
         for k, v in inference(index=index, m=m, d=d).items():
             sequential_layer_specification[k] = v
 
