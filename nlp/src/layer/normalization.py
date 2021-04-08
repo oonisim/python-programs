@@ -42,6 +42,12 @@ class Standardization(Layer):
         Need to apply the same mean and standard deviation (SD) to the non-training
         data set because the model has been trained on the specific mean/SD of the
         training data set.
+
+    TODO:
+        Convert into the parent class of BatchNormalization.
+        Provide interfaces and properties for standardization
+        Incremental update of running mean/std as done in BatchNormalization.
+        predict i/f to use the RU/RSD.
     """
     # ================================================================================
     # Class initialization
@@ -74,6 +80,9 @@ class Standardization(Layer):
             "Standardization[%s] number of nodes is [%s]",
             name, num_nodes
         )
+
+        self._mean = None
+        self._variance = None
 
         # Layers to which forward the matmul output
         self._posteriors: List[Layer] = posteriors

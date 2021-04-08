@@ -1,27 +1,12 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
-
-
-
-
-
-# ## PTB (Penn Treebank) 
-
-# In[1]:
-
-
-#coding: utf-8
 import sys
 import os
+import pickle
+import numpy as np
 sys.path.append('../../../python/examples/robot2')
 try:
     import urllib.request
 except ImportError:
     raise ImportError('Use Python3!')
-import pickle
-import numpy as np
 
 
 url_base = 'https://raw.githubusercontent.com/tomsercu/lstm/master/data/'
@@ -36,10 +21,9 @@ save_file = {
     'valid':'ptb.valid.npy'
 }
 vocab_file = 'ptb.vocab.pkl'
-
-#dataset_dir = os.path.dirname(os.path.abspath(__file__))
-dataset_dir = os.path.dirname(os.path.abspath("/home/oonisim/dataset/hoge"))
+dataset_dir = os.path.dirname(os.path.abspath(__file__))
 print(dataset_dir)
+
 
 def _download(file_name):
     file_path = dataset_dir + '/' + file_name
@@ -59,7 +43,6 @@ def _download(file_name):
 
 
 def load_text(data_type):
-#    data_type = 'train'
     file_name = key_file[data_type]
     file_path = dataset_dir + '/' + file_name
     vocab_path = dataset_dir + '/' + vocab_file
@@ -68,8 +51,9 @@ def load_text(data_type):
         _download(file_name)
 
     text = open(file_path).read().replace('\n', '<eos>').strip()
-    return(text)
-    
+    return text
+
+
 def load_vocab():
     vocab_path = dataset_dir + '/' + vocab_file
 
@@ -101,10 +85,10 @@ def load_vocab():
 
 
 def load_data(data_type='train'):
-    '''
+    """
         :param data_type: データの種類：'train' or 'test' or 'valid (val)'
         :return:
-    '''
+    """
     if data_type == 'val': data_type = 'valid'
     save_path = dataset_dir + '/' + save_file[data_type]
 
@@ -123,10 +107,3 @@ def load_data(data_type='train'):
 
     np.save(save_path, sequence)
     return sequence, word_to_id, id_to_word
-
-
-# In[ ]:
-
-
-
-

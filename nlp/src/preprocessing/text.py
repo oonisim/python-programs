@@ -2,8 +2,10 @@ from typing import(
     Dict,
     List
 )
+import re
+import string
 import numpy as np
-from .constant import (
+from preprocessing.constant import (
     DELIMITER,
     NIL
 )
@@ -57,38 +59,74 @@ def pad_text(
     return padded
 
 
-import re
+def replace_punctuations(corpus: str, replacement: str) -> str:
+    """Replace punctuations in the corpus
+    Args:
+        corpus: sequence of words
+        replacement: char to replace
+    Returns
+        corpus: corpus with punctuation being replaced with replacement.
+    """
+    assert len(replacement) == 1, \
+        f"replacement {replacement} must be length 1 character."
+
+    table = str.maketrans(string.punctuation, replacement * len(string.punctuation))
+    corpus.translate(table)
+
+    assert len(corpus) > 0, "corpus needs words other than punctuations."
+    return corpus
 
 
-def text_to_sequence(corpus) -> (np.ndarray, Dict[str, int], Dict[int, str], int):
-    """Generate integer word indices for the words in the corpus and return
+def standardize(text: str) -> str:
+    """Standardize the text
+    1. Lower the string
+    2. Remove punctuation
+    3. Remove white space, new lines, carriage returns
+    Args:
+        text: sequence of words
+    Returns
+        standardized: standardized text
+    """
+    assert isinstance(text, str) and len(text) > 0
+    replacement = " "
+    pattern: str = '[%s%s]+' % (re.escape(string.punctuation), r"\s")
+
+    standardized: str = re.compile(pattern).sub(repl=replacement, string=text).lower().strip()
+    assert len(standardized) > 0, f"Text [{text}] needs words other than punctuations."
+    return standardized
+
+
+def word_indexing(corpus: str):
+    """Generate word indices
     Args:
         corpus: A string including sentences to process.
     Returns:
-        sequence:
-            A numpy array of word indices to every word in the originlal corpus as as they appear in it.
-            The objective of sequence is to preserve the original corpus but as numerical indices.
-        word_to_id: A dictionary to map a word to a word index
-        id_to_word: A dictionary to map a word index to a word
-        vocabulary_size: Number of words identified in the corpus
+        vocabulary: unique words in the corpus
+        id_to_word: word index to word mapping
+        word_to_id: word to word index mapping
     """
-    words = re.compile(r'[\s\t]+').split(corpus.lower())
+    words = standardize(corpus).split()
+    vocabulary = ['UNK'] + list(set(words))
+    id_to_word: Dict[int, str] = dict(enumerate(vocabulary))
+    word_to_id: Dict[str, int] = dict(zip(id_to_word.values(), id_to_word.keys()))
 
-    word_to_id = {}
-    id_to_word = {}
+    return words, vocabulary, id_to_word, word_to_id
 
-    for word in words:
-        if word not in word_to_id:
-            new_id = len(word_to_id)
-            word_to_id[word] = new_id
-            id_to_word[new_id] = word
 
-    # Word index starts with 0. Total words = max(word index) + 1
-    vocabulary_size = new_id + 1
-    assert vocabulary_size == (max(word_to_id.values()) + 1)
-
-    sequence = np.array([word_to_id[w] for w in words])
-    return sequence, word_to_id, id_to_word, vocabulary_size
+def text_to_sequence(
+        corpus,
+        word_to_id: dict
+) -> List[str]:
+    """Generate integer sequence word
+    Args:
+        corpus: A string including sentences to process.
+        word_to_id: word to integer index mapping
+    Returns:
+        sequence:
+            word indices to every word in the originlal corpus as as they appear in it.
+            The objective of sequence is to preserve the original corpus but as numerical indices.
+    """
+    return [word_to_id.get(w, 0) for w in standardize(corpus).split()]
 
 
 if __name__ == "__main__":
