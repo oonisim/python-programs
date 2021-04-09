@@ -41,6 +41,16 @@ def plot(X, Y, label=None, color=None, title=None, figsize=(5, 4), xlabel=None, 
     return fig, ax
 
 
+def plot_on_ax(ax, X, Y, label=None, color=None, title=None, xlabel=None, ylabel=None, scale=None):
+    ax.set_xlabel(xlabel) if xlabel else ...
+    ax.set_ylabel(ylabel) if ylabel else ...
+    ax.set_title(title) if title is not None else ...
+    ax.plot(X, Y, color=color, label=label)
+    ax.grid()
+    ax.legend()
+    ax.set_xscale(scale) if scale else ...
+
+
 def scatter(X, Y, color=None, title=None, figsize=None):
     fig, ax = plt.subplots(figsize=figsize)
     ax.set_xlabel('x label')

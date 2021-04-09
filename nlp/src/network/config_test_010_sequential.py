@@ -134,7 +134,17 @@ valid_network_specification_mao = {
 }
 
 
-composite_layer_specification_mbambamamo = {
+composite_layer_specification_smbambamamo = {
+    "std01": {
+        _SCHEME: layer.Standardization.__qualname__,
+        _PARAMETERS: {
+            _NAME: "std01",
+            _NUM_NODES: _D,
+            "momentum": _momentum,
+            "eps": _eps,
+            "log_level": logging.ERROR
+        }
+    },
     "matmul01": {
         _SCHEME: layer.Matmul.__qualname__,
         _PARAMETERS: {
@@ -259,7 +269,7 @@ valid_network_specification_mbambamamo = {
     _NAME: "valid_network_mao",
     _NUM_NODES: _M,
     _LOG_LEVEL: logging.ERROR,
-    _COMPOSITE_LAYER_SPEC: composite_layer_specification_mbambamamo
+    _COMPOSITE_LAYER_SPEC: composite_layer_specification_smbambamamo
 }
 
 

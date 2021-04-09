@@ -352,7 +352,7 @@ def test_020_bn_instance_properties_access_to_succeed():
         assert layer.objective == objective
 
 
-def test_020_matmul_builder_to_succeed():
+def test_020_bn_builder_to_succeed():
     """
     Objective:
         Verify the Matmul.build()

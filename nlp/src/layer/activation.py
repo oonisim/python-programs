@@ -45,17 +45,20 @@ class ReLU(Layer):
     def specification(
             name: str,
             num_nodes: int,
+            slope: TYPE_FLOAT = RELU_LEAKY_SLOPE
     ):
         """Generate ReLU specification
         Args:
             name: layer name
             num_nodes: number of nodes (outputs) in the layer
+            slope: leaky slope value
         """
         return {
             _SCHEME: ReLU.__qualname__,
             _PARAMETERS: {
                 _NAME: name,
-                _NUM_NODES: num_nodes
+                _NUM_NODES: num_nodes,
+                "slope": slope
             }
         }
 
@@ -69,8 +72,8 @@ class ReLU(Layer):
         return ReLU(
             name=parameters[_NAME],
             num_nodes=parameters[_NUM_NODES],
-            log_level=parameters[_LOG_LEVEL] 
-            if _LOG_LEVEL in parameters else logging.ERROR
+            slope=parameters["slope"] if "slope" in parameters else TYPE_FLOAT(0),
+            log_level=parameters[_LOG_LEVEL] if _LOG_LEVEL in parameters else logging.ERROR
         )
 
     # ================================================================================
@@ -102,7 +105,7 @@ class ReLU(Layer):
         self._A: np.ndarray = np.empty(())      # Activation
         self._M = num_nodes                     # Number of nodes alias
         self._slope: TYPE_FLOAT = slope
-        assert self.slope > TYPE_FLOAT(0)
+        assert self.slope >= TYPE_FLOAT(0), "Leaky ReLU slope value needs to be positive."
 
     # --------------------------------------------------------------------------------
     # Instance methods
@@ -121,7 +124,7 @@ class ReLU(Layer):
             self._Y = np.empty(X.shape, dtype=TYPE_FLOAT)
 
         np.copyto(self._Y, X)
-        self.mask = (X <= 0)
+        self.mask = (X <= 0.0)
         # --------------------------------------------------------------------------------
         # Leaky ReLU When slope > 0
         # --------------------------------------------------------------------------------
@@ -155,8 +158,30 @@ class ReLU(Layer):
 
 class Sigmoid(Layer):
     # ================================================================================
-    # Class initialization
+    # Class
     # ================================================================================
+    @staticmethod
+    def specification_template():
+        return Sigmoid.specification(name="relu001", num_nodes=3)
+
+    @staticmethod
+    def specification(
+            name: str,
+            num_nodes: int,
+    ):
+        """Generate Sigmoid specification
+        Args:
+            name: layer name
+            num_nodes: number of nodes (outputs) in the layer
+        """
+        return {
+            _SCHEME: Sigmoid.__qualname__,
+            _PARAMETERS: {
+                _NAME: name,
+                _NUM_NODES: num_nodes
+            }
+        }
+
     @staticmethod
     def build(parameters: Dict):
         assert (
@@ -191,7 +216,7 @@ class Sigmoid(Layer):
         assert X.shape[1] == self.M, \
             f"Number of node X {X.shape[1] } does not match {self.M}."
 
-        self._X = X
+        self.X = X
         if self._Y.size <= 0 or self.Y.shape[0] != self.N:
             self._Y = np.empty(X.shape, dtype=TYPE_FLOAT)
 

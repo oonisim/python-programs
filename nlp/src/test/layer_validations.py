@@ -16,6 +16,9 @@ from common.function import (
     relu,
     compose
 )
+from layer.constants import (
+    RELU_LEAKY_SLOPE
+)
 from layer import (
     Matmul,
     ReLU,
@@ -26,6 +29,8 @@ from layer.utility import (
     backward_outputs,
 )
 from test.config import (
+    LOSS_DIFF_ACCEPTANCE_RATIO,
+    LOSS_DIFF_ACCEPTANCE_VALUE,
     GRADIENT_DIFF_CHECK_TRIGGER,
     GRADIENT_DIFF_ACCEPTANCE_RATIO,
     GRADIENT_DIFF_ACCEPTANCE_VALUE,
@@ -67,6 +72,19 @@ def validate_against_expected_gradient(
             b=expected,
             atol=GRADIENT_DIFF_ACCEPTANCE_VALUE,
             rtol=GRADIENT_DIFF_ACCEPTANCE_RATIO
+        )
+
+
+def validate_against_expected_loss(
+        expected: np.ndarray,
+        actual: np.ndarray
+) -> bool:
+    return \
+        np.allclose(
+            a=actual,
+            b=expected,
+            atol=LOSS_DIFF_ACCEPTANCE_VALUE,
+            rtol=LOSS_DIFF_ACCEPTANCE_RATIO
         )
 
 
@@ -131,7 +149,8 @@ def expected_gradients_from_relu_neuron(
     # This should match the actual back-propagation dL/dY from the ReLU layer.
     # --------------------------------------------------------------------------------
     EDY = np.copy(EDA)
-    EDY[Y < 0] = TYPE_FLOAT(0)
+    # EDY[Y < 0] = TYPE_FLOAT(0)
+    EDY[Y < 0] = RELU_LEAKY_SLOPE
 
     # --------------------------------------------------------------------------------
     # EDW: dL/dW, expected gradient in the Matmul layer for its weight W.

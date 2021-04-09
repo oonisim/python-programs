@@ -516,10 +516,6 @@ class Layer:
         Returns:
             dX: [L(f(X+h) - L(f(X-h)] / 2h
         """
-        # self.logger.warning(
-        #    "Layer base method gradient_numerical not overridden but called by %s."
-        # )
-
         # L = Li(f(arg))
         def L(X: np.ndarray):
             return self.objective(self.function(X))

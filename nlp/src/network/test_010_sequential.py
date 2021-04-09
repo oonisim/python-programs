@@ -37,7 +37,9 @@ from network.sequential import (
 )
 from test.layer_validations import (
     expected_gradient_from_log_loss,
-    validate_relu_neuron_round_trip
+    validate_relu_neuron_round_trip,
+    validate_against_expected_loss,
+    validate_against_expected_gradient
 )
 from test.utilities import (
     build_matmul_relu_objective
@@ -156,7 +158,6 @@ def test_010_sequential_instantiation_to_fail():
     )
 
 
-
 def test_010_validate_sequential_matmul_relu_training():
     # --------------------------------------------------------------------------------
     # Network using sequential
@@ -240,11 +241,11 @@ def test_010_validate_sequential_matmul_relu_training():
         #   sequential layer output and gradients must match with those from without
         #   sequential.
         # ********************************************************************************
-        assert np.allclose(A_sequential, A, atol=0.0, rtol=0.01), \
+        assert validate_against_expected_loss(expected=A, actual=A_sequential), \
             "Expected A is \n%s\nactual is \n%s\ndiff %s\n" % (A, A_sequential, A-A_sequential)
-        assert np.allclose(L_sequential, L, atol=0.0, rtol=0.01), \
+        assert validate_against_expected_loss(expected=L, actual=L_sequential), \
             "Expected L is \n%s\nactual is %s\ndiff %s\n" % (L, L_sequential, L-L_sequential)
-        assert np.allclose(dX_sequential, dX, atol=0.0, rtol=0.01), \
+        assert validate_against_expected_gradient(expected=dX, actual=dX_sequential), \
             "Expected dX is \n%s\nactual is %s\ndiff %s\n" % (dX, dX_sequential, dX-dX_sequential)
 
         # --------------------------------------------------------------------------------
