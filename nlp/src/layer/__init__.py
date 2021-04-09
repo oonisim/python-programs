@@ -16,9 +16,6 @@ from layer.objective import (
 from layer.sequential import (
     Sequential
 )
-from layer.parallel import (
-    Parallel
-)
 from layer.schemes import (
     FEATURE_LAYERS,
     ACTIVATION_LAYERS,
