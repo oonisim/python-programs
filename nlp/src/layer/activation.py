@@ -28,7 +28,8 @@ from layer.constants import (
     _NUM_NODES,
     _NUM_FEATURES,
     _PARAMETERS,
-    _LOG_LEVEL
+    _LOG_LEVEL,
+    RELU_LEAKY_SLOPE
 )
 
 
@@ -75,12 +76,33 @@ class ReLU(Layer):
     # ================================================================================
     # Instance
     # ================================================================================
-    def __init__(self, name: str, num_nodes: int, log_level: int = logging.ERROR):
+    @property
+    def slope(self) -> Union[TYPE_FLOAT, np.ndarray]:
+        """Leaky ReLU slope value"""
+        return self._slope
+
+    def __init__(
+            self,
+            name: str,
+            num_nodes: int,
+            slope: TYPE_FLOAT = RELU_LEAKY_SLOPE,
+            log_level:
+            int = logging.ERROR
+    ):
+        """
+        Args:
+            name: Layer identity name
+            num_nodes: Number of nodes in the layer
+            slope: leaky slope value
+            log_level: logging level
+        """
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
 
         self.mask: np.ndarray = np.empty(())    # To zero clear the outputs where x <= 0
         self._A: np.ndarray = np.empty(())      # Activation
         self._M = num_nodes                     # Number of nodes alias
+        self._slope: TYPE_FLOAT = slope
+        assert self.slope > TYPE_FLOAT(0)
 
     # --------------------------------------------------------------------------------
     # Instance methods
@@ -91,15 +113,21 @@ class ReLU(Layer):
             f"Number of node X {X.shape[1] } does not match {self.M}."
 
         self.X = X
+        # --------------------------------------------------------------------------------
+        # Allocate array storage for np.func(out=) for Y but not dY.
+        # gradient() need to validate the dY shape is (N,M)
+        # --------------------------------------------------------------------------------
         if self._Y.size <= 0 or self.Y.shape[0] != self.N:
             self._Y = np.empty(X.shape, dtype=TYPE_FLOAT)
 
-        self.mask = (X <= 0)
-        # Y = np.copy(X)
-        # Y[self.mask] = 0
-        # self._Y = Y
         np.copyto(self._Y, X)
-        self._Y[self.mask] = 0
+        self.mask = (X <= 0)
+        # --------------------------------------------------------------------------------
+        # Leaky ReLU When slope > 0
+        # --------------------------------------------------------------------------------
+        # self._Y[self.mask] = 0
+        self._Y[self.mask] *= self.slope
+
         return self.Y
 
     def gradient(self, dA: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
@@ -116,11 +144,12 @@ class ReLU(Layer):
             f"dA shape should be {(self.N, self.M)} but {dA.shape}."
         self._dY = dA
 
-        # dX = np.copy(dA)
-        # dX[self.mask] = 0
-        # self._dX = dX
         np.copyto(self._dX, dA)
-        self._dX[self.mask] = 0
+        # --------------------------------------------------------------------------------
+        # Leaky ReLU When slope > 0
+        # --------------------------------------------------------------------------------
+        # self._dX[self.mask] = 0
+        self._dX[self.mask] = self.slope
         return self.dX
 
 
