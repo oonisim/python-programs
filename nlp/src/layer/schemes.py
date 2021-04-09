@@ -26,9 +26,6 @@ from layer.normalization import (
 # from layer.sequential import (
 #     Sequential
 # )
-# from layer.parallel import (
-#     Parallel
-# )
 
 # ================================================================================
 # Dictionaries of layer per purpose
