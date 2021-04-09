@@ -102,31 +102,37 @@ def word_indexing(corpus: str):
         corpus: A string including sentences to process.
     Returns:
         vocabulary: unique words in the corpus
-        id_to_word: word index to word mapping
-        word_to_id: word to word index mapping
+        index_to_word: word index to word mapping
+        word_to_index: word to word index mapping
     """
     words = standardize(corpus).split()
     vocabulary = ['UNK'] + list(set(words))
-    id_to_word: Dict[int, str] = dict(enumerate(vocabulary))
-    word_to_id: Dict[str, int] = dict(zip(id_to_word.values(), id_to_word.keys()))
+    index_to_word: Dict[int, str] = \
+        dict(enumerate(vocabulary))
+    word_to_index: Dict[str, int] = \
+        dict(zip(index_to_word.values(), index_to_word.keys()))
 
-    return words, vocabulary, id_to_word, word_to_id
+    return words, vocabulary, index_to_word, word_to_index
 
 
 def text_to_sequence(
         corpus,
-        word_to_id: dict
-) -> List[str]:
+        word_to_index: dict
+) -> List[List[str]]:
     """Generate integer sequence word
     Args:
         corpus: A string including sentences to process.
-        word_to_id: word to integer index mapping
+        word_to_index: word to integer index mapping
     Returns:
         sequence:
             word indices to every word in the originlal corpus as as they appear in it.
             The objective of sequence is to preserve the original corpus but as numerical indices.
     """
-    return [word_to_id.get(w, 0) for w in standardize(corpus).split()]
+    lines = []
+    for line in corpus.split("\n"):
+        lines.append([word_to_index.get(w, 0) for w in standardize(line).split()])
+
+    return lines
 
 
 if __name__ == "__main__":
