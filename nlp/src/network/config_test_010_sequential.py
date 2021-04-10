@@ -2,7 +2,6 @@ import logging
 import numpy as np
 import layer
 from layer import (
-    BatchNormalization,
     Matmul,
     ReLU,
     CrossEntropyLogLoss
@@ -134,7 +133,7 @@ valid_network_specification_mao = {
 }
 
 
-composite_layer_specification_smbambamamo = {
+composite_layer_specification_sfmbambamamo = {
     "std01": {
         _SCHEME: layer.Standardization.__qualname__,
         _PARAMETERS: {
@@ -143,6 +142,21 @@ composite_layer_specification_smbambamamo = {
             "momentum": _momentum,
             "eps": _eps,
             "log_level": logging.ERROR
+        }
+    },
+    "fss01": {
+        _SCHEME: layer.FeatureScaleShift.__qualname__,
+        _PARAMETERS: {
+            _NAME: "fss01",
+            _NUM_NODES: _D,
+            "log_level": logging.ERROR,
+            _OPTIMIZER: {
+                _SCHEME: optimiser.SGD.__qualname__,
+                _PARAMETERS: {
+                    "lr": _lr,
+                    "l2": _l2
+                }
+            }
         }
     },
     "matmul01": {
@@ -265,11 +279,11 @@ composite_layer_specification_smbambamamo = {
     }
 }
 
-valid_network_specification_mbambamamo = {
+valid_network_specification_sfmbambamamo = {
     _NAME: "valid_network_mao",
     _NUM_NODES: _M,
     _LOG_LEVEL: logging.ERROR,
-    _COMPOSITE_LAYER_SPEC: composite_layer_specification_smbambamamo
+    _COMPOSITE_LAYER_SPEC: composite_layer_specification_sfmbambamamo
 }
 
 
@@ -351,78 +365,78 @@ def invalid_network_specification_with_duplicated_names():
 
 def multilayer_network_specification_bn_to_fail(D, M01, M02, M):
     sequential_layer_specification_bn_to_fail = {
-        "matmul01": Matmul.specification(
+        "matmul01": layer.Matmul.specification(
             name="matmul01",
             num_nodes=M01,
             num_features=D,
             weights_initialization_scheme="he",
-            weights_optimizer_specification=SGD.specification(
+            weights_optimizer_specification=optimiser.SGD.specification(
                 lr=0.05,
                 l2=1e-3
             )
         ),
-        "bn01": BatchNormalization.specification(
+        "bn01": layer.BatchNormalization.specification(
             name="bn01",
             num_nodes=M01,
-            gamma_optimizer_specification=SGD.specification(
+            gamma_optimizer_specification=optimiser.SGD.specification(
                 lr=0.05,
                 l2=1e-3
             ),
-            beta_optimizer_specification=SGD.specification(
+            beta_optimizer_specification=optimiser.SGD.specification(
                 lr=0.05,
                 l2=1e-3,
             ),
             momentum=0.9
         ),
-        "relu01": ReLU.specification(
+        "relu01": layer.ReLU.specification(
             name="relu01",
             num_nodes=M01,
         ),
-        "matmul02": Matmul.specification(
+        "matmul02": layer.Matmul.specification(
             name="matmul01",
             num_nodes=M02,
             num_features=M01,
             weights_initialization_scheme="he",
-            weights_optimizer_specification=SGD.specification(
+            weights_optimizer_specification=optimiser.SGD.specification(
                 lr=0.05,
                 l2=1e-3
             )
         ),
-        "bn02": BatchNormalization.specification(
+        "bn02": layer.BatchNormalization.specification(
             name="bn02",
             num_nodes=M02,
-            gamma_optimizer_specification=SGD.specification(
+            gamma_optimizer_specification=optimiser.SGD.specification(
                 lr=0.05,
                 l2=1e-3
             ),
-            beta_optimizer_specification=SGD.specification(
+            beta_optimizer_specification=optimiser.SGD.specification(
                 lr=0.05,
                 l2=1e-3,
             ),
             momentum=0.9
         ),
-        "relu02": ReLU.specification(
+        "relu02": layer.ReLU.specification(
             name="relu02",
             num_nodes=M02,
         ),
-        "matmul03": Matmul.specification(
+        "matmul03": layer.Matmul.specification(
             name="matmul03",
             num_nodes=M,
             num_features=M02,
             weights_initialization_scheme="he",
-            weights_optimizer_specification=SGD.specification(
+            weights_optimizer_specification=optimiser.SGD.specification(
                 lr=0.05,
                 l2=1e-3
             )
         ),
-        "bn03": BatchNormalization.specification(
+        "bn03": layer.BatchNormalization.specification(
             name="bn03",
             num_nodes=M,
-            gamma_optimizer_specification=SGD.specification(
+            gamma_optimizer_specification=optimiser.SGD.specification(
                 lr=0.05,
                 l2=1e-3
             ),
-            beta_optimizer_specification=SGD.specification(
+            beta_optimizer_specification=optimiser.SGD.specification(
                 lr=0.05,
                 l2=1e-3,
             ),

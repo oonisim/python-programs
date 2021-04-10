@@ -325,7 +325,7 @@ class Standardization(Layer):
         """Standardize the input X per feature/column basis.
         Args:
             X: Batch input data from the input layer.
-            numexpr_enabled: flat to use numexpr
+            numexpr_enabled: flag to use numexpr
         Returns:
             Y: Per-feature standardized output
         """
@@ -467,8 +467,8 @@ class Standardization(Layer):
         """Calculate the gradients dL/dX and dL/dW.
         Args:
             dY: Gradient dL/dY, the total impact on L by dY.
-            numexpr_enabled: flat to use numexpr
-            numba_enabled: flat to use numexpr
+            numexpr_enabled: flag to use numexpr
+            numba_enabled: flag to use numexpr
         Returns:
             dX: dL/dX:(N,M) = [         dL/dXmd         + (dL/dU / N) ]
                             = [ (dL/dXmd01 + dL/dXmd02) + (dL/dU / N) ]
@@ -500,10 +500,6 @@ class Standardization(Layer):
         Returns:
             dX: [L(f(X+h) - L(f(X-h)] / 2h
         """
-        # TODO:
-        self.logger.debug("layer[%s]:gradient_numerical", self.name)
-        L = self.objective
-
         dX = super().gradient_numerical(h=h)[0]
         return [dX]
 
@@ -524,6 +520,368 @@ class Standardization(Layer):
         scores = ne.evaluate("(X - RU) / RSD")
 
         return scores
+
+
+class FeatureScaleShift(Layer):
+    """Scale and shift feature with gamma * X + beta
+    """
+    # ================================================================================
+    # Class initialization
+    # ================================================================================
+    @staticmethod
+    def specification_template():
+        return FeatureScaleShift.specification(name="fss001", num_nodes=3)
+
+    @staticmethod
+    def specification(
+            name: str,
+            num_nodes: int,
+            gamma_optimizer_specification: dict = None,
+            beta_optimizer_specification: dict = None,
+    ):
+        """Generate Matmul specification
+        """
+        return {
+            _SCHEME: FeatureScaleShift.__qualname__,
+            _PARAMETERS: {
+                _NAME: name,
+                _NUM_NODES: num_nodes,
+                # Use same optimizer for gamma and beta unless it is proven not sufficient
+                _OPTIMIZER: gamma_optimizer_specification
+                if gamma_optimizer_specification is not None
+                else optimiser.SGD.specification(),
+                "log_level": logging.ERROR
+            }
+        }
+
+    @staticmethod
+    def build(parameters: Dict):
+        """Build a matmul layer based on the parameters
+        """
+        parameters = copy.deepcopy(parameters)
+        assert (
+            isinstance(parameters, dict) and
+            (_NAME in parameters and len(parameters[_NAME]) > 0) and
+            (_NUM_NODES in parameters and parameters[_NUM_NODES] > 0)
+        )
+
+        # Optimizer
+        _optimizer = build_optimizer_from_layer_parameters(parameters)
+        parameters[_OPTIMIZER] = _optimizer
+        return FeatureScaleShift(**parameters)
+
+    # ================================================================================
+    # Instance initialization
+    # ================================================================================
+    def __init__(
+            self,
+            name: str,
+            num_nodes: int,
+            optimizer: optimiser.Optimizer = optimiser.SGD(),
+            posteriors: Optional[List[Layer]] = None,
+            log_level: int = logging.ERROR
+    ):
+        """Initialize a matmul layer that has 'num_nodes' nodes
+        Args:
+            name: Layer identity name
+            num_nodes: Number of nodes in the layer
+            optimizer: Gradient descent implementation e.g SGD, Adam.
+            posteriors: Post layers to which forward the matmul layer output
+            log_level: logging level
+        """
+        assert isinstance(optimizer, optimiser.Optimizer)
+        super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
+        self.logger.debug(
+            "FeatureScaleShift[%s] number of nodes is [%s]",
+            name, num_nodes
+        )
+
+        # Layers to which forward the output
+        self._posteriors: List[Layer] = posteriors
+        self._num_posteriors: int = len(posteriors) if posteriors else -1
+
+        # --------------------------------------------------------------------------------
+        # Scale and shift parameters
+        # --------------------------------------------------------------------------------
+        self._gamma: np.ndarray = np.ones(num_nodes, dtype=TYPE_FLOAT)
+        self._dGamma: np.ndarray = np.empty(num_nodes, dtype=TYPE_FLOAT)
+        self._beta: np.ndarray = np.zeros(num_nodes, dtype=TYPE_FLOAT)
+        self._dBeta: np.ndarray = np.zeros(num_nodes, dtype=TYPE_FLOAT)
+
+        # --------------------------------------------------------------------------------
+        # State of the layer
+        # --------------------------------------------------------------------------------
+        self._S = [self.gamma, self.beta]
+
+        # --------------------------------------------------------------------------------
+        # Gradient descent optimizer
+        # --------------------------------------------------------------------------------
+        self._gamma_optimizer: optimiser.Optimizer = optimizer
+        self._beta_optimizer: optimiser.Optimizer = optimizer
+
+        # --------------------------------------------------------------------------------
+        # Misc
+        # --------------------------------------------------------------------------------
+        self._args = set(locals().keys())
+
+    # --------------------------------------------------------------------------------
+    # Instance properties
+    # --------------------------------------------------------------------------------
+    @property
+    def gamma(self) -> np.ndarray:
+        """Feature scale parameter gamma for each feature in X in shape:(M,)
+        """
+        assert self._gamma.size > 0 and self._gamma.shape == (self.M,), \
+            "gamma is not initialized or invalid"
+        return self._gamma
+
+    @property
+    def dGamma(self) -> np.ndarray:
+        """Gradient dL/dGamma = sum(dL/dY * dL/dXstd, axis=0) for each feature in X.
+        Shape:(M,)
+        """
+        assert self._dGamma.size > 0 and self._dGamma.shape == (self.M,)
+        return self._dGamma
+
+    @property
+    def beta(self) -> np.ndarray:
+        """Feature bias parameter beta for each feature in X.
+        Shape:(M,)"""
+        assert self._beta.size > 0 and self._beta.shape == (self.M,),\
+            "beta is not initialized or invalid"
+        return self._beta
+
+    @property
+    def dBeta(self) -> np.ndarray:
+        """Gradient dL/dBeta = sum(dL/dY * 1, axis=0) for each feature in X.
+        Shape:(M,)
+        """
+        assert self._dBeta.size > 0 and self._dBeta.shape == (self.M,), \
+            "dBeta is not initialized or invalid"
+        return self._dBeta
+
+    @property
+    def S(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
+        """State of the layer"""
+        self._S = [self.gamma, self.beta]
+        return self._S
+
+    @property
+    def gamma_optimizer(self) -> optimiser.Optimizer:
+        """Optimizer instance for gamma gradient descent
+        For now use the same instance for gamma and beta
+        """
+        return self._gamma_optimizer
+
+    @property
+    def beta_optimizer(self) -> optimiser.Optimizer:
+        """Optimizer instance for beta gradient descent
+        For now use the same instance for gamma and beta
+        """
+        return self._beta_optimizer
+
+    # --------------------------------------------------------------------------------
+    # Instance methods
+    # --------------------------------------------------------------------------------
+    @staticmethod
+    def _function_numexpr(x, gamma, beta, out):
+        ne.evaluate("gamma * x + beta", out=out)
+
+    @staticmethod
+    @jit(nopython=True)
+    def _function_numba(x, gamma, beta):
+        return gamma * x + beta
+
+    @staticmethod
+    def _function_numpy(x, gamma, beta, out=None):
+        scaled = np.multiply(gamma, x, out=out)
+        shifted = np.add(scaled, beta, out=out)
+        return shifted
+
+    def function(
+            self, X: Union[np.ndarray, TYPE_FLOAT],
+            numexpr_enabled: bool = ENABLE_NUMEXPR,
+            numba_enabled: bool = ENABLE_NUMBA
+    ) -> Union[np.ndarray, TYPE_FLOAT]:
+        """Standardize the input X per feature/column basis.
+        Args:
+            X: Batch input data from the input layer.
+            numexpr_enabled: flag to use numexpr
+            numba_enabled: flag to use numba
+        Returns:
+            Y: Per-feature standardized output
+        """
+        name = "function"
+        self.X = X
+        assert self.X.shape == (self.N, self.M), \
+            "Number of features %s must match number of nodes %s in the layer." \
+            % (X.shape[1], self.M)      # Make sure to check N is updated too.
+
+        # --------------------------------------------------------------------------------
+        # Allocate array storage for Y but not dY.
+        # --------------------------------------------------------------------------------
+        if self._Y.size <= 0 or self.Y.shape[0] != self.N:
+            self._Y = np.empty((self.N, self.M), dtype=TYPE_FLOAT)
+
+        # --------------------------------------------------------------------------------
+        # Calculate layer output Y
+        # --------------------------------------------------------------------------------
+        gamma = self.gamma
+        beta = self.beta
+        x = self.X
+        out = self._Y
+        if numexpr_enabled:
+            self._function_numexpr(x=x, gamma=gamma, beta=beta, out=out)
+        elif numba_enabled:
+            self._Y = self._function_numba(x=x, gamma=gamma, beta=beta)
+        else:
+            self._function_numpy(x=x, gamma=gamma, beta=beta, out=self._Y)
+
+        assert np.all(np.isfinite(self.Y)), f"{self.Y}"
+        return self.Y
+
+    def _gradient_numpy(self):
+        """Calculate dL/dX using numpy"""
+        # --------------------------------------------------------------------------------
+        # dL/dGamma:(M,) = sum(dL/dY:(N,M) * X(N,M), axis=0)
+        # --------------------------------------------------------------------------------
+        np.sum(self.dY * self.X, axis=0, out=self._dGamma)
+
+        # --------------------------------------------------------------------------------
+        # dL/dBeta:(M,) = sum(dL/dY:(N,M) * 1, axis=0)
+        # --------------------------------------------------------------------------------
+        np.sum(self.dY, axis=0, out=self._dBeta)
+
+        # --------------------------------------------------------------------------------
+        # dL/dX: (N,M): dL/dY:(N,M) * gamma(M,)
+        # --------------------------------------------------------------------------------
+        np.multiply(self.dY, self.gamma, out=self._dX)
+        return self.dX
+
+    def _gradient_numexpr(self):
+        """Calculate dL/dX using numexpr"""
+        dY = self.dY
+        X = self.X
+        dX = self.dX
+        gamma = self.gamma
+        dGamma = self.dGamma
+        dBeta = self.dBeta
+        dX = self.dX
+
+        # --------------------------------------------------------------------------------
+        # dL/dGamma:(M,) = sum(dL/dY:(N,M) * X(N,M), axis=0)
+        # --------------------------------------------------------------------------------
+        ne.evaluate("sum(dY * X, axis=0)", out=dGamma)
+
+        # --------------------------------------------------------------------------------
+        # dL/dBeta:(M,) = sum(dL/dY:(N,M) * 1, axis=0)
+        # --------------------------------------------------------------------------------
+        ne.evaluate("sum(dY, axis=0)", out=dBeta)
+
+        # --------------------------------------------------------------------------------
+        # dL/dX: (N,M): dL/dY:(N,M) * gamma(M,)
+        # --------------------------------------------------------------------------------
+        return ne.evaluate("dY * gamma", out=dX)
+
+    def gradient(
+            self,
+            dY: Union[np.ndarray, TYPE_FLOAT] = 1.0,
+            numexpr_enabled: bool = ENABLE_NUMEXPR,
+            numba_enabled: bool = ENABLE_NUMBA
+    ) -> Union[np.ndarray, TYPE_FLOAT]:
+        """Calculate the gradients dL/dX
+        Args:
+            dY: Gradient dL/dY, the total impact on L by dY.
+            numexpr_enabled: flag to use numexpr
+            numba_enabled: flag to use numexpr
+        Returns: dX
+        """
+        name = "gradient"
+        assert \
+            np.all(np.isfinite(dY)) and \
+            isinstance(dY, TYPE_FLOAT) or \
+            (isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT)
+
+        dY = np.array(dY).reshape((1, -1)) \
+            if isinstance(dY, TYPE_FLOAT) or dY.ndim < 2 else dY
+        assert dY.shape == self.Y.shape, \
+            "dL/dY shape needs %s but %s" % (self.Y.shape, dY.shape)
+
+        self.logger.debug("layer[%s].%s: dY.shape %s", self.name, name, dY.shape)
+        self._dY = dY
+
+        if numexpr_enabled:
+            self._gradient_numexpr()
+        else:
+            self._gradient_numpy()
+
+        assert np.all(np.isfinite(self.dX)), f"{self.dX}"
+        return self.dX
+
+    def gradient_numerical(
+            self, h: float = 1e-5
+    ) -> List[Union[float, np.ndarray]]:
+        """Calculate numerical gradients
+        Args:
+            h: small number for delta to calculate the numerical gradient
+        Returns:
+            dX: [L(f(X+h) - L(f(X-h)] / 2h
+            dGamma:
+            dBeta:
+        """
+        self.logger.debug("layer[%s]:gradient_numerical", self.name)
+        L = self.objective
+
+        def objective_gamma(gamma: np.ndarray):
+            return L(gamma * self.X + self.beta)
+
+        def objective_beta(beta: np.ndarray):
+            return L(self.gamma * self.X + beta)
+
+        dX = super().gradient_numerical(h=h)[0]
+        dGamma = numerical_jacobian(objective_gamma, self.gamma, delta=h)
+        dBeta = numerical_jacobian(objective_beta, self.beta, delta=h)
+        return [dX, dGamma, dBeta]
+
+    def _gradient_descent(self, optimizer, X, dX, out=None) -> Union[np.ndarray, TYPE_FLOAT]:
+        """Gradient descent
+        Directly update matrices to avoid the temporary copies
+        """
+        return optimizer.update(X, dX, out=out)
+
+    def update(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
+        """Run gradient descent
+        Returns:
+            [dL/dX, dL/dGamma, dL/dBeta]: List of gradients.
+       """
+        self._gradient_descent(self.gamma_optimizer, self.gamma, self.dGamma, out=self._gamma)
+        self._gradient_descent(self.beta_optimizer, self.beta, self.dBeta, out=self._beta)
+        # return [self.dX, self.dGamma, self.dBeta]
+
+        assert np.all(np.isfinite(self.dGamma)), f"{self.dGamma}"
+        assert np.all(np.isfinite(self.dBeta)), f"{self.dBeta}"
+        return [self.dGamma, self.dBeta]
+
+    def predict(self, X, numexpr_enabled: bool = ENABLE_NUMEXPR):
+        """Predict
+        Args:
+            X: input
+            numexpr_enabled: flag to use numexpr
+        Returns:
+            Prediction: Index to the category
+        """
+        assert \
+            isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT and \
+            X.ndim == 2 and X.shape[1] == self.M and X.size > 0
+
+        if numexpr_enabled:
+            gamma = self.gamma
+            beta = self.beta
+            score = ne.evaluate("gamma * X + beta")
+        else:
+            score = self.gamma * X + self.beta
+
+        return score
 
 
 class BatchNormalization(Layer):
@@ -930,8 +1288,8 @@ class BatchNormalization(Layer):
         """Standardize the input X per feature/column basis.
         Args:
             X: Batch input data from the input layer.
-            numexpr_enabled: flat to use numexpr
-            numba_enabled: flat to use numba
+            numexpr_enabled: flag to use numexpr
+            numba_enabled: flag to use numba
         Returns:
             Y: Per-feature standardized output
         """
@@ -1132,11 +1490,11 @@ class BatchNormalization(Layer):
             numexpr_enabled: bool = ENABLE_NUMEXPR,
             numba_enabled: bool = ENABLE_NUMBA
     ) -> Union[np.ndarray, TYPE_FLOAT]:
-        """Calculate the gradients dL/dX and dL/dW.
+        """Calculate the gradients dL/dX.
         Args:
             dY: Gradient dL/dY, the total impact on L by dY.
-            numexpr_enabled: flat to use numexpr
-            numba_enabled: flat to use numexpr
+            numexpr_enabled: flag to use numexpr
+            numba_enabled: flag to use numexpr
         Returns:
             dX: dL/dX:(N,M) = [         dL/dXmd         + (dL/dU / N) ]
                             = [ (dL/dXmd01 + dL/dXmd02) + (dL/dU / N) ]

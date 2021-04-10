@@ -267,7 +267,7 @@ def test_010_sequential_train2():
     # Network using sequential
     # --------------------------------------------------------------------------------
     from config_test_010_sequential import (
-        valid_network_specification_mbambamamo,
+        valid_network_specification_sfmbambamamo,
         _N,
         _M,
         _D,
@@ -279,9 +279,9 @@ def test_010_sequential_train2():
     # Otherwise not sure what you are testing.
     # ----------------------------------------------------------------------
     network = _must_succeed(
-        network_specification=valid_network_specification_mbambamamo,
+        network_specification=valid_network_specification_sfmbambamamo,
         message="SequentialNetwork() must succeed with %s"
-                % valid_network_specification_mbambamamo
+                % valid_network_specification_sfmbambamamo
     )
     inference_layer: layer.Sequential = network.layer_inference
     sequential_matmul_layer: layer.Matmul = inference_layer.layers[0]

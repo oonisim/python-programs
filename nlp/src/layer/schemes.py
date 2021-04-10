@@ -19,6 +19,7 @@ from layer.objective import (
 )
 from layer.normalization import (
     Standardization,
+    FeatureScaleShift,
     BatchNormalization
 )
 
@@ -40,6 +41,7 @@ ACTIVATION_LAYERS = (
 )
 NORMALIZATION_LAYERS = (
     Standardization,
+    FeatureScaleShift,
     BatchNormalization
 )
 

@@ -1,7 +1,8 @@
 from layer.base import Layer
 from layer.normalization import (
     BatchNormalization,
-    Standardization
+    Standardization,
+    FeatureScaleShift
 )
 from layer.matmul import Matmul
 from layer.sum import Sum

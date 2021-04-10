@@ -1107,7 +1107,7 @@ def prediction_grid(X, W):
     return x1_grid, x2_grid, Z
 
 
-def prediction_grid_2d(x_min, x_max, y_min, y_max, prediction_function):
+def prediction_grid_2d(x_min, x_max, y_min, y_max, prediction_function, add_bias=False):
     """
     https://cs231n.github.io/neural-networks-case-study/#update
     1. Generate the input X from the grid (x_min, y_min, x_max, y_max)
@@ -1137,12 +1137,17 @@ def prediction_grid_2d(x_min, x_max, y_min, y_max, prediction_function):
     )
     x1 = x1_grid.ravel()
     x2 = x2_grid.ravel()
-    P = prediction_function(
-        np.c_[
+
+    X = np.c_[
             x1,
-            x2
-        ]
-    )
+            x2,
+            np.ones(len(x1), dtype=TYPE_FLOAT)
+    ] if add_bias else np.c_[
+        x1,
+        x2
+    ]
+
+    P = prediction_function(X)
     P = P.reshape(x1_grid.shape)
 
     return x1_grid, x2_grid, P
