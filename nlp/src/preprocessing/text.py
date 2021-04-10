@@ -4,12 +4,15 @@ from typing import(
 )
 import re
 import string
+import collections
 import numpy as np
 from preprocessing.constant import (
     DELIMITER,
     NIL
 )
-
+from common.constants import (
+    TYPE_FLOAT
+)
 PAD_MODE_PREPEND = 'prepend'
 PAD_MODE_APPEND = 'append'
 PAD_MODE_SQUEEZE = 'squeeze'
@@ -104,15 +107,33 @@ def word_indexing(corpus: str):
         vocabulary: unique words in the corpus
         index_to_word: word index to word mapping
         word_to_index: word to word index mapping
+        probabilities: word occurrence probabilities
     """
     words = standardize(corpus).split()
-    vocabulary = ['UNK'] + list(set(words))
-    index_to_word: Dict[int, str] = \
-        dict(enumerate(vocabulary))
-    word_to_index: Dict[str, int] = \
-        dict(zip(index_to_word.values(), index_to_word.keys()))
 
-    return words, vocabulary, index_to_word, word_to_index
+    total = len(words)
+    counts = collections.Counter(words)
+    probabilities = {word: (count / total) for (word, count) in counts.items()}
+
+    vocabulary = ['UNK'] + list(set(words))
+    index_to_word: Dict[int, str] = dict(enumerate(vocabulary))
+    word_to_index: Dict[str, int] = dict(zip(index_to_word.values(), index_to_word.keys()))
+
+    del words, total, counts
+    return vocabulary, index_to_word, word_to_index, probabilities
+
+
+def sub_sampling(corpus: str, power: TYPE_FLOAT = TYPE_FLOAT(0.75)):
+    total = len(words := standardize(corpus).split())
+    counts = collections.Counter(words)
+    probabilities = {word: np.power((count / total), power) for (word, count) in counts.items()}
+
+    sigma = np.sum(list(probabilities.values()))
+    probabilities = {word: (p/sigma) for (word, p) in probabilities.items()}
+    assert (1.0 - np.sum(list(probabilities.values()))) < 1e-5
+
+    del words, total, counts, sigma
+    return probabilities
 
 
 def text_to_sequence(
