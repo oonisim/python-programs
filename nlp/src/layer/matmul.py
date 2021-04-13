@@ -428,3 +428,12 @@ class Matmul(Layer):
         self._dS = [self.dW]
 
         return self.dS
+
+    def load(self, path: str):
+        """Load the layer state
+        TODO: Consider if resetting other properties (dW, X, etc) are required.
+        Args:
+            path: state file path
+        """
+        state = super().load(path)
+        self._W = state[0]

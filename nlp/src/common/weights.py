@@ -9,6 +9,7 @@ from common.constant import (
     TYPE_FLOAT
 )
 
+
 def xavier(M: int, D: int) -> np.ndarray:
     """Xavier weight initialization for base-symmetric activations e.g. sigmoid/tanh
     Gaussian distribution with the standard deviation of sqrt(1/D) to initialize

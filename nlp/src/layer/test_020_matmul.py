@@ -17,7 +17,9 @@ Gradient dL/dW: shape(M, D+1)
 Same shape with W.
 """
 import cProfile
+import os
 import copy
+import pathlib
 import logging
 from typing import (
     Union
@@ -25,6 +27,9 @@ from typing import (
 
 import numpy as np
 
+from common.constant import (
+    TYPE_FLOAT
+)
 import common.weights as weights
 from common.function import (
     numerical_jacobian,
@@ -58,10 +63,38 @@ from test.layer_validations import (
 from optimizer import (
     SGD
 )
+from common.utility import (
+    random_string
+)
 
 
 Logger = logging.getLogger("test_030_objective")
 Logger.setLevel(logging.DEBUG)
+
+
+def _instantiate(name: str, num_nodes: int, num_features: int, objective=None):
+    category = np.random.uniform()
+    if category < 0.3:
+        W=weights.he(num_nodes, num_features + 1)
+    elif category < 0.7:
+        W=weights.xavier(num_nodes, num_features + 1)
+    else:
+        W=weights.uniform(num_nodes, num_features + 1)
+
+    matmul = Matmul(
+        name=name,
+        num_nodes=num_nodes,
+        W=W
+    )
+    if objective is not None:
+        matmul.objective = objective
+    return matmul
+
+
+def _generate_X(N: int = -1, D: int = -1):
+    N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE) if N <= 0 else N
+    D: int = np.random.randint(1, NUM_MAX_FEATURES) if D <= 0 else D
+    return np.random.rand(N, D)
 
 
 def test_020_matmul_instantiation_to_fail():
@@ -757,6 +790,82 @@ def test_020_matmul_round_trip():
 
         # Constraint 7: gradient descent progressing with the new objective L(Yn+1) < L(Yn)
         assert np.all(np.abs(objective(matmul.function(X)) < L))
+
+    profiler.disable()
+    profiler.print_stats(sort="cumtime")
+
+
+def test_020_matmul_save_load():
+    """
+    Objective:
+        Verify the load/save methods.
+
+    Constraints:
+        1. Be able to save the layer state.
+        2. Be able to load the layer state and the state is same with the layer state S.
+    """
+
+    name = "test_020_matmul_save_load"
+
+    def objective(X: np.ndarray) -> Union[float, np.ndarray]:
+        """Dummy objective function to calculate the loss L"""
+        return np.sum(X)
+
+    profiler = cProfile.Profile()
+    profiler.enable()
+
+    for _ in range(NUM_MAX_TEST_TIMES):
+        N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
+        M: int = np.random.randint(1, NUM_MAX_NODES)
+        D: int = np.random.randint(1, NUM_MAX_FEATURES)
+
+        name = "test_020_matmul_methods"
+        matmul = _instantiate(name=name, num_nodes=M, num_features=D, objective=objective)
+        X = _generate_X(N, D)
+        Y = matmul.function(X)
+        matmul.gradient(Y)
+        matmul.update()
+
+        backup_S = copy.deepcopy(matmul.S)
+        backup_W = copy.deepcopy(matmul.W)
+
+        pathname = os.path.sep + os.path.sep.join([
+            "tmp",
+            name + random_string(12) + ".pkl"
+        ])
+
+        # ********************************************************************************
+        # Constraint:
+        #   load must fail with the saved file being deleted.
+        #   Make sure load() is loading the path
+        # ********************************************************************************
+        matmul.save(pathname)
+        path = pathlib.Path(pathname)
+        path.unlink()
+        try:
+            msg = "load must fail with the saved file being deleted."
+            matmul.load(pathname)
+            raise AssertionError(msg)
+        except RuntimeError as e:
+            pass
+
+        # ********************************************************************************
+        # Constraint:
+        #   load restore the state before save
+        # ********************************************************************************
+        matmul.save(pathname)
+        matmul._W = np.zeros(shape=matmul.W.shape, dtype=TYPE_FLOAT)
+        matmul.load(pathname)
+        assert np.array_equal(backup_W, matmul.W), \
+            "expected \n%s\n actual \n%s\n" % (backup_W, matmul.W)
+
+        path = pathlib.Path(pathname)
+        path.unlink()
+
+        Y = matmul.function(X)
+        matmul.gradient(Y)
+        matmul.update()
+
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")

@@ -98,19 +98,18 @@ List[dL/ds]=u(dL/dY):
 Python relative import is defective. Use sys.path + absolute import ONLY.
 Or spend hours on "attempted relative import beyond top-level package"
 """
+import logging
 from typing import (
     Optional,
     Union,
     List,
     Dict,
-    Tuple,
     Callable,
-    Any,
-    NoReturn,
-    Final
+    NoReturn
 )
-import logging
+
 import numpy as np
+
 from common.constant import (
     TYPE_FLOAT,
     TYPE_LABEL,
@@ -119,14 +118,9 @@ from common.constant import (
 from common.function import (
     numerical_jacobian,
 )
-from layer.constants import (
-    _WEIGHTS,
-    _NAME,
-    _SCHEME,
-    _OPTIMIZER,
-    _NUM_NODES,
-    _NUM_FEATURES,
-    _PARAMETERS
+from common.utility import (
+    serialize,
+    deserialize
 )
 
 
@@ -385,7 +379,7 @@ class Layer:
             List[
                 List[Union[float, np.ndarray]]
             ]
-        ] = []   # Gradients dL/dS of layers
+        ] = []
         self._dS: Union[
             List[Union[TYPE_FLOAT, np.ndarray]],
             List[
@@ -548,6 +542,26 @@ class Layer:
         """
         return self.function(X)
 
+    def save(self, path: str):
+        """Save the layer state
+        Args:
+            path: path to save the state
+        """
+        serialize(path, self.S)
 
-    def save(self, path):
-        pass
+    def load(self, path: str):
+        """Load the layer state
+        The responsibility to restore the layer state is that of the child.
+        NOTE:
+            self.S is a list of references to the layer state objects.
+            Hence setting/updating self._S has no effect. You need to update
+            the actual layer state objects themselves to restore the states.
+
+        Args:
+            path: path to save the state
+        Returns:
+            state: loaded state
+        """
+        state = deserialize(path)
+        assert isinstance(state, list) and len(state) > 0
+        return state
