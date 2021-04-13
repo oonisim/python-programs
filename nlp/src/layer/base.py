@@ -552,6 +552,18 @@ class Layer:
     def load(self, path: str):
         """Load the layer state
         The responsibility to restore the layer state is that of the child.
+        Consideration:
+            Need to be clear if update a reference to the state object OR
+            update the object memory area itself.
+
+            If switching the reference to the new state object, there would be
+            references to the old objects which could cause unexpected results.
+
+            Hence, if state object memory can be directly updated, do so.
+            If not, **delete** the object so that the references to the old
+            object will cause an error and fix the code not to hold a reference
+            but get the reference via the property method every time.
+
         NOTE:
             self.S is a list of references to the layer state objects.
             Hence setting/updating self._S has no effect. You need to update

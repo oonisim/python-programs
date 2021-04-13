@@ -521,6 +521,28 @@ class Standardization(Layer):
 
         return scores
 
+    def load(self, path: str):
+        """Load and restore the layer state
+        Consideration:
+            Need to be clear if update a reference to the state object OR
+            update the object memory area itself.
+
+            If switching the reference to the new state object, there would be
+            references to the old objects which could cause unexpected results.
+
+            Hence, if state object memory can be directly updated, do so.
+            If not, **delete** the object so that the references to the old
+            object will cause an error and fix the code not to hold a reference
+            but get the reference via the property method every time.
+
+        TODO:
+            Consider if resetting other properties (dW, X, etc) are required.
+
+        Args:
+            path: state file path
+        """
+        raise NotImplementedError("Must implement")
+
 
 class FeatureScaleShift(Layer):
     """Scale and shift feature with gamma * X + beta
@@ -882,6 +904,28 @@ class FeatureScaleShift(Layer):
             score = self.gamma * X + self.beta
 
         return score
+
+    def load(self, path: str):
+        """Load and restore the layer state
+        Consideration:
+            Need to be clear if update a reference to the state object OR
+            update the object memory area itself.
+
+            If switching the reference to the new state object, there would be
+            references to the old objects which could cause unexpected results.
+
+            Hence, if state object memory can be directly updated, do so.
+            If not, **delete** the object so that the references to the old
+            object will cause an error and fix the code not to hold a reference
+            but get the reference via the property method every time.
+
+        TODO:
+            Consider if resetting other properties (dW, X, etc) are required.
+
+        Args:
+            path: state file path
+        """
+        raise NotImplementedError("Must implement")
 
 
 class BatchNormalization(Layer):
@@ -1580,3 +1624,25 @@ class BatchNormalization(Layer):
         scores = ne.evaluate("gamma * ((X - RU) / RSD) + beta")
 
         return scores
+
+    def load(self, path: str):
+        """Load and restore the layer state
+        Consideration:
+            Need to be clear if update a reference to the state object OR
+            update the object memory area itself.
+
+            If switching the reference to the new state object, there would be
+            references to the old objects which could cause unexpected results.
+
+            Hence, if state object memory can be directly updated, do so.
+            If not, **delete** the object so that the references to the old
+            object will cause an error and fix the code not to hold a reference
+            but get the reference via the property method every time.
+
+        TODO:
+            Consider if resetting other properties (dW, X, etc) are required.
+
+        Args:
+            path: state file path
+        """
+        raise NotImplementedError("Must implement")
