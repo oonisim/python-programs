@@ -5,7 +5,7 @@ from typing import (
 import logging
 import numpy as np
 import numexpr as ne
-from common.constants import (
+from common.constant import (
     TYPE_FLOAT
 )
 from . base import Optimizer

@@ -28,9 +28,6 @@ from typing import (
 
 import numpy as np
 
-from common.constants import (
-    TYPE_LABEL
-)
 from layer.base import Layer
 from layer.constants import (
     _NAME,

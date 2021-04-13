@@ -11,7 +11,7 @@ from typing import (
 )
 import numpy as np
 import common
-from common.constants import (
+from common.constant import (
     TYPE_FLOAT,
     TYPE_LABEL,
 )
@@ -24,6 +24,8 @@ from common.function import (
     softmax,
     generic_cross_entropy_log_loss,
     sigmoid_cross_entropy_log_loss,
+    softmax_cross_entropy_log_loss,
+    LOSS_FUNCTIONS
 )
 from layer.base import Layer
 from layer.constants import (
@@ -61,7 +63,7 @@ class CrossEntropyLogLoss(Layer):
     def specification(
             name: str,
             num_nodes: int,
-            loss_function: str = common.softmax_cross_entropy_log_loss.__qualname__
+            loss_function: str = softmax_cross_entropy_log_loss.__qualname__
     ):
         """Generate ReLU specification
         Args:
@@ -69,9 +71,9 @@ class CrossEntropyLogLoss(Layer):
             num_nodes: number of nodes (outputs) in the layer
             loss_function: cross entropy log loss function
         """
-        assert loss_function in common.LOSS_FUNCTIONS, \
+        assert loss_function in LOSS_FUNCTIONS, \
             "Invalid loss function %s. Must be one of %s" \
-            % (loss_function, list(common.LOSS_FUNCTIONS.keys()))
+            % (loss_function, list(LOSS_FUNCTIONS.keys()))
 
         return {
             _SCHEME: CrossEntropyLogLoss.__qualname__,
@@ -88,13 +90,13 @@ class CrossEntropyLogLoss(Layer):
             _NAME in parameters and
             _NUM_NODES in parameters and
             _LOSS_FUNCTION in parameters and
-            parameters[_LOSS_FUNCTION] in common.LOSS_FUNCTIONS
+            parameters[_LOSS_FUNCTION] in LOSS_FUNCTIONS
         )
 
         return CrossEntropyLogLoss(
             name=parameters[_NAME],
             num_nodes=parameters[_NUM_NODES],
-            log_loss_function=common.LOSS_FUNCTIONS[parameters[_LOSS_FUNCTION]],
+            log_loss_function=LOSS_FUNCTIONS[parameters[_LOSS_FUNCTION]],
             log_level=parameters[_LOG_LEVEL] if _LOG_LEVEL in parameters else logging.ERROR
         )
 

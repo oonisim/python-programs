@@ -10,7 +10,7 @@ from typing import (
 import numpy as np
 
 import common.weights as weights
-from common.constants import (
+from common.constant import (
     TYPE_FLOAT,
     TYPE_LABEL
 )

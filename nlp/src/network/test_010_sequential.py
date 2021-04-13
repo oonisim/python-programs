@@ -7,7 +7,7 @@ import numpy as np
 
 import layer
 import optimizer as optimiser
-from common.constants import (
+from common.constant import (
     TYPE_FLOAT,
 )
 from common.function import (

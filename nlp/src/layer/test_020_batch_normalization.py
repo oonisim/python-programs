@@ -24,7 +24,7 @@ from typing import (
 
 import numpy as np
 
-from common.constants import (
+from common.constant import (
     TYPE_FLOAT,
 )
 from common.function import (

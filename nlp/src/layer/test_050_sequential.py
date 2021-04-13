@@ -8,7 +8,7 @@ from typing import (
 import copy
 import numpy as np
 from common.weights import he
-from common.constants import (
+from common.constant import (
     TYPE_FLOAT
 )
 from common.function import (

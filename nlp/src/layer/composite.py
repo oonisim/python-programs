@@ -13,7 +13,7 @@ from typing import (
 
 import numpy as np
 
-from common.constants import (
+from common.constant import (
     TYPE_LABEL
 )
 from layer.base import Layer

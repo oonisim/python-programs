@@ -12,7 +12,7 @@ from typing import (
 
 import numpy as np
 import numexpr as ne
-from common.constants import (
+from common.constant import (
     TYPE_FLOAT,
     ENABLE_NUMEXPR
 )

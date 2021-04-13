@@ -13,7 +13,7 @@ import numexpr as ne
 import numpy as np
 from numba import jit
 
-from common.constants import (
+from common.constant import (
     TYPE_FLOAT,
     ENABLE_NUMEXPR,
     ENABLE_NUMBA,

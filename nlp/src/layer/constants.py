@@ -1,4 +1,4 @@
-from common.constants import (
+from common.constant import (
     TYPE_FLOAT
 )
 

@@ -9,7 +9,7 @@ from typing import (
 import logging
 import cProfile
 import numpy as np
-from common.constants import (
+from common.constant import (
     TYPE_FLOAT,
     TYPE_LABEL,
     BOUNDARY_SIGMOID

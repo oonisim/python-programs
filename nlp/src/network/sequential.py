@@ -12,7 +12,7 @@ from typing import (
 import copy
 import logging
 import numpy as np
-from common.constants import (
+from common.constant import (
     TYPE_FLOAT,
     TYPE_LABEL,
     LAYER_MAX_NUM_NODES

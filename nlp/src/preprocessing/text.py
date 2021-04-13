@@ -10,7 +10,7 @@ from preprocessing.constant import (
     DELIMITER,
     NIL
 )
-from common.constants import (
+from common.constant import (
     TYPE_FLOAT
 )
 PAD_MODE_PREPEND = 'prepend'
