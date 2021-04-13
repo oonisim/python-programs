@@ -1,3 +1,6 @@
+from typing import (
+    NewType
+)
 import numpy as np
 # --------------------------------------------------------------------------------
 # Float number type to use. For NN, 32 bit is enough.
@@ -7,7 +10,7 @@ import numpy as np
 TYPE_INT = np.int32
 TYPE_LABEL = np.int8
 TYPE_FLOAT = np.float       # alias of Python float
-# TYPE_FLOAT = np.float32   # Cannot use due to Numpy default is float64.
+# TYPE_FLOAT = np.float64   # Cannot use due to Numpy default is float.
 
 # --------------------------------------------------------------------------------
 # Be mindful of the relation between h/OFFSET_DELTA and k/OFFSET_LOG

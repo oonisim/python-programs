@@ -11,7 +11,7 @@ from functools import partial
 import numpy as np
 import numexpr as ne
 import pytest_check as check    # https://pypi.org/project/pytest-check/
-from common.constants import (
+from common.constant import (
     TYPE_FLOAT,
     TYPE_LABEL,
     OFFSET_LOG,
