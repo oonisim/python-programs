@@ -137,7 +137,7 @@ class Layer:
             "num_nodes": 8
         }
         """
-        assert False, "Must override"
+        raise NotImplementedError("Must implement")
 
     # ================================================================================
     # Instance
@@ -460,7 +460,7 @@ class Layer:
         self.logger.warning(
             "Layer base method %s not overridden but called",
         )
-        assert isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT
+        # assert isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT
         return dY
 
     # def backward(self) -> Union[np.ndarray, float]:

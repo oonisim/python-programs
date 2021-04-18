@@ -121,7 +121,7 @@ def test_010_standardize_eps(caplog):
     keepdims = True
 
     # Test eps
-    u = 1e-6
+    u = 1e-5
     for i in range(NUM_MAX_TEST_TIMES):
         eps = np.random.uniform(1e-12, 1e-7)
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
@@ -165,8 +165,8 @@ def test_010_standardize_eps(caplog):
             assert np.allclose(mean, __mean, atol=u, rtol=0)
             assert np.allclose(sd, __sd, atol=u, rtol=0), \
                 "expected sd\n%s\nactual\n%s\ndiff=\n%s\n" % (sd, __sd, (sd - __sd))
-            assert np.allclose(E, A, atol=u), \
-                f"X\n{X}\nstandardized\n{E}\nneeds\n{A}\n"
+            assert np.allclose(E, A, atol=u, rtol=0), \
+                f"X\n{X}\nstandardized\n{E}\nndiff\n{A-E}\n"
 
 
 def test_010_standardize_sd_is_zero_eps():

@@ -3,7 +3,9 @@ https://stackoverflow.com/a/34102855/4281353
 """
 import errno
 import os
+import sys
 import tempfile
+import pathlib
 
 # Sadly, Python fails to provide the following magic number for us.
 ERROR_INVALID_NAME = 123
@@ -15,6 +17,10 @@ See Also
 https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-
     Official listing of all such codes.
 """
+
+
+def is_file(path_to_file) -> bool:
+    return pathlib.Path(path_to_file).is_file()
 
 
 def is_pathname_valid(pathname: str) -> bool:
