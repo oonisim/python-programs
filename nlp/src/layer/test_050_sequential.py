@@ -5,7 +5,6 @@ import logging
 from typing import (
     Callable
 )
-import copy
 import numpy as np
 from common.weights import he
 from common.constant import (
@@ -35,7 +34,6 @@ from test.config import (
     NUM_MAX_FEATURES
 )
 from test.layer_validations import (
-    validate_relu_neuron_training,
     validate_against_expected_gradient,
     forward_outputs,
     backward_outputs
@@ -44,8 +42,7 @@ from test.utilities import (
     build_matmul_relu_objective,
 )
 from optimizer import SGD
-Logger = logging.getLogger("test_030_objective")
-Logger.setLevel(logging.DEBUG)
+Logger = logging.getLogger(__name__)
 
 
 def test_050_sequential_instantiation_to_fail():
@@ -253,6 +250,7 @@ def test_050_sequential_instance_property_access_to_fail():
             pass
 
         try:
+            # pylint: disable=not-callable
             inference.objective(np.array(1.0))
             raise RuntimeError(msg)
         except AssertionError:

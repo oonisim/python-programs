@@ -143,6 +143,7 @@ def train_matmul_bn_relu_classifier(
 
     num_no_progress: int = 0     # how many time when loss L not decreased.
     loss.T = T
+    # pylint: disable=not-callable
     history: List[np.ndarray] = [matmul.objective(matmul.function(X))]
 
     for i in range(num_epochs):
@@ -161,6 +162,7 @@ def train_matmul_bn_relu_classifier(
         # ********************************************************************************
         # Constraint: Network objective L must match layer-by-layer output
         # ********************************************************************************
+        # pylint: disable=not-callable
         assert L == objective(X) and L.shape == (), \
             f"Network objective L(X) %s must match layer-by-layer output %s." \
             % (objective(X), L)

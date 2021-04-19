@@ -310,6 +310,7 @@ def test_040_objective_instantiation():
 
         layer.logger.debug("This is a pytest")
 
+        # pylint: disable=not-callable
         assert layer.objective(np.array(1.0)) == np.array(1.0), \
             "Objective function of the output/last layer is an identity function."
 

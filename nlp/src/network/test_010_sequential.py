@@ -214,6 +214,7 @@ def test_010_validate_sequential_matmul_relu_training():
 
     loss.T = T
     for i in range(num_epochs):
+        # pylint: disable=not-callable
         L = objective(X)
 
         # --------------------------------------------------------------------------------
@@ -233,6 +234,7 @@ def test_010_validate_sequential_matmul_relu_training():
         # --------------------------------------------------------------------------------
         network.T = T
         A_sequential = network.function(X)
+        # pylint: disable=not-callable
         L_sequential = network.objective(A_sequential)
         dX_sequential = network.gradient(TYPE_FLOAT(1))
 

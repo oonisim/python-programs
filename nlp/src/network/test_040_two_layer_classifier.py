@@ -375,6 +375,7 @@ def train_two_layer_classifier(
     # Train the classifier
     # ================================================================================
     num_no_progress: int = 0     # how many time when loss L not decreased.
+    # pylint: disable=not-callable
     history: List[np.ndarray] = [objective(X)]
 
     for i in range(num_epochs):

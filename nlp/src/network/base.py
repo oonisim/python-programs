@@ -207,6 +207,7 @@ class Network(Layer):
             L: Objective value of the network (Loss)
         """
         self.X = X
+        # pylint: disable=not-callable
         self._Y = self._function(X)
         return self.Y
 
@@ -219,6 +220,8 @@ class Network(Layer):
 
     def gradient(self, dY: Union[np.ndarray, TYPE_FLOAT]) -> Union[TYPE_FLOAT, np.ndarray]:
         """Back propagate gradients"""
+        # pylint: disable=not-callable
+
         dY = np.array(dY).astype(TYPE_FLOAT) if isinstance(dY, TYPE_FLOAT) else dY
         assert isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT
         return self._gradient(dY)
@@ -256,12 +259,14 @@ class Network(Layer):
         Returns:
             Model S: Updated state of the network
         """
+        # pylint: disable=not-callable
         self.X = X.astype(TYPE_FLOAT)
         self.T = T.astype(TYPE_LABEL)
 
         # --------------------------------------------------------------------------------
         # Forward path
         # --------------------------------------------------------------------------------
+        # pylint: disable=not-callable
         self._Y = self.function(self.X).astype(TYPE_FLOAT)
         self._L = self.objective(self.Y).astype(TYPE_FLOAT)
         self._history.append(self.L)
@@ -298,4 +303,5 @@ class Network(Layer):
         assert isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT, \
             f"Only np array of type {TYPE_FLOAT} is accepted"
 
+        # pylint: disable=not-callable
         return self._predict(X).astype(TYPE_LABEL)

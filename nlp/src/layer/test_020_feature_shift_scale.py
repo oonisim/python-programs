@@ -54,8 +54,7 @@ from test.config import (
     NUM_MAX_BATCH_SIZE
 )
 
-Logger = logging.getLogger("test_030_objective")
-Logger.setLevel(logging.DEBUG)
+Logger = logging.getLogger(__name__)
 
 
 def _instance(name, num_nodes: int, log_level: int = logging.ERROR):
@@ -206,6 +205,7 @@ def test_020_fss_instance_properties_access_to_fail():
             pass
 
         try:
+            # pylint: disable=not-callable
             _layer.objective(np.array(1.0))
             raise RuntimeError(msg)
         except AssertionError:
@@ -492,6 +492,7 @@ def test_020_fss_method_gradient_descent():
                 X,
                 numexpr_enabled=numexpr_enabled,
             )
+            # pylint: disable=not-callable
             L = _layer.objective(Y)
             G = _layer.gradient(
                 dY=dout,
@@ -519,6 +520,7 @@ def test_020_fss_method_predict():
     Expected:
         The objective
     """
+    # pylint: disable=not-callable
     def objective(X: np.ndarray) -> Union[float, np.ndarray]:
         """Dummy objective function"""
         return np.sum(X)

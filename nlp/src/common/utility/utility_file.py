@@ -23,6 +23,11 @@ def is_file(path_to_file) -> bool:
     return pathlib.Path(path_to_file).is_file()
 
 
+def rm_file(path_to_file):
+    path = pathlib.Path(path_to_file)
+    path.unlink()
+
+
 def is_pathname_valid(pathname: str) -> bool:
     """
     `True` if the passed pathname is a valid pathname for the current OS;
@@ -74,10 +79,7 @@ def is_pathname_valid(pathname: str) -> bool:
             #   * Under most POSIX-compatible OSes, "ENAMETOOLONG".
             #   * Under some edge-case OSes (e.g., SunOS, *BSD), "ERANGE".
             except OSError as exc:
-                if hasattr(exc, 'winerror'):
-                    if exc.winerror == ERROR_INVALID_NAME:
-                        return False
-                elif exc.errno in {errno.ENAMETOOLONG, errno.ERANGE}:
+                if exc.errno in {errno.ENAMETOOLONG, errno.ERANGE}:
                     return False
     # If a "TypeError" exception was raised, it almost certainly has the
     # error message "embedded NUL character" indicating an invalid pathname.

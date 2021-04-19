@@ -17,6 +17,8 @@ from test.config import (
     NUM_MAX_FEATURES
 )
 
+Logger = logging.getLogger(__name__)
+
 
 def test_010_base_instantiation_to_fail():
     """
@@ -175,6 +177,7 @@ def test_010_base_instance_properties():
         pass
 
     try:
+        # pylint: disable=not-callable
         layer.objective(np.array(1.0))
         raise RuntimeError(msg)
     except AssertionError:
@@ -249,6 +252,7 @@ def test_010_base_instantiation():
     # Methods
     # --------------------------------------------------------------------------------
     try:
+        # pylint: disable=not-callable
         layer.function(int(1))
         raise RuntimeError("Invoke layer.function(int(1)) must fail.")
     except AssertionError:
@@ -267,4 +271,5 @@ def test_010_base_instantiation():
     assert np.array_equal(layer.gradient(dY), dY)
 
     layer.objective = objective
+    # pylint: disable=not-callable
     assert np.array_equal(layer.objective(X), objective(X))

@@ -290,6 +290,7 @@ def test_030_objective_instantiation():
         assert np.array_equal(_layer.T, T)
 
         # Once T is set, objective() is available and callable
+        # pylint: disable=not-callable
         assert _layer.objective(_layer.function(X))
 
         _layer._Y = np.dot(X, X.T)
@@ -299,7 +300,7 @@ def test_030_objective_instantiation():
         assert _layer._dY == np.array(0.9)
 
         _layer.logger.debug("This is a pytest")
-
+        # pylint: disable=not-callable
         assert _layer.objective(np.array(1.0)) == np.array(1.0)
 
 

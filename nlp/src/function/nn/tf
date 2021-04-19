@@ -15,43 +15,26 @@ import tensorflow as tf
 from common.constant import (
     TYPE_FLOAT,
     TYPE_LABEL,
+    TYPE_TENSOR,
     BOUNDARY_SIGMOID,
 )
+import function.nn.base as base
 
 
 Logger = logging.getLogger(__name__)
 
 
-class Function:
+class Function(base.Function):
     # ================================================================================
     # Class
     # ================================================================================
     @staticmethod
-    def is_np_float(X) -> bool:
-        """Confirm if X is numpy float
-        """
-        return \
-            np.issubdtype(type(X), np.floating) or \
-            isinstance(X, np.ndarray) and np.issubdtype(X.dtype, np.floating)
+    def to_tensor(X) -> TYPE_TENSOR:
+        return tf.convert_to_tensor(X)
 
     @staticmethod
-    def is_float_tensor(X) -> bool:
-        return tf.is_tensor(X) and X.dtype.is_floating
-
-    @staticmethod
-    def to_float_tensor(X):
-        return tf.convert_to_tensor(X, dtype=TYPE_FLOAT)
-
-    @staticmethod
-    def assure_float_tensor(X) -> tf.Tensor:
-        if Function.is_float_tensor(X):
-            pass
-        elif Function.is_np_float(X):
-            X = Function.to_float_tensor(X)
-        else:
-            raise AssertionError(f"Float compatible type expected but {str(X)}")
-
-        return X
+    def to_float_tensor(X) -> TYPE_TENSOR:
+        return np.array(X, dtype=TYPE_FLOAT)
 
     @staticmethod
     def sigmoid(
@@ -73,7 +56,7 @@ class Function:
 
             To prevent such instability, limit the value range of X with boundary.
         """
-        X = Function.assure_float_tensor(X)
+        X = super().assure_float_tensor(X)
         boundary = BOUNDARY_SIGMOID \
             if (boundary is None or boundary <= TYPE_FLOAT(0)) else boundary
         assert boundary > 0
@@ -99,24 +82,13 @@ class Function:
         return Y
 
     @staticmethod
-    @tf.function
-    def _softmax(X):
-        # --------------------------------------------------------------------------------
-        # exp(x-c) to prevent the infinite exp(x) for a large value x, with c = max(x).
-        # keepdims=True to be able to broadcast.
-        # --------------------------------------------------------------------------------
-        C = tf.math.reduce_max(X, axis=1, keepdims=True)
-        exp = tf.math.exp(X - C)
-        P = tf.math.divide(exp, tf.math.reduce_sum(exp, axis=-1, keepdims=True))
-        return P
-
-    @staticmethod
-    def softmax(X, out=None) -> object:
+    def softmax(X: Union[TYPE_FLOAT, TYPE_TENSOR], axis=None, out=None) -> Union[TYPE_FLOAT, TYPE_TENSOR]:
         """Softmax P = exp(X) / sum(exp(X))
         Args:
             X: batch input data of shape (N,M).
                 N: Batch size
                 M: Number of nodes
+            axis: The dimension softmax would be performed on.
             out: A location into which the result is stored
         Returns:
             P: Probability of shape (N,M)
@@ -125,22 +97,16 @@ class Function:
             https://stackoverflow.com/questions/48824351 for
             Type 'Variable' doesn't have expected attribute '__sub__'
         """
-        X = Function.assure_float_tensor(X)
-        P = Function._softmax(X)
+        X = super().assure_float_tensor(X)
+        P = tf.nn.softmax(logits=X, axis=axis)
         return P
 
     # ================================================================================
     # Instance
     # ================================================================================
-
     # --------------------------------------------------------------------------------
     # Instance properties
     # --------------------------------------------------------------------------------
-    @property
-    def name(self) -> str:
-        """A unique name to identify a layer"""
-        return self._name
-
     # --------------------------------------------------------------------------------
     # Initialization
     # --------------------------------------------------------------------------------
@@ -153,9 +119,4 @@ class Function:
         Args:
             name: ID name
         """
-        assert name
-        self._name: str = name
-
-        # number of nodes in the layer
-        self._logger = logging.getLogger(name)
-        self._logger.setLevel(logging._levelToName[log_level])
+        super().__init__(name=name, log_level=log_level)

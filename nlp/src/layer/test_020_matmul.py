@@ -34,9 +34,6 @@ import common.weights as weights
 from common.function import (
     numerical_jacobian,
 )
-from common.utility import (
-    random_string
-)
 from layer.constants import (
     _WEIGHTS,
     _NAME,
@@ -68,8 +65,7 @@ from common.utility import (
 )
 
 
-Logger = logging.getLogger("test_030_objective")
-Logger.setLevel(logging.DEBUG)
+Logger = logging.getLogger(__name__)
 
 
 def _instantiate(name: str, num_nodes: int, num_features: int, objective=None):
@@ -272,6 +268,7 @@ def test_020_matmul_instance_properties():
             pass
 
         try:
+            # pylint: disable=not-callable
             matmul.objective(np.array(1.0))
             raise RuntimeError(msg)
         except AssertionError:
@@ -717,7 +714,9 @@ def test_020_matmul_round_trip():
         X = np.random.randn(N, D)
         Logger.debug("%s: X is \n%s", name, X)
 
+        # pylint: disable=not-callable
         Y = matmul.function(X)
+        # pylint: disable=not-callable
         L = matmul.objective(Y)
 
         # Constraint 1 : Matmul outputs Y should be X@W.T
@@ -731,6 +730,7 @@ def test_020_matmul_round_trip():
         # LX = lambda x: matmul.objective(matmul.function(x))
         def LX(x):
             y = np.matmul(x, matmul.W.T)
+            # pylint: disable=not-callable
             return matmul.objective(y)
 
         EGNX = numerical_jacobian(LX, matmul.X)          # Numerical dL/dX including bias
@@ -743,6 +743,7 @@ def test_020_matmul_round_trip():
         # LW = lambda w: matmul.objective(np.matmul(X, w.T))
         def LW(w):
             Y = np.matmul(matmul.X, w.T)
+            # pylint: disable=not-callable
             return matmul.objective(Y)
 
         EGNW = numerical_jacobian(LW, matmul.W)          # Numerical dL/dW including bias
@@ -789,6 +790,7 @@ def test_020_matmul_round_trip():
             "dW=\n%s\nGN[1]=\n%sdiff=\n%s\n" % (dW, GN[1], (dW-GN[1]))
 
         # Constraint 7: gradient descent progressing with the new objective L(Yn+1) < L(Yn)
+        # pylint: disable=not-callable
         assert np.all(np.abs(objective(matmul.function(X)) < L))
 
     profiler.disable()
@@ -865,7 +867,6 @@ def test_020_matmul_save_load():
         Y = matmul.function(X)
         matmul.gradient(Y)
         matmul.update()
-
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")

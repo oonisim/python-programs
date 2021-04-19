@@ -12,49 +12,22 @@ from typing import (
 import logging
 import numpy as np
 import numexpr as ne
+import tensorflow as tf
 from common.constant import (
     TYPE_FLOAT,
     TYPE_LABEL,
+    TYPE_TENSOR,
     BOUNDARY_SIGMOID,
     ENABLE_NUMEXPR
 )
-
+import function.common.base as base
 Logger = logging.getLogger(__name__)
 
 
-class Function:
+class Function(base.Function):
     # ================================================================================
     # Class
     # ================================================================================
-    @staticmethod
-    def is_float_scalar(X) -> bool:
-        """Confirm if X is float scalar()
-        """
-        return np.issubdtype(type(X), np.floating)
-
-    @staticmethod
-    def is_float_tensor(X) -> bool:
-        """Confirm if X is float tensor
-        The implementation depends on the framework e.g. numpy, tensorflow.
-        """
-        return \
-            isinstance(X, np.ndarray) and np.issubdtype(X.dtype, np.floating)
-
-    @staticmethod
-    def to_float_tensor(X) -> object:
-        return np.ndarray(X, dtype=TYPE_FLOAT)
-
-    @staticmethod
-    def assure_float_tensor(X) -> np.ndarray:
-        if Function.is_float_tensor(X):
-            pass
-        elif Function.is_float_scalar(X):
-            X = Function.to_float_tensor(X)
-        else:
-            raise AssertionError(f"Float compatible type expected but {str(X)}")
-
-        return X
-
     @staticmethod
     def sigmoid(
             X,
@@ -75,7 +48,7 @@ class Function:
 
             To prevent such instability, limit the value range of X with boundary.
         """
-        X = Function.assure_float_tensor(X)
+        X = super().assure_float_tensor(X)
         boundary = BOUNDARY_SIGMOID \
             if (boundary is None or boundary <= TYPE_FLOAT(0)) else boundary
         assert boundary > 0
@@ -97,22 +70,22 @@ class Function:
         if ENABLE_NUMEXPR:
             Y = ne.evaluate("1 / (1 + exp(-1 * _X))", out=out)
         else:
-            Y = 1 / (1 + np.exp(-1 * _X))
+            if out is not None:
+                assert _X.shape == out.shape, f"Output shape must match X shape {_X.shape}"
+                np.exp(-1 * _X, out=out)
+                np.add(1, out, out=out)
+                Y = np.divide(1, out, out=out)
+            else:
+                Y = 1 / (1 + np.exp(-1 * _X))
 
         return Y
 
     # ================================================================================
     # Instance
     # ================================================================================
-
     # --------------------------------------------------------------------------------
     # Instance properties
     # --------------------------------------------------------------------------------
-    @property
-    def name(self) -> str:
-        """A unique name to identify a layer"""
-        return self._name
-
     # --------------------------------------------------------------------------------
     # Initialization
     # --------------------------------------------------------------------------------
@@ -125,9 +98,4 @@ class Function:
         Args:
             name: ID name
         """
-        assert name
-        self._name: str = name
-
-        # number of nodes in the layer
-        self._logger = logging.getLogger(name)
-        self._logger.setLevel(logging._levelToName[log_level])
+        super().__init__(name=name, log_level=log_level)

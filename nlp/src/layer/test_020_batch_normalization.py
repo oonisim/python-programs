@@ -54,8 +54,7 @@ from test.config import (
     NUM_MAX_BATCH_SIZE
 )
 
-Logger = logging.getLogger("test_030_objective")
-Logger.setLevel(logging.DEBUG)
+Logger = logging.getLogger(__name__)
 
 
 def test_020_bn_instantiation_to_fail():
@@ -272,6 +271,7 @@ def test_020_bn_instance_properties_access_to_fail():
             pass
 
         try:
+            # pylint: disable=not-callable
             layer.objective(np.array(1.0))
             raise RuntimeError(msg)
         except AssertionError:
@@ -901,6 +901,7 @@ def test_020_bn_method_gradient_descent():
                 numexpr_enabled=numexpr_enabled,
                 numba_enabled=numba_enabled
             )
+            # pylint: disable=not-callable
             L = layer.objective(Y)
             G = layer.gradient(
                 dY=dout,

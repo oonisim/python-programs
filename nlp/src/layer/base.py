@@ -113,6 +113,7 @@ import numpy as np
 from common.constant import (
     TYPE_FLOAT,
     TYPE_LABEL,
+    TYPE_TENSOR,
     GRADIENT_SATURATION_THRESHOLD,
 )
 from common.function import (
@@ -122,9 +123,10 @@ from common.utility import (
     serialize,
     deserialize
 )
+import function.nn.base as nn
 
 
-class Layer:
+class Layer(nn.Function):
     """Neural network layer base class"""
     # ================================================================================
     # Class
@@ -168,9 +170,10 @@ class Layer:
         return self._D
 
     @property
-    def X(self) -> np.ndarray:
+    def X(self) -> TYPE_TENSOR:
         """Latest batch input to the layer"""
-        assert isinstance(self._X, np.ndarray) and self._X.dtype == TYPE_FLOAT \
+        assert \
+            isinstance(self._X, np.ndarray) and self._X.dtype == TYPE_FLOAT \
             and self._X.size > 0, "X is not initialized or invalid"
         return self._X
 
@@ -269,13 +272,7 @@ class Layer:
         return self._dY
 
     @property
-    def S(self) -> \
-            Union[
-                List[Union[TYPE_FLOAT, np.ndarray]],
-                List[
-                    List[Union[float, np.ndarray]]
-                ]
-            ]:
+    def S(self) -> List:
         """State of the layer
         For a layer which has no state, it is an empty list.
         Hence cannot validate if initialized or not.
@@ -374,18 +371,8 @@ class Layer:
         # --------------------------------------------------------------------------------
         # State of the layer
         # --------------------------------------------------------------------------------
-        self._S: Union[
-            List[Union[TYPE_FLOAT, np.ndarray]],
-            List[
-                List[Union[float, np.ndarray]]
-            ]
-        ] = []
-        self._dS: Union[
-            List[Union[TYPE_FLOAT, np.ndarray]],
-            List[
-                List[Union[float, np.ndarray]]
-            ]
-        ] = []   # Gradients dL/dS of layers
+        self._S: List = []
+        self._dS: List = []
 
         # --------------------------------------------------------------------------------
         # Layers to which forward the matmul output
@@ -404,7 +391,7 @@ class Layer:
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
-    def function(self, X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
+    def function(self, X: TYPE_TENSOR) -> TYPE_TENSOR:
         """Calculate the output f(arg) to forward as the input to the post layer.
         Args:
             X: input to the layer
@@ -512,6 +499,7 @@ class Layer:
         """
         # L = Li(f(arg))
         def L(X: np.ndarray):
+            # pylint: disable=not-callable
             return self.objective(self.function(X))
 
         dX = numerical_jacobian(L, self.X)

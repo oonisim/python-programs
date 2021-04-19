@@ -35,7 +35,7 @@ from test.config import (
     ENFORCE_STRICT_ASSERT,
 )
 
-Logger = logging.getLogger("functions")
+Logger = logging.getLogger(__name__)
 
 
 def identity(x: np.ndarray):
@@ -110,11 +110,18 @@ def standardize(
     # --------------------------------------------------------------------------------
 
     if eps > 0:
+        # --------------------------------------------------------------------------------
+        # Using numexpr causes differences that cannot be ignored. WHY?
+        # --------------------------------------------------------------------------------
         # Re-use the storage of buffer for standardized.
-        buffer = ne.evaluate("deviation ** 2")
-        sd = np.sum(buffer, axis=0, keepdims=keepdims)
-        sd = ne.evaluate("sqrt( (sd / (N - ddof)) + eps )", out=sd)
-        standardized = ne.evaluate("deviation / sd", out=buffer)
+        # buffer = ne.evaluate("deviation ** 2")
+        # sd = np.sum(buffer, axis=0, keepdims=keepdims)
+        # sd = ne.evaluate("sqrt( (var / (N - ddof)) + eps )", out=sd)
+        # standardized = ne.evaluate("deviation / sd", out=buffer)
+        var = np.var(a=X, axis=0, ddof=ddof, out=out_sd)
+        sd = np.sqrt(var + eps, out=out_sd)
+        standardized = np.divide(deviation, sd)
+        # --------------------------------------------------------------------------------
     else:
         sd = np.std(X, axis=0, ddof=ddof, keepdims=keepdims, out=out_sd)
 
@@ -287,7 +294,13 @@ def sigmoid(
     if ENABLE_NUMEXPR:
         Y = ne.evaluate("1 / (1 + exp(-1 * _X))", out=out)
     else:
-        Y = 1 / (1 + np.exp(-1 * _X))
+        if out is not None:
+            assert _X.shape == out.shape, f"Output shape must match X shape {_X.shape}"
+            np.exp(-1 * _X, out=out)
+            np.add(1, out, out=out)
+            Y = np.divide(1, out, out=out)
+        else:
+            Y = 1 / (1 + np.exp(-1 * _X))
 
     return Y
 

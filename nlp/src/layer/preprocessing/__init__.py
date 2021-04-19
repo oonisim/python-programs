@@ -1,5 +1,4 @@
-from .constant import (
-    SPACE,
-    DELIMITER,
-    NIL
+from . preprocess import (
+    WordIndexing,
+    EventContext
 )

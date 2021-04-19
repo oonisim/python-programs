@@ -1,7 +1,8 @@
 from typing import (
-    NewType
+    TypeVar
 )
 import numpy as np
+import tensorflow as tf
 # --------------------------------------------------------------------------------
 # Float number type to use. For NN, 32 bit is enough.
 # There is no way to change the default float type
@@ -11,6 +12,7 @@ TYPE_INT = np.int32
 TYPE_LABEL = np.int8
 TYPE_FLOAT = np.float       # alias of Python float
 # TYPE_FLOAT = np.float64   # Cannot use due to Numpy default is float.
+TYPE_TENSOR = TypeVar('TYPE_TENSOR', np.ndarray, tf.Tensor)
 
 # --------------------------------------------------------------------------------
 # Be mindful of the relation between h/OFFSET_DELTA and k/OFFSET_LOG

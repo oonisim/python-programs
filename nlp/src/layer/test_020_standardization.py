@@ -54,8 +54,7 @@ from test.config import (
     NUM_MAX_BATCH_SIZE
 )
 
-Logger = logging.getLogger("test_030_objective")
-Logger.setLevel(logging.DEBUG)
+Logger = logging.getLogger(__name__)
 
 
 def _must_fail(
@@ -135,7 +134,6 @@ def test_020_std_instance_properties_access_to_fail():
         Initialization detects the access to the non-initialized parameters and fails.
     """
     msg = "Accessing uninitialized property of the _layer must fail."
-
     for _ in range(NUM_MAX_TEST_TIMES):
         name = random_string(np.random.randint(1, 10))
         M: int = np.random.randint(1, NUM_MAX_NODES)
@@ -234,6 +232,7 @@ def test_020_std_instance_properties_access_to_fail():
             pass
 
         try:
+            # pylint: disable=not-callable
             _layer.objective(np.array(1.0))
             raise RuntimeError(msg)
         except AssertionError:
