@@ -1,26 +1,18 @@
-from typing import (
-    Optional,
-    Union,
-    List,
-    Dict,
-    Tuple,
-    Callable,
-    Any,
-    NoReturn,
-    Final
-)
 import logging
 import numpy as np
-import numexpr as ne
-import tensorflow as tf
 from common.constant import (
-    TYPE_FLOAT,
-    TYPE_LABEL,
-    TYPE_TENSOR,
-    BOUNDARY_SIGMOID,
-    ENABLE_NUMEXPR
+    TYPE_TENSOR
 )
 import function.common.base as base
+import logging
+
+import numpy as np
+
+import function.common.base as base
+from common.constant import (
+    TYPE_TENSOR
+)
+
 Logger = logging.getLogger(__name__)
 
 

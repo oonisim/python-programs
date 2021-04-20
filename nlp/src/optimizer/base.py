@@ -1,17 +1,11 @@
 """Gradient descent base"""
-from typing import (
-    Optional,
-    Union,
-    List,
-    Dict,
-    Tuple,
-    Final,
-    Generator,
-    Iterator,
-    Callable
-)
 import logging
+from typing import (
+    Union
+)
+
 import numpy as np
+
 from common.constant import (
     TYPE_FLOAT
 )

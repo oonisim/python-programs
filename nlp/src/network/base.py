@@ -55,19 +55,15 @@ Interfaces:
         Infer the population.
 
 """
+import logging
 from typing import (
-    Optional,
     Union,
     List,
-    Dict,
-    Tuple,
-    Callable,
-    Iterable,
-    NoReturn,
-    Final
+    Callable
 )
-import logging
+
 import numpy as np
+
 from common.constant import (
     TYPE_FLOAT,
     TYPE_LABEL
