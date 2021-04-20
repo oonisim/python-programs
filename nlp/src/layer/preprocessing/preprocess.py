@@ -1,7 +1,8 @@
 import logging
 from typing import (
     Dict,
-    List
+    List,
+    Iterable
 )
 
 import numpy as np
@@ -11,6 +12,7 @@ import function.utility as utility
 import function.fileio as fileio
 from common.constant import (
     TYPE_FLOAT,
+    TYPE_INT,
     TYPE_TENSOR,
     NIL,
     CONTEXT_WINDOW_SIZE
@@ -92,9 +94,14 @@ class WordIndexing(Layer):
     # Instance properties
     # --------------------------------------------------------------------------------
     @property
-    def vocabulary(self) -> np.ndarray:
+    def vocabulary(self) -> TYPE_TENSOR:
         """Vocabulary of the corpus"""
         return self._vocabulary
+
+    @property
+    def vocabulary_size(self) -> int:
+        """Vocabulary size of the corpus"""
+        return len(self.vocabulary)
 
     @property
     def probabilities(self) -> Dict[str, TYPE_FLOAT]:
@@ -131,11 +138,21 @@ class WordIndexing(Layer):
         self.logger.debug("%s: corpus length is %s", self.name, len(corpus))
 
         self._word_to_index, _, _vocabulary, self._probabilities = text.Function.word_indexing(corpus)
-        self._vocabulary = super().to_tensor(_vocabulary)
+        # self._vocabulary = super().to_tensor(_vocabulary)
+        self._vocabulary = np.array(_vocabulary)
         assert len(self.vocabulary) == len(self.word_to_index)
 
         self.logger.debug("%s: vocabulary size is %s)", self.name, len(_vocabulary))
         del _vocabulary, _
+
+    def list_words(self, indices: Iterable[int]) -> Iterable[str]:
+        return self._vocabulary[list(iter(indices))]
+
+    def list_probabilities(self, words: Iterable[str]) -> Iterable[TYPE_FLOAT]:
+        return [self._probabilities.get(word, TYPE_FLOAT(0)) for word in words]
+
+    def list_word_indices(self, words: Iterable[str]) -> Iterable[TYPE_INT]:
+        return [self._word_to_index.get(word, TYPE_INT(0)) for word in words]
 
     def sentence_to_sequence(self, sentences: str) -> List[List[int]]:
         """Generate a list of word indices per sentence
@@ -153,7 +170,8 @@ class WordIndexing(Layer):
 
     def function(self, X) -> TYPE_TENSOR:
         """Generate a word index sequence for a sentence"""
-        return super().to_tensor(self.sentence_to_sequence(X), dtype=object)
+        # return super().to_tensor(self.sentence_to_sequence(X))
+        return np.array(self.sentence_to_sequence(X), dtype=TYPE_INT)
 
     def load(self, path: str):
         """Load and restore the layer state

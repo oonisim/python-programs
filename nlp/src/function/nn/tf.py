@@ -29,12 +29,12 @@ class Function(base.Function):
     # Class
     # ================================================================================
     @staticmethod
-    def to_tensor(X) -> TYPE_TENSOR:
-        return tf.convert_to_tensor(X)
+    def to_tensor(X, dtype=None) -> TYPE_TENSOR:
+        return tf.convert_to_tensor(X, dtype=dtype)
 
     @staticmethod
-    def to_float_tensor(X) -> TYPE_TENSOR:
-        return np.array(X, dtype=TYPE_FLOAT)
+    def to_float_tensor(X, dtype=TYPE_FLOAT) -> TYPE_TENSOR:
+        return np.array(X, dtype=dtype)
 
     @staticmethod
     def sigmoid(

@@ -124,6 +124,7 @@ from common.utility import (
     deserialize
 )
 import function.nn.base as nn
+# import function.nn.tf as nn
 
 
 class Layer(nn.Function):

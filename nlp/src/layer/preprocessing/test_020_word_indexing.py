@@ -146,22 +146,19 @@ def test_020_word_indexing_instance_properties(caplog):
 
         msg = "WordIndexing vocabulary is available"
         assert word_indexing.is_tensor(word_indexing.vocabulary), msg
-        assert word_indexing.vocabulary.size > 3    # at least UNK and NIL and some words
+        assert word_indexing.vocabulary_size > 3    # at least UNK and NIL and some words
         assert \
-            word_indexing.vocabulary[0] == NIL.lower(), \
+            word_indexing.list_words([0]) == NIL.lower(), \
             f"{NIL.lower()} expected for vocabulary[0] but {word_indexing.vocabulary[0]}"
         assert \
-            word_indexing.vocabulary[1] == UNK.lower(), \
+            word_indexing.list_words([1]) == UNK.lower(), \
             f"{UNK.lower()} expected for vocabulary[0] but {word_indexing.vocabulary[1]}"
-        assert \
-            isinstance(word_indexing.vocabulary[2], str) and \
-            len(word_indexing.vocabulary[2]) > 0, \
-            f"word expected for vocabulary[2] but {word_indexing.vocabulary[2]}"
 
         msg = "word_to_index[vocabulary[index]] must be index"
-        length = len(word_indexing.vocabulary)
+        length = word_indexing.vocabulary_size
         index = np.random.randint(0, length)
-        assert word_indexing.word_to_index[word_indexing.vocabulary[index]] == index, msg
+        word, *_ = list(word_indexing.list_words([index]))
+        assert word_indexing.list_word_indices([word]) == [index], msg
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")
