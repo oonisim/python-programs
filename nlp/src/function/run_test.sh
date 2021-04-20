@@ -22,22 +22,12 @@ rm -rf __pycache__/
 
 echo "--------------------------------------------------------------------------------"
 echo "Running pylint in package (run in the directory in case of xxx not found in module)..."
-for f in $(ls *.py)
+for f in $(find . -name '*.py')
 do
-    if [[ "${f}" != "six.py" ]]
-     then
-#        pylint -E ${f}
-      echo
-    fi
+    echo ${f}
+    # pylint -E ${f}
 done
 
-echo "--------------------------------------------------------------------------------"
-echo "Running pylint in test"
-for t in $(find . test_*.py)
-do
-    echo
-    # pylint -E ${t}
-done
 
 #--------------------------------------------------------------------------------
 # PyTest
@@ -73,5 +63,3 @@ pytest \
   --durations=5 \
   $@ \
 ${DIR}
-
-#python3 run_cprofile_analysis.py
