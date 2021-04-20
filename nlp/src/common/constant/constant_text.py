@@ -1,6 +1,11 @@
 DELIMITER = " "
-UNK = "<unk>"
-NIL = "<nil>"  # Lower letter as lower() will be applied.
+NIL = "<nil>".lower()  # Lower letter as lower() will be applied.
+UNK = "<unk>".lower()
+META_WORDS = [NIL.lower(), UNK.lower()]
+INDEX_TO_META_WORD = dict(enumerate(META_WORDS))
+META_WORD_TO_INDEX = dict(zip(INDEX_TO_META_WORD.values(), INDEX_TO_META_WORD.keys()))
+INDEX_NIL = 0
+INDEX_UNK = 1
 STRIDE = 2
 CONTEXT_WINDOW_SIZE = 1 + (STRIDE * 2)
 SPACE = ' '

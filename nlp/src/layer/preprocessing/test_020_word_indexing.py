@@ -30,7 +30,8 @@ from layer.constants import (
     _OPTIMIZER,
     _NUM_NODES,
     _NUM_FEATURES,
-    _PARAMETERS
+    _PARAMETERS,
+    _LOG_LEVEL
 )
 from layer.preprocessing import (
     WordIndexing
@@ -60,11 +61,12 @@ def download_file(target='shakespeare.txt') -> str:
         return f"~/.keras/datasets/{target}"
 
 
-def _instantiate(name: str, num_nodes: int, path_to_corpus: str):
+def _instantiate(name: str, num_nodes: int, path_to_corpus: str, log_level: int = logging.ERROR):
     word_indexing = WordIndexing.build({
         _NAME: name,
         _NUM_NODES: num_nodes,
-        "path_to_corpus": path_to_corpus
+        "path_to_corpus": path_to_corpus,
+        _LOG_LEVEL: log_level
     })
     return word_indexing
 
@@ -77,10 +79,10 @@ def _must_fail(name: str, num_nodes: int, path_to_corpus: str, msg: str):
         pass
 
 
-def _must_succeed(name: str, num_nodes: int, path_to_corpus: str, msg: str):
+def _must_succeed(name: str, num_nodes: int, path_to_corpus: str, msg: str, log_level=logging.ERROR):
     try:
         if np.random.uniform() > 0.5:
-            return _instantiate(name, num_nodes=num_nodes, path_to_corpus=path_to_corpus)
+            return _instantiate(name, num_nodes=num_nodes, path_to_corpus=path_to_corpus, log_level=log_level)
         else:
             corpus = fileio.Function.read_file(path_to_corpus)
             return WordIndexing(name=name, num_nodes=num_nodes, corpus=corpus)
@@ -119,7 +121,6 @@ def test_020_word_indexing_instance_properties(caplog):
         Initialization detects the access to the non-initialized parameters and fails.
     """
     caplog.set_level(logging.DEBUG)
-    msg = "Accessing uninitialized property of the layer must fail."
     path_to_corpus: str = download_file()
 
     profiler = cProfile.Profile()
@@ -162,3 +163,31 @@ def test_020_word_indexing_instance_properties(caplog):
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")
+
+
+def test_020_word_indexing_function_multi_lines(caplog):
+    """
+    Objective:
+        Verify the wordindexing function can handle multi line sentences
+    Expected:
+    """
+    sentences = """
+    the asbestos fiber <unk> is unusually <unk> once it enters the <unk> 
+    with even brief exposures to it causing symptoms that show up decades later researchers said
+    """
+    caplog.set_level(logging.DEBUG)
+
+    caplog.set_level(logging.DEBUG)
+    path_to_corpus: str = download_file()
+
+    name = random_string(np.random.randint(1, 10))
+    word_indexing = _must_succeed(
+        name=name,
+        num_nodes=1,
+        path_to_corpus=path_to_corpus,
+        msg="need success",
+        log_level=logging.DEBUG
+    )
+
+    word_indexing.function(sentences)
+

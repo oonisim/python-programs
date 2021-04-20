@@ -56,12 +56,36 @@ class Function:
             (tf.is_tensor(X) and X.dtype.is_floating)
 
     @staticmethod
+    def tensor_rank(X):
+        """The rank of a tensor
+         Rank is the number of indices required to uniquely select an element of the tensor.
+         Rank is also known as "order", "degree", or "ndims.
+
+        The rank of a tensor is not the same as the rank of a matrix.
+        Dimension may match with Rank but not always.
+        """
+        assert Function.is_tensor(X)
+        return tf.rank(X) if tf.is_tensor(X) else X.ndim
+
+    @staticmethod
     def to_tensor(X, dtype=None) -> TYPE_TENSOR:
-        return np.array(X, dtype=dtype)
+        if dtype is None:
+            return np.array(X)
+        else:
+            return np.array(X, dtype=dtype)
 
     @staticmethod
     def to_float_tensor(X, dtype=TYPE_FLOAT) -> TYPE_TENSOR:
         return np.array(X, dtype=dtype)
+
+    @staticmethod
+    def assure_tensor(X) -> np.ndarray:
+        if Function.is_tensor(X):
+            pass
+        else:
+            X = Function.to_tensor(X=X)
+
+        return X
 
     @staticmethod
     def assure_float_tensor(X) -> np.ndarray:

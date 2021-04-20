@@ -1,16 +1,13 @@
 import logging
-from typing import (
-    Union
-)
 
+import numexpr as ne
 import numpy as np
-import tensorflow as tf
 
 import function.nn.base as base
 from common.constant import (
     TYPE_FLOAT,
-    TYPE_TENSOR,
     BOUNDARY_SIGMOID,
+    ENABLE_NUMEXPR
 )
 
 Logger = logging.getLogger(__name__)
@@ -20,14 +17,6 @@ class Function(base.Function):
     # ================================================================================
     # Class
     # ================================================================================
-    @staticmethod
-    def to_tensor(X, dtype=None) -> TYPE_TENSOR:
-        return tf.convert_to_tensor(X, dtype=dtype)
-
-    @staticmethod
-    def to_float_tensor(X, dtype=TYPE_FLOAT) -> TYPE_TENSOR:
-        return np.array(X, dtype=dtype)
-
     @staticmethod
     def sigmoid(
             X,
@@ -57,41 +46,28 @@ class Function(base.Function):
             _X = X
         else:
             Logger.warning(
-                "sigmoid: X value exceeded the boundary %s, hence clipping.",
-                boundary
+                "sigmoid: X value exceeded the boundary %s, hence clipping.", boundary
             )
             if isinstance(X, np.ndarray):
-                _X = tf.identity(X)
-                tf.where((X > boundary), boundary, X)
-                tf.where((X > boundary), boundary, X)
+                _X = np.copy(X)
                 _X[X > boundary] = boundary
                 _X[X < -boundary] = -boundary
             else:  # Scalar
                 assert isinstance(X, TYPE_FLOAT)
                 _X = np.sign(X) * boundary
 
-        Y = tf.nn.sigmoid(x=_X)
+        if ENABLE_NUMEXPR:
+            Y = ne.evaluate("1 / (1 + exp(-1 * _X))", out=out)
+        else:
+            if out is not None:
+                assert _X.shape == out.shape, f"Output shape must match X shape {_X.shape}"
+                np.exp(-1 * _X, out=out)
+                np.add(1, out, out=out)
+                Y = np.divide(1, out, out=out)
+            else:
+                Y = 1 / (1 + np.exp(-1 * _X))
+
         return Y
-
-    @staticmethod
-    def softmax(X: Union[TYPE_FLOAT, TYPE_TENSOR], axis=None, out=None) -> Union[TYPE_FLOAT, TYPE_TENSOR]:
-        """Softmax P = exp(X) / sum(exp(X))
-        Args:
-            X: batch input data of shape (N,M).
-                N: Batch size
-                M: Number of nodes
-            axis: The dimension softmax would be performed on.
-            out: A location into which the result is stored
-        Returns:
-            P: Probability of shape (N,M)
-
-        Note:
-            https://stackoverflow.com/questions/48824351 for
-            Type 'Variable' doesn't have expected attribute '__sub__'
-        """
-        X = super(Function, Function).assure_float_tensor(X)
-        P = tf.nn.softmax(logits=X, axis=axis)
-        return P
 
     # ================================================================================
     # Instance

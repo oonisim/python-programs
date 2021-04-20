@@ -1,16 +1,11 @@
 import logging
-import numpy as np
-from common.constant import (
-    TYPE_TENSOR
-)
-import function.common.base as base
-import logging
 
 import numpy as np
 
 import function.common.base as base
 from common.constant import (
-    TYPE_TENSOR
+    TYPE_TENSOR,
+    TYPE_INT
 )
 
 Logger = logging.getLogger(__name__)
@@ -44,47 +39,41 @@ class Function(base.Function):
             [d, e, e]
         ] where the first column(s) is event and the rest are context
         """
-        length: int = len(sequence)
-        stride: int = int((window_size-event_size)/2)
+        length: TYPE_INT = TYPE_INT(len(sequence))
+        stride: TYPE_INT = TYPE_INT((window_size-event_size)/2)
 
         assert \
-            super().is_tensor(sequence) and sequence.ndim == 1 and \
+            super(Function, Function).is_tensor(sequence) and \
+            super(Function, Function).tensor_rank(sequence) == 1 and \
             length >= window_size > event_size > 0, \
             f"Expected a sequence of length >= {window_size} but {sequence}"
         assert (window_size-event_size) % 2 == 0, "Need stride as integer > 0"
 
+        # --------------------------------------------------------------------------------
+        # The result is a matrix in which windows are stacked up.
+        # The result shape is (length-window_size+1, window_size).
+        # --------------------------------------------------------------------------------
         num_windows = length-window_size+1
-        context_windows = [
+        context_windows = np.array([
             sequence[slice(index, index+window_size)]
             for index in range(0, num_windows)
+        ], dtype=TYPE_INT)
+        assert context_windows.shape == (num_windows, window_size)
+        event_context_paris = np.c_[
+            context_windows[    # Labels
+                ::,
+                slice(stride, (stride + event_size))
+            ],
+            context_windows[    # Left context
+                ::,
+                slice(0, stride)
+            ],
+            context_windows[    # Right context
+                ::,
+                slice((event_size + stride), None)
+            ]
         ]
-
-        event_context_paris = np.zeros(shape=(num_windows, window_size))
-        # Labels
-        event_context_paris[
-            ::,
-            0: event_size
-        ] = context_windows[
-            ::,
-            event_size:2*event_size
-        ]
-        # Left contexts
-        event_context_paris[
-            ::,
-            event_size:(event_size+stride)
-        ] = context_windows[
-            ::,
-            0:stride
-        ]
-        # Right contexts
-        event_context_paris[
-            ::,
-            (event_size + stride):
-        ] = context_windows[
-            ::,
-            (event_size + stride):
-        ]
-
+        assert event_context_paris.shape == (num_windows, window_size)
         return event_context_paris
 
     # ================================================================================

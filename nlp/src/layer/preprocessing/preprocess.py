@@ -15,6 +15,8 @@ from common.constant import (
     TYPE_INT,
     TYPE_TENSOR,
     NIL,
+    UNK,
+    META_WORD_TO_INDEX,
     CONTEXT_WINDOW_SIZE
 )
 from layer import (
@@ -99,7 +101,7 @@ class WordIndexing(Layer):
         return self._vocabulary
 
     @property
-    def vocabulary_size(self) -> int:
+    def vocabulary_size(self) -> TYPE_INT:
         """Vocabulary size of the corpus"""
         return len(self.vocabulary)
 
@@ -109,7 +111,7 @@ class WordIndexing(Layer):
         return self._probabilities
 
     @property
-    def word_to_index(self) -> Dict[str, int]:
+    def word_to_index(self) -> Dict[str, TYPE_INT]:
         """Word occurrence ratio"""
         return self._word_to_index
 
@@ -145,16 +147,22 @@ class WordIndexing(Layer):
         self.logger.debug("%s: vocabulary size is %s)", self.name, len(_vocabulary))
         del _vocabulary, _
 
-    def list_words(self, indices: Iterable[int]) -> Iterable[str]:
+    def list_words(self, indices: Iterable[TYPE_INT]) -> Iterable[str]:
         return self._vocabulary[list(iter(indices))]
 
     def list_probabilities(self, words: Iterable[str]) -> Iterable[TYPE_FLOAT]:
-        return [self._probabilities.get(word, TYPE_FLOAT(0)) for word in words]
+        return [
+            self._probabilities.get(word, TYPE_FLOAT(0))
+            for word in words
+        ]
 
     def list_word_indices(self, words: Iterable[str]) -> Iterable[TYPE_INT]:
-        return [self._word_to_index.get(word, TYPE_INT(0)) for word in words]
+        return [
+            self._word_to_index.get(word, TYPE_INT(META_WORD_TO_INDEX[UNK.lower()]))
+            for word in words
+        ]
 
-    def sentence_to_sequence(self, sentences: str) -> List[List[int]]:
+    def sentence_to_sequence(self, sentences: str) -> List[List[TYPE_INT]]:
         """Generate a list of word indices per sentence
         Args:
             sentences: one or more sentences delimited by '\n'.
@@ -168,10 +176,30 @@ class WordIndexing(Layer):
         sequences = text.Function.sentence_to_sequence(sentences, self.word_to_index)
         return sequences
 
-    def function(self, X) -> TYPE_TENSOR:
+    def sequence_to_sentence(self, sequences: Iterable[TYPE_INT]) -> List[List[str]]:
+        """Generate a list of words from
+        Args:
+            sequences: word indices.
+        Returns: List of (word indices per sentence)
+        """
+        self.logger.debug(
+            "%s:%s sequences are [%s]",
+            self.name, "sequence_to_sentence", sequences
+        )
+        sentences = [self._vocabulary[sequence].tolist() for sequence in sequences]
+        assert \
+            len(sentences) > 0, \
+            f"Sequences has no valid indices\n{sequences}."
+        return sentences
+
+    def function(self, X: str) -> TYPE_TENSOR:
         """Generate a word index sequence for a sentence"""
         # return super().to_tensor(self.sentence_to_sequence(X))
-        return np.array(self.sentence_to_sequence(X), dtype=TYPE_INT)
+
+        sequence = super().to_tensor(self.sentence_to_sequence(X))
+        self.logger.debug("sequence generated \n%s", sequence)
+        assert super().tensor_rank(sequence) == 2, "Expected ran 2 but sequence %s" % sequence
+        return sequence
 
     def load(self, path: str):
         """Load and restore the layer state
@@ -236,8 +264,8 @@ class EventContext(Layer):
             isinstance(parameters, dict) and
             (_NAME in parameters and len(parameters[_NAME]) > 0) and
             (_NUM_NODES in parameters and parameters[_NUM_NODES] > 0) and
-            ("window_size" in parameters and fileio.Function.is_file(parameters["window_size"])) and
-            ("event_size" in parameters and fileio.Function.is_file(parameters["event_size"]))
+            ("window_size" in parameters and parameters["window_size"] > 0) and
+            ("event_size" in parameters and parameters["event_size"] > 0)
         ), "build(): missing mandatory elements %s in the parameters\n%s" \
            % ((_NAME, _NUM_NODES, "window_size", "event_size"), parameters)
 
@@ -258,7 +286,7 @@ class EventContext(Layer):
     # Instance properties
     # --------------------------------------------------------------------------------
     @property
-    def window_size(self) -> int:
+    def window_size(self) -> TYPE_INT:
         """Context window size
         For a sequence (b,c,d, e, f,g,d), (b,c,d) are preceding context to the
         event e and (f,g,d) are succeeding context.
@@ -270,21 +298,21 @@ class EventContext(Layer):
         return self._window_size
 
     @property
-    def event_size(self) -> int:
+    def event_size(self) -> TYPE_INT:
         """Length of events e.g. 2 for (announce, market-plunge)"""
         return self._event_size
 
     @property
-    def stride(self) -> int:
+    def stride(self) -> TYPE_INT:
         """Length of preceding and succeeding context"""
-        return int((self.window_size - self.event_size) / 2)
+        return TYPE_INT((self.window_size - self.event_size) / 2)
 
     def __init__(
             self,
             name: str,
             num_nodes: int = 1,
-            window_size: int = CONTEXT_WINDOW_SIZE,
-            event_size: int = 1,
+            window_size: TYPE_INT = CONTEXT_WINDOW_SIZE,
+            event_size: TYPE_INT = 1,
             log_level: int = logging.ERROR
     ):
         """Initialize
@@ -295,7 +323,9 @@ class EventContext(Layer):
             event_size: Size of the events
             log_level: logging level
         """
-        assert 1 <= event_size < window_size and (window_size - event_size) % 2 == 0
+        assert \
+            1 <= event_size < window_size and \
+            (window_size - event_size) % 2 == 0
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
 
         self._window_size = window_size
@@ -305,20 +335,21 @@ class EventContext(Layer):
             self.name, self.window_size, self.event_size
         )
 
-    def forward(self, X: TYPE_TENSOR) -> TYPE_TENSOR:
-        if X.ndim == 1:
-            return super().to_tensor(utility.Function.event_context_pairs(
+    def function(self, X: TYPE_TENSOR) -> TYPE_TENSOR:
+        X = super().assure_tensor(X)
+        if super().tensor_rank(X) == 1:
+            return utility.Function.event_context_pairs(
                 sequence=X,
                 window_size=self.window_size,
                 event_size=self.event_size
-            ))
-        elif X.ndim == 2:
-            super().to_tensor([
+            )
+        elif super().tensor_rank(X) == 2:
+            return np.array([
                 utility.Function.event_context_pairs(
                     sequence=_x,
                     window_size=self.window_size,
                     event_size=self.event_size
                 ) for _x in X
-            ])
+            ], dtype=TYPE_INT)
         else:
             raise RuntimeError(f"Unexpected tensor dimension {X.ndim}.")

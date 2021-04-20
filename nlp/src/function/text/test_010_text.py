@@ -4,6 +4,7 @@ from common.constant import (
     UNK,
     NIL,
     SPACE,
+    SPACE,
     TYPE_FLOAT
 )
 
@@ -92,7 +93,7 @@ def test_010_text_function_sentence_to_sequence_to_handles_invalid_inputs():
         _must_succeed_word_indexing(corpus=valid_corpus, msg=msg)
 
     sentence = "sushi very yummy food from japan"
-    expected = "<nil> <nil> <nil> <nil> <nil> <nil>"
+    expected = SPACE.join([UNK] * len(sentence.split()))
 
     # Constraints
     # 1. Unknown words in inputs are mapped to NIL

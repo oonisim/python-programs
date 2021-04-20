@@ -9,10 +9,13 @@ import collections
 import numpy as np
 from common.constant import (
     TYPE_FLOAT,
+    TYPE_INT,
     DELIMITER,
     NIL,
     UNK,
-    SPACE
+    SPACE,
+    META_WORDS,
+    META_WORD_TO_INDEX
 )
 PAD_MODE_PREPEND = 'prepend'
 PAD_MODE_APPEND = 'append'
@@ -28,7 +31,7 @@ class Function:
         mode: str = PAD_MODE_PREPEND,
         delimiter: str = DELIMITER,
         padding: str = NIL,
-        length: int = 1
+        length: TYPE_INT = 1
     ) -> str:
         """Prepend and append size times of the padding word to the corpus
         Args:
@@ -154,16 +157,15 @@ class Function:
             probabilities: word occurrence probabilities
         """
         words = Function.standardize(corpus).split()
-        probabilities: Dict[int, TYPE_FLOAT] = Function.word_occurrence_probability(words)
+        probabilities: Dict[TYPE_INT, TYPE_FLOAT] = Function.word_occurrence_probability(words)
         assert probabilities.get(NIL.lower(), None) is None, \
             f"NIL {NIL.lower()} should not be included in the corpus. Change NIL"
         probabilities[NIL.lower()] = TYPE_FLOAT(0)
-        probabilities[UNK.lower()] = probabilities.get(UNK.lower(), 0)
+        probabilities[UNK.lower()] = probabilities.get(UNK.lower(), TYPE_FLOAT(0))
 
-        reserved = [NIL.lower(), UNK.lower()]
-        vocabulary: List[str] = reserved + list(set(words) - set(reserved))
-        index_to_word: Dict[int, str] = dict(enumerate(vocabulary))
-        word_to_index: Dict[str, int] = dict(zip(index_to_word.values(), index_to_word.keys()))
+        vocabulary: List[str] = META_WORDS + list(set(words) - set(META_WORDS))
+        index_to_word: Dict[TYPE_INT, str] = dict(enumerate(vocabulary))
+        word_to_index: Dict[str, TYPE_INT] = dict(zip(index_to_word.values(), index_to_word.keys()))
 
         del words
         return word_to_index, index_to_word, vocabulary, probabilities
@@ -171,23 +173,45 @@ class Function:
     @staticmethod
     def sentence_to_sequence(
             sentences: str,
-            word_to_index: Dict[str, int]
-    ) -> List[List[int]]:
+            word_to_index: Dict[str, TYPE_INT]
+    ) -> List[List[TYPE_INT]]:
         """Generate sequence of word indices from a text sentences
+        1. Skip an empty line or
+
         Args:
             sentences:
                 A string including one ore more sentences to process.
                 A sentence is delimited by EOL('\n').
             word_to_index: word to integer index mapping dictionary
+
         Returns: List of integer sequence per sentence
         """
         assert isinstance(sentences, str)
-        lines = []
+
+        sequences = []
+        max_sequence_length = 0
         for line in sentences.split("\n"):
-            if len(line) > 0:
-                lines.append([word_to_index.get(w, 0) for w in Function.standardize(line).split()])
+            if len(line.strip()) > 0:   # Skip empty line
+                sequence = [
+                    word_to_index.get(w, META_WORD_TO_INDEX[UNK.lower()])
+                    for w in Function.standardize(line).split()
+                ]
+                # A line may have punctuations only which results in null sequence
+                if len(sequence) > 0:
+                    max_sequence_length = max(max_sequence_length, len(sequence))
+                    sequences.append(sequence)
             else:
                 Logger.warning("Sentence is empty. Skipping...")
+        assert len(sequences) > 0, f"No valid sentences in the input \n[{sentences}]\n"
 
-        assert len(lines) > 0, f"No valid sentences in the input \n[{sentences}]\n"
-        return lines
+        padded: List[List[TYPE_INT]] = [
+            np.pad(
+                array=seq,
+                pad_width=(0, max_sequence_length - len(seq)),
+                constant_values=META_WORD_TO_INDEX[NIL.lower()]
+            ).astype(TYPE_INT).tolist()
+            for seq in sequences
+        ]
+
+        Logger.debug("Sequences generated for \n%s\n%s", sentences, padded)
+        return padded
