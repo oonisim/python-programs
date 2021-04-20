@@ -122,7 +122,9 @@ class Function:
                 This is to balance the contributions of less frequent and more frequent words.
                 Default 1.0. In word2vec negative sampling, power=0.75 is used.
         """
-        assert (total := len(words)) > 0
+        assert (len(words) > 0)
+
+        total = len(words)
         counts = collections.Counter(words)
         probabilities = {word: np.power((count / total), power) for (word, count) in counts.items()}
 
