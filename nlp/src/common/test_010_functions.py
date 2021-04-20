@@ -162,10 +162,10 @@ def test_010_standardize_eps(caplog):
             # **********************************************************************
             # Constraint. mean/sd should be same.
             # **********************************************************************
-            assert np.allclose(mean, __mean, atol=u, rtol=0)
-            assert np.allclose(sd, __sd, atol=u, rtol=0), \
+            assert np.allclose(mean, __mean, atol=u)
+            assert np.allclose(sd, __sd, atol=u), \
                 "expected sd\n%s\nactual\n%s\ndiff=\n%s\n" % (sd, __sd, (sd - __sd))
-            assert np.allclose(E, A, atol=u, rtol=0), \
+            assert np.allclose(E, A, atol=u), \
                 f"X\n{X}\nstandardized\n{E}\nndiff\n{A-E}\n"
 
 
