@@ -31,7 +31,7 @@ from common.constant import (
     GRADIENT_SATURATION_THRESHOLD,
     ENABLE_NUMEXPR
 )
-from test.config import (
+from testing.config import (
     ENFORCE_STRICT_ASSERT,
 )
 

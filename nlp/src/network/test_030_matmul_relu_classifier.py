@@ -22,14 +22,14 @@ import common.weights as weights
 from data import (
     linear_separable_sectors
 )
-from test.utilities import (
+from testing.utilities import (
     build_matmul_relu_objective
 )
 from optimizer import (
     Optimizer,
     SGD
 )
-from test.layer_validations import (
+from testing.layer_validations import (
     validate_relu_neuron_training
 )
 

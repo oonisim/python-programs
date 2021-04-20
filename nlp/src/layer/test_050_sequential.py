@@ -27,18 +27,18 @@ from layer import (
 from optimizer import (
     Optimizer
 )
-from test.config import (
+from testing.config import (
     NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,
     NUM_MAX_FEATURES
 )
-from test.layer_validations import (
+from testing.layer_validations import (
     validate_against_expected_gradient,
     forward_outputs,
     backward_outputs
 )
-from test.utilities import (
+from testing.utilities import (
     build_matmul_relu_objective,
 )
 from optimizer import SGD

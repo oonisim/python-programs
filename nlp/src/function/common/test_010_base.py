@@ -12,7 +12,7 @@ from common.constant import (
 )
 import function.common.base as base
 
-from test.config import (
+from testing.config import (
     NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,

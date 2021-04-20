@@ -25,12 +25,12 @@ from common.function import (
     compose,
 )
 import common.weights as weights
-from test.config import (
+from testing.config import (
     GRADIENT_DIFF_CHECK_TRIGGER,
     GRADIENT_DIFF_ACCEPTANCE_RATIO,
     GRADIENT_DIFF_ACCEPTANCE_VALUE,
 )
-from test.layer_validations import (
+from testing.layer_validations import (
     expected_gradients_from_relu_neuron,
     expected_gradient_from_log_loss,
     validate_against_expected_gradient
@@ -53,10 +53,10 @@ from optimizer import (
     Optimizer,
     SGD
 )
-from test.config import (
+from testing.config import (
     ENFORCE_STRICT_ASSERT,
 )
-from test.layer_validations import (
+from testing.layer_validations import (
     validate_against_numerical_gradient
 )
 

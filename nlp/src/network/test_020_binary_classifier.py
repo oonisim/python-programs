@@ -33,10 +33,10 @@ from optimizer import (
     Optimizer,
     SGD
 )
-from test.layer_validations import (
+from testing.layer_validations import (
     validate_against_expected_gradient
 )
-from test.layer_validations import (
+from testing.layer_validations import (
     validate_against_numerical_gradient
 )
 

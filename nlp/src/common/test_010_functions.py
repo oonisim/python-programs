@@ -14,7 +14,7 @@ from common.function import (
     cross_entropy_log_loss,
 )
 
-from test.config import (
+from testing.config import (
     NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,

@@ -30,7 +30,7 @@ from layer.constants import (
     _LOSS_FUNCTION,
     _PARAMETERS
 )
-from test.config import (
+from testing.config import (
     NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,

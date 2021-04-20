@@ -28,7 +28,7 @@ from layer.utility import (
     forward_outputs,
     backward_outputs,
 )
-from test.config import (
+from testing.config import (
     LOSS_DIFF_ACCEPTANCE_RATIO,
     LOSS_DIFF_ACCEPTANCE_VALUE,
     GRADIENT_DIFF_CHECK_TRIGGER,

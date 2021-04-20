@@ -46,7 +46,7 @@ from layer.constants import (
 from layer import (
     Matmul
 )
-from test.config import (
+from testing.config import (
     NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,
     NUM_MAX_BATCH_SIZE,
@@ -54,7 +54,7 @@ from test.config import (
     GRADIENT_DIFF_ACCEPTANCE_VALUE,
     GRADIENT_DIFF_ACCEPTANCE_RATIO
 )
-from test.layer_validations import (
+from testing.layer_validations import (
     validate_against_expected_gradient
 )
 from optimizer import (

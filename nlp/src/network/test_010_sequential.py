@@ -35,13 +35,13 @@ from layer.constants import (
 from network.sequential import (
     SequentialNetwork
 )
-from test.layer_validations import (
+from testing.layer_validations import (
     expected_gradient_from_log_loss,
     validate_relu_neuron_round_trip,
     validate_against_expected_loss,
     validate_against_expected_gradient
 )
-from test.utilities import (
+from testing.utilities import (
     build_matmul_relu_objective
 )
 from config_test_010_sequential import (
