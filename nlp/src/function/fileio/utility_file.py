@@ -182,9 +182,9 @@ class Function(base.Function):
     def read_file(path_to_file):
         assert Function.is_file(path_to_file), f"File {path_to_file} does not exist"
         with open(path_to_file, 'r') as _file:
-            corpus = _file.read()
+            content = _file.read()
 
-        return corpus
+        return content
 
     @staticmethod
     def file_line_stream(path: str) -> Generator[str, None, None]:

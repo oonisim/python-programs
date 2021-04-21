@@ -12,8 +12,8 @@ import numpy as np
 import tensorflow as tf
 from common.constant import (
     TYPE_FLOAT,
-    NIL,
-    UNK
+    EVENT_NIL,
+    EVENT_UNK
 )
 import common.weights as weights
 from common.function import (
@@ -34,7 +34,7 @@ from layer.constants import (
     _LOG_LEVEL
 )
 from layer.preprocessing import (
-    WordIndexing
+    EventIndexing
 )
 from testing.config import (
     NUM_MAX_TEST_TIMES,
@@ -62,13 +62,13 @@ def download_file(target='shakespeare.txt') -> str:
 
 
 def _instantiate(name: str, num_nodes: int, path_to_corpus: str, log_level: int = logging.ERROR):
-    word_indexing = WordIndexing.build({
+    event_indexing = EventIndexing.build({
         _NAME: name,
         _NUM_NODES: num_nodes,
         "path_to_corpus": path_to_corpus,
         _LOG_LEVEL: log_level
     })
-    return word_indexing
+    return event_indexing
 
 
 def _must_fail(name: str, num_nodes: int, path_to_corpus: str, msg: str):
@@ -85,19 +85,19 @@ def _must_succeed(name: str, num_nodes: int, path_to_corpus: str, msg: str, log_
             return _instantiate(name, num_nodes=num_nodes, path_to_corpus=path_to_corpus, log_level=log_level)
         else:
             corpus = fileio.Function.read_file(path_to_corpus)
-            return WordIndexing(name=name, num_nodes=num_nodes, corpus=corpus)
+            return EventIndexing(name=name, num_nodes=num_nodes, corpus=corpus)
     except Exception as e:
         raise RuntimeError(msg)
 
 
-def test_020_word_indexing_instantiation_to_fail():
+def test_020_event_indexing_instantiation_to_fail():
     """
     Objective:
         Verify the layer class validates the initialization parameter constraints.
     Expected:
         Initialization detects parameter constraints not meet and fails.
     """
-    name = "test_020_word_indexing_instantiation_to_fail"
+    name = "test_020_event_indexing_instantiation_to_fail"
     path_to_corpus: str = download_file()
 
     for _ in range(NUM_MAX_TEST_TIMES):
@@ -113,7 +113,7 @@ def test_020_word_indexing_instantiation_to_fail():
         os.unlink(path_to_corpus)
 
 
-def test_020_word_indexing_instance_properties(caplog):
+def test_020_event_indexing_instance_properties(caplog):
     """
     Objective:
         Verify the layer class validates the parameters have been initialized before accessed.
@@ -128,44 +128,44 @@ def test_020_word_indexing_instance_properties(caplog):
     for _ in range(10):
 
         name = random_string(np.random.randint(1, 10))
-        word_indexing = _must_succeed(name=name, num_nodes=1, path_to_corpus=path_to_corpus, msg="need success")
+        event_indexing = _must_succeed(name=name, num_nodes=1, path_to_corpus=path_to_corpus, msg="need success")
 
         # --------------------------------------------------------------------------------
         # To pass
         # --------------------------------------------------------------------------------
         try:
-            if not word_indexing.name == name:
-                raise RuntimeError("word_indexing.name == name should be true")
+            if not event_indexing.name == name:
+                raise RuntimeError("event_indexing.name == name should be true")
         except AssertionError as e:
             raise RuntimeError("Access to name should be allowed as already initialized.") from e
 
         try:
-            if not isinstance(word_indexing.logger, logging.Logger):
-                raise RuntimeError("isinstance(word_indexing.logger, logging.Logger) should be true")
+            if not isinstance(event_indexing.logger, logging.Logger):
+                raise RuntimeError("isinstance(event_indexing.logger, logging.Logger) should be true")
         except AssertionError as e:
             raise RuntimeError("Access to logger should be allowed as already initialized.") from e
 
-        msg = "WordIndexing vocabulary is available"
-        assert word_indexing.is_tensor(word_indexing.vocabulary), msg
-        assert word_indexing.vocabulary_size > 3    # at least UNK and NIL and some words
+        msg = "EventIndexing vocabulary is available"
+        assert event_indexing.is_tensor(event_indexing.vocabulary), msg
+        assert event_indexing.vocabulary_size > 3    # at least EVENT_UNK and EVENT_NIL and some words
         assert \
-            word_indexing.list_words([0]) == NIL.lower(), \
-            f"{NIL.lower()} expected for vocabulary[0] but {word_indexing.vocabulary[0]}"
+            event_indexing.list_events([0]) == EVENT_NIL.lower(), \
+            f"{EVENT_NIL.lower()} expected for vocabulary[0] but {event_indexing.vocabulary[0]}"
         assert \
-            word_indexing.list_words([1]) == UNK.lower(), \
-            f"{UNK.lower()} expected for vocabulary[0] but {word_indexing.vocabulary[1]}"
+            event_indexing.list_events([1]) == EVENT_UNK.lower(), \
+            f"{EVENT_UNK.lower()} expected for vocabulary[0] but {event_indexing.vocabulary[1]}"
 
-        msg = "word_to_index[vocabulary[index]] must be index"
-        length = word_indexing.vocabulary_size
+        msg = "event_to_index[vocabulary[index]] must be index"
+        length = event_indexing.vocabulary_size
         index = np.random.randint(0, length)
-        word, *_ = list(word_indexing.list_words([index]))
-        assert word_indexing.list_word_indices([word]) == [index], msg
+        word, *_ = list(event_indexing.list_events([index]))
+        assert event_indexing.list_event_indices([word]) == [index], msg
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")
 
 
-def test_020_word_indexing_function_multi_lines(caplog):
+def test_020_event_indexing_function_multi_lines(caplog):
     """
     Objective:
         Verify the wordindexing function can handle multi line sentences
@@ -181,7 +181,7 @@ def test_020_word_indexing_function_multi_lines(caplog):
     path_to_corpus: str = download_file()
 
     name = random_string(np.random.randint(1, 10))
-    word_indexing = _must_succeed(
+    event_indexing = _must_succeed(
         name=name,
         num_nodes=1,
         path_to_corpus=path_to_corpus,
@@ -189,5 +189,5 @@ def test_020_word_indexing_function_multi_lines(caplog):
         log_level=logging.DEBUG
     )
 
-    word_indexing.function(sentences)
+    event_indexing.function(sentences)
 

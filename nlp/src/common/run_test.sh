@@ -6,11 +6,12 @@
 # Hence will fail without setting it up.
 #--------------------------------------------------------------------------------
 DIR=$(realpath $(dirname $0))
+PARENT=$(realpath "${DIR}/..")
 cd ${DIR}
 
-export PYTHONPATH=${DIR}
+# export PYTHONPATH=$(realpath "${DIR}/.."):${DIR}
+export PYTHONPATH=${PARENT}:${DIR}
 echo "PYTHONPATH=$PYTHONPATH"
-#clear
 
 #--------------------------------------------------------------------------------
 # Pylint
@@ -22,10 +23,11 @@ rm -rf __pycache__/
 
 echo "--------------------------------------------------------------------------------"
 echo "Running pylint in package (run in the directory in case of xxx not found in module)..."
-for f in $(find . -name '*.py')
+# Find "! expr":  True if expr is false.
+for f in $(find . -type f -name '*.py' ! -name '__init__.py')
 do
     echo ${f}
-    # pylint -E ${f}
+    pylint -E ${f}
 done
 
 
@@ -41,10 +43,16 @@ echo "Running PyTest..."
 # To disable assert
 # PYTHONOPTIMIZE=TRUE
 
+#--------------------------------------------------------------------------------
 # Parallel pytest requires pytest-xdist
 # https://stackoverflow.com/questions/28908319
 # conda install pytest-xdist -y
 # Then use with -n option
+#
+# [NOTE]
+# Cannot use live cli log with pytest-xdist <--- !!!
+#  -o log_cli=False -o log_cli_level=WARNING \
+#--------------------------------------------------------------------------------
 NUM_CPU=6
 #python3 -m cProfile -o profile -m pytest \
 pytest \
@@ -53,7 +61,6 @@ pytest \
   -vv \
   --capture=tee-sys \
   --log-level=ERROR \
-  -o log_cli=True -o log_cli_level=ERROR \
   --log-auto-indent=on \
   --cache-clear -x \
   --color=yes --code-highlight=yes \

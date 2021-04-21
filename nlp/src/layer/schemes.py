@@ -8,7 +8,7 @@ from layer.sum import (
     Sum
 )
 from layer.preprocessing import (
-    WordIndexing
+    EventIndexing
 )
 from layer.activation import (
     ReLU,
@@ -32,7 +32,7 @@ from layer.normalization import (
 # Dictionaries of layer per purpose
 # ================================================================================
 PREPROCESS_LAYERS = (
-    WordIndexing,
+    EventIndexing,
 )
 FEATURE_LAYERS = (
     Matmul,

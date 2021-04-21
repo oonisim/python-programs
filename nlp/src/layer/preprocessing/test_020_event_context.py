@@ -12,8 +12,8 @@ import numpy as np
 import tensorflow as tf
 from common.constant import (
     TYPE_FLOAT,
-    NIL,
-    UNK
+    EVENT_NIL,
+    EVENT_UNK
 )
 import common.weights as weights
 from common.function import (
@@ -43,7 +43,7 @@ from testing.config import (
     GRADIENT_DIFF_ACCEPTANCE_VALUE,
     GRADIENT_DIFF_ACCEPTANCE_RATIO
 )
-from . test_020_word_indexing import (
+from . test_020_event_indexing import (
     _must_succeed as _instantiate_event_context
 )
 Logger = logging.getLogger(__name__)

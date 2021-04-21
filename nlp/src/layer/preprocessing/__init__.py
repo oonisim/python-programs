@@ -1,4 +1,4 @@
 from . preprocess import (
-    WordIndexing,
+    EventIndexing,
     EventContext
 )

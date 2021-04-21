@@ -6,11 +6,12 @@
 # Hence will fail without setting it up.
 #--------------------------------------------------------------------------------
 DIR=$(realpath $(dirname $0))
+PARENT=$(realpath "${DIR}/..")
 cd ${DIR}
 
-export PYTHONPATH=${DIR}
+# export PYTHONPATH=$(realpath "${DIR}/.."):${DIR}
+export PYTHONPATH=${PARENT}:${DIR}
 echo "PYTHONPATH=$PYTHONPATH"
-#clear
 
 #--------------------------------------------------------------------------------
 # Pylint
@@ -22,19 +23,13 @@ rm -rf __pycache__/
 
 echo "--------------------------------------------------------------------------------"
 echo "Running pylint in package (run in the directory in case of xxx not found in module)..."
-for f in $(find . -name '*.py')
+# Find "! expr":  True if expr is false.
+for f in $(find . -type f -name '*.py' ! -name '__init__.py')
 do
     echo ${f}
     pylint -E ${f}
 done
 
-echo "--------------------------------------------------------------------------------"
-echo "Running pylint in test"
-for t in $(ls test_*.py)
-do
-    echo
-    # pylint -E ${t}
-done
 
 #--------------------------------------------------------------------------------
 # PyTest

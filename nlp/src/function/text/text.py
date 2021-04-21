@@ -11,11 +11,11 @@ from common.constant import (
     TYPE_FLOAT,
     TYPE_INT,
     DELIMITER,
-    NIL,
-    UNK,
+    EVENT_NIL,
+    EVENT_UNK,
     SPACE,
-    META_WORDS,
-    META_WORD_TO_INDEX
+    EVENT_META_ENTITIES,
+    EVENT_META_ENTITY_TO_INDEX
 )
 PAD_MODE_PREPEND = 'prepend'
 PAD_MODE_APPEND = 'append'
@@ -30,16 +30,16 @@ class Function:
         corpus: str,
         mode: str = PAD_MODE_PREPEND,
         delimiter: str = DELIMITER,
-        padding: str = NIL,
+        padding: str = EVENT_NIL,
         length: TYPE_INT = 1
     ) -> str:
-        """Prepend and append size times of the padding word to the corpus
+        """Prepend and append size times of the padding event to the corpus
         Args:
             corpus:
             mode: how to pad. PREPEND|APPEND|SQUEEZE
-            delimiter: delimiter between words
-            padding: a word to pad
-            length: length of words to pad
+            delimiter: delimiter between events
+            padding: a event to pad
+            length: length of events to pad
         """
         assert corpus and len(corpus) > 0 and isinstance(corpus, str)
 
@@ -60,9 +60,9 @@ class Function:
         """
         padded = sum(
             [ 
-                [ NIL ] * STRIDE, 
+                [ EVENT_NIL ] * STRIDE, 
                 corpus.split(' '),
-                [ NIL ] * STRIDE
+                [ EVENT_NIL ] * STRIDE
             ],
             start=[]
         )
@@ -73,7 +73,7 @@ class Function:
     def replace_punctuations(corpus: str, replacement: str) -> str:
         """Replace punctuations in the corpus
         Args:
-            corpus: sequence of words
+            corpus: sequence of events
             replacement: char to replace
         Returns
             corpus: corpus with punctuation being replaced with replacement.
@@ -84,7 +84,7 @@ class Function:
         table = str.maketrans(string.punctuation, replacement * len(string.punctuation))
         corpus.translate(table)
 
-        assert len(corpus) > 0, "corpus needs words other than punctuations."
+        assert len(corpus) > 0, "corpus needs events other than punctuations."
         return corpus
 
     @staticmethod
@@ -94,17 +94,17 @@ class Function:
         2. Remove punctuation
         3. Replace white space, new lines, and carriage returns with a space
         Args:
-            text: sequence of words
+            text: sequence of events
         Returns
             standardized: standardized text
         """
         assert isinstance(text, str) and len(text) > 0
         # --------------------------------------------------------------------------------
         # https://stackoverflow.com/a/67165082/4281353
-        # pattern: str = '(?<!%s)[%s%s]+(?!unk>)' % ('<UNK', re.escape(string.punctuation), r"\s")
-        # pattern: str = rf'(?:(?!{UNK.lower()})[\W_](?<!{UNK.lower()}))+'
+        # pattern: str = '(?<!%s)[%s%s]+(?!unk>)' % ('<EVENT_UNK', re.escape(string.punctuation), r"\s")
+        # pattern: str = rf'(?:(?!{EVENT_UNK.lower()})[\W_](?<!{EVENT_UNK.lower()}))+'
         # --------------------------------------------------------------------------------
-        pattern: str = rf'(?:(?!{UNK.lower()})(?!{NIL.lower()})[\W_](?<!{UNK.lower()})(?<!{NIL.lower()}))+'
+        pattern: str = rf'(?:(?!{EVENT_UNK.lower()})(?!{EVENT_NIL.lower()})[\W_](?<!{EVENT_UNK.lower()})(?<!{EVENT_NIL.lower()}))+'
         replacement = SPACE
         standardized: str = re.sub(
             pattern=pattern,
@@ -112,77 +112,80 @@ class Function:
             string=text,
             flags=re.IGNORECASE
         ).lower().strip()
-        assert len(standardized) > 0, f"Text [{text}] needs words other than punctuations."
+        assert len(standardized) > 0, f"Text [{text}] needs events other than punctuations."
         return standardized
 
     @staticmethod
-    def word_occurrence_probability(words: List[str], power: TYPE_FLOAT = TYPE_FLOAT(1.0)):
-        """Calculate the probabilities of word occurrences
+    def event_occurrence_probability(
+            events: List[str], power: TYPE_FLOAT = TYPE_FLOAT(1.0)
+    ):
+        """Calculate the probabilities of event occurrences
         Args:
-            words: list of standardized words
+            events: list of standardized events
             power:
                 parameter to adjust the probability by p = p**power/sum(p**power)
-                This is to balance the contributions of less frequent and more frequent words.
+                This is to balance the contributions of less frequent and more frequent events.
                 Default 1.0. In word2vec negative sampling, power=0.75 is used.
         """
-        assert (len(words) > 0)
+        assert (len(events) > 0)
 
-        total = len(words)
-        counts = collections.Counter(words)
-        probabilities = {word: np.power((count / total), power) for (word, count) in counts.items()}
+        total: int = len(events)
+        counts = collections.Counter(events)
+        powered = {event: np.power((count / total), power) for (event, count) in counts.items()}
 
-        sigma = np.sum(list(probabilities.values()))
-        probabilities = {word: TYPE_FLOAT(p / sigma) for (word, p) in probabilities.items()}
+        integral = np.sum(list(powered.values()))
+        probabilities = {event: TYPE_FLOAT(p / integral) for (event, p) in powered.items()}
         assert (1.0 - np.sum(list(probabilities.values()))) < 1e-5
 
-        del total, counts, sigma
+        del total, counts, powered, integral
         return probabilities
 
     @staticmethod
-    def word_indexing(corpus: str):
-        """Generate word indices
-        Add meta-words NIL at 0 and UNK at 1.
-        Words are all lower-cased.
+    def event_indexing(corpus: str, power: TYPE_FLOAT=TYPE_FLOAT(1)):
+        """Generate event indices
+        Add meta-events EVENT_NIL at 0 and EVENT_UNK at 1.
+        events are all lower-cased.
 
         Assumptions:
-            Meta word NIL is NOT included in the corpus
+            Meta event EVENT_NIL is NOT included in the corpus
 
         Args:
             corpus: A string including sentences to process.
+            power: parameter to adjust the event probability
 
         Returns:
-            word_to_index: word to word index mapping
-            index_to_word: word index to word mapping
-            vocabulary: unique words in the corpus
-            probabilities: word occurrence probabilities
+            event_to_index: event to index mapping
+            index_to_event: index to event mapping
+            vocabulary: unique events in the corpus
+            probabilities: event occurrence probabilities
         """
-        words = Function.standardize(corpus).split()
-        probabilities: Dict[TYPE_INT, TYPE_FLOAT] = Function.word_occurrence_probability(words)
-        assert probabilities.get(NIL.lower(), None) is None, \
-            f"NIL {NIL.lower()} should not be included in the corpus. Change NIL"
-        probabilities[NIL.lower()] = TYPE_FLOAT(0)
-        probabilities[UNK.lower()] = probabilities.get(UNK.lower(), TYPE_FLOAT(0))
+        events = Function.standardize(corpus).split()
+        probabilities: Dict[str, TYPE_FLOAT] = Function.event_occurrence_probability(events=events, power=power)
+        assert probabilities.get(EVENT_NIL.lower(), None) is None, \
+            f"EVENT_NIL {EVENT_NIL.lower()} should not be included in the corpus. Change EVENT_NIL"
+        probabilities[EVENT_NIL.lower()] = TYPE_FLOAT(0)
+        probabilities[EVENT_UNK.lower()] = probabilities.get(EVENT_UNK.lower(), TYPE_FLOAT(0))
 
-        vocabulary: List[str] = META_WORDS + list(set(words) - set(META_WORDS))
-        index_to_word: Dict[TYPE_INT, str] = dict(enumerate(vocabulary))
-        word_to_index: Dict[str, TYPE_INT] = dict(zip(index_to_word.values(), index_to_word.keys()))
+        vocabulary: List[str] = EVENT_META_ENTITIES + list(set(events) - set(EVENT_META_ENTITIES))
+        index_to_event: Dict[TYPE_INT, str] = dict(enumerate(vocabulary))
+        event_to_index: Dict[str, TYPE_INT] = dict(zip(index_to_event.values(), index_to_event.keys()))
 
-        del words
-        return word_to_index, index_to_word, vocabulary, probabilities
+        del events
+        return event_to_index, index_to_event, vocabulary, probabilities
 
     @staticmethod
     def sentence_to_sequence(
             sentences: str,
-            word_to_index: Dict[str, TYPE_INT]
+            event_to_index: Dict[str, TYPE_INT]
     ) -> List[List[TYPE_INT]]:
-        """Generate sequence of word indices from a text sentences
+        """Generate sequence of event indices from a text sentences
         1. Skip an empty line or
 
         Args:
             sentences:
                 A string including one ore more sentences to process.
                 A sentence is delimited by EOL('\n').
-            word_to_index: word to integer index mapping dictionary
+            event_to_index: event to integer index mapping dictionary
 
         Returns: List of integer sequence per sentence
         """
@@ -193,7 +196,7 @@ class Function:
         for line in sentences.split("\n"):
             if len(line.strip()) > 0:   # Skip empty line
                 sequence = [
-                    word_to_index.get(w, META_WORD_TO_INDEX[UNK.lower()])
+                    event_to_index.get(w, EVENT_META_ENTITY_TO_INDEX[EVENT_UNK.lower()])
                     for w in Function.standardize(line).split()
                 ]
                 # A line may have punctuations only which results in null sequence
@@ -208,7 +211,7 @@ class Function:
             np.pad(
                 array=seq,
                 pad_width=(0, max_sequence_length - len(seq)),
-                constant_values=META_WORD_TO_INDEX[NIL.lower()]
+                constant_values=EVENT_META_ENTITY_TO_INDEX[EVENT_NIL.lower()]
             ).astype(TYPE_INT).tolist()
             for seq in sequences
         ]

@@ -14,10 +14,10 @@ from common.constant import (
     TYPE_FLOAT,
     TYPE_INT,
     TYPE_TENSOR,
-    NIL,
-    UNK,
-    META_WORD_TO_INDEX,
-    CONTEXT_WINDOW_SIZE
+    EVENT_NIL,
+    EVENT_UNK,
+    EVENT_META_ENTITY_TO_INDEX,
+    EVENT_CONTEXT_WINDOW_SIZE
 )
 from layer import (
     Layer
@@ -30,13 +30,13 @@ from layer.constants import (
 )
 
 
-class WordIndexing(Layer):
+class EventIndexing(Layer):
     # ================================================================================
     # Class
     # ================================================================================
     @staticmethod
     def specification_template():
-        return WordIndexing.specification(
+        return EventIndexing.specification(
             name="w2i001",
             num_nodes=1,
             path_to_corpus="path_to_corpus"
@@ -55,7 +55,7 @@ class WordIndexing(Layer):
             path_to_corpus: path to the corpus file.
         """
         return {
-            _SCHEME: WordIndexing.__qualname__,
+            _SCHEME: EventIndexing.__qualname__,
             _PARAMETERS: {
                 _NAME: name,
                 _NUM_NODES: num_nodes,
@@ -80,14 +80,14 @@ class WordIndexing(Layer):
         with open(parameters["path_to_corpus"], 'r') as _file:
             corpus = _file.read()
 
-        word_indexing = WordIndexing(
+        event_indexing = EventIndexing(
             name=name,
             num_nodes=num_nodes,
             corpus=corpus,
             log_level=parameters["log_level"] if "log_level" in parameters else logging.ERROR
         )
 
-        return word_indexing
+        return event_indexing
 
     # ================================================================================
     # Instance
@@ -96,109 +96,119 @@ class WordIndexing(Layer):
     # Instance properties
     # --------------------------------------------------------------------------------
     @property
-    def vocabulary(self) -> TYPE_TENSOR:
-        """Vocabulary of the corpus"""
+    def vocabulary(self):
+        """Unique events observed in the corpus"""
         return self._vocabulary
 
     @property
     def vocabulary_size(self) -> TYPE_INT:
-        """Vocabulary size of the corpus"""
-        return len(self.vocabulary)
+        """Number of unique events in the vocabulary"""
+        return TYPE_INT(len(self.vocabulary))
 
     @property
     def probabilities(self) -> Dict[str, TYPE_FLOAT]:
-        """Word occurrence ratio"""
+        """Probability of a specific event to occur"""
         return self._probabilities
 
     @property
-    def word_to_index(self) -> Dict[str, TYPE_INT]:
-        """Word occurrence ratio"""
-        return self._word_to_index
+    def event_to_index(self) -> Dict[str, TYPE_INT]:
+        """Event to event index mapping"""
+        return self._event_to_index
 
     @property
     def S(self) -> List:
         """State of the layer"""
-        self._S = [self.word_to_index, self.vocabulary, self.probabilities]
+        self._S = [self.event_to_index, self.vocabulary, self.probabilities]
         return self._S
 
     def __init__(
             self,
             name: str,
             num_nodes: int = 1,
-            corpus: str = None,
+            corpus: str = "",
+            power: TYPE_FLOAT = 0.75,
             log_level: int = logging.ERROR
     ):
         """Initialize
         Args:
             name: Layer identity name
             num_nodes: Number of nodes in the layer
-            corpus:
+            corpus: source of sequential events
             log_level: logging level
         """
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
         assert len(corpus) > 0
         self.logger.debug("%s: corpus length is %s", self.name, len(corpus))
 
-        self._word_to_index, _, _vocabulary, self._probabilities = text.Function.word_indexing(corpus)
+        self._event_to_index, _, _vocabulary, self._probabilities = \
+            text.Function.event_indexing(corpus=corpus, power=power)
+
         # self._vocabulary = super().to_tensor(_vocabulary)
         self._vocabulary = np.array(_vocabulary)
-        assert len(self.vocabulary) == len(self.word_to_index)
+        assert 0 < len(self.vocabulary) == len(self.event_to_index)
 
         self.logger.debug("%s: vocabulary size is %s)", self.name, len(_vocabulary))
-        del _vocabulary, _
+        del _, _vocabulary
 
-    def list_words(self, indices: Iterable[TYPE_INT]) -> Iterable[str]:
+    def list_events(self, indices: Iterable[TYPE_INT]) -> Iterable[str]:
         return self._vocabulary[list(iter(indices))]
 
-    def list_probabilities(self, words: Iterable[str]) -> Iterable[TYPE_FLOAT]:
+    def list_probabilities(self, events: Iterable[str]) -> Iterable[TYPE_FLOAT]:
         return [
-            self._probabilities.get(word, TYPE_FLOAT(0))
-            for word in words
+            self._probabilities.get(event, TYPE_FLOAT(0))
+            for event in events
         ]
 
-    def list_word_indices(self, words: Iterable[str]) -> Iterable[TYPE_INT]:
+    def list_event_indices(self, events: Iterable[str]) -> Iterable[TYPE_INT]:
         return [
-            self._word_to_index.get(word, TYPE_INT(META_WORD_TO_INDEX[UNK.lower()]))
-            for word in words
+            self.event_to_index.get(
+                event, TYPE_INT(EVENT_META_ENTITY_TO_INDEX[EVENT_UNK.lower()])
+            )
+            for event in events
         ]
 
     def sentence_to_sequence(self, sentences: str) -> List[List[TYPE_INT]]:
-        """Generate a list of word indices per sentence
+        """Generate a list of event indices per sentence
         Args:
             sentences: one or more sentences delimited by '\n'.
-        Returns: List of (word indices per sentence)
+        Returns: List of (event indices per sentence)
         """
         assert len(sentences) > 0
         self.logger.debug(
             "%s:%s sentences are [%s]",
             self.name, "sentence_to_sequence", sentences
         )
-        sequences = text.Function.sentence_to_sequence(sentences, self.word_to_index)
+        sequences = text.Function.sentence_to_sequence(sentences, self.event_to_index)
         return sequences
 
     def sequence_to_sentence(self, sequences: Iterable[TYPE_INT]) -> List[List[str]]:
-        """Generate a list of words from
+        """Generate a list of events from
         Args:
-            sequences: word indices.
-        Returns: List of (word indices per sentence)
+            sequences: event indices.
+        Returns: List of (event indices per sentence)
         """
         self.logger.debug(
             "%s:%s sequences are [%s]",
             self.name, "sequence_to_sentence", sequences
         )
-        sentences = [self._vocabulary[sequence].tolist() for sequence in sequences]
+        sentences = [
+            self._vocabulary[seq].tolist()
+            for seq in sequences
+        ]
         assert \
             len(sentences) > 0, \
             f"Sequences has no valid indices\n{sequences}."
         return sentences
 
     def function(self, X: str) -> TYPE_TENSOR:
-        """Generate a word index sequence for a sentence"""
+        """Generate a event index sequence for a sentence"""
         # return super().to_tensor(self.sentence_to_sequence(X))
 
         sequence = super().to_tensor(self.sentence_to_sequence(X))
         self.logger.debug("sequence generated \n%s", sequence)
-        assert super().tensor_rank(sequence) == 2, "Expected ran 2 but sequence %s" % sequence
+        assert \
+            super().tensor_rank(sequence) == 2, \
+            "Expected ran 2 but sequence %s" % sequence
         return sequence
 
     def load(self, path: str):
@@ -207,14 +217,15 @@ class WordIndexing(Layer):
             path: state file path
         """
         state = super().load(path)
-        del self._word_to_index, self._vocabulary, self._probabilities
-        self._word_to_index = state[0]
+        del self._event_to_index, self._vocabulary, self._probabilities
+        self._event_to_index = state[0]
         self._vocabulary = state[1]
         self._probabilities = state[2]
 
         assert \
-            isinstance(self.word_to_index, dict) and self.word_to_index[NIL] == 0 \
-            and self.vocabulary[0] == NIL
+            isinstance(self.event_to_index, dict) and \
+            self.event_to_index[EVENT_NIL] == 0 \
+            and self.vocabulary[0] == EVENT_NIL
 
 
 class EventContext(Layer):
@@ -236,7 +247,7 @@ class EventContext(Layer):
     def specification(
             name: str,
             num_nodes: int = 1,
-            window_size: int = CONTEXT_WINDOW_SIZE,
+            window_size: int = EVENT_CONTEXT_WINDOW_SIZE,
             event_size: int = 1,
     ):
         """Generate a layer specification
@@ -311,7 +322,7 @@ class EventContext(Layer):
             self,
             name: str,
             num_nodes: int = 1,
-            window_size: TYPE_INT = CONTEXT_WINDOW_SIZE,
+            window_size: TYPE_INT = EVENT_CONTEXT_WINDOW_SIZE,
             event_size: TYPE_INT = 1,
             log_level: int = logging.ERROR
     ):
