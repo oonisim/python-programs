@@ -1,3 +1,5 @@
+import string
+import random
 import logging
 
 import numpy as np
@@ -75,6 +77,11 @@ class Function(base.Function):
         ]
         assert event_context_paris.shape == (num_windows, window_size)
         return event_context_paris
+
+    @staticmethod
+    def random_string(stringLength=8):
+        letters = string.ascii_lowercase
+        return ''.join(random.choice(letters) for i in range(stringLength))
 
     # ================================================================================
     # Instance

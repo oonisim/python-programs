@@ -1,50 +1,34 @@
-import tempfile
 import cProfile
-import os
-import copy
-import pathlib
 import logging
+import os
+import tempfile
 from typing import (
-    Union
+    List,
+    Iterable
 )
 
 import numpy as np
 import tensorflow as tf
+
 from common.constant import (
-    TYPE_FLOAT,
+    TYPE_INT,
     EVENT_NIL,
     EVENT_UNK
 )
-import common.weights as weights
-from common.function import (
-    numerical_jacobian,
-)
-from common.utility import (
-    random_string
-)
 import function.fileio as fileio
+import function.utility as utility
 from layer.constants import (
-    _WEIGHTS,
     _NAME,
-    _SCHEME,
-    _OPTIMIZER,
     _NUM_NODES,
-    _NUM_FEATURES,
-    _PARAMETERS,
     _LOG_LEVEL
 )
 from layer.preprocessing import (
     EventIndexing
 )
 from testing.config import (
-    NUM_MAX_TEST_TIMES,
-    NUM_MAX_NODES,
-    NUM_MAX_BATCH_SIZE,
-    NUM_MAX_FEATURES,
-    GRADIENT_DIFF_ACCEPTANCE_VALUE,
-    GRADIENT_DIFF_ACCEPTANCE_RATIO
+    NUM_MAX_TEST_TIMES
 )
-
+import testing.layer
 
 Logger = logging.getLogger(__name__)
 
@@ -127,7 +111,7 @@ def test_020_event_indexing_instance_properties(caplog):
     profiler.enable()
     for _ in range(10):
 
-        name = random_string(np.random.randint(1, 10))
+        name = utility.Function.random_string(np.random.randint(1, 10))
         event_indexing = _must_succeed(name=name, num_nodes=1, path_to_corpus=path_to_corpus, msg="need success")
 
         # --------------------------------------------------------------------------------
@@ -180,7 +164,7 @@ def test_020_event_indexing_function_multi_lines(caplog):
     caplog.set_level(logging.DEBUG)
     path_to_corpus: str = download_file()
 
-    name = random_string(np.random.randint(1, 10))
+    name = utility.Function.random_string(np.random.randint(1, 10))
     event_indexing = _must_succeed(
         name=name,
         num_nodes=1,
@@ -191,3 +175,80 @@ def test_020_event_indexing_function_multi_lines(caplog):
 
     event_indexing.function(sentences)
 
+
+def test_020_event_indexing_save_load(caplog):
+    """
+    Objective:
+        Verify the save/load function of EventIndexing
+    Expected:
+    """
+    sentences = """
+    the asbestos fiber <unk> is unusually <unk> once it enters the <unk> 
+    with even brief exposures to it causing symptoms that show up decades later researchers said
+    """
+    caplog.set_level(logging.DEBUG)
+
+    caplog.set_level(logging.DEBUG)
+    path_to_corpus: str = download_file()
+
+    name = utility.Function.random_string(np.random.randint(1, 10))
+    event_indexing = _must_succeed(
+        name=name,
+        num_nodes=1,
+        path_to_corpus=path_to_corpus,
+        msg="need success",
+        log_level=logging.DEBUG
+    )
+    # --------------------------------------------------------------------------------
+    # Run methods and save the results to compare later
+    # --------------------------------------------------------------------------------
+    indices: List[TYPE_INT] = list(np.random.randint(0, event_indexing.vocabulary_size, 5).tolist())
+    sequence = event_indexing.function(sentences)
+    probabilities = event_indexing.list_probabilities(['asbestos', 'brief'])
+    events = event_indexing.list_events(indices)
+
+    # --------------------------------------------------------------------------------
+    # Save the layer state and invalidate the state variables
+    # --------------------------------------------------------------------------------
+    tester = testing.layer.Function(instance=event_indexing)
+    tester.test_save()
+    event_indexing._vocabulary = "hoge"
+    event_indexing._event_to_index = "hoge"
+    event_indexing._probabilities = "hoge"
+
+    # --------------------------------------------------------------------------------
+    # Confirm the layer does not function anymore
+    # --------------------------------------------------------------------------------
+    try:
+        event_indexing.function(sentences)
+        raise RuntimeError("Must fail with state deleted")
+    except Exception as e:
+        pass
+
+    try:
+        event_indexing.list_probabilities(['asbestos', 'brief'])
+        raise RuntimeError("Must fail with state deleted")
+    except Exception as e:
+        pass
+
+    try:
+        event_indexing.list_events(indices)
+        raise RuntimeError("Must fail with state deleted")
+    except Exception as e:
+        pass
+
+    # --------------------------------------------------------------------------------
+    # Restore the state and confirm the layer functions as expected.
+    # --------------------------------------------------------------------------------
+    try:
+        # Constraint:
+        #   Layer works after state reloaded
+        tester.test_load()
+        assert np.array_equal(event_indexing.function(sentences), sequence)
+        assert event_indexing.list_probabilities(['asbestos', 'brief']) == probabilities
+        assert set(event_indexing.list_events(indices)) == set(events)
+
+    except Exception as e:
+        raise e
+    finally:
+        tester.clean()

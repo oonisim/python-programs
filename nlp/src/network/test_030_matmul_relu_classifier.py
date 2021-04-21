@@ -1,36 +1,33 @@
 """Matmul layer test cases"""
+import cProfile
+import logging
 from typing import (
-    List,
     Callable
 )
-import copy
-import logging
-import cProfile
+
 import numpy as np
+
+import common.weights as weights
 from common.constant import (
     TYPE_FLOAT,
-    TYPE_LABEL,
 )
 from common.function import (
-    softmax,
-    relu,
     transform_X_T,
     softmax_cross_entropy_log_loss,
     compose,
 )
-import common.weights as weights
 from data import (
     linear_separable_sectors
-)
-from testing.utilities import (
-    build_matmul_relu_objective
 )
 from optimizer import (
     Optimizer,
     SGD
 )
-from testing.layer_validations import (
+from testing.layer import (
     validate_relu_neuron_training
+)
+from testing.utilities import (
+    build_matmul_relu_objective
 )
 
 Logger = logging.getLogger(__name__)

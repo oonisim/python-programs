@@ -30,7 +30,7 @@ from testing.config import (
     GRADIENT_DIFF_ACCEPTANCE_RATIO,
     GRADIENT_DIFF_ACCEPTANCE_VALUE,
 )
-from testing.layer_validations import (
+from testing.layer import (
     expected_gradients_from_relu_neuron,
     expected_gradient_from_log_loss,
     validate_against_expected_gradient
@@ -56,7 +56,7 @@ from optimizer import (
 from testing.config import (
     ENFORCE_STRICT_ASSERT,
 )
-from testing.layer_validations import (
+from testing.layer import (
     validate_against_numerical_gradient
 )
 

@@ -187,6 +187,23 @@ class Function(base.Function):
         return content
 
     @staticmethod
+    def serialize(path: str, state: object):
+        assert Function.is_path_creatable(path), f"Cannot create {path}."
+        with open(path, 'wb') as f:
+            pickle.dump(state, f)
+
+    @staticmethod
+    def deserialize(path: str):
+        if os.path.exists(path):
+            with open(path, 'rb') as f:
+                state = pickle.load(f)
+
+            assert state is not None
+            return state
+        else:
+            raise RuntimeError(f"Path {path} does not exist.")
+
+    @staticmethod
     def file_line_stream(path: str) -> Generator[str, None, None]:
         """Stream  lines from the file.
         Args:
@@ -207,23 +224,6 @@ class Function(base.Function):
         except (IOError, FileNotFoundError) as e:
             Logger.error(e)
             raise RuntimeError("Read file failure") from e
-
-    @staticmethod
-    def serialize(path: str, state: object):
-        assert Function.is_path_creatable(path), f"Cannot create {path}."
-        with open(path, 'wb') as f:
-            pickle.dump(state, f)
-
-    @staticmethod
-    def deserialize(path: str):
-        if os.path.exists(path):
-            with open(path, 'rb') as f:
-                state = pickle.load(f)
-
-            assert state is not None
-            return state
-        else:
-            raise RuntimeError(f"Path {path} does not exist.")
 
     # ================================================================================
     # Instance

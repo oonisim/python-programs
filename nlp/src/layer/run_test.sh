@@ -27,7 +27,7 @@ echo "Running pylint in package (run in the directory in case of xxx not found i
 for f in $(find . -type f -name '*.py' ! -name '__init__.py')
 do
     echo ${f}
-    pylint -E ${f}
+    # pylint -E ${f}
 done
 
 

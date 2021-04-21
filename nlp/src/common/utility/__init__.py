@@ -5,7 +5,3 @@ from . utility_file import (
 from . utility_string import (
     random_string
 )
-from . utility_serialization import (
-    serialize,
-    deserialize
-)

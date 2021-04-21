@@ -19,7 +19,7 @@ from common.function import (
     compose,
 )
 import common.weights as weights
-from testing.layer_validations import (
+from testing.layer import (
     validate_against_numerical_gradient
 )
 from data import (

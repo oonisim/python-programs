@@ -24,6 +24,10 @@ from layer import (
     CrossEntropyLogLoss,
     Sequential
 )
+from layer.utility import (
+    forward_outputs,
+    backward_outputs,
+)
 from optimizer import (
     Optimizer
 )
@@ -33,10 +37,8 @@ from testing.config import (
     NUM_MAX_BATCH_SIZE,
     NUM_MAX_FEATURES
 )
-from testing.layer_validations import (
+from testing.layer import (
     validate_against_expected_gradient,
-    forward_outputs,
-    backward_outputs
 )
 from testing.utilities import (
     build_matmul_relu_objective,

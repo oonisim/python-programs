@@ -54,7 +54,7 @@ from testing.config import (
     GRADIENT_DIFF_ACCEPTANCE_VALUE,
     GRADIENT_DIFF_ACCEPTANCE_RATIO
 )
-from testing.layer_validations import (
+from testing.layer import (
     validate_against_expected_gradient
 )
 from optimizer import (

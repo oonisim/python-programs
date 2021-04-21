@@ -33,11 +33,9 @@ from optimizer import (
     Optimizer,
     SGD
 )
-from testing.layer_validations import (
+from testing.layer import (
+    validate_against_numerical_gradient,
     validate_against_expected_gradient
-)
-from testing.layer_validations import (
-    validate_against_numerical_gradient
 )
 
 Logger = logging.getLogger(__name__)

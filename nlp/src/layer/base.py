@@ -119,10 +119,7 @@ from common.constant import (
 from common.function import (
     numerical_jacobian,
 )
-from common.utility import (
-    serialize,
-    deserialize
-)
+import function.fileio as fileio
 import function.nn.base as nn
 # import function.nn.tf as nn
 
@@ -536,7 +533,7 @@ class Layer(nn.Function):
         Args:
             path: path to save the state
         """
-        serialize(path, self.S)
+        fileio.Function.serialize(path, self.S)
 
     def load(self, path: str):
         """Load the layer state
@@ -563,6 +560,6 @@ class Layer(nn.Function):
         Returns:
             state: loaded state
         """
-        state = deserialize(path)
+        state = fileio.Function.deserialize(path)
         assert isinstance(state, list) and len(state) > 0
         return state

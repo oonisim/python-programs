@@ -1,11 +1,5 @@
-from typing import (
-    TypeVar,
-)
 import string
 import random
-
-
-T = TypeVar('T')
 
 
 def random_string(stringLength=8):

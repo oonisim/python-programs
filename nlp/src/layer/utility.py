@@ -1,24 +1,11 @@
 import logging
 from typing import (
-    Union,
-    List,
-    Dict,
-    Callable,
-    NoReturn
+    List
 )
 
-import numpy as np
-
-from common.constant import (
-    TYPE_FLOAT
-)
-from common.function import (
-    compose
-)
 from layer.base import (
     Layer
 )
-
 
 Logger = logging.getLogger(__name__)
 

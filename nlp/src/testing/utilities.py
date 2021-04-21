@@ -1,19 +1,15 @@
+import logging
 from typing import (
-    Optional,
-    Union,
-    List,
-    Dict,
-    Tuple,
     Callable
 )
-import logging
+
 import numpy as np
-from common.constant import (
-    TYPE_FLOAT
-)
+
 from common.function import (
-    softmax_cross_entropy_log_loss,
-    compose
+    softmax_cross_entropy_log_loss
+)
+from layer.activation import (
+    ReLU
 )
 from layer.constants import (
     _WEIGHTS,
@@ -26,10 +22,6 @@ from layer.constants import (
 )
 from layer.matmul import (
     Matmul
-)
-from layer.activation import (
-    ReLU,
-    Sigmoid
 )
 from layer.objective import (
     CrossEntropyLogLoss,

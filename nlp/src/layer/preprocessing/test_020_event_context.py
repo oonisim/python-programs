@@ -1,51 +1,22 @@
-import tempfile
 import cProfile
-import os
-import copy
-import pathlib
 import logging
-from typing import (
-    Union
-)
 
 import numpy as np
-import tensorflow as tf
-from common.constant import (
-    TYPE_FLOAT,
-    EVENT_NIL,
-    EVENT_UNK
-)
-import common.weights as weights
-from common.function import (
-    numerical_jacobian,
-)
+
 from common.utility import (
     random_string
 )
-import function.fileio as fileio
 from layer.constants import (
-    _WEIGHTS,
     _NAME,
-    _SCHEME,
-    _OPTIMIZER,
-    _NUM_NODES,
-    _NUM_FEATURES,
-    _PARAMETERS
+    _NUM_NODES
 )
 from layer.preprocessing import (
     EventContext
 )
 from testing.config import (
-    NUM_MAX_TEST_TIMES,
-    NUM_MAX_NODES,
-    NUM_MAX_BATCH_SIZE,
-    NUM_MAX_FEATURES,
-    GRADIENT_DIFF_ACCEPTANCE_VALUE,
-    GRADIENT_DIFF_ACCEPTANCE_RATIO
+    NUM_MAX_TEST_TIMES
 )
-from . test_020_event_indexing import (
-    _must_succeed as _instantiate_event_context
-)
+
 Logger = logging.getLogger(__name__)
 
 

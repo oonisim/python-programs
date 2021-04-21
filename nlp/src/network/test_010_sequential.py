@@ -17,36 +17,10 @@ from common.function import (
     softmax_cross_entropy_log_loss,
     compose,
 )
-from data import (
-    linear_separable_sectors
-)
-from layer.constants import (
-    _WEIGHTS,
-    _NAME,
-    _SCHEME,
-    _OPTIMIZER,
-    _NUM_NODES,
-    _NUM_FEATURES,
-    _PARAMETERS,
-    _LOSS_FUNCTION,
-    _COMPOSITE_LAYER_SPEC,
-    _LOG_LEVEL
-)
-from network.sequential import (
-    SequentialNetwork
-)
-from testing.layer_validations import (
-    expected_gradient_from_log_loss,
-    validate_relu_neuron_round_trip,
-    validate_against_expected_loss,
-    validate_against_expected_gradient
-)
-from testing.utilities import (
-    build_matmul_relu_objective
-)
-from config_test_010_sequential import (
+from . config_test_010_sequential import (
     valid_network_specification_mao,
     valid_network_specification_mamao,
+    valid_network_specification_sfmbambamamo,
     _N,
     _M,
     _D,
@@ -54,6 +28,28 @@ from config_test_010_sequential import (
     _l2,
     invalid_network_specification_with_duplicated_names,
     multilayer_network_specification_bn_to_fail
+)
+
+from data import (
+    linear_separable_sectors
+)
+from layer.constants import (
+    _OPTIMIZER,
+    _NUM_NODES,
+    _PARAMETERS,
+    _COMPOSITE_LAYER_SPEC
+)
+from network.sequential import (
+    SequentialNetwork
+)
+from testing.layer import (
+    expected_gradient_from_log_loss,
+    validate_relu_neuron_round_trip,
+    validate_against_expected_loss,
+    validate_against_expected_gradient
+)
+from testing.utilities import (
+    build_matmul_relu_objective
 )
 
 Logger = logging.getLogger(__name__)
@@ -268,12 +264,6 @@ def test_010_sequential_train2():
     # --------------------------------------------------------------------------------
     # Network using sequential
     # --------------------------------------------------------------------------------
-    from config_test_010_sequential import (
-        valid_network_specification_sfmbambamamo,
-        _N,
-        _M,
-        _D,
-    )
 
     # ----------------------------------------------------------------------
     # Validate the correct specification.

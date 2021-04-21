@@ -1,4 +1,4 @@
-"""Matmul layer implementation
+"""Embedding layer implementation
 """
 import copy
 import logging
@@ -14,6 +14,8 @@ import numpy as np
 import optimizer as optimiser
 from common.constant import (
     TYPE_FLOAT,
+    TYPE_INT,
+    TYPE_TENSOR
 )
 from common.function import (
     numerical_jacobian,
@@ -34,57 +36,62 @@ from layer._utility_builder_non_layer import (
 )
 
 
-class Matmul(Layer):
-    """MatMul Layer class
-    Batch X: shape(N, D)
+class Embedding(Layer):
+    """Embedding Layer class
+    Batch X: shape(N, R)
     --------------------
-    Note that the original input X e.g. N x 28x28 pixel image (784 features) has
-    (N, D-1) shape WITHOUT the bias feature x0. The layer adds the bias, when the
-    input is given at function(X). Hence internally the shape of X is (N, D).
+    X is N rows of (target, context) pairs.
+    - R is the context window size where context includes the target.
+      (Not using D as D is the features of event vector or word vector).
+    - N is the number of context windows in a sentence = (H-R+1).
+    - H is the sequence length.
+    - E is the target event size.
 
-    X has N rows. Each row X[n] (n: 0, ... N-1) has D features of X[j][d] = x(j)(n).
-    Batch is referred as 'X' in capital and its scalar element is referred as x.
-    X[n] = [x(n)(0), ..., x(n)(d), ..., x(n)(D-1)]. The bias x(n)(0) = 1.
+    The first E columns in X are the labels.
 
-    As an illustration, an input batch X of shape (N, D-1) where (D-1)=784 pixels.
-    The layer adds bias x(n)(0)=1 at each row, and the X becomes shape (N, D).
-    'X' is not limited to the 0th input layer e.g. image pixels but to any layer.
+    The idea is that a target or an event is defined by the context
+    in which it occurs. The context including the target is a context window.
+    Embedding is to train a model to infer target T from a context.
 
-    Gradient dL/dX: shape(N, D-1) to back-propagate but (N, D) internally
+    For "I am a cat who has" where H=6. With R = 5 and E = 1,
+    context windows, and (target, context) pair are:
+    1. (I am a cat)       -> (target=a,   context=i,  am, cat, who)
+    2. (am a cat who has) -> (target=cat, context=am, a,  who, has)
+
+    Train the model which infers 'a' from a context (i, am, cat, who) and 'cat'
+    from (am, a,  who, has).
+
+    Stacking multiple sequences
     --------------------
-    Internally, dX or dL/dX is of shape (N, D) to match with the shape of X.
-    However, dL/dX to back-propagate must match the shape of the output form the
-    previous layer, which is (N, D-1) because the Matmul has added the bias.
+    X:(N, R) has small N for a short sequence, e.g. N=1 for 'I am a cat deeley'
+    as it only has 1 event-context pair (a, I am cat deeley). Hence multiple
+    X can be stacked along axis 0.
+
+    TODO: Decide where to handle the stacking
 
     Weights W: shape(M, D)
     --------------------
-    The layer has M nodes where each node m (m:0, 1, .. M-1) has a weight vector
-    W(m) = [w(m)(0), ... , w(m)(d), w(m)(D-1)] INCLUDING the bias weight w(m)(0).
-    When the layer is instantiated, W of shape (M, D) needs to be provided,
-    because how to configure the weights is up to the user's decision.
+    W is event embedding where each row represents an event (word).
+    - M is the number of vocabulary that depends on the vocabulary_size of the
+    EventIndexing instance.
+    - D is the number of features in the event vector.
+
+    W is a concept vector space in which each concept represented by a event
+    (word) is encoded with a vector of the finite length D. word2vec is proven
+    to be able to capture 'concept' e.g. king=man+(queen-woman). This is the
+    proof that the idea "event is defined by its context" is correct.
 
     Gradient dL/dW: shape(M, D)
     --------------------
-    Has the same shape of W
-
-
-    Numpy slice indexing
-    --------------------
-    Numpy uses View with slice-indexing, hence would be able to re-use the
-    existing memory area to save the memory.
-
-    dX = self.dX[
-        ::,
-        1::     # Omit the bias
-    ]
+    Has the same shape of W.
    """
     # ================================================================================
     # Class
     # ================================================================================
     @staticmethod
     def specification_template():
-        return Matmul.specification(
-            name="matmul001",
+        return Embedding.specification(
+            name="embedding001",
             num_nodes=3,
             num_features=2,     # without bias
         )
@@ -97,7 +104,7 @@ class Matmul(Layer):
             weights_initialization_scheme: str = "uniform",
             weights_optimizer_specification: dict = None
     ):
-        """Generate Matmul specification
+        """Generate Embedding specification
         Args:
             name: layer name
             num_nodes: number of nodes (outputs) in the layer
@@ -107,7 +114,7 @@ class Matmul(Layer):
                 optimizer specification. Default to  SGD
         """
         return {
-            _SCHEME: Matmul.__qualname__,
+            _SCHEME: Embedding.__qualname__,
             _PARAMETERS: {
                 _NAME: name,
                 _NUM_NODES: num_nodes,
@@ -123,7 +130,7 @@ class Matmul(Layer):
 
     @staticmethod
     def build(parameters: Dict):
-        """Build a matmul layer based on the parameters
+        """Build a Embedding layer based on the parameters
         parameters: {
             "num_nodes": 8,
             "num_features": 2,  # NOT including bias
@@ -138,7 +145,7 @@ class Matmul(Layer):
             (_NUM_NODES in parameters and parameters[_NUM_NODES] > 0) and
             (_NUM_FEATURES in parameters and parameters[_NUM_FEATURES] > 0) and
             _WEIGHTS in parameters
-        ), "Matmul.build(): missing mandatory elements %s in the parameters\n%s" \
+        ), "Embedding.build(): missing mandatory elements %s in the parameters\n%s" \
            % ((_NAME, _NUM_NODES, _NUM_FEATURES, _WEIGHTS), parameters)
 
         name = parameters[_NAME]
@@ -151,7 +158,7 @@ class Matmul(Layer):
         # Optimizer
         _optimizer = build_optimizer_from_layer_parameters(parameters)
 
-        matmul = Matmul(
+        embedding = Embedding(
             name=name,
             num_nodes=num_nodes,
             W=W,
@@ -159,7 +166,7 @@ class Matmul(Layer):
             log_level=parameters["log_level"] if "log_level" in parameters else logging.ERROR
         )
 
-        return matmul
+        return embedding
 
     # ================================================================================
     # Instance
@@ -168,7 +175,22 @@ class Matmul(Layer):
     # Instance properties
     # --------------------------------------------------------------------------------
     @property
-    def W(self) -> np.ndarray:
+    def vocabulary_size(self) -> TYPE_INT:
+        """vocabulary size. Same with M"""
+        return self.M
+
+    @property
+    def window_size(self) -> TYPE_INT:
+        """vocabulary size. Same with R"""
+        return self.R
+
+    @property
+    def target_size(self) -> TYPE_INT:
+        """Target event length. Same with E"""
+        return self.E
+
+    @property
+    def W(self) -> TYPE_TENSOR:
         """Layer weight vectors W"""
         return self._W
 
@@ -179,14 +201,14 @@ class Matmul(Layer):
         return self._dW
 
     @property
-    def X(self) -> np.ndarray:
+    def X(self) -> TYPE_TENSOR:
         """Latest batch input to the layer"""
         return super().X
 
     @X.setter
-    def X(self, X: np.ndarray):
+    def X(self, X: TYPE_TENSOR):
         """Set X"""
-        super(Matmul, type(self)).X.fset(self, X)
+        super(Embedding, type(self)).X.fset(self, X)
         assert self.X.shape[1] == self.D, \
             "X shape needs (%s, %s) but %s" % (self.N, self.D, self.X.shape)
 
@@ -231,14 +253,14 @@ class Matmul(Layer):
             optimizer: optimiser.Optimizer = optimiser.SGD(),
             log_level: int = logging.ERROR
     ):
-        """Initialize a matmul layer that has 'num_nodes' nodes
+        """Initialize a Embedding layer that has 'num_nodes' nodes
         Input X:(N,D) is a batch. D is number of features NOT including bias
         Weight W:(M, D+1) is the layer weight including bias weight.
         Args:
             name: Layer identity name
             num_nodes: Number of nodes in the layer
             W: Weight of shape(M=num_nodes, D+1). A row is a weight vector of a node.
-            posteriors: Post layers to which forward the matmul layer output
+            posteriors: Post layers to which forward the Embedding layer output
             optimizer: Gradient descent implementation e.g SGD, Adam.
             log_level: logging level
         """
@@ -264,7 +286,7 @@ class Matmul(Layer):
         self._S = [self.W]
 
         self.logger.debug(
-            "Matmul[%s] W.shape is [%s], number of nodes is [%s]",
+            "Embedding[%s] W.shape is [%s], number of nodes is [%s]",
             name, W.shape, num_nodes
         )
         # --------------------------------------------------------------------------------
@@ -322,11 +344,11 @@ class Matmul(Layer):
 
         # --------------------------------------------------------------------------------
         # TODO:
-        # Because transpose(T) is run everytime matmul is invoked, using the transposed W
+        # Because transpose(T) is run everytime Embedding is invoked, using the transposed W
         # would save the calculation time. This is probably the reason why cs231n uses
         # in column order format.
         # --------------------------------------------------------------------------------
-        np.matmul(self.X, self.W.T, out=self._Y)
+        np.Embedding(self.X, self.W.T, out=self._Y)
         assert np.all(np.isfinite(self.Y)), f"{self.Y}"
         return self.Y
 
@@ -350,7 +372,7 @@ class Matmul(Layer):
         # --------------------------------------------------------------------------------
         # dL/dW of shape (M,D):  [ X.T:(D, N)  @ dL/dY:(N,M) ].T
         # --------------------------------------------------------------------------------
-        dW = np.matmul(self.X.T, self.dY).T
+        dW = np.Embedding(self.X.T, self.dY).T
         assert dW.shape == (self.M, self.D), \
             f"Gradient dL/dW shape needs {(self.M, self.D)} but ({dW.shape}))"
 
@@ -360,7 +382,7 @@ class Matmul(Layer):
         # --------------------------------------------------------------------------------
         # dL/dX of shape (N,D):  [ dL/dY:(N,M) @ W:(M,D)) ]
         # --------------------------------------------------------------------------------
-        np.matmul(self.dY, self.W, out=self._dX)
+        np.Embedding(self.dY, self.W, out=self._dX)
         assert self.dX.shape == (self.N, self.D), \
             "dL/dX shape needs (%s, %s) but %s" % (self.N, self.D, self.dX.shape)
 

@@ -2,9 +2,9 @@
 """
 from typing import (
     List,
-    Union,
     Callable
 )
+import os
 import copy
 import logging
 import numpy as np
@@ -20,6 +20,7 @@ from layer.constants import (
     RELU_LEAKY_SLOPE
 )
 from layer import (
+    Layer,
     Matmul,
     ReLU,
     CrossEntropyLogLoss
@@ -36,6 +37,8 @@ from testing.config import (
     GRADIENT_DIFF_ACCEPTANCE_VALUE,
     ENFORCE_STRICT_ASSERT,
 )
+import function.utility as utility
+import function.fileio as fileio
 
 
 Logger = logging.getLogger(__name__)
@@ -360,3 +363,54 @@ def validate_relu_neuron_training(
             callback(W=matmul.W)
 
     return history
+
+
+class Function:
+    @property
+    def instance(self) -> Layer:
+        return self._instance
+
+    @property
+    def filename(self) -> str:
+        return self._filename
+
+    def __init__(self, instance: Layer):
+        """
+        Args:
+            instance: Layer instance to test
+        """
+        assert isinstance(instance, Layer)
+        self._instance = instance
+        self._filename = os.path.sep + os.path.sep.join([
+            "tmp",
+            __name__ + utility.Function.random_string(12) + ".pkl"
+        ])
+
+    def test_save(self) -> str:
+        # ********************************************************************************
+        # Constraint:
+        #   load must fail with the saved file being deleted.
+        #   Make sure load() is loading the path
+        # ********************************************************************************
+        self.instance.save(self.filename)
+        fileio.Function.rm_file(self.filename)
+        try:
+            msg = "load must fail with the saved file being deleted."
+            self.instance.load(self.filename)
+            raise AssertionError(msg)
+        except RuntimeError as e:
+            pass
+
+        # ********************************************************************************
+        # Constraint:
+        #   load restore the state before save
+        # ********************************************************************************
+        self.instance.save(self.filename)
+        return self.filename
+
+    def test_load(self):
+        self.instance.load(self.filename)
+
+    def clean(self):
+        fileio.Function.rm_file(self.filename)
+
