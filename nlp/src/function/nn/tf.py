@@ -1,6 +1,7 @@
 import logging
 from typing import (
-    Union
+    Union,
+    Callable
 )
 
 import numpy as np
@@ -20,14 +21,6 @@ class Function(base.Function):
     # ================================================================================
     # Class
     # ================================================================================
-    @staticmethod
-    def to_tensor(X, dtype=None) -> TYPE_TENSOR:
-        return tf.convert_to_tensor(X, dtype=dtype)
-
-    @staticmethod
-    def to_float_tensor(X, dtype=TYPE_FLOAT) -> TYPE_TENSOR:
-        return np.array(X, dtype=dtype)
-
     @staticmethod
     def sigmoid(
             X,
@@ -53,7 +46,7 @@ class Function(base.Function):
             if (boundary is None or boundary <= TYPE_FLOAT(0)) else boundary
         assert boundary > 0
 
-        if np.all(np.abs(X) <= boundary):
+        if tf.reduce_all(np.abs(X) <= boundary):
             _X = X
         else:
             Logger.warning(
@@ -61,17 +54,15 @@ class Function(base.Function):
                 boundary
             )
             if isinstance(X, np.ndarray):
-                _X = tf.identity(X)
-                tf.where((X > boundary), boundary, X)
-                tf.where((X > boundary), boundary, X)
-                _X[X > boundary] = boundary
-                _X[X < -boundary] = -boundary
+                _X = tf.Variable(X)
+                _X.assign(tf.where((X > boundary), boundary, X))
+                _X.assign(tf.where((X < -boundary), -boundary, X))
             else:  # Scalar
-                assert isinstance(X, TYPE_FLOAT)
-                _X = np.sign(X) * boundary
+                assert super().is_float_scalar(X)
+                _X = tf.constant(tf.math.sign(X) * boundary)
 
         Y = tf.nn.sigmoid(x=_X)
-        return Y
+        return Y.numpy()
 
     @staticmethod
     def softmax(X: Union[TYPE_FLOAT, TYPE_TENSOR], axis=None, out=None) -> Union[TYPE_FLOAT, TYPE_TENSOR]:
@@ -92,6 +83,13 @@ class Function(base.Function):
         X = super(Function, Function).assure_float_tensor(X)
         P = tf.nn.softmax(logits=X, axis=axis)
         return P
+
+    # --------------------------------------------------------------------------------
+    # Tensorflow method call table
+    # --------------------------------------------------------------------------------
+    matmul: Callable = tf.linalg.matmul # pylint: disable=not-callable
+    einsum: Callable = tf.einsum        # pylint: disable=not-callable
+    tensordot: Callable = tf.tensordot  # pylint: disable=not-callable
 
     # ================================================================================
     # Instance

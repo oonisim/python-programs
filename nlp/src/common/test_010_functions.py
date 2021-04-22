@@ -121,7 +121,7 @@ def test_010_standardize_eps(caplog):
     keepdims = True
 
     # Test eps
-    u = 1e-5
+    u = 1e-3
     for i in range(NUM_MAX_TEST_TIMES):
         eps = np.random.uniform(1e-12, 1e-7)
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)

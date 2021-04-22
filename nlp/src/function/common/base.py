@@ -42,9 +42,13 @@ class Function:
 
     @staticmethod
     def is_tensor(X):
+        """Check if X is rank > 1 tensor
+        Scalar and vector are tensor, but "tensor" is re-defined as rank 2 or larger,
+        so as to handle scalar, and vector respectively.
+        """
         return \
             (isinstance(X, np.ndarray) and X.ndim > 0) or \
-            (tf.is_tensor(X) and X.ndim > 0)
+            (tf.is_tensor(X) and tf.rank(X) > 0)
 
     @staticmethod
     def is_float_tensor(X) -> bool:
@@ -54,6 +58,13 @@ class Function:
         return \
             (isinstance(X, np.ndarray) and X.ndim > 0 and np.issubdtype(X.dtype, np.floating)) or \
             (tf.is_tensor(X) and X.dtype.is_floating)
+
+    @staticmethod
+    def tensor_shape(X):
+        """The shape of a tensor
+        """
+        assert Function.is_tensor(X)
+        return tuple(X.get_shape()) if tf.is_tensor(X) else X.shape
 
     @staticmethod
     def tensor_rank(X):
@@ -83,6 +94,9 @@ class Function:
 
     @staticmethod
     def to_tensor(X, dtype=None) -> TYPE_TENSOR:
+        """Convert to numpy array
+        Use numpy array as TF handles a numpy array as tensor
+        """
         if dtype is None:
             return np.array(X)
         else:
@@ -90,6 +104,9 @@ class Function:
 
     @staticmethod
     def to_float_tensor(X, dtype=TYPE_FLOAT) -> TYPE_TENSOR:
+        """
+        Use numpy array as TF handles a numpy array as tensor
+        """
         return np.array(X, dtype=dtype)
 
     @staticmethod

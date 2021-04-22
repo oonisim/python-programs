@@ -60,9 +60,9 @@ class Function:
         """
         padded = sum(
             [ 
-                [ EVENT_NIL ] * STRIDE, 
+                [ EVENT_NIL ] * EVENT_CONTEXT_STRIDE, 
                 corpus.split(' '),
-                [ EVENT_NIL ] * STRIDE
+                [ EVENT_NIL ] * EVENT_CONTEXT_STRIDE
             ],
             start=[]
         )
@@ -160,18 +160,37 @@ class Function:
             probabilities: event occurrence probabilities
         """
         events = Function.standardize(corpus).split()
-        probabilities: Dict[str, TYPE_FLOAT] = Function.event_occurrence_probability(events=events, power=power)
-        assert probabilities.get(EVENT_NIL.lower(), None) is None, \
+        # --------------------------------------------------------------------------------
+        # Preliminary event probabilities from the standardized event sequence.
+        # --------------------------------------------------------------------------------
+        _event_probabilities: Dict[str, TYPE_FLOAT] = Function.event_occurrence_probability(events=events, power=power)
+        assert _event_probabilities.get(EVENT_NIL.lower(), None) is None, \
             f"EVENT_NIL {EVENT_NIL.lower()} should not be included in the corpus. Change EVENT_NIL"
-        probabilities[EVENT_NIL.lower()] = TYPE_FLOAT(0)
-        probabilities[EVENT_UNK.lower()] = probabilities.get(EVENT_UNK.lower(), TYPE_FLOAT(0))
+        del events
 
-        vocabulary: List[str] = EVENT_META_ENTITIES + list(set(events) - set(EVENT_META_ENTITIES))
+        # --------------------------------------------------------------------------------
+        # Event probability with NIL, UNK at the top, so that the vocabulary, probabilities
+        # both have the same event orders.
+        # --------------------------------------------------------------------------------
+        event_to_probability: Dict[str, TYPE_FLOAT] = {
+            EVENT_NIL.lower(): TYPE_FLOAT(0),
+            EVENT_UNK.lower(): _event_probabilities.get(EVENT_UNK.lower(), TYPE_FLOAT(0))
+        }
+        event_to_probability.update(_event_probabilities)
+        del _event_probabilities
+
+        # --------------------------------------------------------------------------------
+        # Vocabulary from the keys of probabilities preserving the same event order
+        # --------------------------------------------------------------------------------
+        vocabulary: List[str] = list(event_to_probability.keys())
+
+        # --------------------------------------------------------------------------------
+        # mappings
+        # --------------------------------------------------------------------------------
         index_to_event: Dict[TYPE_INT, str] = dict(enumerate(vocabulary))
         event_to_index: Dict[str, TYPE_INT] = dict(zip(index_to_event.values(), index_to_event.keys()))
 
-        del events
-        return event_to_index, index_to_event, vocabulary, probabilities
+        return event_to_index, index_to_event, vocabulary, event_to_probability
 
     @staticmethod
     def sentence_to_sequence(

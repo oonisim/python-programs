@@ -106,9 +106,14 @@ class EventIndexing(Layer):
         return TYPE_INT(len(self.vocabulary))
 
     @property
-    def probabilities(self) -> Dict[str, TYPE_FLOAT]:
+    def probabilities(self) -> TYPE_TENSOR:
         """Probability of a specific event to occur"""
         return self._probabilities
+
+    @property
+    def event_to_probability(self) -> Dict[str, TYPE_INT]:
+        """Event to event probability mapping"""
+        return self._event_to_probability
 
     @property
     def event_to_index(self) -> Dict[str, TYPE_INT]:
@@ -118,7 +123,12 @@ class EventIndexing(Layer):
     @property
     def S(self) -> List:
         """State of the layer"""
-        self._S = [self.event_to_index, self.vocabulary, self.probabilities]
+        self._S = [
+            self.vocabulary,
+            self.probabilities,
+            self.event_to_index,
+            self.event_to_probability
+        ]
         return self._S
 
     def __init__(
@@ -140,32 +150,78 @@ class EventIndexing(Layer):
         assert len(corpus) > 0
         self.logger.debug("%s: corpus length is %s", self.name, len(corpus))
 
-        self._event_to_index, _, _vocabulary, self._probabilities = \
+        # --------------------------------------------------------------------------------
+        # Event statistics (vocabulary, probability, mappings, etc)
+        # --------------------------------------------------------------------------------
+        self._event_to_index, _, _vocabulary, self._event_to_probability = \
             text.Function.event_indexing(corpus=corpus, power=power)
+        del _
 
-        # self._vocabulary = super().to_tensor(_vocabulary)
+        # --------------------------------------------------------------------------------
+        # Vocabulary as np.array so as to select multiple events with its list indexing.
+        # --------------------------------------------------------------------------------
         self._vocabulary = np.array(_vocabulary)
+        del _vocabulary
         assert 0 < len(self.vocabulary) == len(self.event_to_index)
 
-        self.logger.debug("%s: vocabulary size is %s)", self.name, len(_vocabulary))
-        del _, _vocabulary
+        # --------------------------------------------------------------------------------
+        # Probabilities
+        # --------------------------------------------------------------------------------
+        self._probabilities = np.array(list(self.event_to_probability.values()))
+
+        self.logger.debug("%s: vocabulary size is %s)", self.name, self.vocabulary_size)
 
     def list_events(self, indices: Iterable[TYPE_INT]) -> Iterable[str]:
+        """Provides events at the indices in the vocabulary
+        Args:
+            indices: indices of events to get events
+        """
         return self._vocabulary[list(iter(indices))]
 
     def list_probabilities(self, events: Iterable[str]) -> Iterable[TYPE_FLOAT]:
+        """Provides probabilities of events
+        Args:
+            events: events to get the indices
+        """
         return [
-            self._probabilities.get(event, TYPE_FLOAT(0))
+            self.event_to_probability.get(event, TYPE_FLOAT(0))
             for event in events
         ]
 
-    def list_event_indices(self, events: Iterable[str]) -> Iterable[TYPE_INT]:
+    def list_indices(self, events: Iterable[str]) -> Iterable[TYPE_INT]:
+        """Provides indices of events
+        Args:
+            events: events to get the indices
+        """
         return [
             self.event_to_index.get(
                 event, TYPE_INT(EVENT_META_ENTITY_TO_INDEX[EVENT_UNK.lower()])
             )
             for event in events
         ]
+
+    def sample_events(self, size: TYPE_INT) -> Iterable[str]:
+        assert 0 < size < self.vocabulary_size
+        return list(np.random.choice(
+            a=self.vocabulary,
+            size=size,
+            replace=False,
+            p=self.probabilities
+        ))
+
+    def negative_sample_events_with_indices(
+            self, size: TYPE_INT, negatives: Iterable[TYPE_INT]
+    ) -> Iterable[TYPE_INT]:
+        """Generate indices of events that are not included in the negatives
+        Args:
+            size: sample size
+            negatives: event indices which should not be included in the sample
+
+        Return: Indices of events not included in negatives
+        """
+        candidates = self.list_indices(self.sample_events(size*2))
+        self.list_indices(candidates)
+        return list(set(candidates) - set(negatives))[:size]
 
     def sentence_to_sequence(self, sentences: str) -> List[List[TYPE_INT]]:
         """Generate a list of event indices per sentence
@@ -217,15 +273,25 @@ class EventIndexing(Layer):
             path: state file path
         """
         state = super().load(path)
-        del self._event_to_index, self._vocabulary, self._probabilities
-        self._event_to_index = state[0]
-        self._vocabulary = state[1]
-        self._probabilities = state[2]
+        del self._vocabulary, \
+            self._probabilities, \
+            self._event_to_index, \
+            self._event_to_probability
+
+        self._vocabulary = state[0]
+        self._probabilities = state[1]
+        self._event_to_index = state[2]
+        self._event_to_probability = state[3]
 
         assert \
             isinstance(self.event_to_index, dict) and \
-            self.event_to_index[EVENT_NIL] == 0 \
-            and self.vocabulary[0] == EVENT_NIL
+            isinstance(self.event_to_probability, dict) and \
+            self.event_to_index[EVENT_NIL.lower()] == 0 and \
+            self.event_to_index[EVENT_UNK.lower()] == 1 and \
+            self.event_to_probability[EVENT_NIL.lower()] == 0 and \
+            self.vocabulary[0] == EVENT_NIL.lower() and \
+            self.probabilities[0] == TYPE_FLOAT(0) and \
+            self.probabilities[1] == self.event_to_probability[EVENT_UNK.lower()]
 
         return self.S
 

@@ -15,7 +15,8 @@ import optimizer as optimiser
 from common.constant import (
     TYPE_FLOAT,
     TYPE_INT,
-    TYPE_TENSOR
+    TYPE_TENSOR,
+    EVENT_VECTOR_SIZE
 )
 from common.function import (
     numerical_jacobian,
@@ -84,11 +85,6 @@ class Embedding(Layer):
     is encoded with a vector of the finite length D. word2vec is proven to be
     able to capture 'concept' e.g. king=man+(queen-woman). This is the proof
     that the idea "event is defined by its context" is correct.
-
-    Number of output M
-    --------------------
-    The layer output (N, M). M = 1 x (true labe) + (M-1) x (negative labels)
-
     """
     # ================================================================================
     # Class
@@ -181,8 +177,8 @@ class Embedding(Layer):
     # --------------------------------------------------------------------------------
     @property
     def E(self) -> TYPE_INT:
-        """Event size"""
-        return self._event_size
+        """Target event size"""
+        return self._target_size
 
     @property
     def C(self) -> TYPE_INT:
@@ -264,11 +260,11 @@ class Embedding(Layer):
     def __init__(
             self,
             name: str,
-            num_nodes: TYPE_INT,
-            event_size: TYPE_INT,
-            context_size: TYPE_INT,
-            W: np.ndarray,
-            dictionary: EventIndexing,
+            num_nodes: TYPE_INT = 1,
+            target_size: TYPE_INT = 1,
+            context_size: TYPE_INT = 4,
+            dictionary: EventIndexing = None,
+            W: Optional[TYPE_TENSOR] = None,
             optimizer: optimiser.Optimizer = optimiser.SGD(),
             posteriors: Optional[List[Layer]] = None,
             log_level: int = logging.ERROR
@@ -279,33 +275,43 @@ class Embedding(Layer):
         Args:
             name: Layer identity name
             num_nodes: Number of output M
-            W: Weight of shape(V=vocabulary_size, D).
+            target_size: size of the target event of the (target, context) pair.
+            context_size: size of the context of the (target, context) pair.
             dictionary: Dictionary to consult event probabilities and event samples.
+            W: Weight of shape(V=vocabulary_size, D).
             posteriors: Post layers to which forward the Embedding layer output
             optimizer: Gradient descent implementation e.g SGD, Adam.
             log_level: logging level
         """
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
 
-        # --------------------------------------------------------------------------------
-        # W: weight matrix of shape(M,D) where M=num_nodes
-        # Gradient dL/dW has the same shape shape(M, D) with W because L is scalar.
-        #
-        # Not use WT because W keeps updated every cycle, hence need to update WT as well.
-        # Hence not much performance gain and risk of introducing bugs.
-        # self._WT: np.ndarray = W.T          # transpose of W
-        # --------------------------------------------------------------------------------
-        assert 0 < event_size and 0 < context_size
+        assert num_nodes == 1, "Number of output should be 1 for logistic classification"
+        assert 0 < target_size and 0 < context_size
         assert W.shape[0] >= dictionary.vocabulary_size, \
             f"W shape needs ({num_nodes}, >={dictionary.vocabulary_size}) but {W.shape}."
         assert isinstance(dictionary, EventIndexing) and dictionary.vocabulary_size > 2
 
-        self._context_size = context_size
-        self._event_size = event_size
-        self._dictionary: EventIndexing = dictionary
-        self._W: TYPE_TENSOR = copy.deepcopy(W)
-        self._D = self.W.shape[1]
         self._M = num_nodes
+
+        # --------------------------------------------------------------------------------
+        # (target, context) pair attributes
+        # --------------------------------------------------------------------------------
+        self._target_size = target_size
+        self._context_size = context_size
+
+        # --------------------------------------------------------------------------------
+        # Dictionary of events that provide event probability, etc.
+        # --------------------------------------------------------------------------------
+        self._dictionary: EventIndexing = dictionary
+
+        # --------------------------------------------------------------------------------
+        # Event vector space
+        # --------------------------------------------------------------------------------
+        if W is None:
+            self._W = self.weights(M=self.V, D=EVENT_VECTOR_SIZE)
+        else:
+            self._W: TYPE_TENSOR = copy.deepcopy(W)
+        self._D = self.W.shape[1]
 
         # --------------------------------------------------------------------------------
         # State of the layer
@@ -326,21 +332,47 @@ class Embedding(Layer):
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
-    def _extract_context_vectors(self, X: TYPE_TENSOR):
-        """
-        From the event vector space W, extract vectors for contexts in the
-        (event, context) rows in X.
-
+    def _extract_event_vectors(self, X: TYPE_TENSOR):
+        """Extract vectors from event vector space W.
+        Use numpy 1D array indexing to extract rows from W.
         W[
-            [idx, idx, ....]  # indices of all the contexts in X
+            [idx, idx, ....]
         ]
-        """
 
+        Args:
+            X: rank 2 matrix
+
+        Returns: vectors of shape:(N*?, D) where is C or E.
+        """
+        assert isinstance(self.W, np.ndarray) and self.tensor_rank(self.W) == 2
+        vectors = self.W[
+            self.reshape(X, (-1))
+        ]
+        assert \
+            self.tensor_shape(vectors) == (self.N * self.C, self.D) or \
+            self.tensor_shape(vectors) == (self.N * self.E, self.D)
+
+        return vectors
+
+    def _group_sum(self, vectors: TYPE_TENSOR):
+        """sum(vectors) Group-by axis=1 of shape:(N, ?, D)
+        Args:
+            vectors: Event vectors of shape:(N, C, D) or (N, E, D)
+        """
+        return self.einsum(
+            "ncd->nd",
+            self.reshape(vectors, (self.N, -1, self.D))
+        ) if vectors.shape[0] > self.N else vectors
+
+    def _bag(self, X):
+        bag = self._group_sum(self._extract_event_vectors(X))
+        assert self.tensor_shape(bag) == (self.N, self.D)
+        return bag
 
     def function(self, X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
         """Calculate the layer output Y
         Process:
-        1. BoW event vectors for contexts:
+        1. BoW (Bag of Words) event vectors for contexts:
             For all the (target, context) pairs:
             1-1. Extract event vectors from W for the 'context' in (target, context) pair.
                  -> context vectors of shape:(R,D)
@@ -393,13 +425,28 @@ class Embedding(Layer):
         self.X = X
 
         # ================================================================================
-        #
+        # BoW vectors for contexts
+        # ================================================================================
+        contexts = self._bag(X[
+            ::,
+            self.E:(self.E+self.C)
+        ])
+
+        # ================================================================================
+        # Target vectors
+        # ================================================================================
+        targets = self._bag(X[
+            ::,
+            0: self.E
+        ])
+
+        # ================================================================================
+        # Negative samples
         # ================================================================================
 
         # --------------------------------------------------------------------------------
         # Extract event vectors from W for all the contexts in X.
         # --------------------------------------------------------------------------------
-        self._extract_context_vectors(X[::, self.E:(self.E+self.C)])
 
         self.logger.debug(
             "layer[%s].%s: X.shape %s W.shape %s",

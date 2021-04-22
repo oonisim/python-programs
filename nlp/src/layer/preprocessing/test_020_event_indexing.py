@@ -143,7 +143,7 @@ def test_020_event_indexing_instance_properties(caplog):
         length = event_indexing.vocabulary_size
         index = np.random.randint(0, length)
         word, *_ = list(event_indexing.list_events([index]))
-        assert event_indexing.list_event_indices([word]) == [index], msg
+        assert event_indexing.list_indices([word]) == [index], msg
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")
