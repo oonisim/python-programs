@@ -35,7 +35,9 @@ class Function(base.Function):
             sequence: 1 dimensional tensor
             window_size: size of the context including the event
             event_size: size of the event which can be > 1
-        Returns: [
+
+        Returns: (event, context) pairs of shape:(N, E+C) where N=num_windows.
+        [
             [b, a, c],
             [c, b, d],
             [d, e, e]

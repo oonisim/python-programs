@@ -204,14 +204,14 @@ class EventIndexing(Layer):
         """Generate a event index sequence for a sentence"""
         # return super().to_tensor(self.sentence_to_sequence(X))
 
-        sequence = super().to_tensor(self.sentence_to_sequence(X))
+        sequence = self.to_tensor(self.sentence_to_sequence(X))
         self.logger.debug("sequence generated \n%s", sequence)
         assert \
-            super().tensor_rank(sequence) == 2, \
+            self.tensor_rank(sequence) == 2, \
             "Expected ran 2 but sequence %s" % sequence
         return sequence
 
-    def load(self, path: str):
+    def load(self, path: str) -> List:
         """Load and restore the layer state
         Args:
             path: state file path
@@ -226,6 +226,8 @@ class EventIndexing(Layer):
             isinstance(self.event_to_index, dict) and \
             self.event_to_index[EVENT_NIL] == 0 \
             and self.vocabulary[0] == EVENT_NIL
+
+        return self.S
 
 
 class EventContext(Layer):
@@ -347,20 +349,58 @@ class EventContext(Layer):
         )
 
     def function(self, X: TYPE_TENSOR) -> TYPE_TENSOR:
-        X = super().assure_tensor(X)
-        if super().tensor_rank(X) == 1:
-            return utility.Function.event_context_pairs(
+        """Generate (event, context) pairs from event sequence X. The shape of
+        X can be (sequence_size,) for a single sequence or (N, sequence_size)
+        for multiple sequences.
+
+        For X: [0,1,2,3,4,5] of shape (sequence_size,), the output Y is shape:
+        (num_windows, E+C) where each row is (event, context). C is the size of
+        the context.
+
+        Y:[
+          [2, 0, 1, 3, 4],
+          [3, 1, 2, 4, 5],
+          [4, 2, 3, 5, 6]
+        ]
+
+        The number of windows (num_windows) of each sentences is the number of
+        rows in Y, which varies as the sequence size is not fixed.
+        There first column(s) of size E (event can be multiple consecutive) of
+        Y is the event, and the rest is the context for the event.
+        Y[
+            ::,
+            range(E)
+        ]
+
+        For X of shape (N, sequence_size), Y:shape is (N, num_windows, E+C).
+
+        Args:
+            X: One or more event index sequences of shape:(sequence_size,) or
+               shape:(N, sequence_size)
+
+        Returns: (event, context) pairs. The output shape can be
+                 - (num_windows, E+C)    when X is one sequence.
+                 - (N, num_windows, E+C) when X is multiple sequences.
+
+                 Not stacking N x (num_windows, E+C).
+        """
+        X = self.assure_tensor(X)
+        if self.tensor_rank(X) == 1:
+            event_context: TYPE_TENSOR = utility.Function.event_context_pairs(
                 sequence=X,
                 window_size=self.window_size,
                 event_size=self.event_size
             )
-        elif super().tensor_rank(X) == 2:
-            return np.array([
+        elif self.tensor_rank(X) == 2:
+            event_context: TYPE_TENSOR = np.array([
                 utility.Function.event_context_pairs(
                     sequence=_x,
                     window_size=self.window_size,
                     event_size=self.event_size
                 ) for _x in X
-            ], dtype=TYPE_INT)
+            ])
         else:
             raise RuntimeError(f"Unexpected tensor dimension {X.ndim}.")
+
+        assert self.tensor_dtype(event_context) == TYPE_INT
+        return event_context

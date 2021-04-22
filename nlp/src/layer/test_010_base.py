@@ -1,20 +1,17 @@
-"""Network base layer test cases"""
-from typing import (
-    Optional,
-    Union,
-    List,
-    Dict,
-    Tuple
-)
+"""Network base _layer test cases"""
 import logging
+from typing import (
+    Union
+)
+
 import numpy as np
+
 from layer.base import (
     Layer
 )
 from testing.config import (
     NUM_MAX_NODES,
-    NUM_MAX_BATCH_SIZE,
-    NUM_MAX_FEATURES
+    NUM_MAX_BATCH_SIZE
 )
 
 Logger = logging.getLogger(__name__)
@@ -64,15 +61,15 @@ def test_010_base_instantiation_to_fail():
     # try:
     #     N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
     #     M: int = np.random.randint(1, NUM_MAX_NODES)
-    #     layer: Layer = Layer(
+    #     _layer: Layer = Layer(
     #         name="test_010_base",
     #         num_nodes=M,
     #         log_level=logging.DEBUG
     #     )
     #     X = np.random.randn(N, M)
-    #     layer.X = X
+    #     _layer.X = X
     #     T = np.random.randint(0, M, N+1)
-    #     layer.T = T
+    #     _layer.T = T
     #     raise RuntimeError("Layer initialization different batch size between X and T must fail")
     # except AssertionError:
     #     pass
@@ -85,10 +82,10 @@ def test_010_base_instance_properties():
     Expected:
         Initialization detects the access to the non-initialized parameters and fails.
     """
-    msg = "Accessing uninitialized property of the layer must fail."
+    msg = "Accessing uninitialized property of the _layer must fail."
     M: int = np.random.randint(1, NUM_MAX_NODES)
     name = "test_010_base"
-    layer = Layer(
+    _layer = Layer(
         name=name,
         num_nodes=M,
         log_level=logging.DEBUG
@@ -97,17 +94,17 @@ def test_010_base_instance_properties():
     # To pass
     # --------------------------------------------------------------------------------
     try:
-        if not layer.name == name: raise RuntimeError("layer.name == name should be true")
+        if not _layer.name == name: raise RuntimeError("layer.name == name should be true")
     except AssertionError:
         raise RuntimeError("Access to name should be allowed as already initialized.")
 
     try:
-        if not layer.M == M: raise RuntimeError("layer.M == M should be true")
+        if not _layer.M == M: raise RuntimeError("layer.M == M should be true")
     except AssertionError:
         raise RuntimeError("Access to M should be allowed as already initialized.")
 
     try:
-        if not isinstance(layer.logger, logging.Logger):
+        if not isinstance(_layer.logger, logging.Logger):
             raise RuntimeError("isinstance(layer.logger, logging.Logger) should be true")
     except AssertionError:
         raise RuntimeError("Access to logger should be allowed as already initialized.")
@@ -117,80 +114,80 @@ def test_010_base_instance_properties():
     # --------------------------------------------------------------------------------
 
     try:
-        print(layer.D)
+        print(_layer.D)
         raise RuntimeError(msg)
     except AssertionError:
         pass
 
     try:
-        print(layer.X)
+        print(_layer.X)
         raise RuntimeError(msg)
     except AssertionError:
         pass
 
     try:
-        layer.X = int(1)
+        _layer.X = int(1)
         raise RuntimeError(msg)
     except AssertionError:
         pass
 
     try:
-        print(layer.dX)
+        print(_layer.dX)
         raise RuntimeError(msg)
     except AssertionError:
         pass
 
     try:
-        print(layer.Y)
+        print(_layer.Y)
         raise RuntimeError(msg)
     except AssertionError:
         pass
     try:
-        layer._Y = int(1)
-        print(layer.Y)
-        raise RuntimeError(msg)
-    except AssertionError:
-        pass
-
-    try:
-        print(layer.dY)
-        raise RuntimeError(msg)
-    except AssertionError:
-        pass
-    try:
-        layer._dY = int(1)
-        print(layer.dY)
+        _layer._Y = int(1)
+        print(_layer.Y)
         raise RuntimeError(msg)
     except AssertionError:
         pass
 
     try:
-        print(layer.T)
+        print(_layer.dY)
+        raise RuntimeError(msg)
+    except AssertionError:
+        pass
+    try:
+        _layer._dY = int(1)
+        print(_layer.dY)
         raise RuntimeError(msg)
     except AssertionError:
         pass
 
     try:
-        layer.T = float(1)
+        print(_layer.T)
+        raise RuntimeError(msg)
+    except AssertionError:
+        pass
+
+    try:
+        _layer.T = float(1)
         raise RuntimeError(msg)
     except AssertionError:
         pass
 
     try:
         # pylint: disable=not-callable
-        layer.objective(np.array(1.0))
+        _layer.objective(np.array(1.0))
         raise RuntimeError(msg)
     except AssertionError:
         pass
 
     try:
-        print(layer.N)
+        print(_layer.N)
         raise RuntimeError(msg)
     except AssertionError:
         pass
 
-    assert layer.name == name
-    assert layer.num_nodes == M
+    assert _layer.name == name
+    assert _layer.num_nodes == M
 
 
 def test_010_base_instantiation():
@@ -213,7 +210,7 @@ def test_010_base_instantiation():
     N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
     M: int = np.random.randint(1, NUM_MAX_NODES)
     name = "test_010_base"
-    layer: Layer = Layer(
+    _layer: Layer = Layer(
         name=name,
         num_nodes=M,
         log_level=logging.DEBUG
@@ -222,54 +219,55 @@ def test_010_base_instantiation():
     # --------------------------------------------------------------------------------
     # Properties
     # --------------------------------------------------------------------------------
-    assert layer.name == name
-    assert layer.num_nodes == layer.M == M
+    assert _layer.name == name
+    assert _layer.num_nodes == _layer.M == M
 
-    layer._D = 1
-    assert layer.D == 1
+    _layer._D = 1
+    assert _layer.D == 1
 
     X = np.random.randn(N, M)
-    layer.X = X
-    assert np.array_equal(layer.X, X)
-    assert layer.N == N
+    _layer.X = X
+    assert np.array_equal(_layer.X, X), \
+        "Expected:\n%s\nDiff\n%s\n" % (X, (_layer.X-X))
+    assert _layer.N == N
 
-    layer._dX = X
-    assert np.array_equal(layer.dX, X)
+    _layer._dX = X
+    assert np.array_equal(_layer.dX, X)
 
     T = np.random.randint(0, M, N)
-    layer.T = T
-    assert np.array_equal(layer.T, T)
+    _layer.T = T
+    assert np.array_equal(_layer.T, T)
 
-    layer._Y = np.dot(X, X.T)
-    assert np.array_equal(layer.Y, np.dot(X, X.T))
+    _layer._Y = np.dot(X, X.T)
+    assert np.array_equal(_layer.Y, np.dot(X, X.T))
 
-    layer._dY = np.array(0.9)
-    assert layer._dY == np.array(0.9)
+    _layer._dY = np.array(0.9)
+    assert _layer._dY == np.array(0.9)
 
-    layer.logger.debug("This is a pytest")
+    _layer.logger.debug("This is a pytest")
 
     # --------------------------------------------------------------------------------
     # Methods
     # --------------------------------------------------------------------------------
     try:
         # pylint: disable=not-callable
-        layer.function(int(1))
+        _layer.function(int(1))
         raise RuntimeError("Invoke layer.function(int(1)) must fail.")
     except AssertionError:
         pass
 
     x = np.array(1.0)
-    assert np.array_equal(layer.function(x), x)
+    assert np.array_equal(_layer.function(x), x)
 
     try:
-        layer.gradient(int(1))
+        _layer.gradient(int(1))
         raise RuntimeError("Invoke layer.gradient(int(1)) must fail.")
     except AssertionError:
         pass
 
     dY = np.array([1.0, 2.0])
-    assert np.array_equal(layer.gradient(dY), dY)
+    assert np.array_equal(_layer.gradient(dY), dY)
 
-    layer.objective = objective
+    _layer.objective = objective
     # pylint: disable=not-callable
-    assert np.array_equal(layer.objective(X), objective(X))
+    assert np.array_equal(_layer.objective(X), objective(X))

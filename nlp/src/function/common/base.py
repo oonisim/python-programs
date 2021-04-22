@@ -58,14 +58,28 @@ class Function:
     @staticmethod
     def tensor_rank(X):
         """The rank of a tensor
-         Rank is the number of indices required to uniquely select an element of the tensor.
-         Rank is also known as "order", "degree", or "ndims.
+        Rank is the number of indices required to uniquely select an element of the tensor.
+        Rank is also known as "order", "degree", or "ndims.
 
         The rank of a tensor is not the same as the rank of a matrix.
         Dimension may match with Rank but not always.
         """
         assert Function.is_tensor(X)
         return tf.rank(X) if tf.is_tensor(X) else X.ndim
+
+    @staticmethod
+    def tensor_size(X):
+        """The size of a tensor
+        """
+        assert Function.is_tensor(X)
+        return tf.size(X) if tf.is_tensor(X) else X.size
+
+    @staticmethod
+    def tensor_dtype(X):
+        """The dtype of a tensor
+        """
+        assert Function.is_tensor(X)
+        return X.dtype
 
     @staticmethod
     def to_tensor(X, dtype=None) -> TYPE_TENSOR:
@@ -127,7 +141,3 @@ class Function:
         """
         assert name
         self._name: str = name
-
-        # number of nodes in the layer
-        self._logger = logging.getLogger(name)
-        self._logger.setLevel(logging._levelToName[log_level])

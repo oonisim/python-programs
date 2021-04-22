@@ -20,7 +20,11 @@ from common.constant import (
 from common.function import (
     numerical_jacobian,
 )
-from layer.base import Layer
+# TODO: Update to layer.base once RC is done
+from layer.base_rc import Layer
+from layer.preprocessing import (
+    EventIndexing
+)
 from layer.constants import (
     _WEIGHTS,
     _NAME,
@@ -38,22 +42,22 @@ from layer._utility_builder_non_layer import (
 
 class Embedding(Layer):
     """Embedding Layer class
-    Batch X: shape(N, R)
+    Batch X: shape(N, E+C)
     --------------------
-    X is N rows of (target, context) pairs.
-    - R is the context window size where context includes the target.
-      (Not using D as D is the features of event vector or word vector).
-    - N is the number of context windows in a sentence = (H-R+1).
+    X is N rows of (event, context) pairs.
+    - N is the number of context windows in a sentence = (H-C+1).
+    - E is the event size.
+    - C is the context size.
     - H is the sequence length.
-    - E is the target event size.
 
-    The first E columns in X are the labels.
+    The first E columns in X are the labels telling what is the event(s) to be
+    inferred from the context. Context Windows = (event, context) and its size
+    windows_size = E+C
 
-    The idea is that a target or an event is defined by the context
-    in which it occurs. The context including the target is a context window.
-    Embedding is to train a model to infer target T from a context.
+    The idea is that an event is defined by the context in which it occurs.
+    Embedding is to train a model to infer target from a context.
 
-    For "I am a cat who has" where H=6. With R = 5 and E = 1,
+    For "I am a cat who has" where H=6. With C = 5 and E = 1,
     context windows, and (target, context) pair are:
     1. (I am a cat)       -> (target=a,   context=i,  am, cat, who)
     2. (am a cat who has) -> (target=cat, context=am, a,  who, has)
@@ -63,28 +67,29 @@ class Embedding(Layer):
 
     Stacking multiple sequences
     --------------------
-    X:(N, R) has small N for a short sequence, e.g. N=1 for 'I am a cat deeley'
+    X:(N, C) has small N for a short sequence, e.g. N=1 for 'I am a cat deeley'
     as it only has 1 event-context pair (a, I am cat deeley). Hence multiple
     X can be stacked along axis 0.
 
     TODO: Decide where to handle the stacking
 
-    Weights W: shape(M, D)
+    Weights W: shape(V, D)
     --------------------
-    W is event embedding where each row represents an event (word).
-    - M is the number of vocabulary that depends on the vocabulary_size of the
+    W is event vector space where each row represents an event (e.g. word).
+    - V is the number of vocabulary that depends on the vocabulary_size of the
     EventIndexing instance.
-    - D is the number of features in the event vector.
+    - D is the number of features in a event vector.
 
     W is a concept vector space in which each concept represented by a event
-    (word) is encoded with a vector of the finite length D. word2vec is proven
-    to be able to capture 'concept' e.g. king=man+(queen-woman). This is the
-    proof that the idea "event is defined by its context" is correct.
+    is encoded with a vector of the finite length D. word2vec is proven to be
+    able to capture 'concept' e.g. king=man+(queen-woman). This is the proof
+    that the idea "event is defined by its context" is correct.
 
-    Gradient dL/dW: shape(M, D)
+    Number of output M
     --------------------
-    Has the same shape of W.
-   """
+    The layer output (N, M). M = 1 x (true labe) + (M-1) x (negative labels)
+
+    """
     # ================================================================================
     # Class
     # ================================================================================
@@ -175,19 +180,29 @@ class Embedding(Layer):
     # Instance properties
     # --------------------------------------------------------------------------------
     @property
-    def vocabulary_size(self) -> TYPE_INT:
-        """vocabulary size. Same with M"""
-        return self.M
+    def E(self) -> TYPE_INT:
+        """Event size"""
+        return self._event_size
+
+    @property
+    def C(self) -> TYPE_INT:
+        """Context size"""
+        return self._context_size
 
     @property
     def window_size(self) -> TYPE_INT:
-        """vocabulary size. Same with R"""
-        return self.R
+        """Context window size (E+C)"""
+        return self.E + self.C
 
     @property
-    def target_size(self) -> TYPE_INT:
-        """Target event length. Same with E"""
-        return self.E
+    def dictionary(self) -> EventIndexing:
+        """Event dictionary"""
+        return self._dictionary
+
+    @property
+    def V(self) -> TYPE_INT:
+        """vocabulary size. Same"""
+        return self.dictionary.vocabulary_size
 
     @property
     def W(self) -> TYPE_TENSOR:
@@ -207,10 +222,12 @@ class Embedding(Layer):
 
     @X.setter
     def X(self, X: TYPE_TENSOR):
-        """Set X"""
+        """
+        """
+        window_size = list(X.shape)[-1]
+        assert window_size == self.window_size, \
+            "Each X record needs (event+context) size but %s" % window_size
         super(Embedding, type(self)).X.fset(self, X)
-        assert self.X.shape[1] == self.D, \
-            "X shape needs (%s, %s) but %s" % (self.N, self.D, self.X.shape)
 
     @property
     def S(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
@@ -247,19 +264,23 @@ class Embedding(Layer):
     def __init__(
             self,
             name: str,
-            num_nodes: int,
+            num_nodes: TYPE_INT,
+            event_size: TYPE_INT,
+            context_size: TYPE_INT,
             W: np.ndarray,
-            posteriors: Optional[List[Layer]] = None,
+            dictionary: EventIndexing,
             optimizer: optimiser.Optimizer = optimiser.SGD(),
+            posteriors: Optional[List[Layer]] = None,
             log_level: int = logging.ERROR
     ):
         """Initialize a Embedding layer that has 'num_nodes' nodes
-        Input X:(N,D) is a batch. D is number of features NOT including bias
-        Weight W:(M, D+1) is the layer weight including bias weight.
+        Input X:(N,E+C) is a batch.
+        Weight W:(M, D) is the event vector space of size V.
         Args:
             name: Layer identity name
-            num_nodes: Number of nodes in the layer
-            W: Weight of shape(M=num_nodes, D+1). A row is a weight vector of a node.
+            num_nodes: Number of output M
+            W: Weight of shape(V=vocabulary_size, D).
+            dictionary: Dictionary to consult event probabilities and event samples.
             posteriors: Post layers to which forward the Embedding layer output
             optimizer: Gradient descent implementation e.g SGD, Adam.
             log_level: logging level
@@ -274,53 +295,111 @@ class Embedding(Layer):
         # Hence not much performance gain and risk of introducing bugs.
         # self._WT: np.ndarray = W.T          # transpose of W
         # --------------------------------------------------------------------------------
-        assert W.shape[0] == num_nodes, \
-            f"W shape needs to be ({num_nodes}, D) but {W.shape}."
-        self._D = W.shape[1]                    # number of features in x including bias
-        self._W: np.ndarray = copy.deepcopy(W)  # node weight vectors
-        self._dW: np.ndarray = np.empty(0, dtype=TYPE_FLOAT)
+        assert 0 < event_size and 0 < context_size
+        assert W.shape[0] >= dictionary.vocabulary_size, \
+            f"W shape needs ({num_nodes}, >={dictionary.vocabulary_size}) but {W.shape}."
+        assert isinstance(dictionary, EventIndexing) and dictionary.vocabulary_size > 2
+
+        self._context_size = context_size
+        self._event_size = event_size
+        self._dictionary: EventIndexing = dictionary
+        self._W: TYPE_TENSOR = copy.deepcopy(W)
+        self._D = self.W.shape[1]
+        self._M = num_nodes
 
         # --------------------------------------------------------------------------------
         # State of the layer
         # --------------------------------------------------------------------------------
         self._S = [self.W]
 
-        self.logger.debug(
-            "Embedding[%s] W.shape is [%s], number of nodes is [%s]",
-            name, W.shape, num_nodes
-        )
         # --------------------------------------------------------------------------------
         # Optimizer for gradient descent
-        # Z(n+1) = optimiser.update((Z(n), dL/dZ(n)+regularization)
         # --------------------------------------------------------------------------------
         assert isinstance(optimizer, optimiser.Optimizer)
         self._optimizer: optimiser.Optimizer = optimizer
 
+        self.logger.debug(
+            "Embedding[%s] W.shape is [%s], number of outputs is [%s]",
+            name, self.W.shape, self.M
+        )
+
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
-    def function(self, X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
-        """Calculate the layer output Y = X@W.T
-        Args:
-            X: Batch input data from the input layer without the bias.
-        Returns:
-            Y: Layer value of X@W.T
+    def _extract_context_vectors(self, X: TYPE_TENSOR):
         """
-        assert isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT, \
-            f"Only np array of type {TYPE_FLOAT} is accepted"
+        From the event vector space W, extract vectors for contexts in the
+        (event, context) rows in X.
 
-        name = "function"
-        # --------------------------------------------------------------------------------
-        # Y = (W@X + b) could be efficient
-        # --------------------------------------------------------------------------------
-        if X.ndim <= 1:
-            X = np.array(X).reshape(1, -1)
-
-        self.X = np.c_[
-            np.ones(X.shape[0], dtype=TYPE_FLOAT),  # Add bias
-            X
+        W[
+            [idx, idx, ....]  # indices of all the contexts in X
         ]
-        assert self.X.shape == (self.N, self.D)
+        """
+
+
+    def function(self, X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
+        """Calculate the layer output Y
+        Process:
+        1. BoW event vectors for contexts:
+            For all the (target, context) pairs:
+            1-1. Extract event vectors from W for the 'context' in (target, context) pair.
+                 -> context vectors of shape:(R,D)
+            1-2. Create a BoW (Bag of words) vector from the context vectors with
+                 sum(context_vectors, axis=0)
+                 -> a BoW vector of shape:(1,D)
+            1-3. Stack all the BoWs into shape:(N, D)
+
+        2. Target event vector for events:
+            For all the (target, context) pairs:
+            2-1. Extract event vectors from W for the 'target' in (target, context) pair.
+               If E > 1, sum the target vectors of shape:(E, D) along axis=0.
+               -> a target vector of shape:(1, D).
+            2-2. Stack all the targets into shape:(N, D)
+
+        3. Negative samples.
+            For all the (target, context) pairs.
+            3-1. Sample G negative events from the dictionary. Negative events are
+                 events not includes in the (target, context) pair. G is the number of
+                 negative samples.
+            3-2. Extract event vectors from W for the negative events.
+                 -> negative vectors of shape:(G, D).
+            3-3. Stack all the negative vectors into shape:(N, G, D)
+
+        Args:
+            X:  (event, context) pairs. The shape can be:
+                - (num_windows, E+C)    when X has one sequence.
+                - (N, num_windows, E+C) when X has multiple sequences.
+
+                num_windows is the number of context windows in a sequence which
+                varies per sequence.
+
+        Returns:
+            Y: Layer value
+        """
+        name = "function"
+        assert self.is_tensor(X)
+        assert self.tensor_rank(X) in [2, 3], \
+            "Expected X shape is (?, E+C) or (N, ?, E+C) but %s" % X.shape
+
+        # --------------------------------------------------------------------------------
+        # Stack N x (num_windows, E+C) into (N*num_windows, E+C).
+        # The information of which sequence a (event, context) pair belongs to gets lost.
+        # However, Embedding only require (event, context) pairs, NOT sequences.
+        # --------------------------------------------------------------------------------
+        if self.tensor_rank(X) > 2:
+            X = self.reshape(X, (-1, 1))
+        assert X.shape[1] == self.window_size, \
+            "The X row needs shape (E+C,) but %s" % X.shape[1]
+        self.X = X
+
+        # ================================================================================
+        #
+        # ================================================================================
+
+        # --------------------------------------------------------------------------------
+        # Extract event vectors from W for all the contexts in X.
+        # --------------------------------------------------------------------------------
+        self._extract_context_vectors(X[::, self.E:(self.E+self.C)])
 
         self.logger.debug(
             "layer[%s].%s: X.shape %s W.shape %s",
@@ -471,7 +550,7 @@ class Embedding(Layer):
         Args:
             path: state file path
         """
-        state = super().load(path)
+        state = self.load(path)
         if self.W.shape == state[0].shape:
             np.copyto(self._W, state[0])
         else:

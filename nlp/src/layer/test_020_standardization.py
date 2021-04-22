@@ -33,10 +33,6 @@ from common.function import (
 from common.utility import (
     random_string
 )
-from frederik_kratzert import (
-    batchnorm_forward,
-    batchnorm_backward
-)
 from layer import (
     Standardization
 )

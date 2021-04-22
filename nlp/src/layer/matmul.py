@@ -14,6 +14,7 @@ import numpy as np
 import optimizer as optimiser
 from common.constant import (
     TYPE_FLOAT,
+    TYPE_TENSOR
 )
 from common.function import (
     numerical_jacobian,
@@ -184,14 +185,15 @@ class Matmul(Layer):
         return super().X
 
     @X.setter
-    def X(self, X: np.ndarray):
+    def X(self, X: TYPE_TENSOR):
         """Set X"""
         super(Matmul, type(self)).X.fset(self, X)
         assert self.X.shape[1] == self.D, \
             "X shape needs (%s, %s) but %s" % (self.N, self.D, self.X.shape)
 
     @property
-    def S(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
+    # def S(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
+    def S(self) -> List[TYPE_TENSOR]:
         """State of the layer"""
         self._S = [self.W]
         return self._S
@@ -429,7 +431,7 @@ class Matmul(Layer):
 
         return self.dS
 
-    def load(self, path: str):
+    def load(self, path: str) -> List:
         """Load and restore the layer state
         Consideration:
             Need to be clear if update a reference to the state object OR
@@ -450,8 +452,11 @@ class Matmul(Layer):
             path: state file path
         """
         state = super().load(path)
+        assert isinstance(state, list) and len(state) > 0
         if self.W.shape == state[0].shape:
             np.copyto(self._W, state[0])
         else:
             del self._W
             self._W = state[0]
+
+        return self.S
