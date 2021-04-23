@@ -84,12 +84,9 @@ class Function(base.Function):
         P = tf.nn.softmax(logits=X, axis=axis)
         return P
 
-    # --------------------------------------------------------------------------------
-    # Tensorflow method call table
-    # --------------------------------------------------------------------------------
-    matmul: Callable = tf.linalg.matmul # pylint: disable=not-callable
-    einsum: Callable = tf.einsum        # pylint: disable=not-callable
-    tensordot: Callable = tf.tensordot  # pylint: disable=not-callable
+    @staticmethod
+    def einsum(equation, *inputs, **kwargs) -> TYPE_TENSOR:
+        return tf.einsum(equation, *inputs, **kwargs).numpy()
 
     # ================================================================================
     # Instance

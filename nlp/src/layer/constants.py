@@ -17,3 +17,8 @@ _COMPOSITE_LAYER_SPEC = "composite_layer_specification"
 
 LOG_LOSS_GRADIENT_ACCEPTANCE_VALUE = TYPE_FLOAT(1.2)
 RELU_LEAKY_SLOPE = TYPE_FLOAT(1e-10)
+
+# --------------------------------------------------------------------------------
+# EventEmbedding negative sampling size
+# --------------------------------------------------------------------------------
+MAX_NEGATIVE_SAMPLE_SIZE = 20

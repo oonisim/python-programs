@@ -60,6 +60,10 @@ class Function:
             (tf.is_tensor(X) and X.dtype.is_floating)
 
     @staticmethod
+    def is_finite(X) -> bool:
+        return np.isfinite(X)
+
+    @staticmethod
     def tensor_shape(X):
         """The shape of a tensor
         """

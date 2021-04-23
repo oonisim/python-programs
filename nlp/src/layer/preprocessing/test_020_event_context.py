@@ -2,7 +2,9 @@ import cProfile
 import logging
 
 import numpy as np
-
+from common.constant import (
+    TYPE_INT,
+)
 from common.utility import (
     random_string
 )
@@ -20,7 +22,7 @@ from testing.config import (
 Logger = logging.getLogger(__name__)
 
 
-def _instantiate(name: str, num_nodes: int, window_size: int, event_size: int,):
+def _instantiate(name: str, num_nodes: TYPE_INT, window_size: TYPE_INT, event_size: TYPE_INT,):
     if np.random.uniform() > 0.5:
         event_context = EventContext.build({
             _NAME: name,
@@ -34,7 +36,7 @@ def _instantiate(name: str, num_nodes: int, window_size: int, event_size: int,):
     return event_context
 
 
-def _must_fail(name: str, num_nodes: int, window_size: int, event_size: int, msg: str):
+def _must_fail(name: str, num_nodes: TYPE_INT, window_size: TYPE_INT, event_size: TYPE_INT, msg: str):
     try:
         _instantiate(name, num_nodes=num_nodes, window_size=window_size, event_size=event_size)
         raise RuntimeError(msg)
@@ -42,7 +44,7 @@ def _must_fail(name: str, num_nodes: int, window_size: int, event_size: int, msg
         pass
 
 
-def _must_succeed(name: str, num_nodes: int, window_size: int, event_size: int, msg: str):
+def _must_succeed(name: str, num_nodes: TYPE_INT, window_size: TYPE_INT, event_size: TYPE_INT, msg: str):
     try:
         return _instantiate(name, num_nodes=num_nodes, window_size=window_size, event_size=event_size)
     except Exception as e:
@@ -57,9 +59,9 @@ def test_020_event_context_instantiation_to_fail():
         Initialization detects parameter constraints not meet and fails.
     """
     name = "test_020_event_context_instantiation_to_fail"
-    stride: int = np.random.randint(1, 100)
-    event_size: int = np.random.randint(1, 100)
-    window_size: int = 2 * stride + event_size
+    stride: TYPE_INT = np.random.randint(1, 100)
+    event_size: TYPE_INT = np.random.randint(1, 100)
+    window_size: TYPE_INT = 2 * stride + event_size
 
     event_context = _must_succeed(
         name=name, num_nodes=1, window_size=window_size, event_size=event_size, msg="must scceed"
@@ -93,13 +95,13 @@ def test_020_event_context_instance_properties(caplog):
     profiler = cProfile.Profile()
     profiler.enable()
     for _ in range(NUM_MAX_TEST_TIMES):
-        stride: int = np.random.randint(1, 100)
-        event_size: int = np.random.randint(1, 100)
-        window_size: int = 2 * stride + event_size
+        stride: TYPE_INT = np.random.randint(1, 100)
+        event_size: TYPE_INT = np.random.randint(1, 100)
+        window_size: TYPE_INT = 2 * stride + event_size
 
         name = random_string(np.random.randint(1, 10))
         event_context = _must_succeed(
-            name=name, num_nodes=1, window_size=window_size, event_size=event_size, msg=msg
+            name=name, num_nodes=TYPE_INT(1), window_size=window_size, event_size=event_size, msg=msg
         )
 
         # --------------------------------------------------------------------------------
@@ -138,9 +140,9 @@ def test_020_event_context_function_event_size_1(caplog):
     profiler = cProfile.Profile()
     profiler.enable()
 
-    stride: int = 2
-    event_size: int = 1
-    window_size: int = 2 * stride + event_size
+    stride: TYPE_INT = 2
+    event_size: TYPE_INT = 1
+    window_size: TYPE_INT = 2 * stride + event_size
 
     event_context = _must_succeed(
         name=name, num_nodes=1, window_size=window_size, event_size=event_size, msg=msg
@@ -223,9 +225,9 @@ def test_020_event_context_function_event_size_2(caplog):
     profiler = cProfile.Profile()
     profiler.enable()
 
-    stride: int = 2
-    event_size: int = 2
-    window_size: int = 2 * stride + event_size
+    stride: TYPE_INT = 2
+    event_size: TYPE_INT = 2
+    window_size: TYPE_INT = 2 * stride + event_size
 
     event_context = _must_succeed(
         name=name, num_nodes=1, window_size=window_size, event_size=event_size, msg=msg

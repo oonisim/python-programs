@@ -16,13 +16,14 @@ from common.constant import (
     TYPE_FLOAT,
     TYPE_INT,
     TYPE_TENSOR,
-    EVENT_VECTOR_SIZE
+    EVENT_VECTOR_SIZE,
+    EVENT_META_ENTITIES
 )
 from common.function import (
     numerical_jacobian,
 )
 # TODO: Update to layer.base once RC is done
-from layer.base_rc import Layer
+from layer.base import Layer
 from layer.preprocessing import (
     EventIndexing
 )
@@ -33,7 +34,8 @@ from layer.constants import (
     _OPTIMIZER,
     _NUM_NODES,
     _NUM_FEATURES,
-    _PARAMETERS
+    _PARAMETERS,
+    MAX_NEGATIVE_SAMPLE_SIZE,
 )
 from layer._utility_builder_non_layer import (
     build_optimizer_from_layer_parameters,
@@ -91,11 +93,7 @@ class Embedding(Layer):
     # ================================================================================
     @staticmethod
     def specification_template():
-        return Embedding.specification(
-            name="embedding001",
-            num_nodes=3,
-            num_features=2,     # without bias
-        )
+        raise NotImplementedError("TBD")
 
     @staticmethod
     def specification(
@@ -114,20 +112,7 @@ class Embedding(Layer):
             weights_optimizer_specification:
                 optimizer specification. Default to  SGD
         """
-        return {
-            _SCHEME: Embedding.__qualname__,
-            _PARAMETERS: {
-                _NAME: name,
-                _NUM_NODES: num_nodes,
-                _NUM_FEATURES: num_features,  # NOT including bias
-                _WEIGHTS: {
-                    _SCHEME: weights_initialization_scheme
-                },
-                _OPTIMIZER: weights_optimizer_specification
-                if weights_optimizer_specification is not None
-                else optimiser.SGD.specification_template()
-            }
-        }
+        raise NotImplementedError("TBD")
 
     @staticmethod
     def build(parameters: Dict):
@@ -140,34 +125,7 @@ class Embedding(Layer):
         }
         """
         parameters = copy.deepcopy(parameters)
-        assert (
-            isinstance(parameters, dict) and
-            (_NAME in parameters and len(parameters[_NAME]) > 0) and
-            (_NUM_NODES in parameters and parameters[_NUM_NODES] > 0) and
-            (_NUM_FEATURES in parameters and parameters[_NUM_FEATURES] > 0) and
-            _WEIGHTS in parameters
-        ), "Embedding.build(): missing mandatory elements %s in the parameters\n%s" \
-           % ((_NAME, _NUM_NODES, _NUM_FEATURES, _WEIGHTS), parameters)
-
-        name = parameters[_NAME]
-        num_nodes = parameters[_NUM_NODES]
-        num_features = parameters[_NUM_FEATURES]
-
-        # Weights
-        W = build_weights_from_layer_parameters(parameters)
-
-        # Optimizer
-        _optimizer = build_optimizer_from_layer_parameters(parameters)
-
-        embedding = Embedding(
-            name=name,
-            num_nodes=num_nodes,
-            W=W,
-            optimizer=_optimizer,
-            log_level=parameters["log_level"] if "log_level" in parameters else logging.ERROR
-        )
-
-        return embedding
+        raise NotImplementedError("TBD")
 
     # ================================================================================
     # Instance
@@ -191,8 +149,17 @@ class Embedding(Layer):
         return self.E + self.C
 
     @property
+    def negative_sample_size(self) -> TYPE_INT:
+        """Negative sample size"""
+        return self._negative_sample_size
+
+    @property
     def dictionary(self) -> EventIndexing:
         """Event dictionary"""
+        assert \
+            isinstance(self._dictionary, EventIndexing) and \
+            self._dictionary.vocabulary_size > len(EVENT_META_ENTITIES), \
+            "Invalid vocabulary size"
         return self._dictionary
 
     @property
@@ -203,12 +170,13 @@ class Embedding(Layer):
     @property
     def W(self) -> TYPE_TENSOR:
         """Layer weight vectors W"""
+        assert self._W is not None and self.tensor_size(self._W) > 0
         return self._W
 
     @property
-    def dW(self) -> np.ndarray:
+    def dW(self) -> TYPE_TENSOR:
         """Layer weight gradients dW"""
-        assert self._dW.size > 0, "dW is not initialized"
+        assert self.tensor_size(self._dW.size) > 0, "dW is not initialized"
         return self._dW
 
     @property
@@ -218,11 +186,10 @@ class Embedding(Layer):
 
     @X.setter
     def X(self, X: TYPE_TENSOR):
+        """Batch input (event, context) pairs.
         """
-        """
-        window_size = list(X.shape)[-1]
-        assert window_size == self.window_size, \
-            "Each X record needs (event+context) size but %s" % window_size
+        assert X.shape[1] == self.window_size, \
+            "Xi needs shape (E+C,) but %s" % X.shape[1]
         super(Embedding, type(self)).X.fset(self, X)
 
     @property
@@ -263,6 +230,8 @@ class Embedding(Layer):
             num_nodes: TYPE_INT = 1,
             target_size: TYPE_INT = 1,
             context_size: TYPE_INT = 4,
+            negative_sample_size: TYPE_INT = 10,
+            event_vector_size: TYPE_INT = EVENT_VECTOR_SIZE,
             dictionary: EventIndexing = None,
             W: Optional[TYPE_TENSOR] = None,
             optimizer: optimiser.Optimizer = optimiser.SGD(),
@@ -277,6 +246,8 @@ class Embedding(Layer):
             num_nodes: Number of output M
             target_size: size of the target event of the (target, context) pair.
             context_size: size of the context of the (target, context) pair.
+            negative_sample_size: size of the negative samples
+            event_vector_size: size of the event vector
             dictionary: Dictionary to consult event probabilities and event samples.
             W: Weight of shape(V=vocabulary_size, D).
             posteriors: Post layers to which forward the Embedding layer output
@@ -286,18 +257,29 @@ class Embedding(Layer):
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
 
         assert num_nodes == 1, "Number of output should be 1 for logistic classification"
-        assert 0 < target_size and 0 < context_size
-        assert W.shape[0] >= dictionary.vocabulary_size, \
-            f"W shape needs ({num_nodes}, >={dictionary.vocabulary_size}) but {W.shape}."
+        assert target_size > 0 == (context_size % 2) and 0 < context_size
         assert isinstance(dictionary, EventIndexing) and dictionary.vocabulary_size > 2
+        availability_for_negatives = (
+            dictionary.vocabulary_size
+            - (context_size+target_size)
+            - len(EVENT_META_ENTITIES)
+        )
+        assert \
+            0 < negative_sample_size <= MAX_NEGATIVE_SAMPLE_SIZE and \
+            negative_sample_size <= availability_for_negatives
 
         self._M = num_nodes
 
         # --------------------------------------------------------------------------------
-        # (target, context) pair attributes
+        # (target, context) pair properties
         # --------------------------------------------------------------------------------
         self._target_size = target_size
         self._context_size = context_size
+
+        # --------------------------------------------------------------------------------
+        # Negative sampling property
+        # --------------------------------------------------------------------------------
+        self._negative_sample_size = negative_sample_size
 
         # --------------------------------------------------------------------------------
         # Dictionary of events that provide event probability, etc.
@@ -306,12 +288,22 @@ class Embedding(Layer):
 
         # --------------------------------------------------------------------------------
         # Event vector space
+        # Gradient dL/dW varies because only the extracted W rows need to be processed.
         # --------------------------------------------------------------------------------
         if W is None:
-            self._W = self.weights(M=self.V, D=EVENT_VECTOR_SIZE)
+            self._W: TYPE_TENSOR = self.build_weights(
+                M=dictionary.vocabulary_size,
+                D=event_vector_size
+            )
         else:
             self._W: TYPE_TENSOR = copy.deepcopy(W)
+        assert \
+            self.W.shape[0] >= dictionary.vocabulary_size and \
+            self.W.shape[1] == event_vector_size,\
+            "W shape needs (%s, >=%s) but %s." \
+            % (dictionary.vocabulary_size, dictionary.vocabulary_size, self.W.shape)
         self._D = self.W.shape[1]
+        self._dW = np.empty(shape=())
 
         # --------------------------------------------------------------------------------
         # State of the layer
@@ -344,30 +336,35 @@ class Embedding(Layer):
 
         Returns: vectors of shape:(N*?, D) where is C or E.
         """
-        assert isinstance(self.W, np.ndarray) and self.tensor_rank(self.W) == 2
-        vectors = self.W[
-            self.reshape(X, (-1))
-        ]
-        assert \
-            self.tensor_shape(vectors) == (self.N * self.C, self.D) or \
-            self.tensor_shape(vectors) == (self.N * self.E, self.D)
-
+        assert isinstance(self.W, np.ndarray), "Needs numpy array for array indexing"
+        vectors = self.reshape(
+            self.W[
+                self.reshape(X, (-1))
+            ],
+            (self.N, -1, self.D)
+        )
         return vectors
 
-    def _group_sum(self, vectors: TYPE_TENSOR):
-        """sum(vectors) Group-by axis=1 of shape:(N, ?, D)
+    def _bag_vectors_per_window(self, vectors: TYPE_TENSOR):
+        """Sum(vectors) via Group-by window(axis=1) of shape:(N, ?, D)
+        where ? is either target or context in (target/E, context/C) pair window.
+
         Args:
             vectors: Event vectors of shape:(N, C, D) or (N, E, D)
+        Returns: Bagged vectors of shape (N, D)
         """
+        assert \
+            self.tensor_shape(vectors) == (self.N, self.E, self.D) or \
+            self.tensor_shape(vectors) == (self.N, self.C, self.D)
         return self.einsum(
             "ncd->nd",
-            self.reshape(vectors, (self.N, -1, self.D))
-        ) if vectors.shape[0] > self.N else vectors
+            vectors
+        )
 
-    def _bag(self, X):
-        bag = self._group_sum(self._extract_event_vectors(X))
-        assert self.tensor_shape(bag) == (self.N, self.D)
-        return bag
+    def _bagging(self, X):
+        bags = self._bag_vectors_per_window(self._extract_event_vectors(X))
+        assert self.tensor_shape(bags) == (self.N, self.D)
+        return bags
 
     def function(self, X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
         """Calculate the layer output Y
@@ -406,10 +403,15 @@ class Embedding(Layer):
                 varies per sequence.
 
         Returns:
-            Y: Layer value
+            Y: dot products of (context bow) vector against (target, negatives) vectors
+               in shape(N, 1+negative_sample_size) where:
+               - the first column: scores for true labels
+               - reset negative_sample_size columns: scores for false labels
+
+               Hence for all the 1st columns, the label T=1, and 0 for the rest.
         """
         name = "function"
-        assert self.is_tensor(X)
+        X = self.assure_tensor(X)
         assert self.tensor_rank(X) in [2, 3], \
             "Expected X shape is (?, E+C) or (N, ?, E+C) but %s" % X.shape
 
@@ -418,64 +420,63 @@ class Embedding(Layer):
         # The information of which sequence a (event, context) pair belongs to gets lost.
         # However, Embedding only require (event, context) pairs, NOT sequences.
         # --------------------------------------------------------------------------------
-        if self.tensor_rank(X) > 2:
-            X = self.reshape(X, (-1, 1))
-        assert X.shape[1] == self.window_size, \
-            "The X row needs shape (E+C,) but %s" % X.shape[1]
+        X = self.reshape(X, (-1, self.window_size)) if self.tensor_rank(X) > 2 else X
         self.X = X
+        self.logger.debug(
+            "layer[%s].%s: X.shape %s W.shape %s",
+            self.name, name, self.tensor_shape(self.X), self.tensor_shape(self.W)
+        )
 
         # ================================================================================
+        # Score (BoW dot Target) for label=1 (True) classification
+        # ================================================================================
+        # --------------------------------------------------------------------------------
         # BoW vectors for contexts
-        # ================================================================================
-        contexts = self._bag(X[
+        # --------------------------------------------------------------------------------
+        bows = self._bagging(X[
             ::,
-            self.E:(self.E+self.C)
+            self.E:
         ])
-
-        # ================================================================================
+        # --------------------------------------------------------------------------------
         # Target vectors
-        # ================================================================================
-        targets = self._bag(X[
+        # --------------------------------------------------------------------------------
+        targets = self._bagging(X[
             ::,
             0: self.E
         ])
 
+        # --------------------------------------------------------------------------------
+        # Positive score (BoW dot Target)
+        # --------------------------------------------------------------------------------
+        positive_scores = self.einsum("nd,nd->n", bows, targets)
+        del targets
+
         # ================================================================================
+        # Score (BoW dot Negative) for label=0 (False) classification
+        # ================================================================================
+        # --------------------------------------------------------------------------------
         # Negative samples
+        # --------------------------------------------------------------------------------
+        negatives = self._extract_event_vectors(self.to_tensor([
+            self.dictionary.negative_sample_indices(size=self.negative_sample_size, excludes=X[row])
+            for row in range(self.N)
+        ]))
+        assert self.tensor_shape(negatives) == (self.N, self.negative_sample_size, self.D), \
+            "Negative samples \n%s\nexpected shape %s but %s" % \
+            (negatives, (self.N, self.negative_sample_size, self.D), self.tensor_shape(negatives))
+
+        # --------------------------------------------------------------------------------
+        # Negative score (BoW dot Negatives)
+        # --------------------------------------------------------------------------------
+        negative_scores = self.einsum("nd,nkd->nk", bows, negatives)
+        del bows, negatives
+
         # ================================================================================
-
-        # --------------------------------------------------------------------------------
-        # Extract event vectors from W for all the contexts in X.
-        # --------------------------------------------------------------------------------
-
-        self.logger.debug(
-            "layer[%s].%s: X.shape %s W.shape %s",
-            self.name, name, self.X.shape, self.W.shape
-        )
-        assert self.W.shape == (self.M, self.D), \
-            f"W shape needs {(self.M, self.D)} but ({self.W.shape})"
-
-        # --------------------------------------------------------------------------------
-        # Allocate array storage for np.func(out=) for Y but not dY.
-        # Y:(N,M) = [ X:(N,D) @ W.T:(D,M) ]
-        # gradient() need to validate the dY shape is (N,M)
-        # --------------------------------------------------------------------------------
-        if self._Y.size <= 0 or self.Y.shape[0] != self.N:
-            self._Y = np.empty((self.N, self.M), dtype=TYPE_FLOAT)
-            # --------------------------------------------------------------------------------
-            # DO NOT allocate memory area for the gradient that has already been calculated.
-            # dL/dY is calculated at the post layer, hence it has the buffer allocated already.
-            # --------------------------------------------------------------------------------
-            # self._dY = np.empty((self.N, self.M), dtype=TYPE_FLOAT)
-
-        # --------------------------------------------------------------------------------
-        # TODO:
-        # Because transpose(T) is run everytime Embedding is invoked, using the transposed W
-        # would save the calculation time. This is probably the reason why cs231n uses
-        # in column order format.
-        # --------------------------------------------------------------------------------
-        np.Embedding(self.X, self.W.T, out=self._Y)
-        assert np.all(np.isfinite(self.Y)), f"{self.Y}"
+        # Result of np.c_[positive_scores, negative_scores)
+        # ================================================================================
+        self._Y = np.c_[positive_scores, negative_scores]
+        assert self.tensor_shape(self.Y) == (self.N, (1 + self.negative_sample_size))
+        assert np.all(self.is_finite(self.Y)), f"NaN or inf detected in {self.Y}"
         return self.Y
 
     def gradient(self, dY: Union[np.ndarray, float] = 1.0) -> Union[np.ndarray, float]:
@@ -597,8 +598,8 @@ class Embedding(Layer):
         Args:
             path: state file path
         """
-        state = self.load(path)
-        if self.W.shape == state[0].shape:
+        state = super().load(path)
+        if self.is_tensor(self._W) and self.tensor_shape(self._W) == state[0].shape:
             np.copyto(self._W, state[0])
         else:
             del self._W

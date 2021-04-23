@@ -13,6 +13,7 @@ from common.constant import (
     DELIMITER,
     EVENT_NIL,
     EVENT_UNK,
+    EOL,
     SPACE,
     EVENT_META_ENTITIES,
     EVENT_META_ENTITY_TO_INDEX
@@ -195,16 +196,28 @@ class Function:
     @staticmethod
     def sentence_to_sequence(
             sentences: str,
-            event_to_index: Dict[str, TYPE_INT]
+            event_to_index: Dict[str, TYPE_INT],
+            minimum_length: TYPE_INT = TYPE_INT(0)
     ) -> List[List[TYPE_INT]]:
         """Generate sequence of event indices from a text sentences
-        1. Skip an empty line or
+        1. Skip an empty line or a line only contain non-word e.g punctuation.
+        2. Return [[]] if there is no sequence generated.
+        3. Pad each sequence to the length of max(sequence_len, or min_length).
+
+        Sentence length varies and a vectorization framework e.g. numpy may
+        require same length rows, e.g. numpy array cannot handle ragged numeric
+        rows. Hence pad a sequence to align, when minimum_length > 0.
+
+        A sentence can be short e.g. "I am". To create (event, context) pair,
+        minimum (event_length+context_length) is required. If a generated
+        sequence length < minimum_length, then pad it to meet the min length.
 
         Args:
             sentences:
                 A string including one ore more sentences to process.
                 A sentence is delimited by EOL('\n').
             event_to_index: event to integer index mapping dictionary
+            minimum_length: minimum length of a generated sequence.
 
         Returns: List of integer sequence per sentence
         """
@@ -212,7 +225,7 @@ class Function:
 
         sequences = []
         max_sequence_length = 0
-        for line in sentences.split("\n"):
+        for line in sentences.split(EOL):
             if len(line.strip()) > 0:   # Skip empty line
                 sequence = [
                     event_to_index.get(w, EVENT_META_ENTITY_TO_INDEX[EVENT_UNK.lower()])
@@ -224,16 +237,24 @@ class Function:
                     sequences.append(sequence)
             else:
                 Logger.warning("Sentence is empty. Skipping...")
-        assert len(sequences) > 0, f"No valid sentences in the input \n[{sentences}]\n"
 
-        padded: List[List[TYPE_INT]] = [
-            np.pad(
-                array=seq,
-                pad_width=(0, max_sequence_length - len(seq)),
-                constant_values=EVENT_META_ENTITY_TO_INDEX[EVENT_NIL.lower()]
-            ).astype(TYPE_INT).tolist()
-            for seq in sequences
-        ]
+        if len(sequences) > 0:
+            if minimum_length > 0:  # padding required
+                max_sequence_length = max(max_sequence_length, minimum_length)
+                padded: List[List[TYPE_INT]] = [
+                    np.pad(
+                        array=seq,
+                        pad_width=(0, max_sequence_length - len(seq)),
+                        constant_values=EVENT_META_ENTITY_TO_INDEX[EVENT_NIL.lower()]
+                    ).astype(TYPE_INT).tolist()
+                    for seq in sequences
+                ]
+                del sequences
+            else:
+                padded = sequences
+        else:
+            Logger.warning("Return [[]] as no valid sentences in the input \n[%s]\n", sentences)
+            padded = [[]]
 
         Logger.debug("Sequences generated for \n%s\n%s", sentences, padded)
         return padded

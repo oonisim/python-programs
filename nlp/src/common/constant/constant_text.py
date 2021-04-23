@@ -1,8 +1,10 @@
-DELIMITER = " "
+EOL = '\n'
 SPACE = ' '
+DELIMITER = SPACE
 EVENT_NIL = "<nil>".lower()  # Lower letter as lower() will be applied.
 EVENT_UNK = "<unk>".lower()
 EVENT_META_ENTITIES = [EVENT_NIL.lower(), EVENT_UNK.lower()]
+EVENT_META_ENTITIES_COUNT = len(EVENT_META_ENTITIES)
 EVENT_INDEX_TO_META_ENTITY = dict(enumerate(EVENT_META_ENTITIES))
 EVENT_META_ENTITY_TO_INDEX = dict(zip(EVENT_INDEX_TO_META_ENTITY.values(), EVENT_INDEX_TO_META_ENTITY.keys()))
 EVENT_INDEX_NIL = 0

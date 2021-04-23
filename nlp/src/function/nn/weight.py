@@ -54,7 +54,8 @@ def uniform(M: TYPE_INT, D: TYPE_INT) -> np.ndarray:
         W: weight matrix
     """
     assert all([D > 0, M > 0])
-    return (np.random.uniform(low=0.0, high=1.0, size=(M, D))).astype(TYPE_FLOAT)
+    weights = (np.random.uniform(low=0.0, high=1.0, size=(M, D))).astype(TYPE_FLOAT)
+    return weights
 
 
 SCHEMES = {
@@ -105,13 +106,14 @@ class Weights:
             self,
             M: TYPE_INT,
             D: TYPE_INT,
-            scheme: str = "uniform"
+            initialization_scheme: str = list(SCHEMES.keys())[0]
     ):
-        assert M > 0, D > 0 and scheme in SCHEMES
-        self._initialization_scheme = list(SCHEMES.keys())[0]
+        assert M > 0, D > 0 and initialization_scheme in SCHEMES
+        self._initialization_scheme = initialization_scheme
         self._M = M
         self._D = D
-        self._weights = SCHEMES[self.scheme](M, D)
+        self._weights = SCHEMES[self.initialization_scheme](M, D)
+        assert self._weights is not None and self._weights.shape == (self.M, self.D)
 
     @property
     def M(self):
@@ -119,12 +121,15 @@ class Weights:
 
     @property
     def D(self):
-        return self._M
+        return self._D
 
     @property
-    def scheme(self):
+    def initialization_scheme(self):
+        assert \
+            self._initialization_scheme in SCHEMES, \
+            "Invalid weight initialization scheme"
         return self._initialization_scheme
 
     @property
-    def weights(self):
+    def weights(self) -> np.ndarray:
         return self._weights

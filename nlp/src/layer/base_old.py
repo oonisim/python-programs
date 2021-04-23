@@ -168,31 +168,40 @@ class Layer(nn.Function):
         return self._D
 
     @property
-    def X(self) -> TYPE_TENSOR:
+    def X(self) -> Union[float, np.ndarray]:
         """Latest batch input to the layer"""
-        assert self.is_tensor(self._X) and self.tensor_size(self._X) > 0, \
-            "X is not initialized or invalid"
-
+        assert \
+            isinstance(self._X, np.ndarray) and self._X.dtype == TYPE_FLOAT \
+            and self._X.size > 0, "X is not initialized or invalid"
         return self._X
 
     @X.setter
-    def X(self, X: TYPE_TENSOR):
+    def X(self, X: Union[float, np.ndarray]):
         """Set layer input X
+        1. Convert into 2D array if X is scalar or X.ndim < 2.
         2. Allocate _dX storage.
         3. DO NOT set/update _D as it can be set with the weight shape.
         """
-        assert X is not None and self.is_tensor(X)
-        if self.is_float_tensor(X):
-            assert np.all(np.isfinite(X)), f"{X}"
-            if np.all(np.abs(X) > 1.0):
-                self.logger.warning("Input data X has not been standardized.")
+        assert X is not None and \
+               ((isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) or isinstance(X, float))
+        assert np.all(np.isfinite(X)), f"{X}"
 
-        self._X = X
+        if np.all(np.abs(X) > 1.0):
+            self.logger.warning("Input data X has not been standardized.")
+
+        if isinstance(X, float):
+            self._X = np.array(X)
+        elif X.ndim == 1:
+            self._X = np.array(X).reshape(1, -1)
+        else:
+            self._X = X
+
+        assert self.X.size > 0
         self._N = self.X.shape[0]
 
         # Allocate the storage for np.func(out=dX).
         if self._dX.shape != self.X.shape:
-            self._dX = np.empty(self.X.shape, dtype=self.X.dtype)
+            self._dX = np.empty(self.X.shape, dtype=TYPE_FLOAT)
 
         # DO NOT
         # self._D = X.shape[1]
@@ -329,8 +338,7 @@ class Layer(nn.Function):
             name: layer ID name
             num_nodes: number of nodes in a layer
         """
-        super().__init__(name=name, log_level=log_level)
-
+        super().__init__(name, log_level)
         assert name
         self._name: str = name
 
@@ -528,7 +536,7 @@ class Layer(nn.Function):
         """
         fileio.Function.serialize(path, self.S)
 
-    def load(self, path: str):
+    def load(self, path: str) -> List:
         """Load the layer state
         The responsibility to restore the layer state is that of the child.
         Consideration:

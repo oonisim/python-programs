@@ -160,8 +160,6 @@ def test_020_event_indexing_function_multi_lines(caplog):
     with even brief exposures to it causing symptoms that show up decades later researchers said
     """
     caplog.set_level(logging.DEBUG)
-
-    caplog.set_level(logging.DEBUG)
     path_to_corpus: str = download_file()
 
     name = utility.Function.random_string(np.random.randint(1, 10))
@@ -187,8 +185,6 @@ def test_020_event_indexing_save_load(caplog):
     with even brief exposures to it causing symptoms that show up decades later researchers said
     """
     caplog.set_level(logging.DEBUG)
-
-    caplog.set_level(logging.DEBUG)
     path_to_corpus: str = download_file()
 
     name = utility.Function.random_string(np.random.randint(1, 10))
@@ -202,7 +198,7 @@ def test_020_event_indexing_save_load(caplog):
     # --------------------------------------------------------------------------------
     # Run methods and save the results to compare later
     # --------------------------------------------------------------------------------
-    indices: List[TYPE_INT] = list(np.random.randint(0, event_indexing.vocabulary_size, 5).tolist())
+    indices: List[TYPE_INT] = np.random.randint(0, event_indexing.vocabulary_size, 5).tolist()
     sequence = event_indexing.function(sentences)
     probabilities = event_indexing.list_probabilities(['asbestos', 'brief'])
     events = event_indexing.list_events(indices)

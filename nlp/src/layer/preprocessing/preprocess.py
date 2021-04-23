@@ -11,11 +11,14 @@ import function.text as text
 import function.utility as utility
 import function.fileio as fileio
 from common.constant import (
+    EOL,
     TYPE_FLOAT,
     TYPE_INT,
     TYPE_TENSOR,
     EVENT_NIL,
     EVENT_UNK,
+    EVENT_META_ENTITIES,
+    EVENT_META_ENTITIES_COUNT,
     EVENT_META_ENTITY_TO_INDEX,
     EVENT_CONTEXT_WINDOW_SIZE
 )
@@ -26,7 +29,8 @@ from layer.constants import (
     _NAME,
     _SCHEME,
     _NUM_NODES,
-    _PARAMETERS
+    _PARAMETERS,
+    MAX_NEGATIVE_SAMPLE_SIZE
 )
 
 
@@ -96,6 +100,11 @@ class EventIndexing(Layer):
     # Instance properties
     # --------------------------------------------------------------------------------
     @property
+    def min_sequence_length(self) -> TYPE_INT:
+        """Minimum length required for the output sequence"""
+        return self._min_sequence_length
+
+    @property
     def vocabulary(self):
         """Unique events observed in the corpus"""
         return self._vocabulary
@@ -136,20 +145,30 @@ class EventIndexing(Layer):
             name: str,
             num_nodes: int = 1,
             corpus: str = "",
+            min_sequence_length: TYPE_INT = 3,
             power: TYPE_FLOAT = 0.75,
             log_level: int = logging.ERROR
     ):
-        """Initialize
+        """Initialize the instance
         Args:
             name: Layer identity name
             num_nodes: Number of nodes in the layer
             corpus: source of sequential events
+            min_sequence_length: length to which the output sequence to meet
             log_level: logging level
+
+        Note:
+            To generate a (event, context) pair from a generated sequence,
+            (event_size + context+size) is required as 'min_sequence_length'.
+            At least 3 (event_size=1, context_size=2) is expected.
+
         """
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
         assert len(corpus) > 0
+        assert min_sequence_length >= 3, "Minimum 3 events expected in the corpus"
         self.logger.debug("%s: corpus length is %s", self.name, len(corpus))
 
+        self._min_sequence_length = min_sequence_length
         # --------------------------------------------------------------------------------
         # Event statistics (vocabulary, probability, mappings, etc)
         # --------------------------------------------------------------------------------
@@ -200,28 +219,42 @@ class EventIndexing(Layer):
             for event in events
         ]
 
-    def sample_events(self, size: TYPE_INT) -> Iterable[str]:
-        assert 0 < size < self.vocabulary_size
-        return list(np.random.choice(
+    def take(self, start: TYPE_INT = 0, size: TYPE_INT = 5) -> Iterable[str]:
+        assert 0 <= start < (self.vocabulary_size - EVENT_META_ENTITIES_COUNT)
+        assert 0 < size <= (self.vocabulary_size - EVENT_META_ENTITIES_COUNT - start)
+        return self.vocabulary[
+            EVENT_META_ENTITIES_COUNT+start: EVENT_META_ENTITIES_COUNT+start+size
+        ]
+
+    def sample(self, size: TYPE_INT) -> Iterable[str]:
+        assert 0 < size <= (self.vocabulary_size - len(EVENT_META_ENTITIES))
+        candidates: List[str] = list(np.random.choice(
             a=self.vocabulary,
-            size=size,
+            size=size + EVENT_META_ENTITIES_COUNT,
             replace=False,
             p=self.probabilities
         ))
+        # Do not sample meta events
+        return list(set(candidates) - set(EVENT_META_ENTITIES))[:size]
 
-    def negative_sample_events_with_indices(
-            self, size: TYPE_INT, negatives: Iterable[TYPE_INT]
+    def negative_sample_indices(
+            self, size: TYPE_INT,
+            excludes: Iterable[TYPE_INT]
     ) -> Iterable[TYPE_INT]:
         """Generate indices of events that are not included in the negatives
         Args:
             size: sample size
-            negatives: event indices which should not be included in the sample
+            excludes: event indices which should not be included in the sample
 
         Return: Indices of events not included in negatives
         """
-        candidates = self.list_indices(self.sample_events(size*2))
+        excludes_length = len(list(excludes))
+        assert size <= MAX_NEGATIVE_SAMPLE_SIZE
+        assert 0 < excludes_length <= (self.vocabulary_size - size - len(EVENT_META_ENTITIES))
+
+        candidates = self.list_indices(self.sample(size+excludes_length))
         self.list_indices(candidates)
-        return list(set(candidates) - set(negatives))[:size]
+        return list(set(candidates) - set(excludes))[:size]
 
     def sentence_to_sequence(self, sentences: str) -> List[List[TYPE_INT]]:
         """Generate a list of event indices per sentence
@@ -234,7 +267,11 @@ class EventIndexing(Layer):
             "%s:%s sentences are [%s]",
             self.name, "sentence_to_sequence", sentences
         )
-        sequences = text.Function.sentence_to_sequence(sentences, self.event_to_index)
+        sequences = text.Function.sentence_to_sequence(
+            sentences=sentences,
+            event_to_index=self.event_to_index,
+            minimum_length=self.min_sequence_length
+        )
         return sequences
 
     def sequence_to_sentence(self, sequences: Iterable[TYPE_INT]) -> List[List[str]]:
@@ -257,15 +294,26 @@ class EventIndexing(Layer):
         return sentences
 
     def function(self, X: str) -> TYPE_TENSOR:
-        """Generate a event index sequence for a sentence"""
-        # return super().to_tensor(self.sentence_to_sequence(X))
+        """Generate a event index sequence for a sentence
+        Args:
+              X: One more more sentences delimited by EOL to convert into event
+                 sequences. Each generated sequence has the min_sequence_length.
 
-        sequence = self.to_tensor(self.sentence_to_sequence(X))
-        self.logger.debug("sequence generated \n%s", sequence)
+        Returns: Event sequences Y of shape (N,sequence_length) where the N is
+                 the number of valid sentences in the input, and sequence_length
+                 is aligned to the maximum length of the sequences generated.
+
+        Raises:
+            AssertionError: When there is no valid sentences in X.
+        """
+        sequences = self.to_tensor(self.sentence_to_sequence(X))
         assert \
-            self.tensor_rank(sequence) == 2, \
-            "Expected ran 2 but sequence %s" % sequence
-        return sequence
+            self.tensor_size(sequences) > 0 and self.tensor_rank(sequences) == 2, \
+            "Expected non-empty rank 2 tensor but rank is %s and sequence=\n%s\n" \
+            % (self.tensor_rank(sequences), sequences)
+
+        self.logger.debug("sequence generated \n%s", sequences)
+        return sequences
 
     def load(self, path: str) -> List:
         """Load and restore the layer state
@@ -386,6 +434,9 @@ class EventContext(Layer):
         """Length of preceding and succeeding context"""
         return TYPE_INT((self.window_size - self.event_size) / 2)
 
+    # --------------------------------------------------------------------------------
+    # Initialization
+    # --------------------------------------------------------------------------------
     def __init__(
             self,
             name: str,
