@@ -1441,30 +1441,19 @@ class BatchNormalization(Layer):
         np.multiply(self.dXstd, self.norm, out=self._dXmd02)
         assert self.dXmd02.shape == (self.N, self.M)
 
-        combined = True
-        if combined:
-            # --------------------------------------------------------------------------------
-            # dL/dX:(N,M) = dL/dX01 + dL/dX02
-            # - dL/dX01 = (dL/dXmd01 + dL/dXmd02)
-            # - dL/dX02 = [sum(-dL/dX01, axis=0) / N]
-            # --------------------------------------------------------------------------------
-            np.add(self.dXmd01, self.dXmd02, out=self._dX)
-            np.sum(self.dX, axis=0, out=self._dU)
-            self._dU *= -1
-            np.add(self.dX, self.dU / self.N, out=self.dX)
-        else:
-            # --------------------------------------------------------------------------------
-            # dL/dU:(M,) = -sum(dL/dXmd01 + dL/dXmd02, axis=0)
-            # * -1 in -sum() is from d(X-U)/dU
-            # --------------------------------------------------------------------------------
-            np.sum((self.dXmd01+self.dXmd02), axis=0, out=self._dU)
-            self._dU *= -1
-
-            # --------------------------------------------------------------------------------
-            # dL/dX:(N,M) = dL/dXmd01 + dL/dXmd02  + dU/N
-            # --------------------------------------------------------------------------------
-            np.add(self.dXmd01, self.dXmd02, out=self._dX)
-            np.add(self.dX, self.dU / self.N, out=self._dX)
+        # --------------------------------------------------------------------------------
+        # dL/dX:(N,M) = dL/dX01 + dL/dX02
+        # - dL/dX01:(N,M) = dL/dXmd01:(N,M) + dL/dXmd02:(N,M)
+        # - dL/dX02:(N,M) = dL/dU:(M,) * dU/dX:(N,M) = [sum(-dL/dX01, axis=0) * (I/N)]
+        # where
+        # - dL/dU:(M,) = -sum(dL/dXmd01 + dL/dXmd02, axis=0) where '-1' is from d(X-U)/dU
+        #              = sum(-dL/dX01, axis=0)
+        # - dU/dX:(N,M) = (I / N) where I is identity of shape:(N,M)
+        # --------------------------------------------------------------------------------
+        np.add(self.dXmd01, self.dXmd02, out=self._dX)      # dL/dX01 using dX buffer
+        np.sum(self.dX, axis=0, out=self._dU)               # -dL/dU as sum(dL/dX01, axis=0)
+        self._dU *= -1                                      # dL/dU
+        np.add(self.dX, self.dU / self.N, out=self._dX)     # dL/dX01 + dL/dX02
 
         return self.dX
 

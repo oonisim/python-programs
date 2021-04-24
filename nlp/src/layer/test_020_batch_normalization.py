@@ -33,10 +33,6 @@ from common.function import (
 from common.utility import (
     random_string
 )
-from frederik_kratzert import (
-    batchnorm_forward,
-    batchnorm_backward
-)
 from layer import (
     BatchNormalization
 )
@@ -44,6 +40,10 @@ from layer.constants import (
     _OPTIMIZER,
     _PARAMETERS,
     _LOG_LEVEL
+)
+from layer.frederik_kratzert import (
+    batchnorm_forward,
+    batchnorm_backward
 )
 from optimizer import (
     Optimizer
