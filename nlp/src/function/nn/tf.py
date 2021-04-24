@@ -88,6 +88,10 @@ class Function(base.Function):
     def einsum(equation, *inputs, **kwargs) -> TYPE_TENSOR:
         return tf.einsum(equation, *inputs, **kwargs).numpy()
 
+    @staticmethod
+    def multiply(x, y) -> TYPE_TENSOR:
+        return tf.math.multiply(x, y).numpy()
+
     # ================================================================================
     # Instance
     # ================================================================================

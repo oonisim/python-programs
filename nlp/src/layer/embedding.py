@@ -139,9 +139,25 @@ class Embedding(Layer):
         return self._target_size
 
     @property
+    def target_indices(self) -> TYPE_TENSOR:
+        """Indices to extract target event vectors"""
+        assert self.tensor_shape(self._target_indices) == (self.N*self.E,), \
+            "Indices shape must be %s but %s" \
+            % ((self.N*self.E,), self.tensor_shape(self._target_indices))
+        return self._target_indices
+
+    @property
     def C(self) -> TYPE_INT:
         """Context size"""
         return self._context_size
+
+    @property
+    def context_indices(self) -> TYPE_TENSOR:
+        """Indices to extract context event vectors"""
+        assert self.tensor_shape(self._context_indices) == (self.N*self.C,), \
+            "Indices shape must be %s but %s" \
+            % ((self.N*self.C,), self.tensor_shape(self._context_indices))
+        return self._context_indices
 
     @property
     def window_size(self) -> TYPE_INT:
@@ -152,6 +168,16 @@ class Embedding(Layer):
     def negative_sample_size(self) -> TYPE_INT:
         """Negative sample size"""
         return self._negative_sample_size
+
+    @property
+    def negative_sample_indices(self) -> TYPE_TENSOR:
+        """Indices to extract negative sample event vectors"""
+        shape = (self.N*self.negative_sample_size,)
+        assert \
+            self.tensor_shape(self._negative_sample_indices) == shape, \
+            "Indices shape must be %s but %s" \
+            % (shape, self.tensor_shape(self._negative_sample_indices))
+        return self._negative_sample_indices
 
     @property
     def dictionary(self) -> EventIndexing:
@@ -174,9 +200,33 @@ class Embedding(Layer):
         return self._W
 
     @property
+    def Ws(self) -> TYPE_TENSOR:
+        """Event vector for negative samples"""
+        assert self.tensor_shape(self._Ws) == (self.N, self.negative_sample_size, self.D)
+        return self._Ws
+
+    @property
+    def Be(self) -> TYPE_TENSOR:
+        """BoW of event vector for targets"""
+        assert self.tensor_shape(self._Be) == (self.N, self.D)
+        return self._Be
+
+    @property
+    def Bc(self) -> TYPE_TENSOR:
+        """BoW of event vector for context"""
+        assert self.tensor_shape(self._Bc) == (self.N, self.D)
+        return self._Bc
+
+    @property
     def dW(self) -> TYPE_TENSOR:
-        """Layer weight gradients dW"""
-        assert self.tensor_size(self._dW.size) > 0, "dW is not initialized"
+        """Weight gradients as np.c_[dL/dWe, dL/dWc, dL/dWs]
+        dL/dWe:shape(N, E, D)
+        dL/dWc:shape(N, C, D)
+        dL/dWs:shape(N, G, D)
+        """
+        size = self.N * (self.E+self.C+self.negative_sample_size) * self.D
+        assert self.tensor_size(self._dW) == size, \
+            "dW is not initialized or invalid"
         return self._dW
 
     @property
@@ -273,13 +323,16 @@ class Embedding(Layer):
         # --------------------------------------------------------------------------------
         # (target, context) pair properties
         # --------------------------------------------------------------------------------
-        self._target_size = target_size
-        self._context_size = context_size
+        self._target_size: TYPE_INT = target_size
+        self._context_size: TYPE_INT = context_size
+        self._target_indices: TYPE_TENSOR = np.empty(())    # 1D array
+        self._context_indices: TYPE_TENSOR = np.empty(())
 
         # --------------------------------------------------------------------------------
         # Negative sampling property
         # --------------------------------------------------------------------------------
-        self._negative_sample_size = negative_sample_size
+        self._negative_sample_size: TYPE_TENSOR = negative_sample_size
+        self._negative_sample_indices: TYPE_TENSOR = np.empty(())
 
         # --------------------------------------------------------------------------------
         # Dictionary of events that provide event probability, etc.
@@ -303,7 +356,11 @@ class Embedding(Layer):
             "W shape needs (%s, >=%s) but %s." \
             % (dictionary.vocabulary_size, dictionary.vocabulary_size, self.W.shape)
         self._D = self.W.shape[1]
-        self._dW = np.empty(shape=())
+
+        self._Be: TYPE_TENSOR = np.empty(shape=())   # BoW of event vectors for targets
+        self._Bc: TYPE_TENSOR = np.empty(shape=())   # BoW of event vectors for contexts
+        self._Ws: TYPE_TENSOR = np.empty(shape=())   # Event vectors for negative samples
+        self._dW: TYPE_TENSOR = np.empty(shape=())   # np.c_[dL/dWe, dL/dWc, dL/dWs]
 
         # --------------------------------------------------------------------------------
         # State of the layer
@@ -337,12 +394,9 @@ class Embedding(Layer):
         Returns: vectors of shape:(N*?, D) where is C or E.
         """
         assert isinstance(self.W, np.ndarray), "Needs numpy array for array indexing"
-        vectors = self.reshape(
-            self.W[
-                self.reshape(X, (-1))
-            ],
-            (self.N, -1, self.D)
-        )
+        vectors = self.W[
+            self.reshape(X, (-1))
+        ]
         return vectors
 
     def _bag_vectors_per_window(self, vectors: TYPE_TENSOR):
@@ -353,17 +407,18 @@ class Embedding(Layer):
             vectors: Event vectors of shape:(N, C, D) or (N, E, D)
         Returns: Bagged vectors of shape (N, D)
         """
-        assert \
-            self.tensor_shape(vectors) == (self.N, self.E, self.D) or \
-            self.tensor_shape(vectors) == (self.N, self.C, self.D)
+        vectors = self.reshape(vectors, (self.N, -1, self.D))
         return self.einsum(
             "ncd->nd",
             vectors
         )
 
-    def _bagging(self, X):
-        bags = self._bag_vectors_per_window(self._extract_event_vectors(X))
-        assert self.tensor_shape(bags) == (self.N, self.D)
+    def _bagging(self, w) -> TYPE_TENSOR:
+        """Create a bag of event vectors
+        Args:
+            w: event vectors from W
+        """
+        bags = self._bag_vectors_per_window(w)
         return bags
 
     def function(self, X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
@@ -431,92 +486,109 @@ class Embedding(Layer):
         # Score (BoW dot Target) for label=1 (True) classification
         # ================================================================================
         # --------------------------------------------------------------------------------
-        # BoW vectors for contexts
+        # BoW vectors for target
         # --------------------------------------------------------------------------------
-        bows = self._bagging(X[
-            ::,
-            self.E:
-        ])
-        # --------------------------------------------------------------------------------
-        # Target vectors
-        # --------------------------------------------------------------------------------
-        targets = self._bagging(X[
+        self._target_indices = self.reshape(X=X[
             ::,
             0: self.E
-        ])
+        ], shape=(-1))
+        We: TYPE_TENSOR = self.reshape(
+            X=self._extract_event_vectors(self.target_indices),
+            shape=(self.N, -1, self.D)
+        )
+        assert self.tensor_shape(We) == (self.N, self.E, self.D)
+        self._Be = self._bagging(We)
+
+        # --------------------------------------------------------------------------------
+        # BoW vectors for contexts
+        # --------------------------------------------------------------------------------
+        self._context_indices = self.reshape(X=X[
+            ::,
+            self.E:
+        ], shape=(-1))
+        Wc = self.reshape(
+            X=self._extract_event_vectors(self.context_indices),
+            shape=(self.N, -1, self.D)
+        )
+        assert self.tensor_shape(Wc) == (self.N, self.C, self.D)
+        self._Bc = self._bagging(Wc)
+        del Wc
 
         # --------------------------------------------------------------------------------
         # Positive score (BoW dot Target)
         # --------------------------------------------------------------------------------
-        positive_scores = self.einsum("nd,nd->n", bows, targets)
-        del targets
+        Ye = positive_scores = self.einsum("nd,nd->n", self.Bc, self.Be)
 
         # ================================================================================
         # Score (BoW dot Negative) for label=0 (False) classification
         # ================================================================================
         # --------------------------------------------------------------------------------
-        # Negative samples
+        # Event vectors of negative samples
         # --------------------------------------------------------------------------------
-        negatives = self._extract_event_vectors(self.to_tensor([
-            self.dictionary.negative_sample_indices(size=self.negative_sample_size, excludes=X[row])
+        self._negative_sample_indices = self.reshape(X=self.to_tensor([
+            self.dictionary.negative_sample_indices(
+                size=self.negative_sample_size,
+                excludes=X[row]
+            )
             for row in range(self.N)
-        ]))
-        assert self.tensor_shape(negatives) == (self.N, self.negative_sample_size, self.D), \
-            "Negative samples \n%s\nexpected shape %s but %s" % \
-            (negatives, (self.N, self.negative_sample_size, self.D), self.tensor_shape(negatives))
+        ]), shape=(-1))
+        self._Ws = self.reshape(
+            X=self._extract_event_vectors(self.negative_sample_indices),
+            shape=(self.N, -1, self.D)
+        )
+        assert self.tensor_shape(self.Ws) == (self.N, self.negative_sample_size, self.D), \
+            "Negative self.Ws \n%s\nexpected shape %s but %s" % \
+            (self.Ws, (self.N, self.negative_sample_size, self.D), self.tensor_shape(self.Ws))
 
         # --------------------------------------------------------------------------------
         # Negative score (BoW dot Negatives)
         # --------------------------------------------------------------------------------
-        negative_scores = self.einsum("nd,nkd->nk", bows, negatives)
-        del bows, negatives
+        Ys = negative_scores = self.einsum("nd,nkd->nk", self.Bc, self.Ws)
 
         # ================================================================================
-        # Result of np.c_[positive_scores, negative_scores)
+        # Result of np.c_[Ye, Ys]
         # ================================================================================
-        self._Y = np.c_[positive_scores, negative_scores]
+        self._Y = np.c_[Ye, Ys]
         assert self.tensor_shape(self.Y) == (self.N, (1 + self.negative_sample_size))
         assert np.all(self.is_finite(self.Y)), f"NaN or inf detected in {self.Y}"
         return self.Y
 
-    def gradient(self, dY: Union[np.ndarray, float] = 1.0) -> Union[np.ndarray, float]:
-        """Calculate the gradients dL/dX and dL/dW.
+    def gradient(self, dY: Union[TYPE_TENSOR, TYPE_FLOAT]) -> TYPE_TENSOR:
+        """Calculate the gradients dL/dWe, dL/dWc, dL/dWs
+        dL/dWe = dL/dW[target_indices] = dL/dYe * Bc
+        dL/dWc = dL/dW[target_indices] = dL/dYe * Be
+
+        dL/dYe=dL/dY[0:1] is the gradient of target event vectors We=W[target_indices].
+        dL/dYc=dL/dY[1:] is the gradient of negative sample vectors Ws=W[negative_sample_indices].
+
         Args:
-            dY: Gradient dL/dY, the total impact on L by dY.
+            dY: Gradient dL/dY
         Returns:
-            dX: dL/dX of shape (N, D-1) without the bias
+            TODO: Confirm what to back-prop
+            dX: dL/dX
         """
         name = "gradient"
-        assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT)
-
-        dY = np.array(dY).reshape((1, -1)) if isinstance(dY, float) or dY.ndim < 2 else dY
+        dY: TYPE_TENSOR = self.assure_tensor(dY)
         assert dY.shape == self.Y.shape, \
             "dL/dY shape needs %s but %s" % (self.Y.shape, dY.shape)
 
         self.logger.debug("layer[%s].%s: dY.shape %s", self.name, name, dY.shape)
         self._dY = dY
 
-        # --------------------------------------------------------------------------------
-        # dL/dW of shape (M,D):  [ X.T:(D, N)  @ dL/dY:(N,M) ].T
-        # --------------------------------------------------------------------------------
-        dW = np.Embedding(self.X.T, self.dY).T
-        assert dW.shape == (self.M, self.D), \
-            f"Gradient dL/dW shape needs {(self.M, self.D)} but ({dW.shape}))"
+        dYe: TYPE_TENSOR = dY[
+            ...,
+            0
+        ]
+        dBe: TYPE_TENSOR = self.multiply(dYe, self.Bc)
+        assert self.tensor_shape(dBe) == (self.N, self.D), \
+            f"Expected dBe shape {(self.N, self.D)} but {self.tensor_shape(dBe)}"
+        dBc: TYPE_TENSOR = self.multiply(dYe, self.Be)
+        assert self.tensor_shape(dBc) == (self.N, self.D),\
+            f"Expected dBc shape {(self.N, self.D)} but {self.tensor_shape(dBc)}"
 
-        self._dW = dW
-        assert np.all(np.isfinite(self.dW)), f"{self.dW}"
-
-        # --------------------------------------------------------------------------------
-        # dL/dX of shape (N,D):  [ dL/dY:(N,M) @ W:(M,D)) ]
-        # --------------------------------------------------------------------------------
-        np.Embedding(self.dY, self.W, out=self._dX)
-        assert self.dX.shape == (self.N, self.D), \
-            "dL/dX shape needs (%s, %s) but %s" % (self.N, self.D, self.dX.shape)
-
-        assert np.all(np.isfinite(self.dX)), f"{self.dX}"
-        return self.dX[
-            ::,
-            1::     # Omit bias column 0
+        dYs: TYPE_TENSOR = dY[
+            ...,
+            1:
         ]
 
     def gradient_numerical(
