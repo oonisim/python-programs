@@ -55,6 +55,7 @@ echo "Running PyTest..."
 #--------------------------------------------------------------------------------
 NUM_CPU=6
 #python3 -m cProfile -o profile -m pytest \
+#python3 -m memory_profiler -m pytest \
 pytest \
   -n $NUM_CPU \
   --rootdir=${DIR} \

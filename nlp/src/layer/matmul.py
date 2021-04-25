@@ -9,6 +9,7 @@ from typing import (
     Dict
 )
 
+from memory_profiler import profile as memory_profile
 import numpy as np
 
 import optimizer as optimiser
@@ -279,6 +280,7 @@ class Matmul(Layer):
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
+    @memory_profile
     def function(self, X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
         """Calculate the layer output Y = X@W.T
         Args:
@@ -332,6 +334,7 @@ class Matmul(Layer):
         assert np.all(np.isfinite(self.Y)), f"{self.Y}"
         return self.Y
 
+    @memory_profile
     def gradient(self, dY: Union[np.ndarray, float] = 1.0) -> Union[np.ndarray, float]:
         """Calculate the gradients dL/dX and dL/dW.
         Args:

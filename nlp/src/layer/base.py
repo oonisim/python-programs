@@ -170,7 +170,9 @@ class Layer(nn.Function):
     @property
     def X(self) -> TYPE_TENSOR:
         """Latest batch input to the layer"""
-        assert self.is_tensor(self._X) and self.tensor_size(self._X) > 0, \
+        assert \
+            (self.is_tensor(self._X) and self.tensor_size(self._X) > 0) or \
+            self.is_float_scalar(self._X), \
             "X is not initialized or invalid"
 
         return self._X
@@ -259,6 +261,13 @@ class Layer(nn.Function):
                 "Gradient dY/dX \n[%s] may have been saturated." % self._dY[5::]
             )
         return self._dY
+
+    @dY.setter
+    def dY(self, dY):
+        assert self.is_same_shape(dY, self.Y), \
+            "dL/dY shape needs %s but %s" \
+            % (self.tensor_shape(self.Y), self.tensor_shape(dY))
+        self._dY = dY
 
     @property
     def S(self) -> List:
@@ -393,10 +402,10 @@ class Layer(nn.Function):
         self.logger.warning(
             "Layer base method %s not overridden but called.",
         )
-
+        self._X = self.to_tensor(X)
+        self._Y = self.X
         # In case for the layer is a repeater, pass X through as the default behavior.
-        X = np.array(X).reshape((1, -1)) if isinstance(X, float) else X
-        return X
+        return self.Y
 
     def forward(self, X: np.ndarray) -> Union[np.ndarray, float]:
         """Calculate and forward-propagate the matmul output Y to post layers if exist.
@@ -432,23 +441,32 @@ class Layer(nn.Function):
         Returns:
             dL/dX: impact on L by the layer input X
         """
-        assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT)
+        # assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT)
+        dY = self.assure_tensor(dY)
+        assert self.tensor_shape(self.Y) == self.tensor_shape(dY)
 
         # In case the layer is a repeater or no gradient, pass dY through.
         self.logger.warning(
             "Layer base method %s not overridden but called",
         )
-        # assert isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT
+        # The shape of dX must match X. Simply back-prop dY which would have a
+        # different shape of Y=f(X) is incorrect. We do not know how to restore
+        # the shape of dX from dY, hence we cannot handle it here.
+        # However, there are layers e.g. event indexing which has no gradient
+        # to back-prop. Hence returns:
+        # - dL/dY if it has the same shape of X
+        # - dL/dY * Ones(shape=X.shape) if dL/dY can be broadcast to X
+        # - X
+        if self.tensor_shape(dY) == self.tensor_shape(self.X):
+            pass
+        elif self.is_broadcastable(dY, self.X):
+            dY = self.multiply(dY, self.X)
+        else:
+            dY = self.X
+
+        self._dY = dY
         return dY
 
-    # def backward(self) -> Union[np.ndarray, float]:
-    #     """Calculate and back-propagate the gradient dL/dX"""
-    #     self.logger.warning(
-    #         "Layer base method %s not overridden but called by %s.",
-    #         inspect.stack()[0][3], inspect.stack()[1][3]
-    #     )
-    #     assert False, "Need to override"
-    #     return np.array(-np.inf)
     def backward(self) -> Union[np.ndarray, float]:
         """Calculate the gradient dL/dX to back-propagate
         """

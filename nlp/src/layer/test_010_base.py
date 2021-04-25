@@ -6,6 +6,9 @@ from typing import (
 
 import numpy as np
 
+from common.constant import (
+    TYPE_INT
+)
 from layer.base import (
     Layer
 )
@@ -251,7 +254,7 @@ def test_010_base_instantiation():
     # --------------------------------------------------------------------------------
     try:
         # pylint: disable=not-callable
-        _layer.function(int(1))
+        _layer.function(TYPE_INT(1))
         raise RuntimeError("Invoke layer.function(int(1)) must fail.")
     except AssertionError:
         pass
@@ -260,13 +263,15 @@ def test_010_base_instantiation():
     assert np.array_equal(_layer.function(x), x)
 
     try:
+        Y = _layer.function(X)
+        assert Y.ndim > 0
         _layer.gradient(int(1))
         raise RuntimeError("Invoke layer.gradient(int(1)) must fail.")
     except AssertionError:
         pass
 
-    dY = np.array([1.0, 2.0])
-    assert np.array_equal(_layer.gradient(dY), dY)
+    Y = _layer.function(X)
+    assert np.array_equal(_layer.gradient(Y), Y)
 
     _layer.objective = objective
     # pylint: disable=not-callable

@@ -64,11 +64,20 @@ class Function:
         return np.isfinite(X)
 
     @staticmethod
+    def is_broadcastable(x: TYPE_TENSOR, y: TYPE_TENSOR):
+        assert Function.is_tensor(x) and Function.is_tensor(y)
+        return all((m == n) or (m == 1) or (n == 1) for m, n in zip(x.shape[::-1], y.shape[::-1]))
+
+    @staticmethod
     def tensor_shape(X):
         """The shape of a tensor
         """
         assert Function.is_tensor(X)
         return tuple(X.get_shape()) if tf.is_tensor(X) else X.shape
+
+    @staticmethod
+    def is_same_shape(x: TYPE_TENSOR, y: TYPE_TENSOR):
+        return Function.tensor_shape(x) == Function.tensor_shape(y)
 
     @staticmethod
     def tensor_rank(X):

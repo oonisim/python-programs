@@ -9,6 +9,7 @@ from typing import (
     Dict
 )
 
+from memory_profiler import profile as memory_profile
 import numpy as np
 
 import optimizer as optimiser
@@ -200,9 +201,24 @@ class Embedding(Layer):
         return self._W
 
     @property
+    def We(self) -> TYPE_TENSOR:
+        """Event vector for target"""
+        assert self.tensor_shape(self._We) == (self.N, self.E, self.D), \
+            "We is not initialized or deleted"
+        return self._We
+
+    @property
+    def Wc(self) -> TYPE_TENSOR:
+        """Event vector for context"""
+        assert self.tensor_shape(self._Wc) == (self.N, self.C, self.D), \
+            "Wc is not initialized or deleted"
+        return self._Wc
+
+    @property
     def Ws(self) -> TYPE_TENSOR:
         """Event vector for negative samples"""
-        assert self.tensor_shape(self._Ws) == (self.N, self.negative_sample_size, self.D)
+        assert self.tensor_shape(self._Ws) == (self.N, self.negative_sample_size, self.D), \
+            "Ws is not initialized or deleted"
         return self._Ws
 
     @property
@@ -222,12 +238,49 @@ class Embedding(Layer):
         """Weight gradients as np.c_[dL/dWe, dL/dWc, dL/dWs]
         dL/dWe:shape(N, E, D)
         dL/dWc:shape(N, C, D)
-        dL/dWs:shape(N, G, D)
+        dL/dWs:shape(N, SL, D)
         """
-        size = self.N * (self.E+self.C+self.negative_sample_size) * self.D
-        assert self.tensor_size(self._dW) == size, \
-            "dW is not initialized or invalid"
-        return self._dW
+        raise AssertionError("TBD")
+        raise NotImplementedError("To be implemented")
+        # return np.c_[self.dWe, self.dWc (TODO: FIX THIS!), self.dWs]
+
+    @property
+    def dWe(self) -> TYPE_TENSOR:
+        """Gradients dL/dWe for target event vectors We
+        dL/dWe:shape(N, E, D)
+        """
+        assert self.tensor_size(self._dWe) == (self.N * self.E * self.D), \
+            "dWe is not initialized or invalid"
+        return self._dWe
+
+    @property
+    def dWc01(self) -> TYPE_TENSOR:
+        """Gradients dL/dWc01 for context event vectors Wc with Be
+        (BoW of target event vectors)
+        dL/dWc01:shape(N, C, D)
+        """
+        assert self.tensor_shape(self._dWc01) == (self.N, self.C, self.D), \
+            "dWc01 is not initialized or invalid"
+        return self._dWc01
+
+    @property
+    def dWc02(self) -> TYPE_TENSOR:
+        """Gradients dL/dWc02 for context event vectors Wc with Ws
+        (Negative sample event vectors)
+        dL/dWc02:shape(N, C, D)
+        """
+        assert self.tensor_shape(self._dWc02) == (self.N, self.C, self.D), \
+            "dWc02 is not initialized or invalid"
+        return self._dWc02
+
+    @property
+    def dWs(self) -> TYPE_TENSOR:
+        """Gradients dL/dWs for negative sample event vectors Ws
+        dL/dWs:shape(N, SL, D)
+        """
+        assert self.tensor_size(self._dWs) == (self.N * self.negative_sample_size * self.D), \
+            "dWs is not initialized or invalid"
+        return self._dWs
 
     @property
     def X(self) -> TYPE_TENSOR:
@@ -357,10 +410,15 @@ class Embedding(Layer):
             % (dictionary.vocabulary_size, dictionary.vocabulary_size, self.W.shape)
         self._D = self.W.shape[1]
 
-        self._Be: TYPE_TENSOR = np.empty(shape=())   # BoW of event vectors for targets
-        self._Bc: TYPE_TENSOR = np.empty(shape=())   # BoW of event vectors for contexts
-        self._Ws: TYPE_TENSOR = np.empty(shape=())   # Event vectors for negative samples
-        self._dW: TYPE_TENSOR = np.empty(shape=())   # np.c_[dL/dWe, dL/dWc, dL/dWs]
+        self._Be: TYPE_TENSOR = np.empty(shape=())      # BoW of event vectors for targets
+        self._Bc: TYPE_TENSOR = np.empty(shape=())      # BoW of event vectors for contexts
+        self._We: TYPE_TENSOR = np.empty(shape=())      # Event vectors for target
+        self._Wc: TYPE_TENSOR = np.empty(shape=())      # Event vectors for context
+        self._Ws: TYPE_TENSOR = np.empty(shape=())      # Event vectors for negative samples
+        self._dWe: TYPE_TENSOR = np.empty(shape=())     # dL/dWe
+        self._dWc01: TYPE_TENSOR = np.empty(shape=())   # dL/dWc01:(N,C,D) with Be (BoWs of target event vectors).
+        self._dWc02: TYPE_TENSOR = np.empty(shape=())   # dL/dWc02:(N,S,D) with Ws (negative sample event vectors).
+        self._dWs: TYPE_TENSOR = np.empty(shape=())     # dL/dWs
 
         # --------------------------------------------------------------------------------
         # State of the layer
@@ -399,29 +457,22 @@ class Embedding(Layer):
         ]
         return vectors
 
-    def _bag_vectors_per_window(self, vectors: TYPE_TENSOR):
-        """Sum(vectors) via Group-by window(axis=1) of shape:(N, ?, D)
-        where ? is either target or context in (target/E, context/C) pair window.
+    def _bagging(self, w) -> TYPE_TENSOR:
+        """Create a bag of event vectors by sum along axis=1 as einsum("ncd->nd").
+        Like SQL sum(context_vectors) GROUP BY context causing (N, ?, D)->(N,D)
+        where ? is either target size E or context size C.
 
         Args:
-            vectors: Event vectors of shape:(N, C, D) or (N, E, D)
+            w: Event vectors of shape:(N, C, D) or (N, E, D)
         Returns: Bagged vectors of shape (N, D)
         """
-        vectors = self.reshape(vectors, (self.N, -1, self.D))
         return self.einsum(
             "ncd->nd",
-            vectors
+            w
         )
 
-    def _bagging(self, w) -> TYPE_TENSOR:
-        """Create a bag of event vectors
-        Args:
-            w: event vectors from W
-        """
-        bags = self._bag_vectors_per_window(w)
-        return bags
-
-    def function(self, X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
+    @memory_profile
+    def function(self, X: Union[TYPE_TENSOR, TYPE_FLOAT]) -> TYPE_TENSOR:
         """Calculate the layer output Y
         Process:
         1. BoW (Bag of Words) event vectors for contexts:
@@ -442,12 +493,12 @@ class Embedding(Layer):
 
         3. Negative samples.
             For all the (target, context) pairs.
-            3-1. Sample G negative events from the dictionary. Negative events are
-                 events not includes in the (target, context) pair. G is the number of
-                 negative samples.
+            3-1. Sample SL number of negative events from the dictionary.
+                 Negative events are those not includes in the (target, context) pair.
+                 SL is the number of negative samples.
             3-2. Extract event vectors from W for the negative events.
-                 -> negative vectors of shape:(G, D).
-            3-3. Stack all the negative vectors into shape:(N, G, D)
+                 -> negative vectors of shape:(SL, D).
+            3-3. Stack all the negative vectors into shape:(N, SL, D)
 
         Args:
             X:  (event, context) pairs. The shape can be:
@@ -471,9 +522,11 @@ class Embedding(Layer):
             "Expected X shape is (?, E+C) or (N, ?, E+C) but %s" % X.shape
 
         # --------------------------------------------------------------------------------
-        # Stack N x (num_windows, E+C) into (N*num_windows, E+C).
-        # The information of which sequence a (event, context) pair belongs to gets lost.
-        # However, Embedding only require (event, context) pairs, NOT sequences.
+        # Reshape (N, num_windows, E+C) into (N*num_windows, E+C) if X has multiple
+        # sequences (rank > 2).
+        # Knowledge about "to which sequence a (event, context) pair belongs" gets lost.
+        # However, Embedding only encodes (event, context) pairs, and sequence knowledge
+        # is not utilised. Hence reshaping has no impact on Embedding capability.
         # --------------------------------------------------------------------------------
         X = self.reshape(X, (-1, self.window_size)) if self.tensor_rank(X) > 2 else X
         self.X = X
@@ -492,12 +545,11 @@ class Embedding(Layer):
             ::,
             0: self.E
         ], shape=(-1))
-        We: TYPE_TENSOR = self.reshape(
+        self._We = self.reshape(
             X=self._extract_event_vectors(self.target_indices),
             shape=(self.N, -1, self.D)
         )
-        assert self.tensor_shape(We) == (self.N, self.E, self.D)
-        self._Be = self._bagging(We)
+        self._Be = self._bagging(self.We)
 
         # --------------------------------------------------------------------------------
         # BoW vectors for contexts
@@ -506,13 +558,11 @@ class Embedding(Layer):
             ::,
             self.E:
         ], shape=(-1))
-        Wc = self.reshape(
+        self._Wc = self.reshape(
             X=self._extract_event_vectors(self.context_indices),
             shape=(self.N, -1, self.D)
         )
-        assert self.tensor_shape(Wc) == (self.N, self.C, self.D)
-        self._Bc = self._bagging(Wc)
-        del Wc
+        self._Bc = self._bagging(self.Wc)
 
         # --------------------------------------------------------------------------------
         # Positive score (BoW dot Target)
@@ -537,13 +587,13 @@ class Embedding(Layer):
             shape=(self.N, -1, self.D)
         )
         assert self.tensor_shape(self.Ws) == (self.N, self.negative_sample_size, self.D), \
-            "Negative self.Ws \n%s\nexpected shape %s but %s" % \
+            "Negative self.Ws \n%s\nExpected shape %s but %s" % \
             (self.Ws, (self.N, self.negative_sample_size, self.D), self.tensor_shape(self.Ws))
 
         # --------------------------------------------------------------------------------
         # Negative score (BoW dot Negatives)
         # --------------------------------------------------------------------------------
-        Ys = negative_scores = self.einsum("nd,nkd->nk", self.Bc, self.Ws)
+        Ys = negative_scores = self.einsum("nd,nsd->ns", self.Bc, self.Ws)
 
         # ================================================================================
         # Result of np.c_[Ye, Ys]
@@ -553,6 +603,7 @@ class Embedding(Layer):
         assert np.all(self.is_finite(self.Y)), f"NaN or inf detected in {self.Y}"
         return self.Y
 
+    @memory_profile
     def gradient(self, dY: Union[TYPE_TENSOR, TYPE_FLOAT]) -> TYPE_TENSOR:
         """Calculate the gradients dL/dWe, dL/dWc, dL/dWs
         dL/dWe = dL/dW[target_indices] = dL/dYe * Bc
@@ -563,33 +614,109 @@ class Embedding(Layer):
 
         Args:
             dY: Gradient dL/dY
-        Returns:
-            TODO: Confirm what to back-prop
-            dX: dL/dX
+        Returns: Return the input X as is as there is no gradient of X
         """
         name = "gradient"
         dY: TYPE_TENSOR = self.assure_tensor(dY)
-        assert dY.shape == self.Y.shape, \
-            "dL/dY shape needs %s but %s" % (self.Y.shape, dY.shape)
-
+        self.dY = dY
         self.logger.debug("layer[%s].%s: dY.shape %s", self.name, name, dY.shape)
-        self._dY = dY
 
         dYe: TYPE_TENSOR = dY[
-            ...,
-            0
+            ::,
+            0:1     # To make dYe:(N,1), NOT (N,) so as to multiply (N,1) * (N,D)
         ]
+        assert self.tensor_shape(dYe) == (self.N, 1)    # Make sure dYe:(N,1), NOT (N,)
+        dYs: TYPE_TENSOR = dY[
+            ::,
+            1:
+        ]
+        assert self.tensor_shape(dYs) == (self.N, self.negative_sample_size)
+
+        # --------------------------------------------------------------------------------
+        # dL/dWe:(N,E,D) = dL/dBe:(N,D) OP dBe/dWe:(N,E,D)
+        # - dL/dBe = dL/dYe:(N,1) OP1 Bc:(N,D)
+        #            *Make sure dYe:(N,1), NOT (N,)
+        # where 'OP' is the gradient of Be=einsum("ned->nd", We) at the forward path.
+        # --------------------------------------------------------------------------------
+        # Be=einsum("ned->nd", We) has done:
+        #   1. Summed along axis 1 and
+        #   2. Dropped the axis 1
+        # Hence the inversion is:
+        #   1. Add the axis 1 to dL/dBe:(N,D) with reshape (N,D)->(N,1,D), or newaxis.
+        #   2. Gradient of sum is 1 with reversing "ned->nd" as element-multiply ones((N,E,D)).
+        # [OP]
+        # dL/dWe:(N,E,D) = reshape(dL/dBe:(N,D), (N,1,D)) * ones((N,E,D)).
+        # --------------------------------------------------------------------------------
         dBe: TYPE_TENSOR = self.multiply(dYe, self.Bc)
         assert self.tensor_shape(dBe) == (self.N, self.D), \
             f"Expected dBe shape {(self.N, self.D)} but {self.tensor_shape(dBe)}"
-        dBc: TYPE_TENSOR = self.multiply(dYe, self.Be)
-        assert self.tensor_shape(dBc) == (self.N, self.D),\
-            f"Expected dBc shape {(self.N, self.D)} but {self.tensor_shape(dBc)}"
+        self._dWe = self.multiply(
+            x=self.reshape(X=dBe, shape=(self.N, 1, self.D)),
+            y=np.ones(shape=(self.N, self.E, self.D))
+        )
+        del dBe
 
-        dYs: TYPE_TENSOR = dY[
-            ...,
-            1:
-        ]
+        # --------------------------------------------------------------------------------
+        # dL/dWc01:(N,C,D) with Be (BoWs of target event vectors).
+        # --------------------------------------------------------------------------------
+        # dL/dWc01:(N,C,D) = dL/dBc01:(N,D) OP dBc/dWc:(N,C,D)
+        # where 'OP' is the gradient of Be=einsum("ncd->nd", We) at the forward path.
+        # - dL/dBc01:(N,D)  = dL/dYs:(N,SL) * Ws:(N,SL,D)
+        # - dBc/dWc:(N,C,D) = ones((N,C,D))
+        #
+        # [OP]
+        # - dL/dWc01:(N,C,D) = reshape(dL/dBc01:(N,D), (N,1,D)) * ones((N,C,D))
+        # It is possible to omit '* ones((N,C,D))' as broadcast handles it but to be explicit.
+        # --------------------------------------------------------------------------------
+        dBc01: TYPE_TENSOR = self.multiply(dYe, self.Be)
+        assert self.tensor_shape(dBc01) == (self.N, self.D),\
+            f"Expected dBc shape {(self.N, self.D)} but {self.tensor_shape(dBc01)}"
+        self._dWc01 = self.multiply(
+            x=self.reshape(X=dBc01, shape=(self.N, 1, self.D)),
+            y=np.ones(shape=(self.N, self.C, self.D))
+        )
+
+        # --------------------------------------------------------------------------------
+        # dL/dWc02:(N,C,D) with Wc (Negative sample event vectors).
+        # --------------------------------------------------------------------------------
+        # dL/dWc02:(N,C,D) = dL/dBc02:(N,D) OP2 dBc/dWc:(N,C,D)
+        # - dL/dBc02:(N,D) = dL/dYs:(N,SL) OP1 dYs/dBc:(N,SL,D)
+        # - dYs/dBc:(N,SL,D) = Ws:(N,SL,D)
+        # - dBc/dWc:(N,C,D) = ones((N,C,D))
+        # where 'OP1' is the gradient of "Ys=einsum("nd,nsd->ns", self.Bc, self.Ws)".
+        #
+        # [OP1]
+        # Ys = einsum("nd,nsd->ns", self.Bc:(N,D), self.Ws:(N,SL,D)) is operation
+        # of (BoWc:(D,) dot Ws(n)(s)) for s:(0,1,...,SL-1).
+        # This is 1-to-SL operation hence the gradient is a sum op as "ns,nsd->nd"
+        # as einsum("ns,nsd->nd", dL/dYs:(N,SL), dYs/dBc:(N,SL,D)).
+        #
+        # [OP2]
+        # Bc=einsum("ncd->nd", Wc) has done:
+        #   1. Sum along axis 1
+        #   2. Drop axis 1.
+        # Hence the gardient of Bc=einsum("ncd->nd", Wc) are:
+        #   1. Add the axis 1 to dL/dBc02:(N,D) with reshape (N,D)->(N,1,D), or newaxis
+        #   2. Gradient of sum is 1 with reversing "ncd->nd" as ones((N,C,D)).
+        # - dL/dWc02:(N,C,D) = reshape(dL/dBc02:(N,D), (N,1,D)) * ones((N,C,D))
+        # --------------------------------------------------------------------------------
+        dBc02: TYPE_TENSOR = self.einsum("ns,nsd->nd", dYs, self.Ws)
+        assert self.tensor_shape(dBc02) == (self.N, self.D),\
+            f"Expected dBc shape {(self.N, self.D)} but {self.tensor_shape(dBc02)}"
+        self._dWc02 = self.multiply(
+            x=self.reshape(X=dBc02, shape=(self.N, 1, self.D)),
+            y=np.ones((self.N, self.C, self.D))
+        )
+
+        # --------------------------------------------------------------------------------
+        # TODO:
+        #   What to return as dX? For now return self.X as-is as X has no gradient.
+        #   What to set to self._dx? Use empty for now and monitor how it goes.
+        #  'self._dX = self.X' is incorrect and can cause unexpected result e.g.
+        #   trying to copy data into self.X which can cause unexpected effects.
+        # --------------------------------------------------------------------------------
+        self._dX = np.empty(shape=self.tensor_shape(self.X))
+        return self.X
 
     def gradient_numerical(
             self, h: Optional[TYPE_FLOAT] = None
@@ -605,27 +732,22 @@ class Embedding(Layer):
         name = "gradient_numerical"
         self.logger.debug("layer[%s].%s", self.name, name)
         L = self.objective
-        WT = self.W.T
-
-        def objective_X(x: np.ndarray):
-            return L(x @ WT)
 
         def objective_W(w: np.ndarray):
-            return L(self.X @ w.T)
+            raise NotImplementedError("TBD")
 
-        dX = numerical_jacobian(objective_X, self.X, delta=h)
-        dX = dX[
-            ::,
-            1::     # Omit the bias
-        ]
-        dW = numerical_jacobian(objective_W, self.W, delta=h)
-        return [dX, dW]
+        dWe = numerical_jacobian(objective_W, self.We, delta=h)
+        dWc = numerical_jacobian(objective_W, self.Wc, delta=h)
+        dWs = numerical_jacobian(objective_W, self.Ws, delta=h)
+        return [dWe, dWc, dWs]
 
-    def _gradient_descent(self, W, dW, out=None) -> Union[np.ndarray, float]:
+    def _gradient_descent(
+            self, w: TYPE_TENSOR, dw: TYPE_TENSOR, out=None
+    ) -> TYPE_TENSOR:
         """Gradient descent
         Directly update matrices to avoid the temporary copies
         """
-        return self.optimizer.update(W, dW, out=out)
+        return self.optimizer.update(w, dw, out=out)
 
     def update(self) -> List[Union[float, np.ndarray]]:
         """
@@ -633,9 +755,6 @@ class Embedding(Layer):
 
         1. Calculate dL/dW = (dL/dY * dY/dW).
         2. Update W with the optimizer.
-
-        dL/dW.T:(D,M) = [ X.T:(D, N) @ dL/dY:(N,M) ].
-        dL/dW:  (M,D):  [ X.T:(D, N) @ dL/dY:(N,M) ].T.
 
         Returns:
             [dL/dW]: List of dL/dW.
@@ -645,8 +764,20 @@ class Embedding(Layer):
             update() is to update the state of the layer S. Hence not
             include dL/dX which is not part of the layer state.
        """
-        self._gradient_descent(self.W, self.dW, out=self._W)
-        self._dS = [self.dW]
+        self._gradient_descent(self.We, self.dWe, out=self._We)
+        self.W[self.target_indices] = self.We
+
+        self._gradient_descent(self.Wc, self.dWc, out=self._Wc)
+        self.W[self.context_indices] = self.Wc
+
+        self._gradient_descent(self.Ws, self.dWs, out=self._Ws)
+        self.W[self.target_indices] = self.Ws
+
+        self._dS = [self.dWe, self.dWc, self.dWs]
+
+        # self.N changes every time function() is called, hence the buffer
+        # cannot be re-usable as the out buffer. Free them.
+        del self._We, self._Wc, self._Ws, self._Be, self._Bc
 
         return self.dS
 
