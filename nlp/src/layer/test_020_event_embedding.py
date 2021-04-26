@@ -518,7 +518,7 @@ def test_020_embedding_instance_properties_access_to_succeed(caplog):
             raise RuntimeError("Access to window_size should be allowed as already initialized.")
 
         try:
-            if not embedding.negative_sample_size == negative_sample_size:
+            if not embedding.SL == negative_sample_size:
                 raise RuntimeError("embedding.negative_sample_size == negative_sample_size should be true")
         except AssertionError:
             raise RuntimeError("Access to negative_sample_size should be allowed as already initialized.")
@@ -557,10 +557,34 @@ def test_020_embedding_instance_properties_access_to_succeed(caplog):
             raise RuntimeError("Access to l2 should be allowed as already initialized.")
 
         try:
-            if not np.array_equal(embedding.S[0], embedding.W):
-                raise RuntimeError("embedding.S == S should be true")
+            if not np.array_equal(embedding.S["target_size"], embedding.E):
+                raise RuntimeError("embedding.E == E should be true")
         except AssertionError:
-            raise RuntimeError("Access to S should be allowed as already initialized.")
+            raise RuntimeError("Access to S['target_size'] should be allowed as already initialized.")
+
+        try:
+            if not np.array_equal(embedding.S["context_size"], embedding.C):
+                raise RuntimeError("embedding.C == C should be true")
+        except AssertionError:
+            raise RuntimeError("Access to S['context_size'] should be allowed as already initialized.")
+
+        try:
+            if not np.array_equal(embedding.S["negative_sample_size"], embedding.SL):
+                raise RuntimeError("embedding.SL == SL should be true")
+        except AssertionError:
+            raise RuntimeError("Access to S['negative_sample_size'] should be allowed as already initialized.")
+
+        try:
+            if embedding.S["dictionary"] is not embedding.dictionary:
+                raise RuntimeError("embedding.dictionary is dictionary should be true")
+        except AssertionError:
+            raise RuntimeError("Access to S['dictionary'] should be allowed as already initialized.")
+
+        try:
+            if not np.array_equal(embedding.S["W"], embedding.W):
+                raise RuntimeError("embedding.W == W should be true")
+        except AssertionError:
+            raise RuntimeError("Access to S['W'] should be allowed as already initialized.")
 
         try:
             if not isinstance(embedding.logger, logging.Logger):

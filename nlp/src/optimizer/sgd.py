@@ -6,7 +6,8 @@ import logging
 import numpy as np
 import numexpr as ne
 from common.constant import (
-    TYPE_FLOAT
+    TYPE_FLOAT,
+    TYPE_TENSOR
 )
 from . base import Optimizer
 
@@ -56,6 +57,9 @@ class SGD(Optimizer):
     # ================================================================================
     # Instance
     # ================================================================================
+    # --------------------------------------------------------------------------------
+    # Initialization
+    # --------------------------------------------------------------------------------
     def __init__(
             self,
             name=_SGD_NAME_DEFAULT,
@@ -66,8 +70,12 @@ class SGD(Optimizer):
         super().__init__(name=name, lr=lr, l2=l2, log_level=log_level)
 
     # --------------------------------------------------------------------------------
-    # Instance properties
+    # Instance methods
     # --------------------------------------------------------------------------------
+    def differential(self, dW: TYPE_TENSOR, W: TYPE_TENSOR = None, out: TYPE_TENSOR = None):
+        """Calculate the differential to update W"""
+        return self.multiply(x=dW, y=(1 + self.l2))
+
     def update(self, W, dW, out=None) -> np.ndarray:
         """Default method to update the weight matrix W
         Args:

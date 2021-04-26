@@ -166,14 +166,14 @@ class Embedding(Layer):
         return self.E + self.C
 
     @property
-    def negative_sample_size(self) -> TYPE_INT:
+    def SL(self) -> TYPE_INT:
         """Negative sample size"""
         return self._negative_sample_size
 
     @property
     def negative_sample_indices(self) -> TYPE_TENSOR:
         """Indices to extract negative sample event vectors"""
-        shape = (self.N*self.negative_sample_size,)
+        shape = (self.N*self.SL,)
         assert \
             self.tensor_shape(self._negative_sample_indices) == shape, \
             "Indices shape must be %s but %s" \
@@ -217,7 +217,7 @@ class Embedding(Layer):
     @property
     def Ws(self) -> TYPE_TENSOR:
         """Event vector for negative samples"""
-        assert self.tensor_shape(self._Ws) == (self.N, self.negative_sample_size, self.D), \
+        assert self.tensor_shape(self._Ws) == (self.N, self.SL, self.D), \
             "Ws is not initialized or deleted"
         return self._Ws
 
@@ -240,9 +240,7 @@ class Embedding(Layer):
         dL/dWc:shape(N, C, D)
         dL/dWs:shape(N, SL, D)
         """
-        raise AssertionError("TBD")
-        raise NotImplementedError("To be implemented")
-        # return np.c_[self.dWe, self.dWc (TODO: FIX THIS!), self.dWs]
+        return np.c_[self.dWe, self.dWc, self.dWs]
 
     @property
     def dWe(self) -> TYPE_TENSOR:
@@ -274,11 +272,23 @@ class Embedding(Layer):
         return self._dWc02
 
     @property
+    def dWc(self) -> TYPE_TENSOR:
+        """Gradients combined dL/dWc01 with Be and dL/dWc02 with Ws
+        dL/dWc:shape(N, C, D)
+
+        Gradient descent on Wc is subtraction of dL/dWc01 and dL/dWc02
+        in a linear manner. The impact on L from Wc=(dL/dWc01 and dL/dWc02).
+        """
+        assert self.tensor_shape(self._dWc) == (self.N, self.C, self.D), \
+            "dWc is not initialized or invalid"
+        return self._dWc
+
+    @property
     def dWs(self) -> TYPE_TENSOR:
         """Gradients dL/dWs for negative sample event vectors Ws
         dL/dWs:shape(N, SL, D)
         """
-        assert self.tensor_size(self._dWs) == (self.N * self.negative_sample_size * self.D), \
+        assert self.tensor_size(self._dWs) == (self.N * self.SL * self.D), \
             "dWs is not initialized or invalid"
         return self._dWs
 
@@ -296,9 +306,30 @@ class Embedding(Layer):
         super(Embedding, type(self)).X.fset(self, X)
 
     @property
-    def S(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
-        """State of the layer"""
-        self._S = [self.W]
+    def state_elements(self):
+        return [
+            "name",
+            "target_size",
+            "context_size",
+            "negative_sample_size",
+            "dictionary",
+            "W",
+            "optimizer"
+        ]
+
+    @property
+    def S(self) -> Union[List, Dict]:
+        """State of the layer instance"""
+        self._S = {
+            "name": self.name,
+            "target_size": self._target_size,
+            "context_size": self._context_size,
+            "negative_sample_size": self._negative_sample_size,
+            "dictionary": self.dictionary,
+            "W": self.W,
+            "optimizer": self.optimizer
+        }
+        assert set(self._S.keys()) == set(self.state_elements)
         return self._S
 
     @property
@@ -418,6 +449,7 @@ class Embedding(Layer):
         self._dWe: TYPE_TENSOR = np.empty(shape=())     # dL/dWe
         self._dWc01: TYPE_TENSOR = np.empty(shape=())   # dL/dWc01:(N,C,D) with Be (BoWs of target event vectors).
         self._dWc02: TYPE_TENSOR = np.empty(shape=())   # dL/dWc02:(N,S,D) with Ws (negative sample event vectors).
+        self._dWc: TYPE_TENSOR = np.empty(shape=())     # dL/dWc:(N,C,D)=(dL/dWc01 + dL/dWc02).
         self._dWs: TYPE_TENSOR = np.empty(shape=())     # dL/dWs
 
         # --------------------------------------------------------------------------------
@@ -577,7 +609,7 @@ class Embedding(Layer):
         # --------------------------------------------------------------------------------
         self._negative_sample_indices = self.reshape(X=self.to_tensor([
             self.dictionary.negative_sample_indices(
-                size=self.negative_sample_size,
+                size=self.SL,
                 excludes=X[row]
             )
             for row in range(self.N)
@@ -586,9 +618,9 @@ class Embedding(Layer):
             X=self._extract_event_vectors(self.negative_sample_indices),
             shape=(self.N, -1, self.D)
         )
-        assert self.tensor_shape(self.Ws) == (self.N, self.negative_sample_size, self.D), \
+        assert self.tensor_shape(self.Ws) == (self.N, self.SL, self.D), \
             "Negative self.Ws \n%s\nExpected shape %s but %s" % \
-            (self.Ws, (self.N, self.negative_sample_size, self.D), self.tensor_shape(self.Ws))
+            (self.Ws, (self.N, self.SL, self.D), self.tensor_shape(self.Ws))
 
         # --------------------------------------------------------------------------------
         # Negative score (BoW dot Negatives)
@@ -599,7 +631,7 @@ class Embedding(Layer):
         # Result of np.c_[Ye, Ys]
         # ================================================================================
         self._Y = np.c_[Ye, Ys]
-        assert self.tensor_shape(self.Y) == (self.N, (1 + self.negative_sample_size))
+        assert self.tensor_shape(self.Y) == (self.N, (1 + self.SL))
         assert np.all(self.is_finite(self.Y)), f"NaN or inf detected in {self.Y}"
         return self.Y
 
@@ -630,7 +662,7 @@ class Embedding(Layer):
             ::,
             1:
         ]
-        assert self.tensor_shape(dYs) == (self.N, self.negative_sample_size)
+        assert self.tensor_shape(dYs) == (self.N, self.SL)
 
         # --------------------------------------------------------------------------------
         # dL/dWe:(N,E,D) = dL/dBe:(N,D) OP dBe/dWe:(N,E,D)
@@ -675,6 +707,7 @@ class Embedding(Layer):
             x=self.reshape(X=dBc01, shape=(self.N, 1, self.D)),
             y=np.ones(shape=(self.N, self.C, self.D))
         )
+        del dBc01
 
         # --------------------------------------------------------------------------------
         # dL/dWc02:(N,C,D) with Wc (Negative sample event vectors).
@@ -707,6 +740,14 @@ class Embedding(Layer):
             x=self.reshape(X=dBc02, shape=(self.N, 1, self.D)),
             y=np.ones((self.N, self.C, self.D))
         )
+        del dBc02
+
+        # --------------------------------------------------------------------------------
+        # dL/dWc: Combined gradient of Wc.
+        # Impact of Wc on L is a linear combination of dL/dWc01 and dL/dWc02.
+        # --------------------------------------------------------------------------------
+        self._dWc = self.add(self._dWc01, self._dWc02)
+        del self._dWc01, self._dWc02
 
         # --------------------------------------------------------------------------------
         # TODO:
@@ -742,12 +783,13 @@ class Embedding(Layer):
         return [dWe, dWc, dWs]
 
     def _gradient_descent(
-            self, w: TYPE_TENSOR, dw: TYPE_TENSOR, out=None
-    ) -> TYPE_TENSOR:
-        """Gradient descent
-        Directly update matrices to avoid the temporary copies
+            self, w: TYPE_TENSOR, dw: TYPE_TENSOR, indices
+    ):
+        """Gradient descent on event vector w
+        Update the W elements extracted with the indices at the forward path.
         """
-        return self.optimizer.update(w, dw, out=out)
+        differential: TYPE_TENSOR = self.optimizer.differential(dW=dw)
+        np.subtract.at(a=w, indices=indices, b=differential)
 
     def update(self) -> List[Union[float, np.ndarray]]:
         """
@@ -764,15 +806,8 @@ class Embedding(Layer):
             update() is to update the state of the layer S. Hence not
             include dL/dX which is not part of the layer state.
        """
-        self._gradient_descent(self.We, self.dWe, out=self._We)
-        self.W[self.target_indices] = self.We
-
-        self._gradient_descent(self.Wc, self.dWc, out=self._Wc)
-        self.W[self.context_indices] = self.Wc
-
-        self._gradient_descent(self.Ws, self.dWs, out=self._Ws)
-        self.W[self.target_indices] = self.Ws
-
+        self._gradient_descent(w=self.We, dw=self.dWe, indices=self.target_indices)
+        self._gradient_descent(w=self.dWc, dw=self.dWc, indices=self.context_indices)
         self._dS = [self.dWe, self.dWc, self.dWs]
 
         # self.N changes every time function() is called, hence the buffer
@@ -781,7 +816,7 @@ class Embedding(Layer):
 
         return self.dS
 
-    def load(self, path: str):
+    def load(self, path: str) -> Dict:
         """Load and restore the layer state
         Consideration:
             Need to be clear if update a reference to the state object OR
@@ -802,8 +837,27 @@ class Embedding(Layer):
             path: state file path
         """
         state = super().load(path)
-        if self.is_tensor(self._W) and self.tensor_shape(self._W) == state[0].shape:
-            np.copyto(self._W, state[0])
+        assert \
+            isinstance(state, dict) and len(state) == len(self.state_elements) \
+            and all([element in state for element in self.state_elements])
+
+        self._name = state["name"]
+        self._target_size = state["target_size"]
+        self._context_size = state["context_size"]
+        self._negative_sample_size = state["negative_sample_size"]
+
+        if self.dictionary is not None: del self._dictionary
+        self._dictionary = state["dictionary"]
+
+        assert self.is_float_tensor(state["W"]), \
+            "Expected float tensor but \n%s\n" % state["W"]
+        if self.is_tensor(self._W) and self.tensor_shape(self._W) == self.tensor_shape(state["W"]):
+            np.copyto(self._W, state["W"])
         else:
             del self._W
-            self._W = state[0]
+            self._W = state["W"]
+
+        if self.optimizer is not None: del self._optimizer
+        self._optimizer = state["optimizer"]
+
+        return self.S

@@ -85,12 +85,19 @@ class Function(base.Function):
         return P
 
     @staticmethod
-    def einsum(equation, *inputs, **kwargs) -> TYPE_TENSOR:
-        return tf.einsum(equation, *inputs, **kwargs).numpy()
+    def add(x, y, out=None):
+        assert out is None, "out is not supported for TF"
+        return tf.math.add(x, y)
 
     @staticmethod
-    def multiply(x, y) -> TYPE_TENSOR:
+    def multiply(x, y, out=None) -> TYPE_TENSOR:
+        assert out is None, "out is not supported for TF"
         return tf.math.multiply(x, y).numpy()
+
+    @staticmethod
+    def einsum(equation, *inputs, **kwargs) -> TYPE_TENSOR:
+        assert "out" not in kwargs, "out is not supported for TF"
+        return tf.einsum(equation, *inputs, **kwargs).numpy()
 
     # ================================================================================
     # Instance

@@ -7,11 +7,13 @@ from typing import (
 import numpy as np
 
 from common.constant import (
-    TYPE_FLOAT
+    TYPE_FLOAT,
+    TYPE_TENSOR
 )
+import function.nn.tf as nn
 
 
-class Optimizer:
+class Optimizer(nn.Function):
     """Gradient descent optimization base class implementation"""
     # ================================================================================
     # Instance
@@ -22,7 +24,7 @@ class Optimizer:
             lr: learning rate of the gradient descent
             l2: L2 regularization hyper parameter, e.g. 1e-3, set to 0 not to use it
         """
-        self._name = name
+        super().__init__(name=name, log_level=log_level)
         self.lr = lr
         self.l2 = l2
 
@@ -80,6 +82,10 @@ class Optimizer:
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
+    def differential(self, dW: TYPE_TENSOR, W: TYPE_TENSOR = None, out: TYPE_TENSOR = None):
+        """Calculate the differential to update W"""
+        raise NotImplementedError("TBD")
+
     def update(self, W, dW, out=None) -> np.ndarray:
         """Default method to update the weight matrix W
         Args:
@@ -89,7 +95,7 @@ class Optimizer:
         Returns:
             Updated W
         """
-        pass
+        raise NotImplementedError("TBD")
 
 
 

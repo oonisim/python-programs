@@ -193,10 +193,24 @@ class Matmul(Layer):
             "X shape needs (%s, %s) but %s" % (self.N, self.D, self.X.shape)
 
     @property
-    # def S(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
-    def S(self) -> List[TYPE_TENSOR]:
-        """State of the layer"""
-        self._S = [self.W]
+    def state_elements(self):
+        return [
+            "name",
+            "num_nodes",
+            "W",
+            "optimizer"
+        ]
+
+    @property
+    def S(self) -> Union[List, Dict]:
+        """State of the layer instance"""
+        self._S = {
+            "name": self.name,
+            "num_nodes": self._num_nodes,
+            "W": self.W,
+            "optimizer": self.optimizer
+        }
+        assert set(self._S.keys()) == set(self.state_elements)
         return self._S
 
     @property
@@ -264,7 +278,7 @@ class Matmul(Layer):
         # --------------------------------------------------------------------------------
         # State of the layer
         # --------------------------------------------------------------------------------
-        self._S = [self.W]
+        self._S = {}
 
         self.logger.debug(
             "Matmul[%s] W.shape is [%s], number of nodes is [%s]",
@@ -434,7 +448,7 @@ class Matmul(Layer):
 
         return self.dS
 
-    def load(self, path: str) -> List:
+    def load(self, path: str) -> Dict:
         """Load and restore the layer state
         Consideration:
             Need to be clear if update a reference to the state object OR
@@ -455,11 +469,22 @@ class Matmul(Layer):
             path: state file path
         """
         state = super().load(path)
-        assert isinstance(state, list) and len(state) > 0
-        if self.W.shape == state[0].shape:
-            np.copyto(self._W, state[0])
+        assert \
+            isinstance(state, dict) and len(state) == len(self.state_elements) \
+            and all([element in state for element in self.state_elements])
+
+        self._name = state["name"]
+        self._num_nodes = state["num_nodes"]
+
+        assert self.is_float_tensor(state["W"]), \
+            "Expected float tensor but \n%s\n" % state["W"]
+        if self.is_tensor(self._W) and self.tensor_shape(self._W) == self.tensor_shape(state["W"]):
+            np.copyto(self._W, state["W"])
         else:
             del self._W
-            self._W = state[0]
+            self._W = state["W"]
+
+        if self.optimizer is not None: del self._optimizer
+        self._optimizer = state["optimizer"]
 
         return self.S

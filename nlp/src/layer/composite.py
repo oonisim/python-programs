@@ -147,9 +147,7 @@ class Composite(Layer):
         return self._S
 
     @property
-    def dS(self) -> List[
-            List[Union[float, np.ndarray]]
-    ]:
+    def dS(self) -> Union[List, Dict]:
         """List of the state gradients from each layer [ dS0, dS1, ..., dSn-1]
         Layers may not have state e.g. ReLU, hence cannot check if initialized
         """

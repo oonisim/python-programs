@@ -280,13 +280,7 @@ class Layer(nn.Function):
         return self._S
 
     @property
-    def dS(self) -> \
-            Union[
-                List[Union[TYPE_FLOAT, np.ndarray]],
-                List[
-                    List[Union[float, np.ndarray]]
-                ]
-            ]:
+    def dS(self) -> Union[List, Dict]:
         """Gradients dL/dS that have been used to update S in each layer
         For a layer which has no state, it is an empty list.
         Hence cannot validate if initialized or not.

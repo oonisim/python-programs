@@ -1,6 +1,7 @@
 # coding: utf-8
 import numpy as np
 
+
 class SGD:
 
     """確率的勾配降下法（Stochastic Gradient Descent）"""

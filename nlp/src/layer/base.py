@@ -100,6 +100,7 @@ Or spend hours on "attempted relative import beyond top-level package"
 """
 import logging
 from typing import (
+    Any,
     Optional,
     Union,
     List,
@@ -270,7 +271,7 @@ class Layer(nn.Function):
         self._dY = dY
 
     @property
-    def S(self) -> List:
+    def S(self) -> Union[List, Dict]:
         """State of the layer
         For a layer which has no state, it is an empty list.
         Hence cannot validate if initialized or not.
@@ -280,18 +281,12 @@ class Layer(nn.Function):
         return self._S
 
     @property
-    def dS(self) -> \
-            Union[
-                List[Union[TYPE_FLOAT, np.ndarray]],
-                List[
-                    List[Union[float, np.ndarray]]
-                ]
-            ]:
+    def dS(self) -> Union[List, Dict]:
         """Gradients dL/dS that have been used to update S in each layer
         For a layer which has no state, it is an empty list.
         Hence cannot validate if initialized or not.
         """
-        assert isinstance(self._S, list), \
+        assert isinstance(self._dS, list), \
             "Gradients dL/dS of the network not initialized."
         return self._dS
 
@@ -546,7 +541,7 @@ class Layer(nn.Function):
         """
         fileio.Function.serialize(path, self.S)
 
-    def load(self, path: str):
+    def load(self, path: str) -> Any:
         """Load the layer state
         The responsibility to restore the layer state is that of the child.
         Consideration:
@@ -572,5 +567,6 @@ class Layer(nn.Function):
             state: loaded state
         """
         state = fileio.Function.deserialize(path)
-        assert isinstance(state, list) and len(state) > 0
+        # DO NOT limit the implementation. Let the actual class handles it.
+        # assert isinstance(state, list) and len(state) > 0
         return state
