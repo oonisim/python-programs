@@ -61,7 +61,7 @@ class Function:
 
     @staticmethod
     def is_finite(X) -> bool:
-        return np.isfinite(X)
+        return np.all(np.isfinite(X))
 
     @staticmethod
     def is_broadcastable(x: TYPE_TENSOR, y: TYPE_TENSOR):

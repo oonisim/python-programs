@@ -9,8 +9,8 @@ from typing import (
     Dict
 )
 
-from memory_profiler import profile as memory_profile
 import numpy as np
+from memory_profiler import profile as memory_profile
 
 import optimizer as optimiser
 from common.constant import (
@@ -23,24 +23,12 @@ from common.constant import (
 from common.function import (
     numerical_jacobian,
 )
-# TODO: Update to layer.base once RC is done
 from layer.base import Layer
-from layer.preprocessing import (
-    EventIndexing
-)
 from layer.constants import (
-    _WEIGHTS,
-    _NAME,
-    _SCHEME,
-    _OPTIMIZER,
-    _NUM_NODES,
-    _NUM_FEATURES,
-    _PARAMETERS,
     MAX_NEGATIVE_SAMPLE_SIZE,
 )
-from layer._utility_builder_non_layer import (
-    build_optimizer_from_layer_parameters,
-    build_weights_from_layer_parameters
+from layer.preprocessing import (
+    EventIndexing
 )
 
 
@@ -631,8 +619,11 @@ class Embedding(Layer):
         # Result of np.c_[Ye, Ys]
         # ================================================================================
         self._Y = np.c_[Ye, Ys]
-        assert self.tensor_shape(self.Y) == (self.N, (1 + self.SL))
-        assert np.all(self.is_finite(self.Y)), f"NaN or inf detected in {self.Y}"
+        del Ye, Ys
+        assert \
+            self.is_finite(self.Y) and \
+            self.tensor_shape(self.Y) == (self.N, (1 + self.SL))
+        assert self.is_finite(self.Y), f"NaN or inf detected in {self.Y}"
         return self.Y
 
     @memory_profile
@@ -750,18 +741,62 @@ class Embedding(Layer):
         del self._dWc01, self._dWc02
 
         # --------------------------------------------------------------------------------
-        # TODO:
-        #   What to return as dX? For now return self.X as-is as X has no gradient.
-        #   What to set to self._dx? Use empty for now and monitor how it goes.
-        #  'self._dX = self.X' is incorrect and can cause unexpected result e.g.
-        #   trying to copy data into self.X which can cause unexpected effects.
+        # dL/dWs:(N,SL,D) = OP1(dL/dYs:(N,SL)) * OP2(Bc:(N,D))
+        # Ys:(N,SL)=einsum("nd,nsd->ns", Be:(N,D), Ws:(N,SL,D)).
+        # With respect to Ws, it has done:
+        #   (1). Broadcast/reshape Bc(n):(D) into Bc(n):(SL,D)
+        #   (2). Amplify sample event vectors in Ws(n):(SL,D) by Bc(n):(SL,D).
+        #   (3). Sum along d.
+        #
+        # To calculate dYs/dWs of einsum("nd,nsd->ns", Bc:(N,D), Ws:(N,SL,D)):
+        # [OP1]
+        #   1. Restore the rank for 'd' lost during "nd,nsd->ns" at the step (3)
+        #      with reshape(dL/dYs:(N,SL), shape=(N, SL, 1)).
+        #      This is "ns->n1d" as the inverse of "nd,nsd->nd" with regard to the rank.
+        #   2. Restore the shape (N,SL,D) lost during "nsd->ns" at the step (3)
+        #      with element-wise multiplication with ones(shape=(N,SL,D)).
+        #      This is "n1d->nsd" as the inverse of "nd,nsd->ns".
+        #   With step 1 and 2,
+        #   dL/dYs:(N,SL,D)
+        #      = OP1(dL/dYs)
+        #      = reshape(dL/dYs:(N,SL), shape=(N, SL, 1)) * ones(shape=(N,SL,D))
+        #
+        # [OP2]
+        # To amplify OP1(dL/dYs):(N,SL,D) with Be:(N,D), add the axis=1 to Be as:
+        #   Be:(N,1,D)
+        #      = OP2(Be:(N,D))
+        #      = reshape(Be:(N,D), shape=(N,1,D)).
+        #
+        # Then:
+        # dL/dWs:(N,SL,D) = multiply(OP1(dL/dYs):(N,SL,D), OP2(Be):(N,1,D))
+        # --------------------------------------------------------------------------------
+        self._dWs = self.multiply(
+            x=self.multiply(    # OP1
+                self.reshape(dYs, shape=(self.N, self.SL, 1)),
+                np.ones(shape=(self.N, self.SL, self.D))
+            ),
+            y=self.reshape(self.Be, shape=(self.N, 1, self.D))
+        )
+        assert self.is_finite(self.dWs), "NaN/inf in \n%s\n" % self.dWs
+        assert \
+            self.tensor_shape(self.dWs) == \
+            self.tensor_shape(self.Ws) == \
+            (self.N, 1, self.D), \
+            "Expected shape %s but dWs.shape %s Ws.shape %s " \
+            % ((self.N, 1, self.D), self.tensor_shape(self.dWs), self.tensor_shape(self.Ws))
+
+        # --------------------------------------------------------------------------------
+        # What to return as dX? For now return self.X as-is as X has no gradient.
+        # What to set to self._dx? Use empty for now and monitor how it goes.
+        # 'self._dX = self.X' is incorrect and can cause unexpected result e.g.
+        # trying to copy data into self.X which can cause unexpected effects.
         # --------------------------------------------------------------------------------
         self._dX = np.empty(shape=self.tensor_shape(self.X))
         return self.X
 
     def gradient_numerical(
             self, h: Optional[TYPE_FLOAT] = None
-    ) -> List[Union[float, np.ndarray]]:
+    ) -> List[Union[TYPE_TENSOR, TYPE_FLOAT]]:
         """Calculate numerical gradients
         Args:
             h: small number for delta to calculate the numerical gradient
@@ -772,14 +807,21 @@ class Embedding(Layer):
         """
         name = "gradient_numerical"
         self.logger.debug("layer[%s].%s", self.name, name)
-        L = self.objective
 
-        def objective_W(w: np.ndarray):
+        def objective_Ws(ws: TYPE_TENSOR):
+            ys = self.einsum("nd,nsd->ns", self.Bc, ws)
+            return self.objective(ys)
+
+        def objective_We(we: TYPE_TENSOR):
+            ye = self.einsum("ncd,nd->n", self.Bc, we)
+            return self.objective(ye)
+
+        def objective_Wc(wc: TYPE_TENSOR):
             raise NotImplementedError("TBD")
 
-        dWe = numerical_jacobian(objective_W, self.We, delta=h)
-        dWc = numerical_jacobian(objective_W, self.Wc, delta=h)
-        dWs = numerical_jacobian(objective_W, self.Ws, delta=h)
+        dWe = numerical_jacobian(objective_We, self.We, delta=h)
+        dWc = numerical_jacobian(objective_Wc, self.Wc, delta=h)
+        dWs = numerical_jacobian(objective_Ws, self.Ws, delta=h)
         return [dWe, dWc, dWs]
 
     def _gradient_descent(
@@ -807,7 +849,8 @@ class Embedding(Layer):
             include dL/dX which is not part of the layer state.
        """
         self._gradient_descent(w=self.We, dw=self.dWe, indices=self.target_indices)
-        self._gradient_descent(w=self.dWc, dw=self.dWc, indices=self.context_indices)
+        self._gradient_descent(w=self.Wc, dw=self.dWc, indices=self.context_indices)
+        self._gradient_descent(w=self.Ws, dw=self.dWs, indices=self.negative_sample_indices)
         self._dS = [self.dWe, self.dWc, self.dWs]
 
         # self.N changes every time function() is called, hence the buffer
@@ -839,7 +882,7 @@ class Embedding(Layer):
         state = super().load(path)
         assert \
             isinstance(state, dict) and len(state) == len(self.state_elements) \
-            and all([element in state for element in self.state_elements])
+            and all(element in state for element in self.state_elements)
 
         self._name = state["name"]
         self._target_size = state["target_size"]
