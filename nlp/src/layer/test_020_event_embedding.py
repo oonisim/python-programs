@@ -204,6 +204,7 @@ def test_020_embedding_instantiation_to_fail():
             context_size=context_size,
             negative_sample_size=negative_sample_size,
             event_vector_size=event_vector_size,
+            dictionary=dictionary,
             log_level=logging.DEBUG,
             msg=msg
         )
@@ -216,6 +217,7 @@ def test_020_embedding_instantiation_to_fail():
             context_size=context_size,
             negative_sample_size=negative_sample_size,
             event_vector_size=event_vector_size,
+            dictionary=dictionary,
             log_level=logging.DEBUG,
             msg=msg
         )
@@ -228,6 +230,7 @@ def test_020_embedding_instantiation_to_fail():
             context_size=context_size,
             negative_sample_size=negative_sample_size,
             event_vector_size=event_vector_size,
+            dictionary=dictionary,
             log_level=logging.DEBUG,
             msg=msg
         )
@@ -240,6 +243,7 @@ def test_020_embedding_instantiation_to_fail():
             context_size=context_size,
             negative_sample_size=negative_sample_size,
             event_vector_size=event_vector_size,
+            dictionary=dictionary,
             log_level=logging.DEBUG,
             msg=msg
         )
@@ -252,6 +256,7 @@ def test_020_embedding_instantiation_to_fail():
             context_size=TYPE_INT(0),
             negative_sample_size=negative_sample_size,
             event_vector_size=event_vector_size,
+            dictionary=dictionary,
             log_level=logging.DEBUG,
             msg=msg
         )
@@ -264,6 +269,7 @@ def test_020_embedding_instantiation_to_fail():
             context_size=context_size,
             negative_sample_size=TYPE_INT(0),
             event_vector_size=event_vector_size,
+            dictionary=dictionary,
             log_level=logging.DEBUG,
             msg=msg
         )
@@ -276,6 +282,7 @@ def test_020_embedding_instantiation_to_fail():
             context_size=context_size,
             negative_sample_size=negative_sample_size,
             event_vector_size=TYPE_INT(0),
+            dictionary=dictionary,
             log_level=logging.DEBUG,
             msg=msg
         )
@@ -288,7 +295,7 @@ def test_020_embedding_instantiation_to_fail():
             context_size=context_size,
             negative_sample_size=negative_sample_size,
             event_vector_size=event_vector_size,
-            dictionary="hoge",
+            dictionary=["hoge", None][np.random.randint(0, 2)],
             log_level=logging.DEBUG,
             msg=msg
         )
