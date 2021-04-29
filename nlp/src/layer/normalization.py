@@ -1,4 +1,7 @@
-"""Normalization layer implementation
+"""Normalization layer implementations
+Note:
+    BN layer copied the Standardization layer. Need to refactor to make the
+    Standardization as a parent class to eliminate copy/paste duplicates.
 """
 import copy
 import logging
@@ -44,10 +47,7 @@ class Standardization(Layer):
         training data set.
 
     TODO:
-        Convert into the parent class of Standardization.
-        Provide interfaces and properties for standardization
-        Incremental update of running mean/std as done in Standardization.
-        predict i/f to use the RU/RSD.
+        Convert into the parent class of Batch Normalization.
     """
     # ================================================================================
     # Class initialization
@@ -929,7 +929,13 @@ class FeatureScaleShift(Layer):
 
 
 class BatchNormalization(Layer):
-    """BatchNormalization Layer class
+    """BatchNormalization class
+    Basically copy&paste of Standardization and FeatureScaleShift layers.
+    This layer can be completely replaced with (Standardization o FeatureScaleShift).
+
+    TODO:
+        Convert into a child class of Standardization and FeatureScaleShift.
+
     Considerations:
         Need to apply the population mean and SD to the non-training data set.
     """

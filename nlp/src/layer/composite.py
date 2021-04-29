@@ -189,8 +189,8 @@ class Composite(Layer):
         Responsibility:
             Set the label T to the layers in the composite.
         """
-        for __layer in self.layers:
-            __layer.T = T
+        for _layer in self.layers:
+            _layer.T = T
 
     def update(self) -> List[
             List[Union[float, np.ndarray]]
@@ -199,6 +199,6 @@ class Composite(Layer):
         Returns:
             [*dL/dS]: List of dL/dS form each layer update()
         """
-        dS = [__layer.update() for __layer in self.layers]
+        dS = [_layer.update() for _layer in self.layers]
         self._dS = dS
         return dS

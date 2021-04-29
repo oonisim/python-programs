@@ -162,8 +162,10 @@ def compose_sequential_layer_interface(
         gradient = layers[0].gradient
     else:
         Logger.debug("Layer names=%s", [_layer.name for _layer in layers])
+
         # Layer function F=(fn-1 o ... o f0)
         function = compose(*[__layer.function for __layer in layers])
+
         # Gradient function G=(g0 o g1 o ... o gn-1)
         gradient = compose(*[__layer.gradient for __layer in layers[::-1]])
 

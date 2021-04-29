@@ -517,6 +517,14 @@ class Layer(nn.Function):
 
                 Back-propagation to the previous layer is not included as
                 it is not part of the state S of the layer.
+
+            Why not returning S instead of dS?
+            Because state S of of a layer includes all the memory state, both mutable
+            and immutable, which the layer needs to functions. An embedding layer
+            instance requires a dictionary which may have million events (e.g. words).
+
+            Why not returning the subset of S which have been updated?
+            TODO: Answer
         """
         self.logger.warning(
             "Layer base method %s not overridden but called."
