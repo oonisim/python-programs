@@ -426,7 +426,7 @@ class Layer(nn.Function):
         list(map(_forward, Y, self._posteriors))
         return Y
 
-    def gradient(self, dY: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
+    def gradient(self, dY: Union[TYPE_TENSOR, TYPE_FLOAT]) -> Union[TYPE_TENSOR, TYPE_FLOAT]:
         """Calculate the gradient dL/dX, the impact on L by the input dX
         to back propagate to the previous layer, and other gradients on S
         dL/dS = dL/dY * dY/dS.
@@ -493,8 +493,8 @@ class Layer(nn.Function):
         return self.gradient(dY)
 
     def gradient_numerical(
-            self, h: float = 1e-5
-    ) -> List[Union[float, np.ndarray]]:
+            self, h: TYPE_FLOAT = 1e-5
+    ) -> List[Union[TYPE_TENSOR, TYPE_FLOAT]]:
         """Calculate numerical gradients
         Args:
             h: small number for delta to calculate the numerical gradient

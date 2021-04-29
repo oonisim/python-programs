@@ -12,7 +12,6 @@ from typing import (
 import numpy as np
 from memory_profiler import profile as memory_profile
 
-import optimizer as optimiser
 from common.constant import (
     TYPE_FLOAT,
     TYPE_INT,
@@ -30,6 +29,7 @@ from layer.constants import (
 from layer.preprocessing import (
     EventIndexing
 )
+import optimizer as optimiser
 
 
 class Embedding(Layer):

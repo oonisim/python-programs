@@ -1,26 +1,22 @@
 """Objective function layer implementations
 """
 import logging
-from functools import partial
 from typing import (
     List,
     Dict,
     Union,
-    Callable,
-    NoReturn
+    Callable
 )
+
 import numpy as np
-import common
+
 from common.constant import (
     TYPE_FLOAT,
     TYPE_LABEL,
-)
-from layer.constants import (
-    LOG_LOSS_GRADIENT_ACCEPTANCE_VALUE
+    TYPE_TENSOR
 )
 from common.function import (
     transform_X_T,
-    sigmoid,
     softmax,
     generic_cross_entropy_log_loss,
     sigmoid_cross_entropy_log_loss,
@@ -28,6 +24,9 @@ from common.function import (
     LOSS_FUNCTIONS
 )
 from layer.base import Layer
+from layer.constants import (
+    LOG_LOSS_GRADIENT_ACCEPTANCE_VALUE
+)
 from layer.constants import (
     _NAME,
     _NUM_NODES,
@@ -173,7 +172,7 @@ class CrossEntropyLogLoss(Layer):
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
-    def function(self, X: Union[np.ndarray, float]) -> np.ndarray:
+    def function(self, X: TYPE_TENSOR) -> TYPE_TENSOR:
         """Log Loss layer output L
         Pre-requisite:
             T has been set before calling.
@@ -248,7 +247,9 @@ class CrossEntropyLogLoss(Layer):
         self.logger.debug("Layer[%s].%s: L = %s", self.name, name, self.Y)
         return self.Y
 
-    def gradient(self, dY: Union[np.ndarray, float] = float(1)) -> Union[np.ndarray, float]:
+    def gradient(
+            self, dY: Union[TYPE_TENSOR, TYPE_FLOAT] = TYPE_FLOAT(1)
+    ) -> Union[TYPE_TENSOR, TYPE_FLOAT]:
         """Calculate the gradient dL/dX, the impact on F by the input dX.
         L: Output of the layer. Alias is Y.
         J = cross_entropy_log_loss(P,T)
@@ -355,7 +356,7 @@ class CrossEntropyLogLoss(Layer):
         return dX
 
     def gradient_numerical(
-            self, h: float = 1e-5
+            self, h: TYPE_FLOAT = TYPE_FLOAT(1e-5)
     ) -> List[Union[float, np.ndarray]]:
         GN: Union[float, np.ndarray] = super().gradient_numerical()[0]
 

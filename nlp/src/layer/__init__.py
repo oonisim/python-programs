@@ -11,6 +11,7 @@ from layer.activation import (
     Sigmoid,
     ReLU
 )
+from layer.embedding import Embedding
 from layer.objective import (
     CrossEntropyLogLoss
 )
