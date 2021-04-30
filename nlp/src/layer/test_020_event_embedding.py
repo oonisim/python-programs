@@ -178,7 +178,7 @@ def test_020_embedding_instantiation_to_fail():
 
     _must_succeed(
         name=name,
-        num_nodes=TYPE_INT(1),
+        num_nodes=(1+negative_sample_size),
         target_size=target_size,
         context_size=context_size,
         negative_sample_size=negative_sample_size,
@@ -199,7 +199,7 @@ def test_020_embedding_instantiation_to_fail():
         msg = "Name is string with length > 0."
         _must_fail(
             name="",
-            num_nodes=TYPE_INT(1),
+            num_nodes=(1 + negative_sample_size),
             target_size=target_size,
             context_size=context_size,
             negative_sample_size=negative_sample_size,
@@ -222,23 +222,23 @@ def test_020_embedding_instantiation_to_fail():
             msg=msg
         )
 
-        msg = "num_nodes must be 1."
-        _must_fail(
-            name=name,
-            num_nodes=TYPE_INT(np.random.randint(2, 100)),
-            target_size=target_size,
-            context_size=context_size,
-            negative_sample_size=negative_sample_size,
-            event_vector_size=event_vector_size,
-            dictionary=dictionary,
-            log_level=logging.DEBUG,
-            msg=msg
-        )
+        # msg = "num_nodes is 1+negative_sample_size but does not has to be enforced"
+        # _must_fail(
+        #     name=name,
+        #     num_nodes=TYPE_INT(1+negative_sample_size),
+        #     target_size=target_size,
+        #     context_size=context_size,
+        #     negative_sample_size=negative_sample_size,
+        #     event_vector_size=event_vector_size,
+        #     dictionary=dictionary,
+        #     log_level=logging.DEBUG,
+        #     msg=msg
+        # )
 
         msg = "target size must be >0."
         _must_fail(
             name=name,
-            num_nodes=TYPE_INT(1),
+            num_nodes=(1 + negative_sample_size),
             target_size=TYPE_INT(0),
             context_size=context_size,
             negative_sample_size=negative_sample_size,
@@ -251,7 +251,7 @@ def test_020_embedding_instantiation_to_fail():
         msg = "context_size must be >0."
         _must_fail(
             name=name,
-            num_nodes=TYPE_INT(1),
+            num_nodes=(1+negative_sample_size),
             target_size=target_size,
             context_size=TYPE_INT(0),
             negative_sample_size=negative_sample_size,
@@ -264,7 +264,7 @@ def test_020_embedding_instantiation_to_fail():
         msg = "negative_sample_size must be >0."
         _must_fail(
             name=name,
-            num_nodes=TYPE_INT(1),
+            num_nodes=(1+negative_sample_size),
             target_size=target_size,
             context_size=context_size,
             negative_sample_size=TYPE_INT(0),
@@ -277,7 +277,7 @@ def test_020_embedding_instantiation_to_fail():
         msg = "event_vector_size must be >0."
         _must_fail(
             name=name,
-            num_nodes=TYPE_INT(1),
+            num_nodes=(1+negative_sample_size),
             target_size=target_size,
             context_size=context_size,
             negative_sample_size=negative_sample_size,
@@ -290,7 +290,7 @@ def test_020_embedding_instantiation_to_fail():
         msg = "dictionary must be of type EventIndexing"
         _must_fail(
             name=name,
-            num_nodes=TYPE_INT(1),
+            num_nodes=(1+negative_sample_size),
             target_size=target_size,
             context_size=context_size,
             negative_sample_size=negative_sample_size,
@@ -314,7 +314,7 @@ def test_020_embedding_instantiation_to_fail():
         assert _indexing_dummy.vocabulary_size == length + len(EVENT_META_ENTITIES)
         _must_succeed(
             name=name,
-            num_nodes=TYPE_INT(1),
+            num_nodes=(1+negative_sample_size),
             target_size=TYPE_INT(target_size),
             context_size=TYPE_INT(context_size),
             negative_sample_size=TYPE_INT(negative_sample_size),
@@ -325,7 +325,7 @@ def test_020_embedding_instantiation_to_fail():
         )
         _must_fail(
             name=name,
-            num_nodes=TYPE_INT(1),
+            num_nodes=(1+negative_sample_size),
             target_size=TYPE_INT(target_size) + 1,
             context_size=TYPE_INT(context_size),
             negative_sample_size=TYPE_INT(negative_sample_size),
@@ -342,7 +342,7 @@ def test_020_embedding_instantiation_to_fail():
         )
         _must_fail(
             name=name,
-            num_nodes=TYPE_INT(1),
+            num_nodes=(1+negative_sample_size),
             target_size=TYPE_INT(target_size),
             context_size=TYPE_INT(context_size),
             negative_sample_size=TYPE_INT(negative_sample_size),
@@ -363,7 +363,7 @@ def test_020_embedding_instantiation_to_fail():
         )
         _must_fail(
             name=name,
-            num_nodes=TYPE_INT(1),
+            num_nodes=(1+negative_sample_size),
             target_size=TYPE_INT(target_size),
             context_size=TYPE_INT(context_size),
             negative_sample_size=TYPE_INT(negative_sample_size),
@@ -402,7 +402,7 @@ def test_020_embedding_instance_properties_access_to_fail(caplog):
 
         embedding, event_context = _must_succeed(
             name=name,
-            num_nodes=TYPE_INT(1),
+            num_nodes=(1+negative_sample_size),
             target_size=target_size,
             context_size=context_size,
             negative_sample_size=negative_sample_size,
@@ -480,7 +480,7 @@ def test_020_embedding_instance_properties_access_to_succeed(caplog):
 
         embedding, event_context = _must_succeed(
             name=name,
-            num_nodes=TYPE_INT(1),
+            num_nodes=(1+negative_sample_size),
             target_size=target_size,
             context_size=context_size,
             negative_sample_size=negative_sample_size,
@@ -632,7 +632,7 @@ def test_020_embedding_function_multi_lines(caplog):
 
         embedding, event_context = _must_succeed(
             name=name,
-            num_nodes=TYPE_INT(1),
+            num_nodes=(1+negative_sample_size),
             target_size=target_size,
             context_size=context_size,
             negative_sample_size=negative_sample_size,
@@ -677,7 +677,7 @@ def test_020_embedding_save_load(caplog):
 
         embedding, event_context = _must_succeed(
             name=name,
-            num_nodes=TYPE_INT(1),
+            num_nodes=(1+negative_sample_size),
             target_size=target_size,
             context_size=context_size,
             negative_sample_size=negative_sample_size,
