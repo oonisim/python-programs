@@ -130,6 +130,17 @@ class Layer(nn.Function):
     # ================================================================================
     # Class
     # ================================================================================
+    @classmethod
+    def class_id(cls):
+        """Identify the class
+        Avoid using Python implementation specific __qualname__
+
+        Returns:
+            Class identifier which may not be unique as Python does not have
+            a way to get fully qualified hierarchical name
+        """
+        return cls.__qualname__
+
     @staticmethod
     def build(parameters: Dict):
         """Build a matmul layer based on the specification

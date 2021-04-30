@@ -3,7 +3,7 @@ DO NOT import composite layer classes from this Python module.
 
 Layer specification:
     A layer specification is a dictionary object which identifies:
-    1. a layer class (use class.__qualname__)
+    1. a layer class (use class.class_id())
     2. **kwargs parameters for __init__
 
     Format:
@@ -14,7 +14,7 @@ Layer specification:
 
     Example: (Matmul)
     {
-        _SCHEME: layer.Matmul.__qualname__,
+        _SCHEME: layer.Matmul.class_id(),
         _PARAMETERS: {
             _NAME: "matmul01",
             _NUM_NODES: 8,
@@ -23,7 +23,7 @@ Layer specification:
                 _SCHEME: "he"
             },
             _OPTIMIZER: {
-                _SCHEME: optimiser.optimizer.SGD.__qualname__,
+                _SCHEME: optimiser.optimizer.SGD.class_id(),
                 _PARAMETERS: {
                     "lr": 1e-2,
                     "l2": 1e-3
@@ -35,7 +35,7 @@ Layer specification:
     Example: Sequential composite layer.
 
     {
-        _SCHEME: layer.Sequential.__qualname__,
+        _SCHEME: layer.Sequential.class_id(),
         _PARAMETERS: {
             _NAME: "sequential01",
             _NUM_NODES: 8,
@@ -54,7 +54,7 @@ Composite layer specification:
     Example for matmul-activation-matmul-objective composite layer.
     {
         "matmul01": {
-            _SCHEME: layer.Matmul.__qualname__,
+            _SCHEME: layer.Matmul.class_id(),
             _PARAMETERS: {
                 _NAME: "matmul01",
                 _NUM_NODES: 8,
@@ -63,7 +63,7 @@ Composite layer specification:
                     _SCHEME: "he"
                 },
                 _OPTIMIZER: {
-                    _SCHEME: optimiser.optimizer.SGD.__qualname__,
+                    _SCHEME: optimiser.optimizer.SGD.class_id(),
                     _PARAMETERS: {
                         "lr": _lr,
                         "l2": _l2
@@ -72,14 +72,14 @@ Composite layer specification:
             },
         },
         "activation01": {
-            _SCHEME: layer.ReLU.__qualname__,
+            _SCHEME: layer.ReLU.class_id(),
             _PARAMETERS: {
                 _NAME: "relu01",
                 _NUM_NODES: 8
             }
         },
         "matmul02": {
-            _SCHEME: layer.Matmul.__qualname__,
+            _SCHEME: layer.Matmul.class_id(),
             _PARAMETERS: {
                 _NAME: "matmul02",
                 _NUM_NODES: 3,
@@ -90,7 +90,7 @@ Composite layer specification:
             }
         },
         "objective": {
-            _SCHEME: layer.CrossEntropyLogLoss.__qualname__,
+            _SCHEME: layer.CrossEntropyLogLoss.class_id(),
             _PARAMETERS: {
                 _NAME: "relu01",
                 _NUM_NODES: M,

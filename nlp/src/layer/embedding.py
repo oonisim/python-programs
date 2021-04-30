@@ -508,7 +508,7 @@ class Embedding(Layer):
             w
         )
 
-    @memory_profile
+    # @memory_profile
     def function(self, X: Union[TYPE_TENSOR, TYPE_FLOAT]) -> TYPE_TENSOR:
         """Calculate the layer output Y
         Process:
@@ -642,7 +642,7 @@ class Embedding(Layer):
         assert self.is_finite(self.Y), f"NaN or inf detected in {self.Y}"
         return self.Y
 
-    @memory_profile
+    # @memory_profile
     def gradient(self, dY: Union[TYPE_TENSOR, TYPE_FLOAT]) -> TYPE_TENSOR:
         """Calculate the gradients dL/dWe, dL/dWc, dL/dWs
         dL/dWe = dL/dW[target_indices] = dL/dYe * Bc

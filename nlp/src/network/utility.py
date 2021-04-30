@@ -23,8 +23,8 @@ import optimizer
 
 def multilayer_network_specification(
         num_features: List[int],
-        omit_input_standardization: bool = False,
-        activation: str = ReLU.__qualname__
+        use_input_standardization: bool = True,
+        activation: str = ReLU.class_id()
 ):
     """
     Responsibility:
@@ -37,15 +37,17 @@ def multilayer_network_specification(
             number of features. e.g. [D, M01, M02, M]
 
             D: the number of input features into the network.
-            M01: the number of outputs from the first [matmul-bn-activation].
-            M02: the number of outputs from the second [matmul-bn-activation].
-            M: the number of classes to predict by the network.
+            M01: the number of outputs from the first [matmul-bn-activation],
+                 which are the number of input features into the next layer.
+            M02: the number of outputs from the second [matmul-bn-activation],
+                 which are the number of input features into the next layer.
+            M: the number of outputs, or classes to predict by the network.
 
             X:(N,D) -> [matmul-bn-activation] -> A01:(N,M01)
             A01:(N,M01) -> [matmul-bn-activation] -> A02:(N, M02)
             A02:(N, M02) -> [matmul -> Y:(N,M) -> loss -> ()].
 
-        omit_input_standardization: flag to skip the input standardization
+        use_input_standardization: flag to use the input standardization
         activation: Activation class to use.
     """
     # At least 3 stack: m0:(m1,m0)->(m) where m is the number of outputs at the last layer
@@ -108,7 +110,7 @@ def multilayer_network_specification(
                 name=f"relu{index:03d}",
                 num_nodes=m,
             )
-            if activation == ReLU.__qualname__
+            if activation == ReLU.class_id()
             else Sigmoid.specification(
                 name=f"sigmoid{index:03d}",
                 num_nodes=m,
@@ -139,7 +141,7 @@ def multilayer_network_specification(
     # --------------------------------------------------------------------------------
     # Standardization as the first stack
     # --------------------------------------------------------------------------------
-    if not omit_input_standardization:
+    if use_input_standardization:
         for k, v in input(index=0, d=D).items():
             sequential_layer_specification[k] = v
 

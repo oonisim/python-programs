@@ -54,7 +54,7 @@ class ReLU(Layer):
             slope: leaky slope value
         """
         return {
-            _SCHEME: ReLU.__qualname__,
+            _SCHEME: ReLU.class_id(),
             _PARAMETERS: {
                 _NAME: name,
                 _NUM_NODES: num_nodes,
@@ -175,7 +175,7 @@ class Sigmoid(Layer):
             num_nodes: number of nodes (outputs) in the layer
         """
         return {
-            _SCHEME: Sigmoid.__qualname__,
+            _SCHEME: Sigmoid.class_id(),
             _PARAMETERS: {
                 _NAME: name,
                 _NUM_NODES: num_nodes

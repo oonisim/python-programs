@@ -59,7 +59,7 @@ class EventIndexing(Layer):
             path_to_corpus: path to the corpus file.
         """
         return {
-            _SCHEME: EventIndexing.__qualname__,
+            _SCHEME: EventIndexing.class_id(),
             _PARAMETERS: {
                 _NAME: name,
                 _NUM_NODES: num_nodes,
@@ -374,7 +374,7 @@ class EventContext(Layer):
             event_size: Size of the events
        """
         return {
-            _SCHEME: EventContext.__qualname__,
+            _SCHEME: EventContext.class_id(),
             _PARAMETERS: {
                 _NAME: name,
                 _NUM_NODES: num_nodes,

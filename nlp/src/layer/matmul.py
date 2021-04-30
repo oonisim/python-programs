@@ -83,6 +83,9 @@ class Matmul(Layer):
     # ================================================================================
     # Class
     # ================================================================================
+    # --------------------------------------------------------------------------------
+    # Factory method
+    # --------------------------------------------------------------------------------
     @staticmethod
     def specification_template():
         return Matmul.specification(
@@ -109,7 +112,7 @@ class Matmul(Layer):
                 optimizer specification. Default to  SGD
         """
         return {
-            _SCHEME: Matmul.__qualname__,
+            _SCHEME: Matmul.class_id(),
             _PARAMETERS: {
                 _NAME: name,
                 _NUM_NODES: num_nodes,
@@ -294,7 +297,7 @@ class Matmul(Layer):
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
-    @memory_profile
+    # @memory_profile
     def function(self, X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
         """Calculate the layer output Y = X@W.T
         Args:
@@ -348,7 +351,7 @@ class Matmul(Layer):
         assert np.all(np.isfinite(self.Y)), f"{self.Y}"
         return self.Y
 
-    @memory_profile
+    # @memory_profile
     def gradient(self, dY: Union[np.ndarray, float] = 1.0) -> Union[np.ndarray, float]:
         """Calculate the gradients dL/dX and dL/dW.
         Args:

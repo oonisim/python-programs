@@ -559,7 +559,7 @@ def test_020_matmul_build_specification():
     num_features = 2
     weights_initialization_scheme = "he"
     expected_spec = {
-        _SCHEME: Matmul.__qualname__,
+        _SCHEME: Matmul.class_id(),
         _PARAMETERS: {
             _NAME: name,
             _NUM_NODES: num_nodes,

@@ -16,18 +16,15 @@ import numpy as np
 from common.constant import (
     TYPE_LABEL
 )
-from layer.base import Layer
 from layer.constants import (
     _NAME,
     _NUM_NODES,
     _LOG_LEVEL,
     _COMPOSITE_LAYER_SPEC
 )
+from layer.base import Layer
 from layer.utility_builder_layer import (
     build_layers_from_composite_layer_specification
-)
-from layer.composite_layer_specification_template import (
-    _composite_layer_specification
 )
 
 
@@ -35,14 +32,25 @@ class Composite(Layer):
     """Container layer"""
 
     # ================================================================================
-    # Class initialization
+    # Class
     # ================================================================================
+    # --------------------------------------------------------------------------------
+    # Factory method
+    # --------------------------------------------------------------------------------
     @staticmethod
     def specification_template():
-        return _composite_layer_specification
+        raise NotImplementedError("Must override")
+
+    @staticmethod
+    def specification():
+        raise AssertionError("There is no generic way to generate composite specification")
 
     @staticmethod
     def _build_layers(parameters: Dict) -> List[Layer]:
+        """Build individual layer instances in the composite layer
+        Args:
+            parameters: Composite layer specification parameters
+        """
         assert (
             _NAME in parameters and
             _NUM_NODES in parameters and
@@ -104,6 +112,10 @@ class Composite(Layer):
             "The num_nodes %s must match with that of the last layer %s" \
             % (num_nodes, layers[-1].num_nodes)
 
+        # --------------------------------------------------------------------------------
+        # Invoke _wire_layer_interfaces method of the implementation/child class
+        # Template pattern
+        # --------------------------------------------------------------------------------
         self._layers: List[Layer] = layers
         self.function, self.predict, self.gradient = \
             self._wire_layer_interfaces(self.layers)

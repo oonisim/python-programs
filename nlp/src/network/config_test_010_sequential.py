@@ -38,7 +38,7 @@ valid_network_specification_mamao = {
     _LOG_LEVEL: logging.ERROR,
     _COMPOSITE_LAYER_SPEC: {
         "matmul01": {
-            _SCHEME: layer.Matmul.__qualname__,
+            _SCHEME: layer.Matmul.class_id(),
             _PARAMETERS: {
                 _NAME: "matmul01",
                 _NUM_NODES: 8,
@@ -47,7 +47,7 @@ valid_network_specification_mamao = {
                     _SCHEME: "he"
                 },
                 _OPTIMIZER: {
-                    _SCHEME: optimiser.SGD.__qualname__,
+                    _SCHEME: optimiser.SGD.class_id(),
                     _PARAMETERS: {
                         "lr": _lr,
                         "l2": _l2
@@ -56,14 +56,14 @@ valid_network_specification_mamao = {
             },
         },
         "activation01": {
-            _SCHEME: layer.ReLU.__qualname__,
+            _SCHEME: layer.ReLU.class_id(),
             _PARAMETERS: {
                 _NAME: "relu01",
                 _NUM_NODES: 8
             }
         },
         "matmul02": {
-            _SCHEME: layer.Matmul.__qualname__,
+            _SCHEME: layer.Matmul.class_id(),
             _PARAMETERS: {
                 _NAME: "matmul02",
                 _NUM_NODES: _M,
@@ -74,14 +74,14 @@ valid_network_specification_mamao = {
             }
         },
         "activation02": {
-            _SCHEME: layer.ReLU.__qualname__,
+            _SCHEME: layer.ReLU.class_id(),
             _PARAMETERS: {
                 _NAME: "relu02",
                 _NUM_NODES: _M
             }
         },
         "objective": {
-            _SCHEME: layer.CrossEntropyLogLoss.__qualname__,
+            _SCHEME: layer.CrossEntropyLogLoss.class_id(),
             _PARAMETERS: {
                 _NAME: "loss",
                 _NUM_NODES: _M,
@@ -97,7 +97,7 @@ valid_network_specification_mao = {
     _LOG_LEVEL: logging.ERROR,
     _COMPOSITE_LAYER_SPEC: {
         "matmul01": {
-            _SCHEME: layer.Matmul.__qualname__,
+            _SCHEME: layer.Matmul.class_id(),
             _PARAMETERS: {
                 _NAME: "matmul01",
                 _NUM_NODES: _M,
@@ -106,7 +106,7 @@ valid_network_specification_mao = {
                     _SCHEME: "he"
                 },
                 _OPTIMIZER: {
-                    _SCHEME: optimiser.SGD.__qualname__,
+                    _SCHEME: optimiser.SGD.class_id(),
                     _PARAMETERS: {
                         "lr": _lr,
                         "l2": _l2
@@ -115,14 +115,14 @@ valid_network_specification_mao = {
             },
         },
         "activation01": {
-            _SCHEME: layer.ReLU.__qualname__,
+            _SCHEME: layer.ReLU.class_id(),
             _PARAMETERS: {
                 _NAME: "relu01",
                 _NUM_NODES: _M
             }
         },
         "objective": {
-            _SCHEME: layer.CrossEntropyLogLoss.__qualname__,
+            _SCHEME: layer.CrossEntropyLogLoss.class_id(),
             _PARAMETERS: {
                 _NAME: "loss",
                 _NUM_NODES: _M,
@@ -135,7 +135,7 @@ valid_network_specification_mao = {
 
 composite_layer_specification_sfmbambamamo = {
     "std01": {
-        _SCHEME: layer.Standardization.__qualname__,
+        _SCHEME: layer.Standardization.class_id(),
         _PARAMETERS: {
             _NAME: "std01",
             _NUM_NODES: _D,
@@ -145,13 +145,13 @@ composite_layer_specification_sfmbambamamo = {
         }
     },
     "fss01": {
-        _SCHEME: layer.FeatureScaleShift.__qualname__,
+        _SCHEME: layer.FeatureScaleShift.class_id(),
         _PARAMETERS: {
             _NAME: "fss01",
             _NUM_NODES: _D,
             "log_level": logging.ERROR,
             _OPTIMIZER: {
-                _SCHEME: optimiser.SGD.__qualname__,
+                _SCHEME: optimiser.SGD.class_id(),
                 _PARAMETERS: {
                     "lr": _lr,
                     "l2": _l2
@@ -160,7 +160,7 @@ composite_layer_specification_sfmbambamamo = {
         }
     },
     "matmul01": {
-        _SCHEME: layer.Matmul.__qualname__,
+        _SCHEME: layer.Matmul.class_id(),
         _PARAMETERS: {
             _NAME: "matmul01",
             _NUM_NODES: 16,
@@ -169,7 +169,7 @@ composite_layer_specification_sfmbambamamo = {
                 _SCHEME: "he"
             },
             _OPTIMIZER: {
-                _SCHEME: optimiser.SGD.__qualname__,
+                _SCHEME: optimiser.SGD.class_id(),
                 _PARAMETERS: {
                     "lr": _lr,
                     "l2": _l2
@@ -178,12 +178,12 @@ composite_layer_specification_sfmbambamamo = {
         },
     },
     "bn01": {
-        _SCHEME: layer.BatchNormalization.__qualname__,
+        _SCHEME: layer.BatchNormalization.class_id(),
         _PARAMETERS: {
             _NAME: "bn01",
             _NUM_NODES: 16,
             _OPTIMIZER: {
-                _SCHEME: optimiser.SGD.__qualname__,
+                _SCHEME: optimiser.SGD.class_id(),
                 _PARAMETERS: {
                     "lr": _lr,
                     "l2": _l2
@@ -195,14 +195,14 @@ composite_layer_specification_sfmbambamamo = {
         }
     },
     "activation01": {
-        _SCHEME: layer.ReLU.__qualname__,
+        _SCHEME: layer.ReLU.class_id(),
         _PARAMETERS: {
             _NAME: "relu01",
             _NUM_NODES: 16
         }
     },
     "matmul02": {
-        _SCHEME: layer.Matmul.__qualname__,
+        _SCHEME: layer.Matmul.class_id(),
         _PARAMETERS: {
             _NAME: "matmul02",
             _NUM_NODES: 32,
@@ -211,7 +211,7 @@ composite_layer_specification_sfmbambamamo = {
                 _SCHEME: "he"
             },
             _OPTIMIZER: {
-                _SCHEME: optimiser.SGD.__qualname__,
+                _SCHEME: optimiser.SGD.class_id(),
                 _PARAMETERS: {
                     "lr": _lr,
                     "l2": _l2
@@ -220,21 +220,21 @@ composite_layer_specification_sfmbambamamo = {
         },
     },
     "bn02": {
-        _SCHEME: layer.BatchNormalization.__qualname__,
+        _SCHEME: layer.BatchNormalization.class_id(),
         _PARAMETERS: {
             _NAME: "bn02",
             _NUM_NODES: 32,
         }
     },
     "activation02": {
-        _SCHEME: layer.ReLU.__qualname__,
+        _SCHEME: layer.ReLU.class_id(),
         _PARAMETERS: {
             _NAME: "relu02",
             _NUM_NODES: 32
         }
     },
     "matmul03": {
-        _SCHEME: layer.Matmul.__qualname__,
+        _SCHEME: layer.Matmul.class_id(),
         _PARAMETERS: {
             _NAME: "matmul03",
             _NUM_NODES: 16,
@@ -243,7 +243,7 @@ composite_layer_specification_sfmbambamamo = {
                 _SCHEME: "he"
             },
             _OPTIMIZER: {
-                _SCHEME: optimiser.SGD.__qualname__,
+                _SCHEME: optimiser.SGD.class_id(),
                 _PARAMETERS: {
                     "lr": _lr,
                     "l2": _l2
@@ -252,14 +252,14 @@ composite_layer_specification_sfmbambamamo = {
         },
     },
     "activation03": {
-        _SCHEME: layer.ReLU.__qualname__,
+        _SCHEME: layer.ReLU.class_id(),
         _PARAMETERS: {
             _NAME: "relu03",
             _NUM_NODES: 16
         }
     },
     "matmul04": {
-        _SCHEME: layer.Matmul.__qualname__,
+        _SCHEME: layer.Matmul.class_id(),
         _PARAMETERS: {
             _NAME: "matmul04",
             _NUM_NODES: _M,
@@ -270,7 +270,7 @@ composite_layer_specification_sfmbambamamo = {
         }
     },
     "objective": {
-        _SCHEME: layer.CrossEntropyLogLoss.__qualname__,
+        _SCHEME: layer.CrossEntropyLogLoss.class_id(),
         _PARAMETERS: {
             _NAME: "loss",
             _NUM_NODES: _M,

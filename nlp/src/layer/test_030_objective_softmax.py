@@ -308,7 +308,7 @@ def test_030_objective_specification():
     name = "loss001"
     num_nodes = 16
     expected_spec = {
-        _SCHEME: layer.CrossEntropyLogLoss.__qualname__,
+        _SCHEME: layer.CrossEntropyLogLoss.class_id(),
         _PARAMETERS: {
             _NAME: name,
             _NUM_NODES: num_nodes,

@@ -19,7 +19,6 @@ import logging
 from typing import (
     Tuple,
     Optional,
-    Union,
     List,
     Dict,
     Callable,
@@ -29,18 +28,20 @@ from typing import (
 import numpy as np
 
 from layer.base import Layer
+from layer.composite import (
+    Composite
+)
 from layer.constants import (
     _NAME,
     _NUM_NODES,
-    _LOG_LEVEL,
-    _COMPOSITE_LAYER_SPEC
+    _LOG_LEVEL
 )
 from layer.utility_builder_layer import (
     compose_sequential_layer_interface,
     compose_sequential_layer_objective
 )
-from layer.composite import (
-    Composite
+from layer.composite_layer_specification_template import (
+    _sequential_composite_layer_specification
 )
 
 
@@ -48,8 +49,15 @@ class Sequential(Composite):
     """Container layer to sequence layers."""
 
     # ================================================================================
-    # Class initialization
+    # Class
     # ================================================================================
+    # --------------------------------------------------------------------------------
+    # Factory method
+    # --------------------------------------------------------------------------------
+    @staticmethod
+    def specification_template():
+        return _sequential_composite_layer_specification
+
     @staticmethod
     def build(parameters: Dict):
         layers = super(Sequential, Sequential)._build_layers(parameters)

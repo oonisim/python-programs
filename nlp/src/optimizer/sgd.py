@@ -40,7 +40,7 @@ class SGD(Optimizer):
             specification
         """
         return {
-            "scheme": SGD.__qualname__,
+            "scheme": SGD.class_id(),
             "parameters": {
                 "name": name,
                 "lr": lr,

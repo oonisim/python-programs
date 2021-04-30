@@ -75,7 +75,7 @@ class CrossEntropyLogLoss(Layer):
             % (loss_function, list(LOSS_FUNCTIONS.keys()))
 
         return {
-            _SCHEME: CrossEntropyLogLoss.__qualname__,
+            _SCHEME: CrossEntropyLogLoss.class_id(),
             _PARAMETERS: {
                 _NAME: name,
                 _NUM_NODES: num_nodes,

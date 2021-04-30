@@ -6,6 +6,6 @@ OPTIMIZERS = (
 )
 for __optimizer in OPTIMIZERS:
     if __optimizer:
-        SCHEMES[__optimizer.__qualname__.lower()] = __optimizer
+        SCHEMES[__optimizer.class_id().lower()] = __optimizer
 
 assert SCHEMES

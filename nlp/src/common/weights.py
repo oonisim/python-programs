@@ -67,6 +67,16 @@ class Weights:
     # ================================================================================
     # Class
     # ================================================================================
+    @classmethod
+    def class_id(cls):
+        """Identify the class
+        Avoid using Python implementation specific __qualname__
+
+        Returns:
+            Class identifier
+        """
+        return cls.__qualname__
+
     @staticmethod
     def specification_template():
         return Weights.specification(M=3, D=3)
@@ -84,7 +94,7 @@ class Weights:
             specification
         """
         return {
-            "scheme": Weights.__qualname__,
+            "scheme": Weights.class_id(),
             "parameters": {
                 "M": M,
                 "D": D

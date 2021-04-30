@@ -58,7 +58,7 @@ FUNCTION_LAYERS = \
 
 FUNCTION_LAYER_SCHEMES = {}
 for _layer in FUNCTION_LAYERS:
-    FUNCTION_LAYER_SCHEMES[_layer.__qualname__] = _layer
+    FUNCTION_LAYER_SCHEMES[_layer.class_id()] = _layer
 
 # --------------------------------------------------------------------------------
 # Objective layers
@@ -68,7 +68,7 @@ OBJECTIVE_LAYERS = (
 )
 OBJECTIVE_LAYER_SCHEMES = {}
 for _layer in OBJECTIVE_LAYERS:
-    OBJECTIVE_LAYER_SCHEMES[_layer.__qualname__] = _layer
+    OBJECTIVE_LAYER_SCHEMES[_layer.class_id()] = _layer
 
 # All layers
 SCHEMES = {

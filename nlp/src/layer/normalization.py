@@ -65,7 +65,7 @@ class Standardization(Layer):
         """Generate Matmul specification
         """
         return {
-            _SCHEME: Standardization.__qualname__,
+            _SCHEME: Standardization.class_id(),
             _PARAMETERS: {
                 _NAME: name,
                 _NUM_NODES: num_nodes,
@@ -171,7 +171,7 @@ class Standardization(Layer):
         # --------------------------------------------------------------------------------
         # Misc
         # --------------------------------------------------------------------------------
-        self._args = set(locals().keys())
+        _, *self._args = list(locals().keys())
 
     # --------------------------------------------------------------------------------
     # Instance properties
@@ -564,7 +564,7 @@ class FeatureScaleShift(Layer):
         """Generate Matmul specification
         """
         return {
-            _SCHEME: FeatureScaleShift.__qualname__,
+            _SCHEME: FeatureScaleShift.class_id(),
             _PARAMETERS: {
                 _NAME: name,
                 _NUM_NODES: num_nodes,
@@ -644,7 +644,7 @@ class FeatureScaleShift(Layer):
         # --------------------------------------------------------------------------------
         # Misc
         # --------------------------------------------------------------------------------
-        self._args = set(locals().keys())
+
 
     # --------------------------------------------------------------------------------
     # Instance properties
@@ -957,7 +957,7 @@ class BatchNormalization(Layer):
         """Generate Matmul specification
         """
         return {
-            _SCHEME: BatchNormalization.__qualname__,
+            _SCHEME: BatchNormalization.class_id(),
             _PARAMETERS: {
                 _NAME: name,
                 _NUM_NODES: num_nodes,
@@ -1090,7 +1090,7 @@ class BatchNormalization(Layer):
         # --------------------------------------------------------------------------------
         # Misc
         # --------------------------------------------------------------------------------
-        self._args = set(locals().keys())
+        _, *self._args = list(locals().keys())
 
     # --------------------------------------------------------------------------------
     # Instance properties

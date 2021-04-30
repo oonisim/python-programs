@@ -26,7 +26,7 @@ _momentum = np.random.uniform(low=0.9, high=1.0)
 
 _composite_layer_specification_template = {
     "matmul01": {
-        _SCHEME: layer.Matmul.__qualname__,
+        _SCHEME: layer.Matmul.class_id(),
         _PARAMETERS: {
             _NAME: "matmul01",
             _NUM_NODES: 16,
@@ -35,7 +35,7 @@ _composite_layer_specification_template = {
                 _SCHEME: "he"
             },
             _OPTIMIZER: {
-                _SCHEME: optimiser.SGD.__qualname__,
+                _SCHEME: optimiser.SGD.class_id(),
                 _PARAMETERS: {
                     "lr": _lr,
                     "l2": _l2
@@ -44,12 +44,12 @@ _composite_layer_specification_template = {
         },
     },
     "bn01": {
-        _SCHEME: layer.BatchNormalization.__qualname__,
+        _SCHEME: layer.BatchNormalization.class_id(),
         _PARAMETERS: {
             _NAME: "bn01",
             _NUM_NODES: 16,
             _OPTIMIZER: {
-                _SCHEME: optimiser.SGD.__qualname__,
+                _SCHEME: optimiser.SGD.class_id(),
                 _PARAMETERS: {
                     "lr": _lr,
                     "l2": _l2
@@ -61,14 +61,14 @@ _composite_layer_specification_template = {
         }
     },
     "activation01": {
-        _SCHEME: layer.ReLU.__qualname__,
+        _SCHEME: layer.ReLU.class_id(),
         _PARAMETERS: {
             _NAME: "relu01",
             _NUM_NODES: 16
         }
     },
     "objective": {
-        _SCHEME: layer.CrossEntropyLogLoss.__qualname__,
+        _SCHEME: layer.CrossEntropyLogLoss.class_id(),
         _PARAMETERS: {
             _NAME: "loss",
             _NUM_NODES: _M,
@@ -77,7 +77,7 @@ _composite_layer_specification_template = {
     }
 }
 
-_composite_layer_specification = {
+_sequential_composite_layer_specification = {
     _NAME: "valid_network_mao",
     _NUM_NODES: _M,
     _LOG_LEVEL: logging.ERROR,

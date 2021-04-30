@@ -60,7 +60,7 @@ def _must_fail(
         message
 ):
     try:
-        network = SequentialNetwork(
+        network = SequentialNetwork.build(
             specification=network_specification,
         )
         raise RuntimeError(message)
@@ -73,7 +73,7 @@ def _must_succeed(
         message
 ):
     try:
-        network = SequentialNetwork(
+        network = SequentialNetwork.build(
             specification=network_specification,
         )
         return network

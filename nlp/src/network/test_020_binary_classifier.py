@@ -336,7 +336,7 @@ def test():
             )
         }
     }
-    logistic_classifier = SequentialNetwork(
+    logistic_classifier = SequentialNetwork.build(
         specification=sigmoid_classifier_specification,
     )
 

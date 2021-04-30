@@ -1,41 +1,38 @@
 """
 Neural network implementation
 """
+import logging
 from typing import (
     Dict,
     List,
     Tuple,
     Union,
-    Callable,
-    NoReturn
+    Callable
 )
-import copy
-import logging
+
 import numpy as np
+
+import layer
 from common.constant import (
     TYPE_FLOAT,
-    TYPE_LABEL,
+    TYPE_INT,
     LAYER_MAX_NUM_NODES
 )
 from common.function import (
     compose
 )
-import layer
+from layer.constants import (
+    _NAME,
+    _NUM_NODES,
+    _LOG_LEVEL,
+    _COMPOSITE_LAYER_SPEC
+)
 from layer.utility_builder_layer import (
     build_layers_from_composite_layer_specification
 )
 from network.base import Network
-from layer.constants import (
-    _WEIGHTS,
-    _NAME,
-    _SCHEME,
-    _OPTIMIZER,
-    _NUM_NODES,
-    _NUM_FEATURES,
-    _PARAMETERS,
-    _LAYER_CLASS,
-    _LOG_LEVEL,
-    _COMPOSITE_LAYER_SPEC
+from network.utility import (
+    multilayer_network_specification
 )
 
 
@@ -50,39 +47,90 @@ class SequentialNetwork(Network):
     # ================================================================================
     # Class
     # ================================================================================
+    # --------------------------------------------------------------------------------
+    # Specification
+    # --------------------------------------------------------------------------------
     @staticmethod
-    def _validate_network_specification(network_spec: dict):
+    def specification_template():
+        """
+        Specification template
+        """
+        M = TYPE_INT(3)
+        D = TYPE_INT(2)
+        M01 = M
+        return SequentialNetwork.specification(
+            num_features=[D, M01, M],
+            activation_scheme=layer.ReLU.class_id()
+        )
+
+    @staticmethod
+    def specification(
+            num_features: List[TYPE_INT],
+            use_input_standardization=True,
+            activation_scheme: str = layer.ReLU.class_id(),
+            weights_initialization_scheme: str = "uniform",
+            weights_optimizer_specification: dict = None
+    ):
+        """Generate network specification
+        TODO:
+            Use weights_initialization_scheme
+            Use weights_optimizer_specification
+
+        Args:
+            num_features: number of features. e.g. [D, M01, M02, M]
+            use_input_standardization: flag to use the input standardization
+            activation_scheme: Activation function to use e.g. ReLU
+            weights_initialization_scheme: weight initialization scheme e.g. he
+            weights_optimizer_specification: optimizer specification.
+                                             Default to SGD if omitted
+        """
+        specification = multilayer_network_specification(
+            num_features=num_features,
+            use_input_standardization=use_input_standardization,
+            activation=activation_scheme
+        )
+        return specification
+
+    # --------------------------------------------------------------------------------
+    # Factory
+    # --------------------------------------------------------------------------------
+    @staticmethod
+    def _validate_network_specification(specification: dict):
+        """Validate if the neural network specification has mandatory parameters
+        Args:
+            specification: Neural network specification
+        """
         assert \
-            isinstance(network_spec, dict) and \
-            len(network_spec) > 0
+            isinstance(specification, dict) and \
+            len(specification) > 0
 
         assert \
-            _NAME in network_spec and \
-            isinstance(network_spec[_NAME], str) and \
-            len(network_spec[_NAME]) > 0
-        name = network_spec[_NAME].lower()
+            _NAME in specification and \
+            isinstance(specification[_NAME], str) and \
+            len(specification[_NAME]) > 0
+        name = specification[_NAME].lower()
 
         assert \
-            _NUM_NODES in network_spec and \
-            isinstance(network_spec[_NUM_NODES], int) and \
-            0 < network_spec[_NUM_NODES] < LAYER_MAX_NUM_NODES, \
+            _NUM_NODES in specification and \
+            isinstance(specification[_NUM_NODES], int) and \
+            0 < specification[_NUM_NODES] < LAYER_MAX_NUM_NODES, \
             "0 < num_nodes %s required" % LAYER_MAX_NUM_NODES
-        num_nodes = network_spec[_NUM_NODES]
+        num_nodes = specification[_NUM_NODES]
 
         assert \
-            _COMPOSITE_LAYER_SPEC in network_spec and \
-            isinstance(network_spec[_COMPOSITE_LAYER_SPEC], dict) and \
-            len(network_spec[_COMPOSITE_LAYER_SPEC]) > 0, \
-            "Invalid %s\n%s\n" % (_COMPOSITE_LAYER_SPEC, network_spec)
+            _COMPOSITE_LAYER_SPEC in specification and \
+            isinstance(specification[_COMPOSITE_LAYER_SPEC], dict) and \
+            len(specification[_COMPOSITE_LAYER_SPEC]) > 0, \
+            "Invalid %s\n%s\n" % (_COMPOSITE_LAYER_SPEC, specification)
 
-        log_level = network_spec[_LOG_LEVEL] \
-            if _LOG_LEVEL in network_spec else logging.ERROR
+        log_level = specification[_LOG_LEVEL] \
+            if _LOG_LEVEL in specification else logging.ERROR
 
         return name, num_nodes, log_level
 
     @staticmethod
     def _build_network_layers(
-            network_spec: dict,
+            specification: dict,
     ) -> Tuple[List[layer.Layer], List[layer.Layer]]:
         """
         Responsibility
@@ -93,13 +141,13 @@ class SequentialNetwork(Network):
         Returns:
             (inference_layers, objective_layers)
         """
-        num_nodes = network_spec[_NUM_NODES]
-        log_level = network_spec[_LOG_LEVEL]
+        *parameters, = SequentialNetwork._validate_network_specification(specification)
+        name, num_nodes, log_level = parameters
         inference_layers: List[layer.Layer] = []
         objective_layers: List[layer.Layer] = []
 
         layers = build_layers_from_composite_layer_specification(
-            specification=network_spec[_COMPOSITE_LAYER_SPEC],
+            specification=specification[_COMPOSITE_LAYER_SPEC],
             log_level=log_level
         )
         assert len(layers) > 0
@@ -132,17 +180,19 @@ class SequentialNetwork(Network):
             last_inference_num_nodes == first_objective_num_nodes == num_nodes, \
             "The number of nodes in the last inference layer [%s] and "\
             "that of the first objective layer [%s]. "\
-            "must match num_nodes %s in the network_spec " \
+            "must match num_nodes %s in the specification " \
             % (last_inference_num_nodes, first_objective_num_nodes, num_nodes)
 
         return inference_layers, objective_layers
 
     @staticmethod
     def _wire_network_layers(
-            network_spec: dict,
+            name: str,
+            num_nodes: int,
             inference_layers: List[layer.Layer],
             objective_layers: List[layer.Layer],
-    ):
+            log_level: int = logging.ERROR
+    ) -> Tuple[layer.Sequential, layer.Sequential]:
         """
         Responsibility:
             Wire the layers to function as a network.
@@ -152,13 +202,9 @@ class SequentialNetwork(Network):
             objective_layers: layer to produce the objective e.g. the loss.
 
         Returns:
-            layer_inference, layer_objective
-
+            (layer_inference, layer_objective) where layer_inference and
+            layer_objective are layer.Sequential class instances.
         """
-        name: str = network_spec[_NAME]
-        num_nodes: int = network_spec[_NUM_NODES]
-        log_level: int = network_spec[_LOG_LEVEL]
-
         def identity(x: np.ndarray):
             assert x.ndim == 0, "The output of the log loss should be of shape ()"
             return x
@@ -169,10 +215,11 @@ class SequentialNetwork(Network):
             layers=objective_layers,
             log_level=log_level
         )
-        # Sequential objective is initialized upon its setter call.
-        # Hence required even when the objective layer has its setup.
+        # The objective function of the layer.Sequential class is initialized
+        # upon its setter call. Hence it is required to set the objective
+        # function although the objective layer itself has its own objective
+        # function setup.
         layer_objective.objective = identity
-
         layer_inference = layer.Sequential(
             name=name + "_inference",
             num_nodes=num_nodes,
@@ -180,7 +227,11 @@ class SequentialNetwork(Network):
             log_level=log_level
         )
         # Explicitly set "compose(objective.function o objective.objective)"
-        # although it is the same with setting (objective.function)
+        # although it is actually the same with setting (objective.function)
+        # because:
+        # compose(layer_objective.function, layer_objective.objective) ->
+        # compose (layer_objective.function, identity) ->
+        # layer.objective.function
         layer_inference.objective = \
             compose(layer_objective.function, layer_objective.objective)
 
@@ -188,62 +239,56 @@ class SequentialNetwork(Network):
 
     @staticmethod
     def build(
-            network_spec: Dict,
+            specification: Dict,
     ):
         """Build a neural network instance from the specification
+        Args:
+            specification: Network specification in JSON.
         """
+        *parameters, = SequentialNetwork._validate_network_specification(specification)
+        name, num_nodes, log_level = parameters
+
         # --------------------------------------------------------------------------------
         # Build layers in the network
         # --------------------------------------------------------------------------------
-        inference_layers, objective_layers = \
-            SequentialNetwork._build_network_layers(
-                network_spec=network_spec
-            )
+        inference_layers, objective_layers = SequentialNetwork._build_network_layers(
+            specification=specification
+        )
 
-        # --------------------------------------------------------------------------------
-        # Wire the layers to function as a network
-        # --------------------------------------------------------------------------------
-        *layers, = SequentialNetwork._wire_network_layers(
-            network_spec=network_spec,
+        return SequentialNetwork(
+            name=name,
+            num_nodes=num_nodes,
             inference_layers=inference_layers,
             objective_layers=objective_layers,
+            log_level=log_level
         )
-        layer_inference, layer_objective = layers
-
-        return layer_inference, layer_objective
 
     # ================================================================================
     # Instance
     # ================================================================================
-    @property
-    def specification(self) -> Dict:
-        """Network specification"""
-        return self._specification
-
     # --------------------------------------------------------------------------------
     # Initialization
     # --------------------------------------------------------------------------------
     def __init__(
             self,
-            specification: Dict
+            name: str,
+            num_nodes: int,
+            inference_layers: List[layer.Layer],
+            objective_layers: List[layer.Layer],
+            log_level: int = logging.ERROR
     ):
-        """Initialize the network instance
-        Args:
-            specification: Network specification in JSON.
-        """
-        name, num_nodes, log_level = \
-            SequentialNetwork._validate_network_specification(specification)
-
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
-        network_spec = copy.deepcopy(specification)
-        self._specification = network_spec
-
         # --------------------------------------------------------------------------------
-        # Build network
+        # Wire the layers to function as a network
         # --------------------------------------------------------------------------------
-        self._layer_inference, self._layer_objective = SequentialNetwork.build(
-            network_spec=self.specification
+        *layers, = SequentialNetwork._wire_network_layers(
+            name=name,
+            num_nodes=num_nodes,
+            inference_layers=inference_layers,
+            objective_layers=objective_layers,
+            log_level=log_level
         )
+        self._layer_inference, self._layer_objective = layers
         self._layers_all = [self.layer_inference, self.layer_objective]
 
         # --------------------------------------------------------------------------------

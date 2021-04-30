@@ -16,6 +16,19 @@ import function.nn.tf as nn
 class Optimizer(nn.Function):
     """Gradient descent optimization base class implementation"""
     # ================================================================================
+    # Class
+    # ================================================================================
+    @classmethod
+    def class_id(cls):
+        """Identify the class
+        Avoid using Python implementation specific __qualname__
+
+        Returns:
+            Class identifier
+        """
+        return cls.__qualname__
+
+    # ================================================================================
     # Instance
     # ================================================================================
     def __init__(self, name, lr=0.01, l2: TYPE_FLOAT = 1e-3, log_level=logging.WARNING):
