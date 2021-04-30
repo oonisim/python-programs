@@ -22,9 +22,12 @@ from common.constant import (
 from common.function import (
     numerical_jacobian,
 )
-from layer.base import Layer
 from layer.constants import (
     MAX_NEGATIVE_SAMPLE_SIZE,
+)
+from layer.base import Layer
+from layer.objective import (
+    CrossEntropyLogLoss
 )
 from layer.preprocessing import (
     EventIndexing
@@ -383,8 +386,6 @@ class Embedding(Layer):
             log_level: logging level
         """
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
-
-        assert num_nodes == 1, "Number of output should be 1 for logistic classification"
         assert 0 == (context_size % 2) < context_size
         # target_size >= context_size in SkipGram, eg. (target=i,am,red,cat), context=(a)
         # assert 0 < target_size <= context_size
@@ -401,12 +402,20 @@ class Embedding(Layer):
         assert isinstance(optimizer, optimiser.Optimizer)
 
         # --------------------------------------------------------------------------------
-        # Number of outputs from the layer.
-        # M='1' because Negative Sampling is Logistic regression.
-        # The output Y:shape is (N,E+C) which mis-aligns with what the LogLoss expects,
-        # hence needs an adapter for shape transformation (N,E+C) <-> (N*(E+C),).
+        # Number of outputs from the layer 'M'
+        # Negative Sampling is to run Logistic Regression which expect 1 input.
+        # Each target and sample is independent and has its label (1/target, 0/sample).
+        # Hence regard (target, samples) as outputs -> M = (1+SL).
+        #
+        # The output Y:shape (N,(1+SL)) needs to be transformed via an adapter
+        # as (N,E+C) <-> (N*(E+C),) to align with what the logistic log loss layer
+        # expects (input num_nodes ==1).
+        #
+        # No need to check (num_nodes==(1+SL) as it can be auto-calculated.
         # --------------------------------------------------------------------------------
-        self._M = num_nodes
+        # assert num_nodes == (1+negative_sample_size), \
+        #     "Number of output should be %s" % (1+negative_sample_size)
+        self._M = (1+negative_sample_size)
 
         # --------------------------------------------------------------------------------
         # (target, context) pair properties
@@ -491,6 +500,8 @@ class Embedding(Layer):
 
         Returns: vectors of shape:(N*?, D) where is C or E.
         """
+        assert self.tensor_rank(indices) in [0, 1], \
+            "Indices to extract event vectors from W must be rank 0 or 1"
         vectors = self.W[indices]
         return vectors
 
@@ -555,8 +566,12 @@ class Embedding(Layer):
         """
         name = "function"
         expected_ranks = [2,3]
-        assert self.is_tensor(X) and self.tensor_rank(X) in expected_ranks, \
+        assert \
+            self.is_tensor(X) and self.tensor_rank(X) in expected_ranks, \
             "Expected X rank is %s but %s" % (expected_ranks, X.shape)
+        assert \
+            self.tensor_dtype(X) == TYPE_INT, \
+            "Expected X dtype %s but %s" % (TYPE_INT, self.tensor_dtype(X) )
 
         # --------------------------------------------------------------------------------
         # Reshape (N, num_windows, E+C) into (N*num_windows, E+C) if rank(X) > 2.
@@ -960,6 +975,84 @@ class Embedding(Layer):
         del self._We, self._Wc, self._Ws, self._Be, self._Bc
 
         return self.dS
+
+    def predict(self, X: Union[TYPE_INT, TYPE_TENSOR]):
+        """Provides the event vector(s) for the given indices X
+        Args:
+            Index or indices to extract event vector(s) from event vector space W
+        """
+        if self.is_scalar(X):
+            assert type(X) == TYPE_INT
+            return self._extract_event_vectors(indices=X)
+
+        assert \
+            self.is_dtype_int(X) and \
+            self.tensor_dtype(X) == TYPE_INT, \
+            "Expected X dtype %s but %s" % (TYPE_INT, self.tensor_dtype(X))
+
+        return self._extract_event_vectors(indices=self.reshape(X=X, shape=(-1)))
+
+    def adapt_function_to_logistic_log_loss(self, loss: CrossEntropyLogLoss):
+        """
+        Provides an adapter function to bridge between Embedding function and
+        Logistic Log Loss layer function, because a Logistic Log Loss layer
+        expects one dimensional inputs X and labels T.
+
+        1. Create labels T for the Embedding outputs of shape:(N,(1+SL)).
+        2. Set true labels 1 for the targets at the column 0 in T.
+        3. Reshape X and T into (-1).
+
+        Args:
+            loss: Logistic log loss layer instance
+        Returns: Adapter function
+        """
+        def f(X: TYPE_TENSOR):
+            assert self.tensor_shape(X) == (self.N, (1+self.SL))
+
+            # --------------------------------------------------------------------------------
+            # Labels T.
+            # 1. T[::, 0] = 1 for the targets and T[::, 1:] = 0 for negative samples.
+            # 2. Reshape into (-1) to align with what Log Loss expects.
+            # --------------------------------------------------------------------------------
+            T: TYPE_TENSOR = np.zeros(shape=self.tensor_shape(X), dtype=TYPE_INT)
+            T[
+                ::,
+                0
+            ] = TYPE_INT(1)
+
+            # --------------------------------------------------------------------------------
+            # Set labels to the Loss layer.
+            # --------------------------------------------------------------------------------
+            # The network.train() method is supposed to:
+            # 1. sets labels T to the layers.
+            # 2. call function() methods of all the network layers.
+            #
+            # For embedding, until it comes through the layers in the network to
+            # the EventIndexing or the Embedding layer, labels are unknown.
+            # Hence Embedding layer drives the labels settings.
+            # --------------------------------------------------------------------------------
+            loss.T = self.reshape(T, (-1))
+
+            # --------------------------------------------------------------------------------
+            # Flatten the Embedding layer output.
+            # --------------------------------------------------------------------------------
+            Y = self.reshape(X=X, shape=(-1))
+            return Y
+
+        return f
+
+    def adapt_gradient_to_logistic_log_loss(self):
+        def g(dY: TYPE_TENSOR):
+            assert \
+                self.tensor_shape(dY) == (self.N * (1+self.SL),), \
+                "Expected shape is %s but %s" \
+                % ((self.N * (1+self.SL),), self.tensor_shape(dY))
+
+            dY = self.reshape(X=dY, shape=(-1, (1+self.SL)))
+            assert self.tensor_shape(self.Y) == self.tensor_shape(dY)
+            return dY
+
+        return g
 
     def load(self, path: str) -> Dict:
         """Load and restore the layer state

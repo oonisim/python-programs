@@ -33,6 +33,32 @@ class Function:
             isinstance(X, np.ndarray) and X.ndim > 0 and np.issubdtype(X.dtype, np.floating)
 
     @staticmethod
+    def is_dtype_int(X):
+        return np.issubdtype(type(X), np.integer) or \
+               (tf.is_tensor(X) and np.issubdtype(X.numpy().dtype, np.integer))
+
+    @staticmethod
+    def assert_dtype_int(X):
+        tf.debugging.assert_integer(X)
+
+    @staticmethod
+    def is_dtype_float(X):
+        return np.issubdtype(type(X), np.floating) or \
+               (tf.is_tensor(X) and np.issubdtype(X.numpy().dtype, np.floating))
+
+    @staticmethod
+    def is_scalar(X) -> bool:
+        """Confirm if X is scalar of shape ()
+        """
+        return \
+            np.issubdtype(type(X), np.number) or \
+            (tf.is_tensor(X) and X.shape == () and np.issubdtype(type(X.numpy()), np.number))
+
+    @staticmethod
+    def assert_scalar(X):
+        tf.debugging.assert_scalar(X)
+
+    @staticmethod
     def is_float_scalar(X) -> bool:
         """Confirm if X is float scalar of shape ()
         """
@@ -102,8 +128,12 @@ class Function:
     def tensor_dtype(X):
         """The dtype of a tensor
         """
-        assert Function.is_tensor(X)
-        return X.dtype
+        if Function.is_scalar(X):
+            return type(X)
+        elif Function.is_tensor(X):
+            return X.dtype
+        else:
+            raise AssertionError("X must be of type scalar or tensor but %s" % type(X))
 
     @staticmethod
     def to_tensor(X, dtype=None) -> TYPE_TENSOR:

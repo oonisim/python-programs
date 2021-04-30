@@ -247,7 +247,14 @@ class Network(Layer):
             T: Union[TYPE_FLOAT, np.ndarray],
             run_validations: bool = False
     ):
-        """
+        """Run the model training.
+        1. Set labels T to both inference and objective layers although only the
+           objective layers would need labels.
+        2. Invoke function() on the layers to run forward path through layers.
+        3. Invoke gradient() on the layers to calculate and back-propagate the
+           gradients through layers.
+        4. Invoke update() on the layers to run gradient descents.
+
         Args:
             X: batch training data in shape (N,M)
             T: label of shape (N,) in the index format
@@ -257,7 +264,7 @@ class Network(Layer):
         """
         # pylint: disable=not-callable
         self.X = X.astype(TYPE_FLOAT)
-        self.T = T.astype(TYPE_LABEL)
+        self.T = T.astype(TYPE_LABEL)   # Set T to the layers. See @T.setter
 
         # --------------------------------------------------------------------------------
         # Forward path
@@ -284,7 +291,10 @@ class Network(Layer):
         self.logger.info("Gradient dL/dX is %s", self.dX)
         self.logger.info("Analytical gradients dS are %s\n", self.dS)
 
-        return self.S
+        # TODO:
+        #  Reconsider using dictionary with layer ids as keys instead of list.
+        #  Think again why need to return dS and how it could be used.
+        return self.dS
 
     def predict(
             self,

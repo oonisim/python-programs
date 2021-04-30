@@ -152,23 +152,34 @@ class EventIndexing(Layer):
         """Initialize the instance
         Args:
             name: Layer identity name
-            num_nodes: Number of nodes in the layer
+            num_nodes: Number of outputs from the layer.
             corpus: source of sequential events
             min_sequence_length: length to which the output sequence to meet
             log_level: logging level
 
         Note:
+            Use "sentence" as a sequence of event-word in string format.
+            Those "event-words" are converted into numerical "event-indices"
+            which is called "sequence".
+
             To generate a (event, context) pair from a generated sequence,
             (event_size + context+size) is required as 'min_sequence_length'.
             At least 3 (event_size=1, context_size=2) is expected.
 
+            The number of outputs (num_nodes) is not fixed as the length of
+            sequence(s) generated varies depending on the incoming sentences.
+            Hence set to 1.
         """
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
         assert len(corpus) > 0
         assert min_sequence_length >= 3, "Minimum 3 events expected in the corpus"
         self.logger.debug("%s: corpus length is %s", self.name, len(corpus))
 
+        assert num_nodes == 1
+        self._M = num_nodes
+
         self._min_sequence_length = min_sequence_length
+
         # --------------------------------------------------------------------------------
         # Event statistics (vocabulary, probability, mappings, etc)
         # --------------------------------------------------------------------------------
@@ -448,16 +459,22 @@ class EventContext(Layer):
         """Initialize
         Args:
             name: Layer identity name
-            num_nodes: Number of nodes in the layer
+            num_nodes: Number of outputs from the layer
             window_size: Size of the context window including the event
             event_size: Size of the events
             log_level: logging level
+
+        Note:
+            Number of outputs (num_nodes) is window_size, as each event
+            and context are features to be processed at the next layer.
+            No need to check if "windows_size = num_nodes".
         """
         assert \
             1 <= event_size < window_size and \
             (window_size - event_size) % 2 == 0
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
 
+        self._M = window_size
         self._window_size = window_size
         self._event_size = event_size
         self.logger.debug(
