@@ -64,9 +64,7 @@ class Embedding(Layer):
     --------------------
     X:(N, C) has small N for a short sequence, e.g. N=1 for 'I am a cat deeley'
     as it only has 1 event-context pair (a, I am cat deeley). Hence multiple
-    X can be stacked along axis 0.
-
-    TODO: Decide where to handle the stacking
+    X can be stacked along axis 0. This has been done at function(X).
 
     Weights W: shape(V, D)
     --------------------
@@ -79,6 +77,24 @@ class Embedding(Layer):
     is encoded with a vector of the finite length D. word2vec is proven to be
     able to capture 'concept' e.g. king=man+(queen-woman). This is the proof
     that the idea "event is defined by its context" is correct.
+
+    Independence of (n) and (s)
+    --------------------
+    (n), (s), or (n)(s) element are independent and must not be mixed.
+    * Be(n=0) and Be(n=1) are independent.
+    * Bc(n=0) and Bc(n=1) are independent.
+    During the forward/backward paths e.g. Ye = f(Be, Bc), elements at (n)(d)
+    interacts with the same 'n' value only, e.g. Ye=einsum("nd,nd->n", Be, Bc)
+    where Be(n=0) only interact with Bc(n=0), never with Bc(n=i) where i != 0.
+
+    (s) is to index negative samples. Each sample is independent and has its
+    own label when calculated with Bc.
+
+    (n) is to index a sequence in X. Each sequence is independent and does not
+    interact with other sequence, because the embedding algorithm only works
+    WITHIN an sequence only by calculating (target, context) WITHIN a sequence
+    for true label, and (sample(s), context) for each independent sample(s)
+    for the context WITHIN the sequence of 'target' only for false labels.
     """
     # ================================================================================
     # Class
@@ -620,6 +636,8 @@ class Embedding(Layer):
 
         # --------------------------------------------------------------------------------
         # Positive score (BoW dot Target)
+        # The order (Bc, Be), not (Be, Bc) is because the positive score is to
+        # make the context Bc closer to the truth Be, hence 'primary' is Bc.
         # --------------------------------------------------------------------------------
         Ye = positive_scores = self.einsum("nd,nd->n", self.Bc, self.Be)
 
@@ -659,16 +677,27 @@ class Embedding(Layer):
 
     # @memory_profile
     def gradient(self, dY: Union[TYPE_TENSOR, TYPE_FLOAT]) -> TYPE_TENSOR:
-        """Calculate the gradients dL/dWe, dL/dWc, dL/dWs
+        """Calculate gradients dL/dWe:(N,E,D), dL/dWc:(N,C,D), dL/dWs:(N,SL,D)
         dL/dWe = dL/dW[target_indices] = dL/dYe * Bc
         dL/dWc = dL/dW[target_indices] = dL/dYe * Be
 
         dL/dYe=dL/dY[0:1] is the gradient of target event vectors We=W[target_indices].
-        dL/dYc=dL/dY[1:] is the gradient of negative sample vectors Ws=W[negative_sample_indices].
+        dL/dYs=dL/dY[1:] is the gradient of negative sample vectors Ws=W[negative_sample_indices].
 
         Args:
             dY: Gradient dL/dY
-        Returns: Return the input X as is as there is no gradient of X
+        Returns:
+            Return empty tensor of input X shape, as there is no gradient of X
+
+        TODO:
+            Think if there is a meaning to calculate the score with (Be, Ws)
+            for labels 0.
+
+            (Be(n), Bc(n)) with label 1 is to make them closer.
+            (Ws(n)(s), Bc(n)) with labels 0 are to make them away.
+
+            If (Be(n),Bc(n)) is closer, then Be(n) should be away from Ws.
+            Then label 0 for (Be(n), Ws(n)(s)) seems making a sense.
         """
         name = "gradient"
         assert \
@@ -732,15 +761,15 @@ class Embedding(Layer):
         # --------------------------------------------------------------------------------
         # dL/dWc01:(N,C,D) for the forward path with Be.
         # --------------------------------------------------------------------------------
-        # dL/dWc01:(N,C,D) = dL/dBc01:(N,D) OP dBc01/dWc01:(N,C,D)
-        # - dL/dBc01:(N,D) = dL/dYe:(N,D) * dYe/dBc01:(N,D)
-        #                  = dL/dYe:(N,D) * Be:(N,D)
+        # dL/dWc01:(N,C,D) = dL/dBc01:(N,D) OP1 dBc01/dWc01:(N,C,D)
+        # - dL/dBc01:(N,D) = dL/dYe:(N,1) * dYe/dBc01:(N,D)
+        #                  = dL/dYe:(N,1) * Be:(N,D)
         # - dBc/dWc:(N,C,D) = I:(N,C,D)
         #
         # Forward path:
         # F1. Bc = einsum("ncd->nd", Wc)
         #   F1-1. Sum along axis 1 (bag of word vectors) as "ncd->n1d".
-        #   F2-2. Rank -1 by dropping axis 1 as "n1d->nd".
+        #   F1-2. Rank -1 by dropping axis 1 as "n1d->nd".
         # F2. Ye = einsum("nd,nd->n", Be, Bc)
         #   F2-1. Element-wise multiplication along axis -1. "nd,nd->nd"
         #   F2-2. Sum along axis -1.                         "nd->n1"
@@ -760,7 +789,7 @@ class Embedding(Layer):
         #       Restore the Wc shape (N,C,D) by multiplying with I:(N,C,D),
         #       which corresponds to reversing "ncd->n1d" as "n1d->ncd".
         # --------------------------------------------------------------------------------
-        dBc01: TYPE_TENSOR = self.multiply(dYe, self.Be)    # B1
+        dBc01: TYPE_TENSOR = self.multiply(dYe, self.Be)    # B1 where dYe:(N,1)
         assert self.tensor_shape(dBc01) == self.tensor_shape(self.Bc) == (self.N, self.D),\
             f"Expected dBc shape {(self.N, self.D)} but {self.tensor_shape(dBc01)}"
 
@@ -912,11 +941,22 @@ class Embedding(Layer):
         return self.X
 
     def gradient_numerical(
-            self, h: Optional[TYPE_FLOAT] = None
+            self,
+            h: Optional[TYPE_FLOAT] = None,
+            condition: TYPE_TENSOR = None
     ) -> List[Union[TYPE_TENSOR, TYPE_FLOAT]]:
-        """Calculate numerical gradients
+        """
+        Calculate numerical gradients:
+        dL/dWe:(N,E,D), dL/dWc:(N,C,D), dL/dWs:(N,SL,D)
+
+        dL/dYe = dL/dY[0:1] is the gradient of target event vectors We.
+                 (We=W[target_indices])
+        dL/dYs = dL/dY[1:] is the gradient of negative sample vectors Ws.
+                 (Ws=W[negative_sample_indices])
+
         Args:
             h: small number for delta to calculate the numerical gradient
+            condition: boolean indices to select elements to run calculations
         Returns:
             [dX, dW]: Numerical gradients for X and W without bias
             dX is dL/dX of shape (N, D-1) without the bias to match the original input
@@ -925,21 +965,80 @@ class Embedding(Layer):
         name = "gradient_numerical"
         self.logger.debug("layer[%s].%s", self.name, name)
 
-        def objective_Ws(ws: TYPE_TENSOR):
-            ys = self.einsum("nd,nsd->ns", self.Bc, ws)
-            return self.objective(ys)
+        # --------------------------------------------------------------------------------
+        # Can NOT apply the objective function Li to Ye:(N,1), Ys:(N,SL).
+        # The objective L (of the network) results from applying the composition
+        # of functions in the post layers. Fi is the function of the Embedding.
+        #
+        # L=(Fi o Fi+1 o ... o Fn-1)(X)
+        #  = Fn-1(Fn-2(...(Fi+1(Fi(X)))...))
+        #  = Fn-1(Fn-2(...(Fi+1(Y))...))
+        #  =(Fi+1 o ... Fn-1)(Y)
+        #  =Li(Y)
+        #
+        # The objective function Li for the Embedding is (Fi+1 o ... o Fn-1)
+        # which takes 'Y:(N,1+SL)' as the input, NOT Ye:(N,1) nor Ys:(N,SL).
+        #
+        # Hence, to run the numerical gradient that applies Li=self.objective,
+        # need the shape (N,1+SL).
+        #
+        # TODO:
+        #  Convert to tf.function without using numpy functions.
+        #  Highly likely impossible and require rewrite only with tf.tensor.
+        #  1. Fi+1, ..., Fn-1 needs to be TF functions.
+        #  2. Use tf.range instead of Python range.
+        #  See:
+        #  * https://stackoverflow.com/questions/56547737 and more
+        #  * https://pgaleone.eu/tensorflow/tf.function/2019/03/21/dissecting-tf-function-part-1/
+        #  * https://pgaleone.eu/tensorflow/tf.function/2019/04/03/dissecting-tf-function-part-2/
+        # --------------------------------------------------------------------------------
+        # def objective_Ws(ws: TYPE_TENSOR):
+        #     ys = self.einsum("nd,nsd->ns", self.Bc, ws)
+        #     return self.objective(ys)
+        #
+        # def objective_We(we: TYPE_TENSOR):
+        #     ye = self.einsum("ncd,nd->n", self.Bc, we)
+        #     return self.objective(ye)
+        #
+        # def objective_Wc(wc: TYPE_TENSOR):
+        #     raise NotImplementedError("TBD")
+        #
+        # dWe = numerical_jacobian(objective_We, self.We, delta=h)
+        # dWc = numerical_jacobian(objective_Wc, self.Wc, delta=h)
+        # dWs = numerical_jacobian(objective_Ws, self.Ws, delta=h)
+        # return [dWe, dWc, dWs]
+        # --------------------------------------------------------------------------------
+        Ye = self.Y[
+            ::,
+            0:1
+        ]
+        Ys = self.Y[
+            ::,
+            1:
+        ]
 
         def objective_We(we: TYPE_TENSOR):
-            ye = self.einsum("ncd,nd->n", self.Bc, we)
-            return self.objective(ye)
+            """Objective function for We to calculate numerical dL/dWe"""
+            _ye = self.einsum("ncd,nd->n", self.Bc, we)
+            return self.objective(np.c_[_ye, Ys])
+
+        def objective_Ws(ws: TYPE_TENSOR):
+            """Objective function for Ws to calculate numerical dL/dWs"""
+            _ys = self.einsum("nd,nsd->ns", self.Bc, ws)
+            return self.objective(np.c_[Ye, _ys])
 
         def objective_Wc(wc: TYPE_TENSOR):
-            raise NotImplementedError("TBD")
+            """Objective function for Wc to calculate numerical dL/dWc"""
+            _bc = self._bagging(wc)
+            _ye = self.einsum("ncd,nd->n", _bc, self.Be)
+            _ys = self.einsum("nd,nsd->ns", _bc, self.Ws)
+            return self.objective(np.c_[_ye, _ys])
 
         dWe = numerical_jacobian(objective_We, self.We, delta=h)
-        dWc = numerical_jacobian(objective_Wc, self.Wc, delta=h)
         dWs = numerical_jacobian(objective_Ws, self.Ws, delta=h)
-        return [dWe, dWc, dWs]
+        dWc = numerical_jacobian(objective_Wc, self.Wc, delta=h)
+
+        return [dWe, dWs]
 
     def _gradient_descent(
             self, w: TYPE_TENSOR, dw: TYPE_TENSOR, indices
@@ -954,24 +1053,24 @@ class Embedding(Layer):
         """
         Responsibility: Update layer state with gradient descent.
 
-        1. Calculate dL/dW = (dL/dY * dY/dW).
-        2. Update W with the optimizer.
-
         Returns:
-            [dL/dW]: List of dL/dW.
-            dW is dL/dW of shape (M, D) including the bias weight w0.
+            Event vector gradients [dWe:(N,E,D), dWs:(N,SL,D), dWc:(N,C,D)]
+            for target, samples, and context.
 
         Note:
             update() is to update the state of the layer S. Hence not
             include dL/dX which is not part of the layer state.
        """
         self._gradient_descent(w=self.We, dw=self.dWe, indices=self.target_indices)
-        self._gradient_descent(w=self.Wc, dw=self.dWc, indices=self.context_indices)
         self._gradient_descent(w=self.Ws, dw=self.dWs, indices=self.negative_sample_indices)
-        self._dS = [self.dWe, self.dWc, self.dWs]
+        self._gradient_descent(w=self.Wc, dw=self.dWc, indices=self.context_indices)
+        self._dS = [self.dWe, self.dWs, self.dWc]
 
         # self.N changes every time function() is called, hence the buffer
         # cannot be re-usable as the out buffer. Free them.
+        # TODO:
+        #  * Make sure the property access will raise asserts.
+        #  * Make sure numerical gradient will not use them or raise asserts.
         del self._We, self._Wc, self._Ws, self._Be, self._Bc
 
         return self.dS
