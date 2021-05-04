@@ -350,8 +350,8 @@ class Function(base.Function):
             dX = tape.gradient(loss, X)
 
         assert \
-            dX is not None
-#            super(Function, Function).tensor_shape(dX) == super(Function, Function).tensor_shape(X)
+            dX is not None and \
+            super(Function, Function).tensor_shape(dX) == super(Function, Function).tensor_shape(X)
         if not tf.reduce_all(tf.math.is_finite(dX)):
             raise ValueError(f"{name} caused Nan or Inf \n%s\n" % dX.numpy())
 

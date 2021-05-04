@@ -16,6 +16,18 @@ class Function:
     # Class
     # ================================================================================
     @staticmethod
+    def tensor_cast(X: TYPE_TENSOR, dtype=TYPE_FLOAT):
+        try:
+            if isinstance(X, np.ndarray):
+                return X.astype(dtype)
+            elif tf.is_tensor(X):
+                return tf.cast(X, dtype=dtype)
+            else:
+                raise AssertionError("Invalid tensor type %s" % type(X))
+        except TypeError as e:
+            raise AssertionError(f"Invalid tensor dtype {dtype}")
+
+    @staticmethod
     def is_np_float_scalar(X) -> bool:
         """Confirm if X is numpy float scalar
         1. np primitive e.g. np.float, np.float32
@@ -134,6 +146,11 @@ class Function:
             return X.dtype
         else:
             raise AssertionError("X must be of type scalar or tensor but %s" % type(X))
+
+    @staticmethod
+    def is_same_dtype(dtype_a, dtype_b):
+        """Check if dtype_a and dtype_b are the same"""
+        return tf.dtypes.as_dtype(dtype_a) == tf.dtypes.as_dtype(dtype_b)
 
     @staticmethod
     def to_tensor(X, dtype=None) -> TYPE_TENSOR:

@@ -1,3 +1,6 @@
+from common.constant import (
+    TYPE_FLOAT
+)
 from layer.constants import (
     _COMPOSITE_LAYER_SPEC,
     _SCHEME,

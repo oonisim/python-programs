@@ -44,6 +44,7 @@ class Optimizer(nn.Function):
             l2: L2 regularization hyper parameter, e.g. 1e-3, set to 0 not to use it
         """
         super().__init__(name=name, log_level=log_level)
+        assert isinstance(lr, TYPE_FLOAT) and isinstance(l2, TYPE_FLOAT)
         self.lr = lr
         self.l2 = l2
 

@@ -13,6 +13,7 @@ import tensorflow as tf
 import testing.layer
 from common.constant import (
     TYPE_INT,
+    TYPE_FLOAT,
     TYPE_TENSOR,
     EVENT_META_ENTITIES
 )
@@ -480,7 +481,7 @@ def test_020_embedding_instance_properties_access_to_succeed(caplog):
         context_size = TYPE_INT(2 * np.random.randint(1, 10))
         negative_sample_size = TYPE_INT(np.random.randint(5, 20))
         event_vector_size: TYPE_INT = TYPE_INT(np.random.randint(5, 100))
-        W: TYPE_TENSOR = np.random.randn(dictionary.vocabulary_size, event_vector_size)
+        W: TYPE_TENSOR = np.random.randn(dictionary.vocabulary_size, event_vector_size).astype(TYPE_FLOAT)
 
         embedding, event_context = _must_succeed(
             name=name,

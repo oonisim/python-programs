@@ -52,6 +52,9 @@ class SGD(Optimizer):
     def build(parameters: Dict):
         """Build an optimizer based on the specification.
         """
+        if "lr" in parameters:
+            parameters["lr"] = TYPE_FLOAT(parameters["lr"])
+            parameters["l2"] = TYPE_FLOAT(parameters["l2"])
         return SGD(**parameters)
 
     # ================================================================================
