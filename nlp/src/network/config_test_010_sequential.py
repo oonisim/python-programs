@@ -1,5 +1,9 @@
 import logging
 import numpy as np
+from common.constant import (
+    TYPE_FLOAT,
+    TYPE_INT
+)
 import layer
 from layer import (
     Matmul,
@@ -28,8 +32,8 @@ _l2 = np.random.uniform()
 _N = 10
 _M = 3  # Number of output/classes
 _D = 2
-_eps = np.random.uniform(low=0, high=1e-4)
-_momentum = np.random.uniform(low=0.9, high=1.0)
+_eps = TYPE_FLOAT(np.random.uniform(low=0, high=1e-4))
+_momentum = TYPE_FLOAT(np.random.uniform(low=0.9, high=1.0))
 
 
 valid_network_specification_mamao = {

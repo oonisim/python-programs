@@ -8,7 +8,9 @@ from typing import (
 import numpy as np
 from common.weights import he
 from common.constant import (
-    TYPE_FLOAT
+    TYPE_FLOAT,
+    TYPE_INT,
+    TYPE_LABEL
 )
 from common.function import (
     compose,
@@ -253,7 +255,7 @@ def test_050_sequential_instance_property_access_to_fail():
 
         try:
             # pylint: disable=not-callable
-            inference.objective(np.array(1.0))
+            inference.objective(np.array(1.0, dtype=TYPE_FLOAT))
             raise RuntimeError(msg)
         except AssertionError:
             pass
@@ -371,7 +373,7 @@ def test_050_sequential_instantiation():
         assert inference.name == name
         assert inference.num_nodes == inference.M == M
 
-        X = np.random.randn(N, D)
+        X = np.random.randn(N, D).astype(TYPE_FLOAT)
         inference.X = X
         assert np.array_equal(inference.X, X)
         assert inference.N == N == X.shape[0]
@@ -379,7 +381,7 @@ def test_050_sequential_instantiation():
         inference._dX = X
         assert np.array_equal(inference.dX, X)
 
-        T = np.random.randint(0, M, N)
+        T = np.random.randint(0, M, N).astype(TYPE_LABEL)
         inference.T = T
         assert np.array_equal(inference.T, T)
 

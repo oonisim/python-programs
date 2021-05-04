@@ -10,10 +10,12 @@ from typing import (
     Dict
 )
 
-import numpy as np
 import numexpr as ne
+import numpy as np
+
 from common.constant import (
     TYPE_FLOAT,
+    TYPE_TENSOR,
     ENABLE_NUMEXPR
 )
 from common.function import (
@@ -21,12 +23,9 @@ from common.function import (
 )
 from layer.base import Layer
 from layer.constants import (
-    _WEIGHTS,
     _NAME,
     _SCHEME,
-    _OPTIMIZER,
     _NUM_NODES,
-    _NUM_FEATURES,
     _PARAMETERS,
     _LOG_LEVEL,
     RELU_LEAKY_SLOPE
@@ -110,8 +109,8 @@ class ReLU(Layer):
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
-    def function(self, X) -> Union[np.ndarray, float]:
-        X = np.array(X).reshape((1, -1)) if isinstance(X, float) else X
+    def function(self, X) -> Union[np.ndarray, TYPE_FLOAT]:
+        X = np.array(X).reshape((1, -1)) if isinstance(X, TYPE_FLOAT) else X
         assert X.shape[1] == self.M, \
             f"Number of node X {X.shape[1] } does not match {self.M}."
 
@@ -124,7 +123,7 @@ class ReLU(Layer):
             self._Y = np.empty(X.shape, dtype=TYPE_FLOAT)
 
         np.copyto(self._Y, X)
-        self.mask = (X <= 0.0)
+        self.mask = (X <= TYPE_FLOAT(0.0))
         # --------------------------------------------------------------------------------
         # Leaky ReLU When slope > 0
         # --------------------------------------------------------------------------------
@@ -133,7 +132,7 @@ class ReLU(Layer):
 
         return self.Y
 
-    def gradient(self, dA: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
+    def gradient(self, dA: Union[np.ndarray, TYPE_FLOAT]) -> Union[np.ndarray, TYPE_FLOAT]:
         """Calculate gradient dL/dX=(dL/dA * dA/dX) to back-propagate
         to the previous layer. dA has the same shape (N,M) with A as L is scalar.
 
@@ -142,7 +141,7 @@ class ReLU(Layer):
         Returns:
             dL/dX: impact on L by the layer input dX
         """
-        dA = np.array(dA).reshape((1, -1)) if isinstance(dA, float) else dA
+        dA = np.array(dA).reshape((1, -1)) if isinstance(dA, TYPE_FLOAT) else dA
         assert dA.shape == (self.N, self.M), \
             f"dA shape should be {(self.N, self.M)} but {dA.shape}."
         self._dY = dA
@@ -211,8 +210,8 @@ class Sigmoid(Layer):
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
-    def function(self, X: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
-        X = np.array(X).reshape((1, -1)) if isinstance(X, float) else X
+    def function(self, X: Union[TYPE_FLOAT, np.ndarray]) -> Union[TYPE_FLOAT, np.ndarray]:
+        X = np.array(X).reshape((1, -1)) if isinstance(X, TYPE_FLOAT) else X
         assert X.shape[1] == self.M, \
             f"Number of node X {X.shape[1] } does not match {self.M}."
 
@@ -223,7 +222,7 @@ class Sigmoid(Layer):
         self._Y = sigmoid(X, out=self._Y)
         return self.Y
 
-    def gradient(self, dA: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
+    def gradient(self, dA: TYPE_TENSOR) -> TYPE_TENSOR:
         """Calculate gradient dL/dX=(dL/dA * dA/dX) to back-propagate
         to the previous layer. dA has the same shape (N,M) with A as L is scalar.
 
@@ -232,7 +231,9 @@ class Sigmoid(Layer):
         Returns:
             dL/dX: impact on L by the layer input dX
         """
-        dA = np.array(dA).reshape((1, -1)) if isinstance(dA, float) else dA
+        if isinstance(dA, TYPE_FLOAT):
+            dA = np.array(dA, dtype=TYPE_FLOAT).reshape((1, -1))
+
         assert dA.shape == (self.N, self.M), \
             f"dA shape should be {(self.N, self.M)} but {dA.shape}."
 
@@ -241,7 +242,6 @@ class Sigmoid(Layer):
             Y = self.Y
             ne.evaluate("dA * (1.0 - Y) * Y", out=self._dX)
         else:
-            self._dX = dA * (1.0 - self.Y) * self.Y
+            self._dX = dA * (TYPE_FLOAT(1.0) - self.Y) * self.Y
 
         return self.dX
-

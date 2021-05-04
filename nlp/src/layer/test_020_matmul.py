@@ -28,7 +28,8 @@ from typing import (
 import numpy as np
 
 from common.constant import (
-    TYPE_FLOAT
+    TYPE_FLOAT,
+    TYPE_LABEL
 )
 import common.weights as weights
 from common.function import (
@@ -269,7 +270,7 @@ def test_020_matmul_instance_properties():
 
         try:
             # pylint: disable=not-callable
-            matmul.objective(np.array(1.0))
+            matmul.objective(np.array(1.0, dtype=TYPE_FLOAT))
             raise RuntimeError(msg)
         except AssertionError:
             pass
@@ -341,7 +342,7 @@ def test_020_matmul_instantiation():
         matmul._D = D
         assert matmul.D == D
 
-        X = np.random.randn(N, D)
+        X = np.random.randn(N, D).astype(TYPE_FLOAT)
         matmul.X = X
         assert np.array_equal(matmul.X, X)
         assert matmul.N == N == X.shape[0]
@@ -349,7 +350,7 @@ def test_020_matmul_instantiation():
         matmul._dX = X
         assert np.array_equal(matmul.dX, X)
 
-        T = np.random.randint(0, M, N)
+        T = np.random.randint(0, M, N).astype(TYPE_LABEL)
         matmul.T = T
         assert np.array_equal(matmul.T, T)
 
@@ -711,7 +712,7 @@ def test_020_matmul_round_trip():
         # Note that bias columns are added inside the matmul layer instance, hence
         # matmul.X.shape is (N, 1+D), matmul.W.shape is (M, 1+D)
         # ================================================================================
-        X = np.random.randn(N, D)
+        X = np.random.randn(N, D).astype(TYPE_FLOAT)
         Logger.debug("%s: X is \n%s", name, X)
 
         # pylint: disable=not-callable

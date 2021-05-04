@@ -31,7 +31,13 @@ class Optimizer(nn.Function):
     # ================================================================================
     # Instance
     # ================================================================================
-    def __init__(self, name, lr=0.01, l2: TYPE_FLOAT = 1e-3, log_level=logging.WARNING):
+    def __init__(
+            self,
+            name,
+            lr=TYPE_FLOAT(0.01),
+            l2: TYPE_FLOAT = TYPE_FLOAT(1e-3),
+            log_level=logging.WARNING
+    ):
         """
         Args:
             lr: learning rate of the gradient descent
@@ -61,12 +67,7 @@ class Optimizer(nn.Function):
     @lr.setter
     def lr(self, lr: Union[TYPE_FLOAT, np.ndarray]):
         """Set Learning rate"""
-        assert \
-            (
-                isinstance(lr, TYPE_FLOAT) or
-                (isinstance(lr, np.ndarray) and lr.dtype == TYPE_FLOAT)
-            ) and (0.0 < lr < 1.0)
-
+        assert self.is_float_scalar(lr) and (TYPE_FLOAT(0) < lr < TYPE_FLOAT(1))
         self._lr = lr
 
     @property
@@ -77,12 +78,7 @@ class Optimizer(nn.Function):
     @l2.setter
     def l2(self, l2: Union[TYPE_FLOAT, np.ndarray]):
         """Set L2 regularization"""
-        assert \
-            (
-                isinstance(l2, TYPE_FLOAT) or
-                (isinstance(l2, np.ndarray) and l2.dtype == TYPE_FLOAT)
-            ) and (0.0 < l2 < 1.0)
-
+        assert self.is_float_scalar(l2) and (TYPE_FLOAT(0) < l2 < TYPE_FLOAT(1))
         self._l2 = l2
 
     @property

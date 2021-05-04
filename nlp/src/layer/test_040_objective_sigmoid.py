@@ -229,7 +229,7 @@ def test_040_objective_instance_properties():
             pass
 
         try:
-            layer.function(1.0)
+            layer.function(TYPE_FLOAT(1.0))
             layer.gradient(int(1))
             raise RuntimeError("Invoke layer.gradient(int(1)) must fail.")
         except AssertionError:
@@ -270,7 +270,7 @@ def test_040_objective_instantiation():
         layer._D = D
         assert layer.D == D
 
-        X = np.random.randn(N, D)
+        X = np.random.randn(N, D).astype(TYPE_FLOAT)
         layer.X = X
         assert np.array_equal(layer.X, X)
         assert layer.N == N == X.shape[0]
@@ -280,7 +280,7 @@ def test_040_objective_instantiation():
         layer._dX = X
         assert np.array_equal(layer.dX, X)
 
-        T = np.random.randint(0, M, N)
+        T = np.random.randint(0, M, N).astype(TYPE_LABEL)
         layer.T = T
         assert np.array_equal(layer.T, T)
 
@@ -311,7 +311,9 @@ def test_040_objective_instantiation():
         layer.logger.debug("This is a pytest")
 
         # pylint: disable=not-callable
-        assert layer.objective(np.array(1.0)) == np.array(1.0), \
+        assert \
+            layer.objective(np.array(1.0, dtype=TYPE_FLOAT)) \
+            == np.array(1.0, dtype=TYPE_FLOAT), \
             "Objective function of the output/last layer is an identity function."
 
 
@@ -353,8 +355,8 @@ def test_040_objective_methods_1d_ohe():
         # ================================================================================
         # Layer forward path
         # ================================================================================
-        X = np.random.uniform(low=-BOUNDARY_SIGMOID, high=BOUNDARY_SIGMOID)
-        T = np.random.randint(0, 2)                # OHE labels.
+        X = TYPE_FLOAT(np.random.uniform(low=-BOUNDARY_SIGMOID, high=BOUNDARY_SIGMOID))
+        T = TYPE_LABEL(np.random.randint(0, 2))                # OHE labels.
 
         # log_loss function require (X, T) in X(N, M), and T(N, M) in OHE label format.
         X, T = transform_X_T(X, T)

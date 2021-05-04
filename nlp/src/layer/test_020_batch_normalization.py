@@ -18,14 +18,12 @@ Same shape with W.
 """
 import cProfile
 import logging
-from typing import (
-    Union
-)
 
 import numpy as np
 
 from common.constant import (
     TYPE_FLOAT,
+    TYPE_INT,
 )
 from common.function import (
     standardize,
@@ -67,7 +65,6 @@ def test_020_bn_instantiation_to_fail():
     name = "test_020_bn_instantiation_to_fail"
     for _ in range(NUM_MAX_TEST_TIMES):
         M: int = np.random.randint(1, NUM_MAX_NODES)
-        D = 1
         # Constraint: Name is string with length > 0.
         try:
             BatchNormalization(
@@ -96,7 +93,7 @@ def test_020_bn_instantiation_to_fail():
                 log_level=-1
             )
             raise RuntimeError("BN initialization with invalid log level must fail")
-        except (AssertionError, KeyError) as e:
+        except (AssertionError, KeyError):
             pass
 
         # Constraint: Momentum is TYPE_FLOAT and 0 < momentum < 1.
@@ -106,13 +103,13 @@ def test_020_bn_instantiation_to_fail():
         )
         assert \
             isinstance(layer.momentum, TYPE_FLOAT) and \
-            0.0 < layer.momentum < 1.0
+            TYPE_FLOAT(0.0) < layer.momentum < TYPE_FLOAT(1.0)
 
         try:
             BatchNormalization(
                 name="test_020_bn",
                 num_nodes=1,
-                momentum=np.random.uniform(-1, 0)
+                momentum=TYPE_FLOAT(np.random.uniform(-1, 0))
             )
             raise RuntimeError("BN initialization with momentum <=0 must fail")
         except AssertionError:
@@ -122,7 +119,7 @@ def test_020_bn_instantiation_to_fail():
             BatchNormalization(
                 name="test_020_bn",
                 num_nodes=1,
-                momentum=np.random.randint(1, 100)
+                momentum=TYPE_FLOAT(np.random.randint(1, 100))
             )
             raise RuntimeError("BN initialization with momentum > 1 must fail")
         except AssertionError:
@@ -133,7 +130,7 @@ def test_020_bn_instantiation_to_fail():
             BatchNormalization(
                 name="test_020_bn",
                 num_nodes=np.random.randint(1, 100),
-                eps=np.random.uniform(-100.0, 0)
+                eps=TYPE_FLOAT(np.random.uniform(-100.0, 0))
             )
             raise RuntimeError("BN initialization with eps < 0 must fail")
         except AssertionError:
@@ -142,7 +139,7 @@ def test_020_bn_instantiation_to_fail():
             BatchNormalization(
                 name="test_020_bn",
                 num_nodes=np.random.randint(1, 100),
-                eps=np.random.uniform(1e-3, 100.0)
+                eps=TYPE_FLOAT(np.random.uniform(1e-3, 100.0))
             )
             raise RuntimeError("BN initialization with eps >=1e-3 must fail")
         except AssertionError:
@@ -171,12 +168,14 @@ def test_020_bn_instance_properties_access_to_fail():
         # To pass
         # --------------------------------------------------------------------------------
         try:
-            if not layer.name == name: raise RuntimeError("layer.name == name should be true")
+            if not layer.name == name:
+                raise RuntimeError("layer.name == name should be true")
         except AssertionError:
             raise RuntimeError("Access to name should be allowed as already initialized.")
 
         try:
-            if not layer.M == M: raise RuntimeError("layer.M == M should be true")
+            if not layer.M == M:
+                raise RuntimeError("layer.M == M should be true")
         except AssertionError:
             raise RuntimeError("Access to M should be allowed as already initialized.")
 
@@ -272,7 +271,7 @@ def test_020_bn_instance_properties_access_to_fail():
 
         try:
             # pylint: disable=not-callable
-            layer.objective(np.array(1.0))
+            layer.objective(np.array(1.0, dtype=TYPE_FLOAT))
             raise RuntimeError(msg)
         except AssertionError:
             pass
@@ -286,9 +285,9 @@ def test_020_bn_instance_properties_access_to_succeed():
         Layer parameter access to succeed
     """
 
-    def objective(X: np.ndarray) -> Union[float, np.ndarray]:
+    def objective(x: np.ndarray):
         """Dummy objective function"""
-        return np.sum(X)
+        return np.sum(x)
 
     for _ in range(NUM_MAX_TEST_TIMES):
         name = random_string(np.random.randint(1, 10))
@@ -363,20 +362,17 @@ def test_020_bn_builder_to_succeed():
     profiler.enable()
 
     for _ in range(NUM_MAX_TEST_TIMES):
-        M = np.random.randint(1, 100)
-        D = np.random.randint(1, 100)  # NOT including bias
-
         # ----------------------------------------------------------------------
         # Validate the correct specification.
         # NOTE: Invalidate one parameter at a time from the correct one.
         # Otherwise not sure what you are testing.
         # ----------------------------------------------------------------------
         valid_bn_parameters = BatchNormalization.specification_template()[_PARAMETERS]
-        eps = valid_bn_parameters["eps"]
-        momentum = valid_bn_parameters["momentum"]
-        lr = valid_bn_parameters[_OPTIMIZER][_PARAMETERS]["lr"]
-        l2 = valid_bn_parameters[_OPTIMIZER][_PARAMETERS]["l2"]
-        log_level = valid_bn_parameters[_LOG_LEVEL]
+        eps = TYPE_FLOAT(valid_bn_parameters["eps"])
+        momentum = TYPE_FLOAT(valid_bn_parameters["momentum"])
+        lr: TYPE_FLOAT = TYPE_FLOAT(valid_bn_parameters[_OPTIMIZER][_PARAMETERS]["lr"])
+        l2: TYPE_FLOAT = TYPE_FLOAT(valid_bn_parameters[_OPTIMIZER][_PARAMETERS]["l2"])
+        log_level: int = valid_bn_parameters[_LOG_LEVEL]
         try:
             bn: BatchNormalization = BatchNormalization.build(parameters=valid_bn_parameters)
             assert bn.optimizer.lr == lr
@@ -385,7 +381,7 @@ def test_020_bn_builder_to_succeed():
             assert bn.eps == eps
             assert bn.momentum == momentum
         except Exception as e:
-            raise RuntimeError("Matmul.build() must succeed with %s" % valid_bn_parameters)
+            raise RuntimeError("Matmul.build() must succeed with %s" % valid_bn_parameters) from e
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")
@@ -403,13 +399,9 @@ def test_020_bn_function_method_to_fail():
 
         # For BN which works on statistics on per-feature basis,
         # no sense if M = 1 or N = 1.
-        N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)
 
-        X = np.random.randn(N, M)
         momentum = TYPE_FLOAT(0.85)
-        ddof = 1 if N > 1 else 0
-
         try:
             layer = BatchNormalization(
                 name=name,
@@ -462,23 +454,23 @@ def _validate_layer_values(layer, X, eps):
     # ----------------------------------------------------------------------
     md = X - X.mean(axis=0)     # md = mean deviation
     variance = X.var(axis=0, ddof=ddof)
-    if eps > 0.0:
-        sd = np.sqrt(variance + eps)
+    if eps > TYPE_FLOAT(0.0):
+        sd = np.sqrt(variance + eps, dtype=TYPE_FLOAT)
     else:
-        sd = np.std(X, axis=0, ddof=ddof)
-        sd[sd == 0.0] = 1.0
+        sd = np.std(X, axis=0, ddof=ddof, dtype=TYPE_FLOAT)
+        sd[sd == TYPE_FLOAT(0.0)] = TYPE_FLOAT(1.0)
 
     expected_standardized = md / sd
     diff = expected_standardized - layer.Xstd
 
-    assert np.allclose(layer.U, X.mean(axis=0), atol=1e-6, rtol=0.0)
-    assert np.allclose(layer.Xmd, md, atol=1e-6, rtol=0.0)
-    assert np.allclose(layer.SD, sd, atol=1e-6, rtol=0.0)
+    assert np.allclose(layer.U, X.mean(axis=0), atol=TYPE_FLOAT(1e-6), rtol=TYPE_FLOAT(0.0))
+    assert np.allclose(layer.Xmd, md, atol=TYPE_FLOAT(1e-6), rtol=TYPE_FLOAT(0.0))
+    assert np.allclose(layer.SD, sd, atol=TYPE_FLOAT(1e-6), rtol=TYPE_FLOAT(0.0))
     assert np.allclose(
         layer.Xstd,
         expected_standardized,
-        atol=1e-6,
-        rtol=0.0
+        atol=TYPE_FLOAT(1e-6),
+        rtol=TYPE_FLOAT(0.0)
     ), "Xstd\n%s\nexpected_standardized=\n%s\ndiff=\n%s\n" \
        % (layer.Xstd, expected_standardized, diff)
 
@@ -498,17 +490,17 @@ def _validate_layer_running_statistics(
         # Currently in standardize(), sd[sd==0.0] = 1.0 is implemented.
         # ----------------------------------------------------------------------
         variance = X.var(axis=0, ddof=ddof)
-        if eps > 0.0:
+        if eps > TYPE_FLOAT(0.0):
             sd = np.sqrt(variance + eps)
         else:
             sd = np.std(X, axis=0, ddof=ddof)
-            sd[sd == 0.0] = 1.0
+            sd[sd == TYPE_FLOAT(0.0)] = TYPE_FLOAT(1.0)
 
-        expected_ru = momentum * previous_ru + (1 - momentum) * X.mean(axis=0)
-        expected_rsd = momentum * previous_rsd + (1 - momentum) * sd
-        assert np.allclose(layer.RU, expected_ru, atol=1e-6, rtol=0)
+        expected_ru = momentum * previous_ru + (TYPE_FLOAT(1) - momentum) * X.mean(axis=0)
+        expected_rsd = momentum * previous_rsd + (TYPE_FLOAT(1) - momentum) * sd
+        assert np.allclose(layer.RU, expected_ru, atol=TYPE_FLOAT(1e-6), rtol=TYPE_FLOAT(0))
         assert \
-            np.allclose(layer.RSD, expected_rsd, atol=1e-6, rtol=0), \
+            np.allclose(layer.RSD, expected_rsd, atol=TYPE_FLOAT(1e-6), rtol=TYPE_FLOAT(0)), \
             "X=\n%s\nX.sd()=\n%s\nlayer.SD=\n%s\nlayer.RSD=\n%s\n" \
             % (X, X.std(axis=0, ddof=ddof), layer.SD, layer.RSD)
 
@@ -520,9 +512,9 @@ def test_020_bn_method_function_to_succeed():
     Expected:
         Layer method calculate expected values.
     """
-    def objective(X: np.ndarray) -> Union[float, np.ndarray]:
+    def objective(x: np.ndarray):
         """Dummy objective function"""
-        return np.sum(X)
+        return np.sum(x)
 
     profiler = cProfile.Profile()
     profiler.enable()
@@ -536,9 +528,12 @@ def test_020_bn_method_function_to_succeed():
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)
 
-        X = np.random.randn(N, M)
-        momentum = np.random.uniform(0.7, 0.99)
-        eps = np.random.uniform(1e-12, 1e-10) if np.random.uniform() < 0.5 else 0.0
+        X = np.random.randn(N, M).astype(TYPE_FLOAT)
+        momentum = TYPE_FLOAT(np.random.uniform(0.7, 0.99))
+        if np.random.uniform() < 0.5:
+            eps = TYPE_FLOAT(np.random.uniform(1e-12, 1e-10))
+        else:
+            eps = TYPE_FLOAT(0.0)
 
         layer = BatchNormalization(
             name=name,
@@ -555,7 +550,7 @@ def test_020_bn_method_function_to_succeed():
         assert layer.total_rows_processed == 0
         ru = layer.RU
         rsd = layer.RSD
-        Y = layer.function(
+        layer.function(
             X,
             numexpr_enabled=numexpr_enabled,
             numba_enabled=numba_enabled
@@ -596,7 +591,7 @@ def test_020_bn_method_function_to_succeed():
                 numexpr_enabled=numexpr_enabled,
                 numba_enabled=numba_enabled
             )
-            assert layer.total_rows_processed == N * (i + 2)
+            assert layer.total_rows_processed == TYPE_INT(N * (i + 2))
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")
@@ -609,9 +604,9 @@ def test_020_bn_method_function_multi_invocations_to_succeed():
     Expected:
         Layer method calculate expected values.
     """
-    def objective(X: np.ndarray) -> Union[float, np.ndarray]:
+    def objective(x: np.ndarray):
         """Dummy objective function"""
-        return np.sum(X)
+        return np.sum(x)
 
     profiler = cProfile.Profile()
     profiler.enable()
@@ -625,9 +620,12 @@ def test_020_bn_method_function_multi_invocations_to_succeed():
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)
 
-        X = np.random.randn(N, M)
-        momentum = np.random.uniform(0.7, 0.99)
-        eps = np.random.uniform(1e-12, 1e-10) if np.random.uniform() < 0.5 else 0.0
+        X = np.random.randn(N, M).astype(TYPE_FLOAT)
+        momentum = TYPE_FLOAT(np.random.uniform(0.7, 0.99))
+        if np.random.uniform() < 0.5:
+            eps = TYPE_FLOAT(np.random.uniform(1e-12, 1e-10))
+        else:
+            eps = TYPE_FLOAT(0.0)
 
         # ********************************************************************************
         # Constraint:
@@ -689,9 +687,9 @@ def test_020_bn_method_function_validate_with_frederik_kratzert():
     Expected:
         Layer method calculate expected values.
     """
-    def objective(X: np.ndarray) -> Union[float, np.ndarray]:
+    def objective(x: np.ndarray):
         """Dummy objective function"""
-        return np.sum(X)
+        return np.sum(x)
 
     profiler = cProfile.Profile()
     profiler.enable()
@@ -706,10 +704,12 @@ def test_020_bn_method_function_validate_with_frederik_kratzert():
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)
 
-        X = np.random.randn(N, M)
-        momentum = np.random.uniform(0.7, 0.99)
-        eps = np.random.uniform(1e-12, 1e-8) if np.random.uniform() < 0.5 else 0.0
-        ddof = 1 if N > 1 else 0
+        X = np.random.randn(N, M).astype(TYPE_FLOAT)
+        momentum = TYPE_FLOAT(np.random.uniform(0.7, 0.99))
+        if np.random.uniform() < 0.5:
+            eps = TYPE_FLOAT(np.random.uniform(1e-12, 1e-10))
+        else:
+            eps = TYPE_FLOAT(0.0)
 
         layer = BatchNormalization(
             name=name,
@@ -762,9 +762,9 @@ def test_020_bn_method_gradient_validate_with_frederik_kratzert():
     Expected:
         Layer method calculate expected values.
     """
-    def objective(X: np.ndarray) -> Union[float, np.ndarray]:
+    def objective(x: np.ndarray):
         """Dummy objective function"""
-        return np.sum(X)
+        return np.sum(x)
 
     profiler = cProfile.Profile()
     profiler.enable()
@@ -779,10 +779,12 @@ def test_020_bn_method_gradient_validate_with_frederik_kratzert():
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)
 
-        X = np.random.randn(N, M)
-        momentum = np.random.uniform(0.7, 0.99)
-        eps = np.random.uniform(1e-12, 1e-8) if np.random.uniform() < 0.5 else 0.0
-        ddof = 1 if N > 1 else 0
+        X = np.random.randn(N, M).astype(TYPE_FLOAT)
+        momentum = TYPE_FLOAT(np.random.uniform(0.7, 0.99))
+        if np.random.uniform() < 0.5:
+            eps = TYPE_FLOAT(np.random.uniform(1e-12, 1e-10))
+        else:
+            eps = TYPE_FLOAT(0.0)
 
         layer = BatchNormalization(
             name=name,
@@ -808,7 +810,7 @@ def test_020_bn_method_gradient_validate_with_frederik_kratzert():
         # ********************************************************************************
         # Constraint: layer gradients should match those of frederik_kratzert
         # ********************************************************************************
-        Y = layer.function(
+        layer.function(
             X,
             numexpr_enabled=numexpr_enabled,
             numba_enabled=numba_enabled
@@ -861,9 +863,9 @@ def test_020_bn_method_gradient_descent():
     Expected:
         The objective decrease with the descents.
     """
-    def objective(X: np.ndarray) -> Union[float, np.ndarray]:
+    def objective(x: np.ndarray):
         """Dummy objective function"""
-        return np.sum(X)
+        return np.sum(x)
 
     profiler = cProfile.Profile()
     profiler.enable()
@@ -878,11 +880,12 @@ def test_020_bn_method_gradient_descent():
         N: int = np.random.randint(2, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)
 
-        X = np.random.randn(N, M)
-        momentum = np.random.uniform(0.7, 0.99)
-        eps = np.random.uniform(1e-12, 1e-8) if np.random.uniform() < 0.5 else 0.0
-        ddof = 1 if N > 1 else 0
-
+        X = np.random.randn(N, M).astype(TYPE_FLOAT)
+        momentum = TYPE_FLOAT(np.random.uniform(0.7, 0.99))
+        if np.random.uniform() < 0.5:
+            eps = TYPE_FLOAT(np.random.uniform(1e-12, 1e-10))
+        else:
+            eps = TYPE_FLOAT(0.0)
         layer = BatchNormalization(
             name=name,
             num_nodes=M,
@@ -902,8 +905,8 @@ def test_020_bn_method_gradient_descent():
                 numba_enabled=numba_enabled
             )
             # pylint: disable=not-callable
-            L = layer.objective(Y)
-            G = layer.gradient(
+            layer.objective(Y)
+            layer.gradient(
                 dY=dout,
                 numexpr_enabled=numexpr_enabled,
                 numba_enabled=numba_enabled
@@ -930,9 +933,9 @@ def test_020_bn_method_predict():
     Expected:
         The objective
     """
-    def objective(X: np.ndarray) -> Union[float, np.ndarray]:
+    def objective(x: np.ndarray):
         """Dummy objective function"""
-        return np.sum(X)
+        return np.sum(x)
 
     profiler = cProfile.Profile()
     profiler.enable()
@@ -947,10 +950,12 @@ def test_020_bn_method_predict():
         N: int = np.random.randint(2, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)
 
-        X = np.random.randn(N, M)
-        momentum = np.random.uniform(0.7, 0.99)
-        eps = np.random.uniform(1e-12, 1e-8) if np.random.uniform() < 0.5 else 0.0
-        ddof = 1 if N > 1 else 0
+        X = np.random.randn(N, M).astype(TYPE_FLOAT)
+        momentum = TYPE_FLOAT(np.random.uniform(0.7, 0.99))
+        if np.random.uniform() < 0.5:
+            eps = TYPE_FLOAT(np.random.uniform(1e-12, 1e-8))
+        else:
+            eps = TYPE_FLOAT(0.0)
 
         layer = BatchNormalization(
             name=name,
@@ -970,21 +975,20 @@ def test_020_bn_method_predict():
         # RU = momentum * RU + (1 - momentum) * U
         # After the 1st invocation, RU==U. Then momentum * U + (1 - momentum) * U -> U
         # ********************************************************************************
-        assert np.allclose(Y, layer.predict(X), atol=1e-9, rtol=0)
+        assert np.allclose(Y, layer.predict(X), atol=TYPE_FLOAT(1e-9), rtol=TYPE_FLOAT(0))
 
         # ********************************************************************************
         # Constraint: At 2nd invocation, predict should be the same with
         #
         # ********************************************************************************
-        Z = np.random.randn(N, M)
+        Z = np.random.randn(N, M).astype(TYPE_FLOAT)
         standardized, mean, sd, deviation = standardize(Z, eps=eps, keepdims=False)
-        expected_RU = layer.RU * momentum + mean * (1-momentum)
-        expected_RSD = layer.RSD * momentum + sd * (1-momentum)
-        Y = layer.function(
+        expected_RU = layer.RU * momentum + mean * (TYPE_FLOAT(1)-momentum)
+        expected_RSD = layer.RSD * momentum + sd * (TYPE_FLOAT(1)-momentum)
+        layer.function(
             Z,
             numexpr_enabled=numexpr_enabled,
             numba_enabled=numba_enabled
         )
-        assert np.allclose(layer.RU, expected_RU, atol=1e-10, rtol=0)
-        assert np.allclose(layer.RSD, expected_RSD, atol=1e-10, rtol=0)
-
+        assert np.allclose(layer.RU, expected_RU, atol=TYPE_FLOAT(1e-10), rtol=TYPE_FLOAT(0))
+        assert np.allclose(layer.RSD, expected_RSD, atol=TYPE_FLOAT(1e-10), rtol=TYPE_FLOAT(0))

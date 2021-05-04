@@ -18,6 +18,8 @@ from numba import jit
 
 from common.constant import (
     TYPE_FLOAT,
+    TYPE_INT,
+    TYPE_TENSOR,
     ENABLE_NUMEXPR,
     ENABLE_NUMBA,
 )
@@ -60,7 +62,7 @@ class Standardization(Layer):
     def specification(
             name: str,
             num_nodes: int,
-            momentum: TYPE_FLOAT = 0.9
+            momentum: TYPE_FLOAT = TYPE_FLOAT(0.9)
     ):
         """Generate Matmul specification
         """
@@ -70,7 +72,7 @@ class Standardization(Layer):
                 _NAME: name,
                 _NUM_NODES: num_nodes,
                 "momentum": momentum,
-                "eps": 0.0,
+                "eps": TYPE_FLOAT(0.0),
                 "log_level": logging.ERROR
             }
         }
@@ -102,8 +104,8 @@ class Standardization(Layer):
             self,
             name: str,
             num_nodes: int,
-            momentum: TYPE_FLOAT = 0.9,
-            eps: TYPE_FLOAT = 0.0,
+            momentum: TYPE_FLOAT = TYPE_FLOAT(0.9),
+            eps: TYPE_FLOAT = TYPE_FLOAT(0.0),
             posteriors: Optional[List[Layer]] = None,
             log_level: int = logging.ERROR
     ):
@@ -121,8 +123,10 @@ class Standardization(Layer):
             "Standardization[%s] number of nodes is [%s] momentum is %s]",
             name, num_nodes, momentum
         )
-        assert TYPE_FLOAT(0) < momentum < TYPE_FLOAT(1)
-        assert TYPE_FLOAT(0) <= eps < TYPE_FLOAT(1e-3)
+        assert \
+            isinstance(momentum, TYPE_FLOAT) and TYPE_FLOAT(0) < momentum < TYPE_FLOAT(1)
+        assert \
+            isinstance(eps, TYPE_FLOAT) and TYPE_FLOAT(0) <= eps < TYPE_FLOAT(1e-3)
 
         # Layers to which forward the output
         self._posteriors: List[Layer] = posteriors
@@ -154,8 +158,8 @@ class Standardization(Layer):
         # --------------------------------------------------------------------------------
         # Running statistics. allocate storage at the instance initialization.
         # --------------------------------------------------------------------------------
-        self._total_rows_processed = 0
-        self._total_training_invocations = 0
+        self._total_rows_processed = TYPE_INT(0)
+        self._total_training_invocations = TYPE_INT(0)
         self._momentum: TYPE_FLOAT = momentum
         # Running mean-per-feature of all the batches X* in shape(M,)
         self._RU: np.ndarray = np.zeros(num_nodes, dtype=TYPE_FLOAT)
@@ -315,8 +319,8 @@ class Standardization(Layer):
 
     def _update_running_means(self):
         """Update running means using decaying"""
-        self._RU = self.momentum * self.RU + (1 - self.momentum) * self.U
-        self._RSD = self.momentum * self.RSD + (1 - self.momentum) * self.SD
+        self._RU = self.momentum * self.RU + (TYPE_FLOAT(1.0) - self.momentum) * self.U
+        self._RSD = self.momentum * self.RSD + (TYPE_FLOAT(1.0) - self.momentum) * self.SD
 
     def function(
             self, X: Union[np.ndarray, TYPE_FLOAT],
@@ -356,13 +360,13 @@ class Standardization(Layer):
             out_sd=self._SD
         )
         self.update_running_means()
-        self._norm = 1.0 / self.SD
+        self._norm = TYPE_FLOAT(1.0) / self.SD
         assert np.all(np.isfinite(self.norm))
 
         # --------------------------------------------------------------------------------
         # Total training data (rows) processed
         # --------------------------------------------------------------------------------
-        self._total_training_invocations += 1
+        self._total_training_invocations += TYPE_INT(1)
         self._total_rows_processed += self.N
 
         assert np.all(np.isfinite(self.Y)), f"{self.Y}"
@@ -460,7 +464,7 @@ class Standardization(Layer):
 
     def gradient(
             self,
-            dY: Union[np.ndarray, TYPE_FLOAT] = 1.0,
+            dY: Union[np.ndarray, TYPE_FLOAT] = TYPE_FLOAT(1.0),
             numexpr_enabled: bool = ENABLE_NUMEXPR,
             numba_enabled: bool = ENABLE_NUMBA
     ) -> Union[np.ndarray, TYPE_FLOAT]:
@@ -492,8 +496,8 @@ class Standardization(Layer):
         return self.dX
 
     def gradient_numerical(
-            self, h: float = 1e-5
-    ) -> List[Union[float, np.ndarray]]:
+            self, h: TYPE_FLOAT = TYPE_FLOAT(1e-5)
+    ) -> List[Union[TYPE_FLOAT, np.ndarray]]:
         """Calculate numerical gradients
         Args:
             h: small number for delta to calculate the numerical gradient
@@ -644,7 +648,6 @@ class FeatureScaleShift(Layer):
         # --------------------------------------------------------------------------------
         # Misc
         # --------------------------------------------------------------------------------
-
 
     # --------------------------------------------------------------------------------
     # Instance properties
@@ -807,7 +810,7 @@ class FeatureScaleShift(Layer):
 
     def gradient(
             self,
-            dY: Union[np.ndarray, TYPE_FLOAT] = 1.0,
+            dY: Union[np.ndarray, TYPE_FLOAT] = TYPE_FLOAT(1.0),
             numexpr_enabled: bool = ENABLE_NUMEXPR,
             numba_enabled: bool = ENABLE_NUMBA
     ) -> Union[np.ndarray, TYPE_FLOAT]:
@@ -841,8 +844,8 @@ class FeatureScaleShift(Layer):
         return self.dX
 
     def gradient_numerical(
-            self, h: float = 1e-5
-    ) -> List[Union[float, np.ndarray]]:
+            self, h: TYPE_FLOAT = TYPE_FLOAT(1e-5)
+    ) -> List[Union[TYPE_FLOAT, np.ndarray]]:
         """Calculate numerical gradients
         Args:
             h: small number for delta to calculate the numerical gradient
@@ -952,7 +955,7 @@ class BatchNormalization(Layer):
             num_nodes: int,
             gamma_optimizer_specification: dict = None,
             beta_optimizer_specification: dict = None,
-            momentum: TYPE_FLOAT = 0.9
+            momentum: TYPE_FLOAT = TYPE_FLOAT(0.9)
     ):
         """Generate Matmul specification
         """
@@ -966,7 +969,7 @@ class BatchNormalization(Layer):
                 _OPTIMIZER: gamma_optimizer_specification
                 if gamma_optimizer_specification is not None
                 else optimiser.SGD.specification(),
-                "eps": 0.0,
+                "eps": TYPE_FLOAT(0.0),
                 "log_level": logging.ERROR
             }
         }
@@ -1002,9 +1005,9 @@ class BatchNormalization(Layer):
             self,
             name: str,
             num_nodes: int,
-            momentum: TYPE_FLOAT = 0.9,
+            momentum: TYPE_FLOAT = TYPE_FLOAT(0.9),
             optimizer: optimiser.Optimizer = optimiser.SGD(),
-            eps: TYPE_FLOAT = 0.0,
+            eps: TYPE_FLOAT = TYPE_FLOAT(0.0),
             posteriors: Optional[List[Layer]] = None,
             log_level: int = logging.ERROR
     ):
@@ -1023,8 +1026,10 @@ class BatchNormalization(Layer):
             "BatchNormalization[%s] number of nodes is [%s] momentum is %s]",
             name, num_nodes, momentum
         )
-        assert TYPE_FLOAT(0) < momentum < TYPE_FLOAT(1)
-        assert TYPE_FLOAT(0) <= eps < TYPE_FLOAT(1e-3)
+        assert \
+            isinstance(momentum, TYPE_FLOAT) and TYPE_FLOAT(0) < momentum < TYPE_FLOAT(1)
+        assert \
+            isinstance(eps, TYPE_FLOAT) and TYPE_FLOAT(0) <= eps < TYPE_FLOAT(1e-3)
         assert isinstance(optimizer, optimiser.Optimizer)
 
         # Layers to which forward the output
@@ -1060,8 +1065,8 @@ class BatchNormalization(Layer):
         # --------------------------------------------------------------------------------
         # Running statistics. allocate storage at the instance initialization.
         # --------------------------------------------------------------------------------
-        self._total_rows_processed = 0
-        self._total_training_invocations = 0
+        self._total_rows_processed = TYPE_INT(0)
+        self._total_training_invocations = TYPE_INT(0)
         self._momentum: TYPE_FLOAT = momentum
         # Running mean-per-feature of all the batches X* in shape(M,)
         self._RU: np.ndarray = np.zeros(num_nodes, dtype=TYPE_FLOAT)
@@ -1312,8 +1317,8 @@ class BatchNormalization(Layer):
 
     def _update_running_means(self):
         """Update running means using decaying"""
-        self._RU = self.momentum * self.RU + (1 - self.momentum) * self.U
-        self._RSD = self.momentum * self.RSD + (1 - self.momentum) * self.SD
+        self._RU = self.momentum * self.RU + (TYPE_FLOAT(1) - self.momentum) * self.U
+        self._RSD = self.momentum * self.RSD + (TYPE_FLOAT(1) - self.momentum) * self.SD
 
     @staticmethod
     def _function_numexpr(x, gamma, beta, out):
@@ -1331,7 +1336,7 @@ class BatchNormalization(Layer):
         return shifted
 
     def function(
-            self, X: Union[np.ndarray, TYPE_FLOAT],
+            self, X: TYPE_TENSOR,
             numexpr_enabled: bool = ENABLE_NUMEXPR,
             numba_enabled: bool = ENABLE_NUMBA
     ) -> Union[np.ndarray, TYPE_FLOAT]:
@@ -1382,7 +1387,7 @@ class BatchNormalization(Layer):
             out_sd=self._SD
         )
         self.update_running_means()
-        self._norm = 1.0 / self.SD
+        self._norm = TYPE_FLOAT(1.0) / self.SD
         assert np.all(np.isfinite(self.norm))
 
         # --------------------------------------------------------------------------------
@@ -1402,7 +1407,7 @@ class BatchNormalization(Layer):
         # --------------------------------------------------------------------------------
         # Total training data (rows) processed
         # --------------------------------------------------------------------------------
-        self._total_training_invocations += 1
+        self._total_training_invocations += TYPE_INT(1)
         self._total_rows_processed += self.N
 
         assert np.all(np.isfinite(self.Y)), f"{self.Y}"
@@ -1431,14 +1436,14 @@ class BatchNormalization(Layer):
         # dL/dV:(M,) = sum(dL/dXstd:(N,M) * Xmd, axis=0) * [-1/2 * (norm**3)]
         # --------------------------------------------------------------------------------
         np.sum(self.dXstd * self.Xmd, axis=0, out=self._dV)
-        np.multiply(self.dV, (self.norm ** 3) / -2.0, out=self._dV)
+        np.multiply(self.dV, (self.norm ** 3) / TYPE_FLOAT(-2.0), out=self._dV)
 
         # --------------------------------------------------------------------------------
         # dL/dXmd01:(N,M) = dL/dV:(M,) / (N-ddof) * 2 * Xmd:(N,M)
         # See https://github.com/pytorch/pytorch/issues/1410 for (N-ddof).
         # --------------------------------------------------------------------------------
         np.multiply(self.dV, self.Xmd, out=self._dXmd01)
-        np.divide(self.dXmd01, ((self.N-ddof) / 2.0), out=self._dXmd01)
+        np.divide(self.dXmd01, ((self.N-ddof) / TYPE_FLOAT(2.0)), out=self._dXmd01)
         assert self.dXmd01.shape == (self.N, self.M)
 
         # --------------------------------------------------------------------------------
@@ -1458,7 +1463,7 @@ class BatchNormalization(Layer):
         # --------------------------------------------------------------------------------
         np.add(self.dXmd01, self.dXmd02, out=self._dX)      # dL/dX01 using dX buffer
         np.sum(self.dX, axis=0, out=self._dU)               # -dL/dU as sum(dL/dX01, axis=0)
-        self._dU *= -1                                      # dL/dU
+        self._dU *= TYPE_FLOAT(-1)                          # dL/dU
         np.add(self.dX, self.dU / self.N, out=self._dX)     # dL/dX01 + dL/dX02
 
         return self.dX
@@ -1525,7 +1530,7 @@ class BatchNormalization(Layer):
 
     def gradient(
             self,
-            dY: Union[np.ndarray, TYPE_FLOAT] = 1.0,
+            dY: Union[np.ndarray, TYPE_FLOAT] = TYPE_FLOAT(1.0),
             numexpr_enabled: bool = ENABLE_NUMEXPR,
             numba_enabled: bool = ENABLE_NUMBA
     ) -> Union[np.ndarray, TYPE_FLOAT]:
@@ -1557,8 +1562,8 @@ class BatchNormalization(Layer):
         return self.dX
 
     def gradient_numerical(
-            self, h: float = 1e-5
-    ) -> List[Union[float, np.ndarray]]:
+            self, h: TYPE_FLOAT = TYPE_FLOAT(1e-5)
+    ) -> List[Union[TYPE_FLOAT, np.ndarray]]:
         """Calculate numerical gradients
         Args:
             h: small number for delta to calculate the numerical gradient
@@ -1611,7 +1616,7 @@ class BatchNormalization(Layer):
             isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT and \
             X.ndim == 2 and X.shape[1] == self.M and X.size > 0
 
-        assert np.all(self.RSD > 0)
+        assert np.all(self.RSD > TYPE_FLOAT(0))
         RU = self.RU
         RSD = self.RSD
         gamma = self.gamma

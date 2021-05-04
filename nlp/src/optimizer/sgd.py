@@ -63,8 +63,8 @@ class SGD(Optimizer):
     def __init__(
             self,
             name=_SGD_NAME_DEFAULT,
-            lr=0.01,
-            l2: float = 1e-3,
+            lr: TYPE_FLOAT = TYPE_FLOAT(0.01),
+            l2: TYPE_FLOAT = TYPE_FLOAT(1e-3),
             log_level=logging.ERROR
     ):
         super().__init__(name=name, lr=lr, l2=l2, log_level=log_level)

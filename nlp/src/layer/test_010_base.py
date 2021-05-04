@@ -7,7 +7,9 @@ from typing import (
 import numpy as np
 
 from common.constant import (
-    TYPE_INT
+    TYPE_INT,
+    TYPE_FLOAT,
+    TYPE_LABEL
 )
 from layer.base import (
     Layer
@@ -171,14 +173,14 @@ def test_010_base_instance_properties():
         pass
 
     try:
-        _layer.T = float(1)
+        _layer.T = TYPE_LABEL(1)
         raise RuntimeError(msg)
     except AssertionError:
         pass
 
     try:
         # pylint: disable=not-callable
-        _layer.objective(np.array(1.0))
+        _layer.objective(np.array(1.0, dtype=TYPE_FLOAT))
         raise RuntimeError(msg)
     except AssertionError:
         pass
@@ -206,7 +208,7 @@ def test_010_base_instantiation():
     # gradient(dL/dY) repeats dL/dY,
     # gradient_numerical() returns 1
     # --------------------------------------------------------------------------------
-    def objective(X: np.ndarray) -> Union[float, np.ndarray]:
+    def objective(X: np.ndarray) -> Union[TYPE_FLOAT, np.ndarray]:
         """Dummy objective function"""
         return np.sum(X)
 
@@ -228,7 +230,7 @@ def test_010_base_instantiation():
     _layer._D = 1
     assert _layer.D == 1
 
-    X = np.random.randn(N, M)
+    X = np.random.randn(N, M).astype(TYPE_FLOAT)
     _layer.X = X
     assert np.array_equal(_layer.X, X), \
         "Expected:\n%s\nDiff\n%s\n" % (X, (_layer.X-X))
@@ -237,15 +239,15 @@ def test_010_base_instantiation():
     _layer._dX = X
     assert np.array_equal(_layer.dX, X)
 
-    T = np.random.randint(0, M, N)
+    T = np.random.randint(0, M, N).astype(TYPE_LABEL)
     _layer.T = T
     assert np.array_equal(_layer.T, T)
 
     _layer._Y = np.dot(X, X.T)
     assert np.array_equal(_layer.Y, np.dot(X, X.T))
 
-    _layer._dY = np.array(0.9)
-    assert _layer._dY == np.array(0.9)
+    _layer._dY = np.array(0.9, dtype=TYPE_FLOAT)
+    assert _layer._dY == np.array(0.9, dtype=TYPE_FLOAT)
 
     _layer.logger.debug("This is a pytest")
 
@@ -259,7 +261,7 @@ def test_010_base_instantiation():
     except AssertionError:
         pass
 
-    x = np.array(1.0)
+    x = np.array(1.0, dtype=TYPE_FLOAT)
     assert np.array_equal(_layer.function(x), x)
 
     try:

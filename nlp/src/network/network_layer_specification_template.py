@@ -22,7 +22,7 @@ _network_layer_specification_template = {
                 "name": "std000",
                 _NUM_NODES: 5,
                 "momentum": 0.9,
-                "eps": 0.0,
+                "eps": TYPE_FLOAT(0.0),
                 _LOG_LEVEL: 40
             }
         },
@@ -59,7 +59,7 @@ _network_layer_specification_template = {
                         "l2": 0.001
                     }
                 },
-                "eps": 0.0,
+                "eps": TYPE_FLOAT(0.0),
                 _LOG_LEVEL: 40
             }
         },

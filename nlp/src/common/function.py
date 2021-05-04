@@ -23,6 +23,7 @@ import numpy as np
 
 from common.constant import (
     TYPE_FLOAT,
+    TYPE_TENSOR,
     TYPE_LABEL,
     OFFSET_DELTA,
     OFFSET_LOG,
@@ -44,7 +45,7 @@ def identity(x: np.ndarray):
 
 def standardize(
     X: Union[np.ndarray, TYPE_FLOAT],
-        eps: TYPE_FLOAT = 0.0,
+        eps: TYPE_FLOAT = TYPE_FLOAT(0.0),
         keepdims=False,
         out=None,
         out_mean=None,
@@ -93,7 +94,7 @@ def standardize(
     deviation = ne.evaluate("X - mean", out_md) \
         if ENABLE_NUMEXPR else np.subtract(X, mean, out=out_md)
 
-    if eps > 0:
+    if eps > 0.0:
         # --------------------------------------------------------------------------------
         # Using numexpr causes differences that cannot be ignored. WHY?
         # --------------------------------------------------------------------------------
@@ -154,7 +155,7 @@ def standardize(
             # Then elements of (X-mean) where sd ==0 should be 0.
             # Hence there should be no need to zero-clear those elements.
             # --------------------------------------------------------------------------------
-            # out[::, mask] = 0.0
+            # out[::, mask] = TYPE_FLOAT(0.0)
 
             # --------------------------------------------------------------------------------
             # Leaving "sd[mask] = 1.0" should be OK because (X-mean)/sd -> 0
@@ -162,7 +163,7 @@ def standardize(
             # "gamma * ((X-mean) / sd) + beta" -> beta
             # --------------------------------------------------------------------------------
             # restore sd
-            # sd[mask] = 0.0
+            # sd[mask] = TYPE_FLOAT(0.0)
 
         else:
             standardized = np.divide(deviation, sd, out)
@@ -190,8 +191,8 @@ def logarithm(
         return np.log(X + offset, out=out)
 
     assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT)
-    offset = OFFSET_LOG if (offset is None or offset <= 0.0) else offset   # offset > 0
-    assert offset > 0.0
+    offset = OFFSET_LOG if (offset is None or offset <= TYPE_FLOAT(0.0)) else offset   # offset > 0
+    assert offset > TYPE_FLOAT(0.0)
     if OFFSET_MODE_ELEMENT_WISE:
         # --------------------------------------------------------------------------------
         # Clip the element value only when it is below the offset as log(k), not log(x+k).
@@ -387,7 +388,7 @@ def logistic_log_loss(
     # J: np.ndarray = -(T * np.log(P+offset) + (1-T) * np.log(1-P+offset))
 
     assert np.all(np.isin(T, [0, 1]))
-    J = -(T * logarithm(P, offset) + (1.0-T) * logarithm(1.0-P, offset))
+    J = -(T * logarithm(P, offset) + TYPE_FLOAT(1.0-T) * logarithm(TYPE_FLOAT(1.0-P), offset))
 
     return J
 
@@ -466,13 +467,13 @@ def transform_X_T(
     assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) or isinstance(X, TYPE_FLOAT), \
         f"Type of P must be {TYPE_FLOAT}"
     assert (isinstance(T, np.ndarray) and np.issubdtype(T.dtype, np.integer)) or \
-           isinstance(T, int), "Type of T must be integer"
+           isinstance(T, TYPE_LABEL), "Type of T %s must be %s but %s" % (T, TYPE_LABEL, type(T))
 
     if isinstance(X, TYPE_FLOAT) or X.ndim == 0:
         # --------------------------------------------------------------------------------
         # When X is scalar, T must be a scalar. This is a binary (0/1) label.
         # --------------------------------------------------------------------------------
-        assert isinstance(T, int) or T.ndim == 0
+        assert isinstance(T, TYPE_LABEL) or T.ndim == 0
         X = np.array(X).reshape((-1, 1))
         T = np.array(T).reshape((-1, 1))  # Convert into T(N,1) 2D OHE Binary
 
@@ -733,10 +734,10 @@ def check_binary_classification_X_T(X, T):
         T: label
     """
     assert \
-        (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT and X.size > 0) and \
+        (isinstance(X, np.ndarray) and np.issubdtype(X.dtype, np.floating) and X.size > 0) and \
         (
-                isinstance(T, np.ndarray) and np.issubdtype(T.dtype, np.integer) and
-                np.all(np.isin(T, [0, 1]))
+            isinstance(T, np.ndarray) and np.issubdtype(T.dtype, np.integer) and
+            np.all(np.isin(T, [0, 1]))
         ) and \
         (
             (X.ndim == 0 and T.ndim == 0) or
@@ -747,7 +748,7 @@ def check_binary_classification_X_T(X, T):
 def sigmoid_cross_entropy_log_loss(
         X: Union[np.ndarray, TYPE_FLOAT],
         T: Union[np.ndarray, int],
-        offset: TYPE_FLOAT = TYPE_FLOAT(0)
+        offset: TYPE_FLOAT = TYPE_FLOAT(0),
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Cross entropy log loss for sigmoid activation -( T*log(Z) + (1-T)*log(1-Z) )
     where Z = sigmoid(X).
@@ -766,12 +767,12 @@ def sigmoid_cross_entropy_log_loss(
         X: Input data of shape (N,1) to go through sigmoid where:
             N is Batch size
             Number of nodes M is always 1 for binary 0/1 classification.
-        T: label in the index format of shape (N,).
+        T: label in the index format of shape (N,) or (N,1).
         offset: small number to avoid np.inf by log(0) by log(0+offset)
 
     Returns:
         J: Loss value of shape () for scalar or (N,) a loss value per batch.
-        P: Activation value sigmoid(X)
+        P: Activation value sigmoid(X) of shape () or (N,)
     """
     name = "sigmoid_cross_entropy_log_loss"
     # P, T = transform_X_T(P, T)
@@ -785,10 +786,29 @@ def sigmoid_cross_entropy_log_loss(
 
     Z1 = TYPE_FLOAT(1.0) + np.exp(-X)    # 1/Z where Z = sigmoid(X) = (1/1 + np.exp(-X))
     P = TYPE_FLOAT(1.0) / Z1
+
+    # --------------------------------------------------------------------------------
+    # DO NOT squeeze P as the original shape from X is expected to the caller.
+    # e.g. CrossEntropyLogLoss.function() where the shape of P:(N,M) is
+    # checked if it has the same shape of X:(N,M)
+    #
+    # To handle both OHE label format and index label format, the data
+    # X and T for OHE/logistic classification both have the shape (N,1).
+    # as the number of input M into the logistic log loss layer = 1.
+    # Because the expected loss J shape is (N,) to match with the output
+    # number of output from the loss layer (N,), one loss value for each
+    # batch, J is squeezed, but not P.
+    # --------------------------------------------------------------------------------
+    # P = np.squeeze(P, axis=-1)    # Shape from (N,M) to (N,)
+
     J = np.multiply((TYPE_FLOAT(1.0) - T), X) + np.log(Z1)
     J = np.squeeze(J, axis=-1)    # Shape from (N,M) to (N,)
-    assert np.all(np.isfinite(J))
 
+    # Shape are P:(N,1) and J:(N,), hence not the same.
+    # assert J.shape == P.shape == (X.shape[0],)
+
+    assert np.all(np.isfinite(J))
+    assert P.shape == X.shape and J.shape == (X.shape[0],)
     return J, P
 
 
@@ -825,7 +845,7 @@ def generic_cross_entropy_log_loss(
 
 def cross_entropy_log_loss(
         P: Union[np.ndarray, TYPE_FLOAT],
-        T: Union[np.ndarray, int],
+        T: Union[np.ndarray, TYPE_LABEL],
         f: Callable = categorical_log_loss,
         offset: TYPE_FLOAT = OFFSET_LOG
 ) -> np.ndarray:
@@ -912,7 +932,8 @@ def cross_entropy_log_loss(
 def numerical_jacobian(
         f: Callable[[np.ndarray], np.ndarray],
         X: Union[np.ndarray, TYPE_FLOAT],
-        delta: Optional[TYPE_FLOAT] = OFFSET_DELTA
+        delta: Optional[TYPE_FLOAT] = OFFSET_DELTA,
+        condition: TYPE_TENSOR = None
 ) -> np.ndarray:
     """Calculate Jacobian matrix J numerically with (f(X+h) - f(X-h)) / 2h
     Jacobian matrix element Jpq = df/dXpq, the impact on J by the
@@ -925,17 +946,22 @@ def numerical_jacobian(
         https://ece.uwaterloo.ca/~dwharder/NumericalAnalysis/02Numerics/Weaknesses/
         https://www.cise.ufl.edu/~mssz/CompOrg/CDA-arith.html
 
+    Calculating the numerical gradients all the elements is expensive.
+    Use "condition" to select which elements to calculate to make the cost O(C)
+    where C is the number of elements to choose.
+
     Args:
         f: Y=f(X) where Y is a scalar or shape() array.
         X: input of shame (N, M), or (N,) or ()
         delta: small delta value to calculate the f value for X+/-h
+        condition: boolean indices to select which elements to calculate
     Returns:
         J: Jacobian matrix that has the same shape of X.
     """
     name = "numerical_jacobian"
     X = np.array(X, dtype=TYPE_FLOAT) if isinstance(X, (TYPE_FLOAT, int)) else X
     J = np.zeros_like(X, dtype=TYPE_FLOAT)
-    delta = OFFSET_DELTA if (delta is None or delta <= 0.0) else delta
+    delta = OFFSET_DELTA if (delta is None or delta <= TYPE_FLOAT(0.0)) else delta
     divider = 2 * delta
 
     # --------------------------------------------------------------------------------
@@ -948,12 +974,32 @@ def numerical_jacobian(
     # e.g. f(1-h) = log(1-h) causes log(0) instead of log(1-h).
     # --------------------------------------------------------------------------------
     assert (X.dtype == TYPE_FLOAT), f"X must be type {TYPE_FLOAT}"
-    assert delta > 0.0 and isinstance(delta, TYPE_FLOAT)
+    assert delta > TYPE_FLOAT(0.0) and isinstance(delta, TYPE_FLOAT)
 
+    # --------------------------------------------------------------------------------
+    # https://numpy.org/doc/stable/reference/arrays.nditer.html
+    # ‘readwrite’ or ‘writeonly’:
+    # nditer yield writeable buffer arrays and the nditer must copy buffer data
+    # back to the original array once iteration is finished. When the iteration
+    # is ended, singnal nditer either:
+    # * Context manager using the "with" statement and existing the clause.
+    # * Call nditer.close() method.
+    #
+    # Original array needs not to be updated, but only needs to be temporarily
+    # modified during the gradient calculation, hence no 'with' nor 'close()'.
+    # --------------------------------------------------------------------------------
     it = np.nditer(X, flags=['multi_index'], op_flags=['readwrite'])
     while not it.finished:
         idx = it.multi_index
         tmp: TYPE_FLOAT = X[idx]
+
+        # --------------------------------------------------------------------------------
+        # If the index does not correspond to the sampling position, skip.
+        # Calculating all the element in X is costly. Hence calculate only
+        # sampled X elements that are selected with the condition given.
+        # --------------------------------------------------------------------------------
+        if (condition is not None) and (not condition[idx]):
+            continue
 
         # --------------------------------------------------------------------------------
         # f(x+h)
@@ -969,7 +1015,7 @@ def numerical_jacobian(
             ((isinstance(fx1, np.ndarray) and fx1.size == 1) or isinstance(fx1, TYPE_FLOAT)), \
             f"The f function needs to return scalar or shape () but {fx1}"
         assert np.isfinite(fx1), \
-            "f(x+h) caused nan for f %s for X %s" % (f, (tmp + delta))
+            "f(x+h) caused nan for f %s for X %s" % (fx1, (tmp + delta))
 
         # --------------------------------------------------------------------------------
         # f(x-h)
@@ -984,7 +1030,7 @@ def numerical_jacobian(
             ((isinstance(fx2, np.ndarray) and fx2.size == 1) or isinstance(fx2, TYPE_FLOAT)), \
             f"The f function needs to return scalar or shape () but {fx2}"
         assert np.isfinite(fx2), \
-            "f(x-h) caused nan for f %s for X %s" % (f, (tmp - delta))
+            "f(x-h) caused nan for f %s for X %s" % (fx2, (tmp - delta))
 
         # --------------------------------------------------------------------------------
         # When f(x+k) and f(x-k) are relatively too close, subtract between them can ben
@@ -1007,7 +1053,7 @@ def numerical_jacobian(
         difference = (fx1 - fx2)
         Logger.debug("%s: (fx1-fx2)=[%s]", name, difference)
 
-        derivative_saturation_condition = (difference == 0.0)
+        derivative_saturation_condition = (difference == TYPE_FLOAT(0.0))
         if derivative_saturation_condition:
             fmt = "%s: derivative saturation fx1=fx2=%s detected.\n"
             args = tuple([name, fx1])

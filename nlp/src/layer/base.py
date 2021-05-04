@@ -198,7 +198,7 @@ class Layer(nn.Function):
         assert X is not None and self.is_tensor(X)
         if self.is_float_tensor(X):
             assert np.all(np.isfinite(X)), f"{X}"
-            if np.all(np.abs(X) > 1.0):
+            if np.all(np.abs(X) > TYPE_FLOAT(1.0)):
                 self.logger.warning("Input data X has not been standardized.")
 
         self._X = X
@@ -249,19 +249,24 @@ class Layer(nn.Function):
         #     f"Set X first and the batch size of T should be {self.N} but {T.shape[0]}"
 
     @property
-    def Y(self) -> np.ndarray:
+    def Y(self) -> TYPE_TENSOR:
         """Latest layer output
         No need to allocate a storage for dY as it is allocated by the post layer.
         """
+        # assert \
+        #     (isinstance(self._Y, np.ndarray) and self._Y.dtype == TYPE_FLOAT) and \
+        #     self._Y.size > 0, \
+        #     "Y %s of type %s is not initialized or invalid." % \
+        #     (self._Y, type(self._Y))
         assert \
-            (isinstance(self._Y, np.ndarray) and self._Y.dtype == TYPE_FLOAT) and \
-            self._Y.size > 0, \
+            (self.is_float_tensor(self._Y) and self.tensor_size(self._Y) > 0) or \
+            self.is_float_scalar(self._Y), \
             "Y %s of type %s is not initialized or invalid." % \
             (self._Y, type(self._Y))
         return self._Y
 
     @property
-    def dY(self) -> np.ndarray:
+    def dY(self) -> TYPE_TENSOR:
         """Latest gradient dL/dY (impact on L by dY) given from the post layer(s)"""
         assert \
             isinstance(self._dY, np.ndarray) and \

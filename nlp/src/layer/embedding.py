@@ -10,6 +10,7 @@ from typing import (
 )
 
 import numpy as np
+import tensorflow as tf
 from memory_profiler import profile as memory_profile
 
 from common.constant import (
@@ -17,7 +18,8 @@ from common.constant import (
     TYPE_INT,
     TYPE_TENSOR,
     EVENT_VECTOR_SIZE,
-    EVENT_META_ENTITIES
+    EVENT_META_ENTITIES,
+    TYPE_NN_FLOAT
 )
 from common.function import (
     numerical_jacobian,
@@ -228,7 +230,7 @@ class Embedding(Layer):
         dL/dWc:shape(N, C, D)
         dL/dWs:shape(N, SL, D)
         """
-        return np.c_[self.dWe, self.dWc, self.dWs]
+        return self.concat([self.dWe, self.dWc, self.dWs], axis=1)
 
     @property
     def We(self) -> TYPE_TENSOR:
@@ -581,7 +583,7 @@ class Embedding(Layer):
                Hence for all the 1st columns, the label T=1, and 0 for the rest.
         """
         name = "function"
-        expected_ranks = [2,3]
+        expected_ranks = [2, 3]
         assert \
             self.is_tensor(X) and self.tensor_rank(X) in expected_ranks, \
             "Expected X rank is %s but %s" % (expected_ranks, X.shape)
@@ -667,7 +669,7 @@ class Embedding(Layer):
         # ================================================================================
         # Result of np.c_[Ye, Ys]
         # ================================================================================
-        self._Y = np.c_[Ye, Ys]
+        self._Y = self.concat([self.reshape(Ye, shape=(-1, 1)), Ys], axis=1)
         del Ye, Ys
         assert \
             self.is_finite(self.Y) and \
@@ -997,7 +999,7 @@ class Embedding(Layer):
         #     return self.objective(ys)
         #
         # def objective_We(we: TYPE_TENSOR):
-        #     ye = self.einsum("ncd,nd->n", self.Bc, we)
+        #     ye = self.einsum("nd,nd->n", self.Bc, we)
         #     return self.objective(ye)
         #
         # def objective_Wc(wc: TYPE_TENSOR):
@@ -1017,28 +1019,39 @@ class Embedding(Layer):
             1:
         ]
 
+        # --------------------------------------------------------------------------------
+        # Tensorflow bug: tape.gradient(objective, X) returns None after tf.concat.
+        # https://github.com/tensorflow/tensorflow/issues/37726
+        # Gradients do not exist for variables after tf.concat()
+        # --------------------------------------------------------------------------------
+        _Y = tf.Variable(
+            initial_value=tf.zeros(shape=tf.shape(self.Y), dtype=TYPE_NN_FLOAT),
+            trainable=True
+        )
+
         def objective_We(we: TYPE_TENSOR):
             """Objective function for We to calculate numerical dL/dWe"""
-            _ye = self.einsum("ncd,nd->n", self.Bc, we)
-            return self.objective(np.c_[_ye, Ys])
+            _be = self._bagging(we)
+            _ye = self.reshape(self.einsum("nd,nd->n", self.Bc, _be), shape=(-1, 1))
+            # return self.objective(self.concat([_ye, Ys], axis=1))
 
         def objective_Ws(ws: TYPE_TENSOR):
             """Objective function for Ws to calculate numerical dL/dWs"""
             _ys = self.einsum("nd,nsd->ns", self.Bc, ws)
-            return self.objective(np.c_[Ye, _ys])
+            return self.objective(self.concat([Ye, _ys], axis=1))
 
         def objective_Wc(wc: TYPE_TENSOR):
             """Objective function for Wc to calculate numerical dL/dWc"""
             _bc = self._bagging(wc)
-            _ye = self.einsum("ncd,nd->n", _bc, self.Be)
+            _ye = self.reshape(self.einsum("nd,nd->n", _bc, self.Be), shape=(-1, 1))
             _ys = self.einsum("nd,nsd->ns", _bc, self.Ws)
-            return self.objective(np.c_[_ye, _ys])
+            return self.objective(self.concat([_ye, _ys], axis=1))
 
-        dWe = numerical_jacobian(objective_We, self.We, delta=h)
-        dWs = numerical_jacobian(objective_Ws, self.Ws, delta=h)
-        dWc = numerical_jacobian(objective_Wc, self.Wc, delta=h)
+        dWe = self.numerical_jacobian(objective_We, self.We, condition=condition)
+        dWs = self.numerical_jacobian(objective_Ws, self.Ws, condition=condition)
+        dWc = self.numerical_jacobian(objective_Wc, self.Wc, condition=condition)
 
-        return [dWe, dWs]
+        return [dWe, dWs, dWc]
 
     def _gradient_descent(
             self, w: TYPE_TENSOR, dw: TYPE_TENSOR, indices

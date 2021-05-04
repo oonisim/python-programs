@@ -186,7 +186,7 @@ class Layer(nn.Function):
                ((isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) or isinstance(X, float))
         assert np.all(np.isfinite(X)), f"{X}"
 
-        if np.all(np.abs(X) > 1.0):
+        if np.all(np.abs(X) > TYPE_FLOAT(1.0)):
             self.logger.warning("Input data X has not been standardized.")
 
         if isinstance(X, float):

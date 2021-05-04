@@ -230,7 +230,7 @@ def test_030_objective_instance_properties():
             pass
 
         try:
-            _layer.function(1.0)
+            _layer.function(TYPE_FLOAT(1.0))
             _layer.gradient(int(1))
             raise RuntimeError("Invoke layer.gradient(int(1)) must fail.")
         except AssertionError:
@@ -275,7 +275,7 @@ def test_030_objective_instantiation():
         _layer._D = D
         assert _layer.D == D
 
-        X = np.random.randn(N, D)
+        X = np.random.randn(N, D).astype(TYPE_FLOAT)
         _layer.X = X
         assert np.array_equal(_layer.X, X)
         assert _layer.N == N == X.shape[0]
@@ -285,7 +285,7 @@ def test_030_objective_instantiation():
         _layer._dX = X
         assert np.array_equal(_layer.dX, X)
 
-        T = np.random.randint(0, M, N)
+        T = np.random.randint(0, M, N).astype(TYPE_LABEL)
         _layer.T = T
         assert np.array_equal(_layer.T, T)
 
@@ -301,7 +301,9 @@ def test_030_objective_instantiation():
 
         _layer.logger.debug("This is a pytest")
         # pylint: disable=not-callable
-        assert _layer.objective(np.array(1.0)) == np.array(1.0)
+        assert \
+            _layer.objective(np.array(1.0, dtype=TYPE_FLOAT)) == \
+            np.array(1.0, dtype=TYPE_FLOAT)
 
 
 def test_030_objective_specification():

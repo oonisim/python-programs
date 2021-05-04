@@ -68,26 +68,33 @@ def test_010_sigmoid_cross_entropy_log_loss_2d(caplog):
         N = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M = 1   # always 1 for binary classification 0 or 1.
 
-        X = np.random.randn(N, M)
-        T = np.random.randint(0, M, N)
+        X = np.random.randn(N, M).astype(TYPE_FLOAT)
+        T = np.random.randint(0, M, N).astype(TYPE_LABEL)
         X, T = transform_X_T(X, T)
         Logger.debug("T is %s\nX is \n%s\n", T, X)
 
         # ----------------------------------------------------------------------
-        # Expected value E = -logarithm(Z)
+        # Expected value EJ for J and EP for P
+        # Note:
+        #   To handle both index label format and OHE label format in the
+        #   Loss layer(s), X and T are transformed into (N,1) shapes in
+        #   transform_X_T(X, T) for logistic log loss.
+        #   Hence need to squeeze from (N,1) to (N,) for both EJ and EP.
+        #   sigmoid_cross_entropy_log_loss handles squeezing for E and P.
         # ----------------------------------------------------------------------
         Z = sigmoid(X)
-        E = np.squeeze(-(T * logarithm(Z) + (1-T) * logarithm(1-Z)), axis=-1)
+        EP = np.squeeze(Z, axis=-1)
+        EJ = np.squeeze(-(T * logarithm(Z) + TYPE_FLOAT(1-T) * logarithm(TYPE_FLOAT(1-Z))), axis=-1)
 
         # ----------------------------------------------------------------------
-        # Actual J should be close to E.
+        # Actual J should be close to EJ.
         # ----------------------------------------------------------------------
         J, P = sigmoid_cross_entropy_log_loss(X, T)
-        assert E.shape == J.shape
-        assert np.all(np.abs(E-J) < u), \
-            "Expected abs(E-J) < %s but \n%s\nE=\n%s\nT=%s\nX=\n%s\nJ=\n%s\n" \
-            % (u, np.abs(E-J), E, T, X, J)
-        assert np.all(np.abs(Z-P) < u)
+        assert EJ.shape == J.shape
+        assert np.all(np.abs(EJ-J) < u), \
+            "Expected abs(EJ-J) < %s but \n%s\nEJ=\n%s\nT=%s\nX=\n%s\nJ=\n%s\n" \
+            % (u, np.abs(EJ-J), EJ, T, X, J)
+        assert np.all(np.abs(EP-P) < u)
 
         # ----------------------------------------------------------------------
         # L = cross_entropy_log_loss(P, T) should be close to J

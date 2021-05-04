@@ -75,7 +75,7 @@ def test_010_text_function_event_indexing_to_succeed():
     assert index_to_event[event_to_index[EVENT_NIL.lower()]] == EVENT_NIL.lower()
     assert index_to_event[event_to_index[EVENT_UNK.lower()]] == EVENT_UNK.lower()
     assert probabilities[EVENT_NIL.lower()] == TYPE_FLOAT(0), "The probability of EVENT_NIL is 0"
-    assert (1.0 - sum(probabilities.values())) < 1e-5, \
+    assert (TYPE_FLOAT(1.0) - sum(probabilities.values())) < TYPE_FLOAT(1e-5), \
         f"Sum of probabilities must be 0 but {sum(probabilities.values())}"
     assert len(event_to_index) == len(index_to_event) == len(vocabulary) == len(probabilities)
 

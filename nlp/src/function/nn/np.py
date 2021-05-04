@@ -6,6 +6,7 @@ import numpy as np
 import function.nn.base as base
 from common.constant import (
     TYPE_FLOAT,
+    TYPE_TENSOR,
     BOUNDARY_SIGMOID,
     ENABLE_NUMEXPR
 )
@@ -17,6 +18,53 @@ class Function(base.Function):
     # ================================================================================
     # Class
     # ================================================================================
+    @staticmethod
+    def ones(shape=None, dtype=TYPE_FLOAT):
+        return np.ones(
+            shape=shape, dtype=dtype
+        )
+
+    @staticmethod
+    def concat(values, axis=0):
+        return np.concatenate(values, axis=axis)
+
+    @staticmethod
+    def add(x, y, out=None):
+        assert out is None, "out is not supported for TF"
+        return np.add(x, y, out=out)
+
+    @staticmethod
+    def sum(x, axis=None, keepdims=False):
+        return np.sum(
+            x, axis=axis, keepdims=keepdims
+        )
+
+    @staticmethod
+    def multiply(x, y, out=None) -> TYPE_TENSOR:
+        assert out is None, "out is not supported for TF"
+        return np.multiply(x, y, out=out)
+
+    @staticmethod
+    def einsum(equation, *inputs, out=None) -> TYPE_TENSOR:
+        return np.einsum(equation, *inputs, out=out)
+
+    @staticmethod
+    def random_bool_tensor(shape: tuple, num_trues: int):
+        """Generate bool tensor where num_trues elements are set to True
+        Args:
+            shape: shape of the tensor to generate
+            num_trues: number of True to randomly set to the tensor
+        Returns: tensor of shape where num_trues elements are set to True
+        """
+        size = np.multiply.reduce(array=shape, axis=None)  # multiply.reduce(([])) -> 1
+        assert len(shape) > 0 <= num_trues <= size
+
+        indices = np.random.choice(a=np.arange(size), size=num_trues, replace=False)
+        flatten = np.zeros(size)
+        flatten[indices] = 1
+
+        return np.reshape(flatten, shape).astype(np.bool_)
+
     @staticmethod
     def sigmoid(
             X,
@@ -68,6 +116,15 @@ class Function(base.Function):
                 Y = 1 / (1 + np.exp(-1 * _X))
 
         return Y
+
+    # --------------------------------------------------------------------------------
+    # Assertion
+    # --------------------------------------------------------------------------------
+    @staticmethod
+    def assert_all_close(x, y, msg):
+        assert np.allclose(
+            x, y, atol=TYPE_FLOAT(1e-5)
+        ), msg
 
     # ================================================================================
     # Instance

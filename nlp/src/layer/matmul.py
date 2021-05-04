@@ -15,6 +15,7 @@ import numpy as np
 import optimizer as optimiser
 from common.constant import (
     TYPE_FLOAT,
+    TYPE_INT,
     TYPE_TENSOR
 )
 from common.function import (
@@ -223,7 +224,7 @@ class Matmul(Layer):
         return self._optimizer
 
     @property
-    def lr(self) -> Union[float, np.ndarray]:
+    def lr(self) -> Union[TYPE_FLOAT, np.ndarray]:
         """Learning rate of the gradient descent"""
         return self.optimizer.lr
 
@@ -233,7 +234,7 @@ class Matmul(Layer):
         self.optimizer.lr = lr
 
     @property
-    def l2(self) -> Union[float, np.ndarray]:
+    def l2(self) -> Union[TYPE_FLOAT, np.ndarray]:
         """L2 regularization hyper parameter"""
         return self.optimizer.l2
 
@@ -298,7 +299,7 @@ class Matmul(Layer):
     # Instance methods
     # --------------------------------------------------------------------------------
     # @memory_profile
-    def function(self, X: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
+    def function(self, X: Union[np.ndarray, TYPE_FLOAT]) -> Union[np.ndarray, TYPE_FLOAT]:
         """Calculate the layer output Y = X@W.T
         Args:
             X: Batch input data from the input layer without the bias.
@@ -352,7 +353,7 @@ class Matmul(Layer):
         return self.Y
 
     # @memory_profile
-    def gradient(self, dY: Union[np.ndarray, float] = 1.0) -> Union[np.ndarray, float]:
+    def gradient(self, dY: Union[np.ndarray, TYPE_FLOAT] = TYPE_FLOAT(1.0)) -> Union[np.ndarray, TYPE_FLOAT]:
         """Calculate the gradients dL/dX and dL/dW.
         Args:
             dY: Gradient dL/dY, the total impact on L by dY.
@@ -360,9 +361,9 @@ class Matmul(Layer):
             dX: dL/dX of shape (N, D-1) without the bias
         """
         name = "gradient"
-        assert isinstance(dY, float) or (isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT)
+        assert isinstance(dY, TYPE_FLOAT) or (isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT)
 
-        dY = np.array(dY).reshape((1, -1)) if isinstance(dY, float) or dY.ndim < 2 else dY
+        dY = np.array(dY).reshape((1, -1)) if isinstance(dY, TYPE_FLOAT) or dY.ndim < 2 else dY
         assert dY.shape == self.Y.shape, \
             "dL/dY shape needs %s but %s" % (self.Y.shape, dY.shape)
 
@@ -394,7 +395,7 @@ class Matmul(Layer):
 
     def gradient_numerical(
             self, h: Optional[TYPE_FLOAT] = None
-    ) -> List[Union[float, np.ndarray]]:
+    ) -> List[Union[TYPE_FLOAT, np.ndarray]]:
         """Calculate numerical gradients
         Args:
             h: small number for delta to calculate the numerical gradient
@@ -422,13 +423,13 @@ class Matmul(Layer):
         dW = numerical_jacobian(objective_W, self.W, delta=h)
         return [dX, dW]
 
-    def _gradient_descent(self, W, dW, out=None) -> Union[np.ndarray, float]:
+    def _gradient_descent(self, W, dW, out=None) -> Union[np.ndarray, TYPE_FLOAT]:
         """Gradient descent
         Directly update matrices to avoid the temporary copies
         """
         return self.optimizer.update(W, dW, out=out)
 
-    def update(self) -> List[Union[float, np.ndarray]]:
+    def update(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:
         """
         Responsibility: Update layer state with gradient descent.
 
@@ -480,7 +481,7 @@ class Matmul(Layer):
         self._num_nodes = state["num_nodes"]
 
         assert self.is_float_tensor(state["W"]), \
-            "Expected float tensor but \n%s\n" % state["W"]
+            "Expected TYPE_FLOAT tensor but \n%s\n" % state["W"]
         if self.is_tensor(self._W) and self.tensor_shape(self._W) == self.tensor_shape(state["W"]):
             np.copyto(self._W, state["W"])
         else:

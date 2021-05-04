@@ -4,6 +4,10 @@ import numpy as np
 
 import layer
 import optimizer as optimiser
+from common.constant import (
+    TYPE_FLOAT,
+    TYPE_INT
+)
 from layer.constants import (
     _WEIGHTS,
     _NAME,
@@ -22,7 +26,7 @@ _l2 = np.random.uniform()
 _M = 3  # Number of output/classes
 _D = 2
 _eps = np.random.uniform(low=0, high=1e-4)
-_momentum = np.random.uniform(low=0.9, high=1.0)
+_momentum = TYPE_FLOAT(np.random.uniform(low=0.9, high=1.0))
 
 _composite_layer_specification_template = {
     "matmul01": {

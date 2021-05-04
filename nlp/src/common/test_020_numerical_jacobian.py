@@ -14,6 +14,7 @@ import pytest_check as check    # https://pypi.org/project/pytest-check/
 from common.constant import (
     TYPE_FLOAT,
     TYPE_LABEL,
+    TYPE_INT,
     OFFSET_LOG,
     OFFSET_DELTA,
     BOUNDARY_SIGMOID,
@@ -49,15 +50,15 @@ def test_020_numerical_jacobian_avg(caplog):
 
     # caplog.set_level(logging.DEBUG, logger=Logger.name)
 
-    u: float = GRADIENT_DIFF_ACCEPTANCE_VALUE
+    u: TYPE_FLOAT = GRADIENT_DIFF_ACCEPTANCE_VALUE
     for _ in range(NUM_MAX_TEST_TIMES):
         # Batch input X of shape (N, M)
         n = np.random.randint(low=1, high=NUM_MAX_BATCH_SIZE)
         m = np.random.randint(low=1, high=NUM_MAX_NODES)
-        X = np.random.randn(n, m)
+        X = np.random.randn(n, m).astype(TYPE_FLOAT)
 
         # Expected gradient matrix of shape (N,M) as label T
-        T = np.full(X.shape, 1 / X.size)
+        T = np.full(X.shape, 1 / X.size).astype(TYPE_FLOAT)
         # Jacobian matrix of shame (N,M), each element of which is df/dXij
         J = numerical_jacobian(f, X)
 
@@ -72,12 +73,16 @@ def test_020_numerical_jacobian_sigmoid(caplog):
     Args:
           u: Acceptable threshold value
     """
-    u: float = GRADIENT_DIFF_ACCEPTANCE_VALUE
+    u: TYPE_FLOAT = GRADIENT_DIFF_ACCEPTANCE_VALUE
 
     # y=sigmoid(x) -> dy/dx = y(1-y)
     # 0.5 = sigmoid(0) -> dy/dx = 0.25
     for _ in range(NUM_MAX_TEST_TIMES):
-        x = np.random.uniform(low=-BOUNDARY_SIGMOID, high=BOUNDARY_SIGMOID, size=1)
+        x = np.random.uniform(
+            low=-BOUNDARY_SIGMOID,
+            high=BOUNDARY_SIGMOID,
+            size=1
+        ).astype(TYPE_FLOAT)
         y = sigmoid(x)
         analytical = np.multiply(y, (1-y))
         numerical = numerical_jacobian(sigmoid, x)
@@ -110,8 +115,8 @@ def test_020_cross_entropy_log_loss_1d(caplog):
 
     # caplog.set_level(logging.DEBUG, logger=Logger.name)
 
-    h: float = OFFSET_DELTA
-    u: float = GRADIENT_DIFF_ACCEPTANCE_VALUE
+    h: TYPE_FLOAT = OFFSET_DELTA
+    u: TYPE_FLOAT = GRADIENT_DIFF_ACCEPTANCE_VALUE
 
     # --------------------------------------------------------------------------------
     # For (P, T): P[index] = True/1, OHE label T[index] = 1 where
@@ -121,19 +126,21 @@ def test_020_cross_entropy_log_loss_1d(caplog):
     # 1. For T=1, loss L = -log(Pi) = 0 and dL/dP=(1/Pi)= -1 is expected.
     # 2. For T=0, Loss L = (-log(0+offset+h)-log(0+offset-h)) / 2h = 0 is expected.
     # --------------------------------------------------------------------------------
-    M: int = np.random.randint(2, NUM_MAX_NODES)
-    index: int = np.random.randint(0, M)            # Position of the true label in P
-    P1 = np.zeros(M)
-    P1[index] = float(1.0)
+    M: TYPE_INT = np.random.randint(2, NUM_MAX_NODES)
+    index: TYPE_INT = TYPE_INT(np.random.randint(0, M))            # Position of the true label in P
+    P1 = np.zeros(M, dtype=TYPE_FLOAT)
+    P1[index] = TYPE_FLOAT(1.0)
     T1 = np.zeros(M, dtype=TYPE_LABEL)
-    T1[index] = int(1)
+    T1[index] = TYPE_LABEL(1)
 
     # Analytica correct gradient for P=1, T=1
-    AG = np.zeros_like(P1)
-    AG[index] = float(-1)   # dL/dP = -1
+    AG = np.zeros_like(P1, dtype=TYPE_FLOAT)
+    AG[index] = TYPE_FLOAT(-1)   # dL/dP = -1
 
-    EGN1 = np.zeros_like(P1)    # Expected numerical gradient
-    EGN1[index] = (-1 * logarithm(1.0 + h) + 1 * logarithm(1.0 - h)) / (2 * h)
+    EGN1 = np.zeros_like(P1, dtype=TYPE_FLOAT)    # Expected numerical gradient
+    EGN1[index] = (
+        -1 * logarithm(TYPE_FLOAT(1.0 + h)) + TYPE_FLOAT(1) * logarithm(TYPE_FLOAT(1.0 - h))
+    ) / TYPE_FLOAT(2 * h)
     assert np.all(np.abs(EGN1-AG) < u), \
         "Expected EGN-1<%s but %s\nEGN=\n%s" % (u, (EGN1-AG), EGN1)
 
@@ -148,7 +155,7 @@ def test_020_cross_entropy_log_loss_1d(caplog):
         % (np.abs(GN1-EGN1), P1, T1, EGN1, GN1)
 
     # The numerical gradient gn is within +/- u within the analytical g = -T/P
-    G1 = np.zeros_like(P1)
+    G1 = np.zeros_like(P1, dtype=TYPE_FLOAT)
     G1[T1 == 1] = -1 * (T1[index] / P1[index])
     # G1[T1 != 0] = 0
     check.equal(np.all(np.abs(G1 - GN1) < u), True, "G1-GN1 %s\n" % np.abs(G1 - GN1))
@@ -157,10 +164,15 @@ def test_020_cross_entropy_log_loss_1d(caplog):
     # For (P, T): P[index] = np uniform(), index label T=index
     # --------------------------------------------------------------------------------
     for _ in range(NUM_MAX_TEST_TIMES):
-        M = np.random.randint(2, NUM_MAX_NODES)    # M > 1
-        T2 = np.random.randint(0, M)            # location of the truth
-        P2 = np.zeros(M)
-        while not (x := np.random.uniform(low=-BOUNDARY_SIGMOID, high=BOUNDARY_SIGMOID)): pass
+        M = np.random.randint(2, NUM_MAX_NODES)     # M > 1
+        T2 = TYPE_LABEL(np.random.randint(0, M))    # location of the truth
+        P2 = np.zeros(M, dtype=TYPE_FLOAT)
+        while not (
+            x := TYPE_FLOAT(np.random.uniform(
+                low=-BOUNDARY_SIGMOID,
+                high=BOUNDARY_SIGMOID
+            ))
+        ): pass
         p = softmax(x)
         P2[T2] = p
 
@@ -168,8 +180,8 @@ def test_020_cross_entropy_log_loss_1d(caplog):
         # The Jacobian G shape is the same with P.shape.
         # G:[0, 0, ...,g, 0, ...] where Gi is numerical gradient close to -1/(1+k).
         # --------------------------------------------------------------------------------
-        N2 = np.zeros_like(P2)
-        N2[T2] = -1 * (logarithm(p+h) - logarithm(p-h)) / (2 * h)
+        N2 = np.zeros_like(P2, dtype=TYPE_FLOAT)
+        N2[T2] = TYPE_FLOAT(-1) * (logarithm(p+h) - logarithm(p-h)) / TYPE_FLOAT(2 * h)
         N2 = numerical_jacobian(partial(f, T=T2), P2)
 
         # The numerical gradient gn = (-t * logarithm(p+h) + t * logarithm(p-h)) / 2h
@@ -177,7 +189,7 @@ def test_020_cross_entropy_log_loss_1d(caplog):
         assert np.all(np.abs(N2-N2) < u), \
             f"Delta expected to be < {u} but \n{np.abs(N2-N2)}"
 
-        G2 = np.zeros_like(P2)
+        G2 = np.zeros_like(P2, dtype=TYPE_FLOAT)
         G2[T2] = -1 / p
 
         # The numerical gradient gn is within +/- u within the analytical g = -T/P
@@ -193,24 +205,29 @@ def test_020_cross_entropy_log_loss_1d(caplog):
         # --------------------------------------------------------------------------------
         M = np.random.randint(2, NUM_MAX_NODES)    # M > 1
         index = np.random.randint(0, M)            # location of the truth
-        while not (x := np.random.uniform(low=-BOUNDARY_SIGMOID, high=BOUNDARY_SIGMOID)): pass
+        while not (
+            x := TYPE_FLOAT(np.random.uniform(
+                low=-BOUNDARY_SIGMOID,
+                high=BOUNDARY_SIGMOID)
+            )
+        ): pass
         p = softmax(x)
-        P3 = np.zeros(M)
+        P3 = np.zeros(M, dtype=TYPE_FLOAT)
         P3[index] = p
-        T3 = np.zeros(M).astype(int)   # OHE index
-        T3[index] = int(1)
+        T3 = np.zeros(M).astype(TYPE_LABEL)   # OHE index
+        T3[index] = TYPE_LABEL(1)
 
         # --------------------------------------------------------------------------------
         # The Jacobian G shape is the same with P.shape.
         # --------------------------------------------------------------------------------
-        N3 = np.zeros_like(P3)
-        N3[index] = (-1 * logarithm(p+h) + 1 * logarithm(p-h)) / (2 * h)
+        N3 = np.zeros_like(P3, dtype=TYPE_FLOAT)
+        N3[index] = TYPE_FLOAT(-1 * logarithm(p+h) + 1 * logarithm(p-h)) / TYPE_FLOAT(2 * h)
         N3 = numerical_jacobian(partial(f, T=T3), P3)
         assert N3.shape == N3.shape
         assert np.all(np.abs(N3-N3) < u), \
             f"Delta expected to be < {u} but \n{np.abs(N3-N3)}"
 
-        G3 = np.zeros_like(P3)
+        G3 = np.zeros_like(P3, dtype=TYPE_FLOAT)
         G3[index] = -1 / p
         check.equal(np.all(np.abs(G3-N3) < u), True, "G3-N3 %s\n" % np.abs(G3-N3))
 
@@ -259,8 +276,8 @@ def test_020_cross_entropy_log_loss_2d(caplog):
 
     # caplog.set_level(logging.DEBUG, logger=Logger.name)
 
-    h: float = OFFSET_DELTA
-    u: float = GRADIENT_DIFF_ACCEPTANCE_VALUE
+    h: TYPE_FLOAT = OFFSET_DELTA
+    u: TYPE_FLOAT = GRADIENT_DIFF_ACCEPTANCE_VALUE
 
     for _ in range(NUM_MAX_TEST_TIMES):
         # --------------------------------------------------------------------------------
@@ -273,22 +290,27 @@ def test_020_cross_entropy_log_loss_2d(caplog):
         # Keep p value away from 0. As p gets close to 0, the log(p+/-h) gets large e.g
         # -11.512925464970229, hence log(p+/-h) / 2h explodes.
         # --------------------------------------------------------------------------------
-        while not (x := np.random.uniform(low=-BOUNDARY_SIGMOID, high=BOUNDARY_SIGMOID)): pass
+        while not (
+            x := TYPE_FLOAT(np.random.uniform(
+                low=-BOUNDARY_SIGMOID,
+                high=BOUNDARY_SIGMOID
+            ))
+        ): pass
         p = softmax(x)
         N = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M = np.random.randint(2, NUM_MAX_NODES)
         # label index, not OHE
-        T = np.random.randint(0, M, N)  # N rows of labels, max label value is M-1
-        P = np.zeros((N, M))
+        T = np.random.randint(0, M, N).astype(TYPE_LABEL) # N rows of labels, max label value is M-1
+        P = np.zeros((N, M)).astype(TYPE_FLOAT)
         P[
             range(N),                    # Set p at random row position
             T
         ] = p
-        E = np.zeros_like(P)
+        E = np.zeros_like(P).astype(TYPE_FLOAT)
         E[
             range(N),                    # Set p at random row position
             T
-        ] = (-1 * logarithm(p+h) + 1 * logarithm(p-h)) / (2 * h)
+        ] = (TYPE_FLOAT(-1) * logarithm(p+h) + TYPE_FLOAT(1) * logarithm(p-h)) / (TYPE_FLOAT(2) * h)
 
         G = numerical_jacobian(partial(f, T=T), P)
         assert E.shape == G.shape, \
@@ -296,7 +318,7 @@ def test_020_cross_entropy_log_loss_2d(caplog):
         assert np.all(np.abs(E-G) < u), \
             f"Delta expected to be < {u} but \n{np.abs(E-G)}"
 
-        A = np.zeros_like(P)
+        A = np.zeros_like(P).astype(TYPE_FLOAT)
         A[
             range(N),                    # Set p at random row position
             T
@@ -324,16 +346,25 @@ def test_020_softmax_1d(caplog):
             L: Loss value of from the softmax with log loss.
         """
         # return np.sum(cross_entropy_log_loss(softmax(X), T))
-        J, _ = softmax_cross_entropy_log_loss(X, T, use_reformula=False, need_softmax=False)
+        J, _ = softmax_cross_entropy_log_loss(
+            X,
+            T,
+            use_reformula=bool(np.random.randint(0, 2)),
+            need_softmax=False
+        )
         return np.sum(J)
 
-    u: float = GRADIENT_DIFF_ACCEPTANCE_VALUE
+    u: TYPE_FLOAT = GRADIENT_DIFF_ACCEPTANCE_VALUE
 
     for _ in range(NUM_MAX_TEST_TIMES):
-        N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)   # Batch size
-        M: int = np.random.randint(2, NUM_MAX_NODES)        # Number of activations
-        T = np.random.randint(0, M, N)  # N rows of labels, max label value is M-1
-        A = np.random.uniform(-float(MAX_ACTIVATION_VALUE), float(MAX_ACTIVATION_VALUE), (N, M))
+        N: TYPE_INT = np.random.randint(1, NUM_MAX_BATCH_SIZE)   # Batch size
+        M: TYPE_INT = np.random.randint(2, NUM_MAX_NODES)        # Number of activations
+        T = np.random.randint(0, M, N).astype(TYPE_LABEL)        # N rows of labels, max label value is M-1
+        A = np.random.uniform(
+            -TYPE_FLOAT(MAX_ACTIVATION_VALUE),
+            TYPE_FLOAT(MAX_ACTIVATION_VALUE),
+            (N, M)
+        ).astype(TYPE_FLOAT)
         G = numerical_jacobian(partial(L, T=T), A)
 
         # Analytical gradient P-T
@@ -341,7 +372,7 @@ def test_020_softmax_1d(caplog):
         dA[
             np.arange(N),
             T
-        ] -= 1
+        ] -= TYPE_FLOAT(1)
 
         # Constraint: Delta between the analytical and numerical gradient < u
         assert \

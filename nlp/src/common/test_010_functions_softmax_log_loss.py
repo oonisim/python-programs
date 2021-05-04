@@ -1,6 +1,11 @@
 import logging
 from functools import partial
 import numpy as np
+from common.constant import (
+    TYPE_FLOAT,
+    TYPE_LABEL,
+    TYPE_INT
+)
 from common.function import (
     standardize,
     logarithm,
@@ -53,9 +58,9 @@ def test_010_softmax_cross_entropy_log_loss_2d(caplog):
     #   softmax(X) generates the same with X.
     #   softmax_cross_entropy_log_loss(X, T) == -log(0.5)
     # --------------------------------------------------------------------------------
-    X = np.array([[0.5, 0.5]])
-    T = np.array([1])
-    E = -logarithm(np.array([0.5]))
+    X = np.array([[0.5, 0.5]]).astype(TYPE_FLOAT)
+    T = np.array([1]).astype(TYPE_LABEL)
+    E = -logarithm(np.array([0.5]).astype(TYPE_FLOAT))
 
     P = softmax(X)
     assert np.array_equal(X, P)
@@ -76,8 +81,8 @@ def test_010_softmax_cross_entropy_log_loss_2d(caplog):
         N = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M = np.random.randint(2, NUM_MAX_NODES)
 
-        X = np.random.randn(N, M)
-        T = np.random.randint(0, M, N)
+        X = np.random.randn(N, M).astype(TYPE_FLOAT)
+        T = np.random.randint(0, M, N).astype(TYPE_LABEL)
         Logger.debug("T is %s\nX is \n%s\n", T, X)
 
         # ----------------------------------------------------------------------
@@ -117,7 +122,7 @@ def test_test_010_softmax_cross_entropy_log_loss_performance():
         N = NUM_MAX_BATCH_SIZE
         M = NUM_MAX_NODES
         X = np.random.randn(N, M)
-        T = np.random.randint(0, M, N)
+        T = np.random.randint(0, M, N).astype(TYPE_LABEL)
 
         f = partial(softmax_cross_entropy_log_loss, T=T)
 

@@ -23,7 +23,7 @@ def xavier(M: int, D: int) -> np.ndarray:
         W: weight matrix
     """
     assert all([D > 0, M > 0])
-    return np.random.randn(M, D) / np.sqrt(D)
+    return np.random.randn(M, D).astype(TYPE_FLOAT) / np.sqrt(D, dtype=TYPE_FLOAT)
 
 
 def he(M: int, D: int) -> np.ndarray:
@@ -39,7 +39,7 @@ def he(M: int, D: int) -> np.ndarray:
         W: weight matrix
     """
     assert all([D > 0, M > 0])
-    return np.random.randn(M, D) / np.sqrt(2*D)
+    return np.random.randn(M, D).astype(TYPE_FLOAT) / np.sqrt(2*D, dtype=TYPE_FLOAT)
 
 
 def uniform(M: int, D: int) -> np.ndarray:
@@ -53,7 +53,7 @@ def uniform(M: int, D: int) -> np.ndarray:
         W: weight matrix
     """
     assert all([D > 0, M > 0])
-    return np.random.uniform(low=0.0, high=1.0, size=(M, D))
+    return np.random.uniform(low=0.0, high=1.0, size=(M, D)).astype(TYPE_FLOAT)
 
 
 SCHEMES = {

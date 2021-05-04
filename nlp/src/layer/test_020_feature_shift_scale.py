@@ -27,15 +27,8 @@ import numpy as np
 from common.constant import (
     TYPE_FLOAT,
 )
-from common.function import (
-    standardize,
-)
 from common.utility import (
     random_string
-)
-from frederik_kratzert import (
-    batchnorm_forward,
-    batchnorm_backward
 )
 from layer import (
     FeatureScaleShift
@@ -206,7 +199,7 @@ def test_020_fss_instance_properties_access_to_fail():
 
         try:
             # pylint: disable=not-callable
-            _layer.objective(np.array(1.0))
+            _layer.objective(np.array(1.0, dtype=TYPE_FLOAT))
             raise RuntimeError(msg)
         except AssertionError:
             pass

@@ -214,7 +214,7 @@ class CrossEntropyLogLoss(Layer):
 
         assert (
                 # Index labels P:(N,M), T:(N,) e.g. T[0,4,2] P[[1.,0.,...],[...],[...]] or
-                # Binary oHE labels P(N,M), T(N,M) e.g T[[0],[1],[0]], P[[0,1],[0.9],[0.]]
+                # Binary OHE labels P(N,M), T(N,M) e.g T[[0],[1],[0]], P[[0,1],[0.9],[0.]]
                 self.X.ndim >= 2 and self.T.ndim in {1, 2} and
                 self.X.shape[0] == self.T.shape[0] and
                 self.X.shape[1] == self.M       # M=1 for logistic binary
@@ -345,7 +345,7 @@ class CrossEntropyLogLoss(Layer):
             dX[
                 rows,
                 cols
-            ] -= 1.0
+            ] -= TYPE_FLOAT(1.0)
             # dF/dY * dY/dJ * (P-T) = dF/dY * (P-T) / N
             np.multiply(dJ, dX, out=dX)
 

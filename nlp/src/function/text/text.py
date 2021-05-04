@@ -136,13 +136,15 @@ class Function:
 
         integral = np.sum(list(powered.values()))
         probabilities = {event: TYPE_FLOAT(p / integral) for (event, p) in powered.items()}
-        assert (1.0 - np.sum(list(probabilities.values()))) < 1e-5
+        assert \
+            (TYPE_FLOAT(1.0) - np.sum(list(probabilities.values()), dtype=TYPE_FLOAT)) < \
+            TYPE_FLOAT(1e-5)
 
         del total, counts, powered, integral
         return probabilities
 
     @staticmethod
-    def event_indexing(corpus: str, power: TYPE_FLOAT=TYPE_FLOAT(1)):
+    def event_indexing(corpus: str, power: TYPE_FLOAT = TYPE_FLOAT(1)):
         """Generate event indices
         Add meta-events EVENT_NIL at 0 and EVENT_UNK at 1.
         events are all lower-cased.

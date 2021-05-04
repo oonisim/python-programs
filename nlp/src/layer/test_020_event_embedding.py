@@ -8,12 +8,16 @@ from typing import (
 )
 
 import numpy as np
+import tensorflow as tf
 
 import testing.layer
 from common.constant import (
     TYPE_INT,
     TYPE_TENSOR,
     EVENT_META_ENTITIES
+)
+from function.nn import (
+    Function
 )
 from layer.preprocessing import (
     EventIndexing,
@@ -24,7 +28,7 @@ from layer.preprocessing.test_020_event_context import (
 )
 from layer.preprocessing.test_020_event_indexing import (
     download_file,
-    _instantiate as _instantiate_embedding
+    _instantiate as ___instantiate_event_indexing
 )
 from optimizer import (
     SGD
@@ -46,7 +50,7 @@ def _instantiate_event_indexing(
         log_level: int = logging.ERROR
 ):
     path_to_corpus: str = download_file()
-    indexing: EventIndexing = _instantiate_embedding(
+    indexing: EventIndexing = ___instantiate_event_indexing(
         name=name,
         num_nodes=1,
         path_to_corpus=path_to_corpus,
@@ -618,10 +622,11 @@ def test_020_embedding_function_multi_lines(caplog):
     with even brief exposures to it causing symptoms that show up decades later researchers said
     """
 
+    dictionary: EventIndexing = _instantiate_event_indexing()
+
     profiler = cProfile.Profile()
     profiler.enable()
 
-    dictionary: EventIndexing = _instantiate_event_indexing()
     for _ in range(NUM_MAX_TEST_TIMES):
         # First validate the correct configuration, then change parameter one by one.
         target_size = TYPE_INT(np.random.randint(1, 3))
@@ -651,6 +656,86 @@ def test_020_embedding_function_multi_lines(caplog):
     profiler.print_stats(sort="cumtime")
 
 
+def test_020_embedding_gradient_single_sentence(caplog):
+    """
+    Objective:
+        Verify the EventIndexing gradient
+    Expected:
+        gradient()
+    """
+    caplog.set_level(logging.DEBUG)
+    name = "test_020_embedding_gradient_multi_lines"
+
+    sentences = """
+    Verify the EventIndexing function can handle multi line sentences
+    the asbestos fiber <unk> is unusually <unk> once it enters the <unk> 
+    with even brief exposures to it causing symptoms that show up decades later researchers said
+    """
+    sentence = "I am a cat who has no name"
+
+    dictionary: EventIndexing = _instantiate_event_indexing()
+
+    profiler = cProfile.Profile()
+    profiler.enable()
+
+    def L(x):
+        loss = Function.sum(
+            x, axis=None, keepdims=False
+        )
+        return loss
+
+    for _ in range(NUM_MAX_TEST_TIMES):
+        # First validate the correct configuration, then change parameter one by one.
+        target_size = TYPE_INT(1)
+        context_size = TYPE_INT(2)
+        negative_sample_size = TYPE_INT(1)
+        event_vector_size: TYPE_INT = TYPE_INT(3)
+        W: TYPE_TENSOR = np.random.randn(dictionary.vocabulary_size, event_vector_size)
+
+        embedding, event_context = _must_succeed(
+            name=name,
+            num_nodes=(1+negative_sample_size),
+            target_size=target_size,
+            context_size=context_size,
+            negative_sample_size=negative_sample_size,
+            event_vector_size=event_vector_size,
+            dictionary=dictionary,
+            W=W,
+            log_level=logging.DEBUG,
+            msg="must succeed"
+        )
+        embedding.objective = L
+        sequences = dictionary.function(sentence)
+        target_context_pairs = event_context.function(sequences)
+
+        # --------------------------------------------------------------------------------
+        # Forward path
+        # --------------------------------------------------------------------------------
+        Y = embedding.function(target_context_pairs)
+        EDWe, EDWs, EDWc = embedding.gradient_numerical()
+
+        # --------------------------------------------------------------------------------
+        # Backward path
+        # --------------------------------------------------------------------------------
+        dY = Function.ones(shape=Function.tensor_shape(Y))
+        embedding.gradient(dY)
+
+        # --------------------------------------------------------------------------------
+        # Backward path
+        # --------------------------------------------------------------------------------
+        dWe, dWs, dWc = embedding.update()
+
+        # ********************************************************************************
+        # Constraint: dW is close to EDW
+        # ********************************************************************************
+        Function.assert_all_close(EDWe, dWe, msg="Expected dWe:\n%s\nActual\n%s\n")
+        Function.assert_all_close(EDWs, dWs, msg="Expected dWs:\n%s\nActual\n%s\n")
+        Function.assert_all_close(EDWc, dWc, msg="Expected dWc:\n%s\nActual\n%s\n")
+
+    profiler.disable()
+    profiler.print_stats(sort="cumtime")
+
+
 def test_020_embedding_save_load(caplog):
     """
     Objective:
@@ -663,10 +748,11 @@ def test_020_embedding_save_load(caplog):
     Verify 
     """
 
+    dictionary: EventIndexing = _instantiate_event_indexing()
+
     profiler = cProfile.Profile()
     profiler.enable()
 
-    dictionary: EventIndexing = _instantiate_event_indexing()
     for _ in range(10):
         # First validate the correct configuration, then change parameter one by one.
         target_size = TYPE_INT(np.random.randint(1, 2))
