@@ -187,7 +187,7 @@ def train_matmul_bn_relu_classifier(
             # --------------------------------------------------------------------------------
             num_no_progress += 1
             if num_no_progress > 5:
-                matmul.lr = matmul.lr * 0.95
+                matmul.lr = matmul.lr * TYPE_FLOAT(0.95)
 
             if num_no_progress > 50:
                 Logger.error(
@@ -205,7 +205,7 @@ def train_matmul_bn_relu_classifier(
         # 2. Gradient descent to update Wn+1 = Wn - lr * dL/dX.
         # ================================================================================
         before = copy.deepcopy(matmul.W)
-        dA = loss.gradient(float(1))        # dL/dA
+        dA = loss.gradient(TYPE_FLOAT(1))        # dL/dA
         dBN = activation.gradient(dA)       # dL/dBN
         dY = bn.gradient(dBN)               # dL/dY
         dX = matmul.gradient(dY)            # dL/dX
@@ -242,7 +242,7 @@ def test_matmul_bn_relu_classifier(
     N = 10
     D = 2
     W = weights.he(M, D+1)
-    optimizer = SGD(lr=0.5)
+    optimizer = SGD(lr=TYPE_FLOAT(0.5))
     X, T, V = linear_separable_sectors(n=N, d=D, m=M)
     assert X.shape == (N, D)
     X, T = transform_X_T(X, T)

@@ -269,9 +269,8 @@ class Layer(nn.Function):
     def dY(self) -> TYPE_TENSOR:
         """Latest gradient dL/dY (impact on L by dY) given from the post layer(s)"""
         assert \
-            isinstance(self._dY, np.ndarray) and \
-            self._dY.dtype == TYPE_FLOAT \
-            and self._dY.size > 0, "dY is not initialized or invalid"
+            self.is_float_tensor(self._dY) and self.tensor_size(self._dY) > 0, \
+            "dY is not initialized or invalid"
 
         if np.all(np.abs(self._dY) < GRADIENT_SATURATION_THRESHOLD):
             self.logger.warning(

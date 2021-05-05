@@ -213,7 +213,7 @@ def _test_binary_classifier(
     N = 50
     D = 2
     W = weights.he(M, D+1)
-    optimizer = SGD(lr=0.1)
+    optimizer = SGD(lr=TYPE_FLOAT(0.1))
     X, T, V = linear_separable(d=D, n=N)
     # X, T = transform_X_T(X, T)
 
@@ -258,7 +258,7 @@ def test_categorical_classifier(
     N = 10
     D = 2
     W = weights.he(M, D+1)
-    optimizer = SGD(lr=0.1)
+    optimizer = SGD(lr=TYPE_FLOAT(0.1))
     X, T, V = linear_separable_sectors(n=N, d=D, m=M)
     assert X.shape == (N, D)
     X, T = transform_X_T(X, T)
@@ -325,8 +325,8 @@ def test():
                 num_features=D,
                 weights_initialization_scheme="he",
                 weights_optimizer_specification=SGD.specification(
-                    lr=0.2,
-                    l2=1e-3
+                    lr=TYPE_FLOAT(0.2),
+                    l2=TYPE_FLOAT(1e-3)
                 )
             ),
             "loss": CrossEntropyLogLoss.specification(

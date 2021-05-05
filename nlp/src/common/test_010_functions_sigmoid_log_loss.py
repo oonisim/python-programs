@@ -74,27 +74,30 @@ def test_010_sigmoid_cross_entropy_log_loss_2d(caplog):
         Logger.debug("T is %s\nX is \n%s\n", T, X)
 
         # ----------------------------------------------------------------------
-        # Expected value EJ for J and EP for P
+        # Expected value EJ for J and Z for P
         # Note:
         #   To handle both index label format and OHE label format in the
         #   Loss layer(s), X and T are transformed into (N,1) shapes in
         #   transform_X_T(X, T) for logistic log loss.
-        #   Hence need to squeeze from (N,1) to (N,) for both EJ and EP.
-        #   sigmoid_cross_entropy_log_loss handles squeezing for E and P.
+        # DO NOT squeeze Z nor P.
         # ----------------------------------------------------------------------
         Z = sigmoid(X)
-        EP = np.squeeze(Z, axis=-1)
         EJ = np.squeeze(-(T * logarithm(Z) + TYPE_FLOAT(1-T) * logarithm(TYPE_FLOAT(1-Z))), axis=-1)
 
-        # ----------------------------------------------------------------------
-        # Actual J should be close to EJ.
-        # ----------------------------------------------------------------------
+        # **********************************************************************
+        # Constraint: Actual J should be close to EJ.
+        # **********************************************************************
         J, P = sigmoid_cross_entropy_log_loss(X, T)
         assert EJ.shape == J.shape
         assert np.all(np.abs(EJ-J) < u), \
             "Expected abs(EJ-J) < %s but \n%s\nEJ=\n%s\nT=%s\nX=\n%s\nJ=\n%s\n" \
             % (u, np.abs(EJ-J), EJ, T, X, J)
-        assert np.all(np.abs(EP-P) < u)
+        
+        # **********************************************************************
+        # Constraint: Actual P should be close to Z.
+        # **********************************************************************
+        assert np.all(np.abs(Z-P) < u), \
+            "EP \n%s\nP\n%s\nEP-P \n%s\n" % (Z, P, Z-P)
 
         # ----------------------------------------------------------------------
         # L = cross_entropy_log_loss(P, T) should be close to J

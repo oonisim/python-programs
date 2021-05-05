@@ -77,7 +77,9 @@ class SGD(Optimizer):
     # --------------------------------------------------------------------------------
     def differential(self, dW: TYPE_TENSOR, W: TYPE_TENSOR = None, out: TYPE_TENSOR = None):
         """Calculate the differential to update W"""
-        return self.multiply(x=dW, y=(1 + self.l2))
+        if out is not None:
+            raise NotImplementedError("out is not supported for TF")
+        return self.multiply(x=dW, y=self.lr * (1 + self.l2))
 
     def update(self, W, dW, out=None) -> np.ndarray:
         """Default method to update the weight matrix W

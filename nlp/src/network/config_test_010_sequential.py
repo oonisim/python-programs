@@ -27,13 +27,13 @@ from layer.constants import (
     _LOG_LEVEL
 )
 
-_lr = np.random.uniform()
-_l2 = np.random.uniform()
+_lr = TYPE_FLOAT(np.random.uniform())
+_l2 = TYPE_FLOAT(np.random.uniform())
 _N = 10
 _M = 3  # Number of output/classes
 _D = 2
-_eps = TYPE_FLOAT(np.random.uniform(low=0, high=1e-4))
-_momentum = TYPE_FLOAT(np.random.uniform(low=0.9, high=1.0))
+_eps = TYPE_FLOAT(np.random.uniform(low=TYPE_FLOAT(0), high=TYPE_FLOAT(1e-4)))
+_momentum = TYPE_FLOAT(np.random.uniform(low=TYPE_FLOAT(0.9), high=TYPE_FLOAT(1.0)))
 
 
 valid_network_specification_mamao = {
@@ -310,22 +310,22 @@ def invalid_network_specification_with_duplicated_names():
             num_features=D,
             weights_initialization_scheme="he",
             weights_optimizer_specification=optimiser.SGD.specification(
-                lr=0.05,
-                l2=1e-3
+                lr=TYPE_FLOAT(0.05),
+                l2=TYPE_FLOAT(1e-3)
             )
         ),
         "bn01": layer.BatchNormalization.specification(
             name="bn01",
             num_nodes=M01,
             gamma_optimizer_specification=optimiser.SGD.specification(
-                lr=0.05,
-                l2=1e-3
+                lr=TYPE_FLOAT(0.05),
+                l2=TYPE_FLOAT(1e-3)
             ),
             beta_optimizer_specification=optimiser.SGD.specification(
-                lr=0.05,
-                l2=1e-3,
+                lr=TYPE_FLOAT(0.05),
+                l2=TYPE_FLOAT(1e-3),
             ),
-            momentum=0.9
+            momentum=TYPE_FLOAT(0.9)
         ),
         "relu01": layer.ReLU.specification(
             name="relu01",
@@ -337,22 +337,22 @@ def invalid_network_specification_with_duplicated_names():
             num_features=M01,
             weights_initialization_scheme="he",
             weights_optimizer_specification=optimiser.SGD.specification(
-                lr=0.05,
-                l2=1e-3
+                lr=TYPE_FLOAT(0.05),
+                l2=TYPE_FLOAT(1e-3)
             )
         ),
         "bn02": layer.BatchNormalization.specification(
             name="bn01",
             num_nodes=M02,
             gamma_optimizer_specification=optimiser.SGD.specification(
-                lr=0.05,
-                l2=1e-3
+                lr=TYPE_FLOAT(0.05),
+                l2=TYPE_FLOAT(1e-3)
             ),
             beta_optimizer_specification=optimiser.SGD.specification(
-                lr=0.05,
-                l2=1e-3,
+                lr=TYPE_FLOAT(0.05),
+                l2=TYPE_FLOAT(1e-3),
             ),
-            momentum=0.9
+            momentum=TYPE_FLOAT(0.9)
         ),
         "loss": layer.CrossEntropyLogLoss.specification(
             name="loss001", num_nodes=M
@@ -375,22 +375,22 @@ def multilayer_network_specification_bn_to_fail(D, M01, M02, M):
             num_features=D,
             weights_initialization_scheme="he",
             weights_optimizer_specification=optimiser.SGD.specification(
-                lr=0.05,
-                l2=1e-3
+                lr=TYPE_FLOAT(0.05),
+                l2=TYPE_FLOAT(1e-3)
             )
         ),
         "bn01": layer.BatchNormalization.specification(
             name="bn01",
             num_nodes=M01,
             gamma_optimizer_specification=optimiser.SGD.specification(
-                lr=0.05,
-                l2=1e-3
+                lr=TYPE_FLOAT(0.05),
+                l2=TYPE_FLOAT(1e-3)
             ),
             beta_optimizer_specification=optimiser.SGD.specification(
-                lr=0.05,
-                l2=1e-3,
+                lr=TYPE_FLOAT(0.05),
+                l2=TYPE_FLOAT(1e-3),
             ),
-            momentum=0.9
+            momentum=TYPE_FLOAT(0.9)
         ),
         "relu01": layer.ReLU.specification(
             name="relu01",
@@ -402,22 +402,22 @@ def multilayer_network_specification_bn_to_fail(D, M01, M02, M):
             num_features=M01,
             weights_initialization_scheme="he",
             weights_optimizer_specification=optimiser.SGD.specification(
-                lr=0.05,
-                l2=1e-3
+                lr=TYPE_FLOAT(0.05),
+                l2=TYPE_FLOAT(1e-3)
             )
         ),
         "bn02": layer.BatchNormalization.specification(
             name="bn02",
             num_nodes=M02,
             gamma_optimizer_specification=optimiser.SGD.specification(
-                lr=0.05,
-                l2=1e-3
+                lr=TYPE_FLOAT(0.05),
+                l2=TYPE_FLOAT(1e-3)
             ),
             beta_optimizer_specification=optimiser.SGD.specification(
-                lr=0.05,
-                l2=1e-3,
+                lr=TYPE_FLOAT(0.05),
+                l2=TYPE_FLOAT(1e-3),
             ),
-            momentum=0.9
+            momentum=TYPE_FLOAT(0.9)
         ),
         "relu02": layer.ReLU.specification(
             name="relu02",
@@ -429,22 +429,22 @@ def multilayer_network_specification_bn_to_fail(D, M01, M02, M):
             num_features=M02,
             weights_initialization_scheme="he",
             weights_optimizer_specification=optimiser.SGD.specification(
-                lr=0.05,
-                l2=1e-3
+                lr=TYPE_FLOAT(0.05),
+                l2=TYPE_FLOAT(1e-3)
             )
         ),
         "bn03": layer.BatchNormalization.specification(
             name="bn03",
             num_nodes=M,
             gamma_optimizer_specification=optimiser.SGD.specification(
-                lr=0.05,
-                l2=1e-3
+                lr=TYPE_FLOAT(0.05),
+                l2=TYPE_FLOAT(1e-3)
             ),
             beta_optimizer_specification=optimiser.SGD.specification(
-                lr=0.05,
-                l2=1e-3,
+                lr=TYPE_FLOAT(0.05),
+                l2=TYPE_FLOAT(1e-3),
             ),
-            momentum=0.9
+            momentum=TYPE_FLOAT(0.9)
         ),
         "loss": CrossEntropyLogLoss.specification(
             name="loss001", num_nodes=M

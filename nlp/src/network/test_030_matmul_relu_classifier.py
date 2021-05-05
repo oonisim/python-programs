@@ -120,7 +120,7 @@ def test_matmul_relu_classifier(
     N = 10
     D = 2
     W = weights.he(M, D+1)
-    optimizer = SGD(lr=0.1)
+    optimizer = SGD(lr=TYPE_FLOAT(0.1))
     X, T, V = linear_separable_sectors(n=N, d=D, m=M)
     assert X.shape == (N, D)
     X, T = transform_X_T(X, T)

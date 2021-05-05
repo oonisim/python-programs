@@ -466,28 +466,27 @@ class Standardization(Layer):
             self,
             dY: Union[np.ndarray, TYPE_FLOAT] = TYPE_FLOAT(1.0),
             numexpr_enabled: bool = ENABLE_NUMEXPR,
-            numba_enabled: bool = ENABLE_NUMBA
     ) -> Union[np.ndarray, TYPE_FLOAT]:
         """Calculate the gradients dL/dX and dL/dW.
         Args:
             dY: Gradient dL/dY, the total impact on L by dY.
             numexpr_enabled: flag to use numexpr
-            numba_enabled: flag to use numexpr
         Returns:
             dX: dL/dX:(N,M) = [         dL/dXmd         + (dL/dU / N) ]
                             = [ (dL/dXmd01 + dL/dXmd02) + (dL/dU / N) ]
         """
         name = "gradient"
-        assert isinstance(dY, TYPE_FLOAT) or (isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT)
-
-        dY = np.array(dY).reshape((1, -1)) if isinstance(dY, TYPE_FLOAT) or dY.ndim < 2 else dY
-        assert dY.shape == self.Y.shape, \
-            "dL/dY shape needs %s but %s" % (self.Y.shape, dY.shape)
+        if self.is_float_scalar(dY):
+            dY = self.to_tensor(X=dY)
+        if self.is_float_tensor(dY):
+            dY = self.reshape(dY, shape=(1, -1)) if self.tensor_rank(dY) < 2 else dY
+        else:
+            raise AssertionError(f"Unexpected dY \n{dY}\n")
 
         self.logger.debug("layer[%s].%s: dY.shape %s", self.name, name, dY.shape)
-        self._dY = dY
+        self.dY = dY
 
-        if numexpr_enabled:
+        if numexpr_enabled and isinstance(TYPE_FLOAT, (np.float, np.float64)):
             self._gradient_numexpr()
         else:
             self._gradient_numpy()
@@ -755,7 +754,7 @@ class FeatureScaleShift(Layer):
         beta = self.beta
         x = self.X
         out = self._Y
-        if numexpr_enabled:
+        if numexpr_enabled and isinstance(TYPE_FLOAT, (np.float, np.float64)):
             self._function_numexpr(x=x, gamma=gamma, beta=beta, out=out)
         elif numba_enabled:
             self._Y = self._function_numba(x=x, gamma=gamma, beta=beta)
@@ -835,7 +834,7 @@ class FeatureScaleShift(Layer):
         self.logger.debug("layer[%s].%s: dY.shape %s", self.name, name, dY.shape)
         self._dY = dY
 
-        if numexpr_enabled:
+        if numexpr_enabled and isinstance(TYPE_FLOAT, (np.float, np.float64)):
             self._gradient_numexpr()
         else:
             self._gradient_numpy()
@@ -899,7 +898,7 @@ class FeatureScaleShift(Layer):
             isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT and \
             X.ndim == 2 and X.shape[1] == self.M and X.size > 0
 
-        if numexpr_enabled:
+        if numexpr_enabled and isinstance(TYPE_FLOAT, (np.float, np.float64)):
             gamma = self.gamma
             beta = self.beta
             score = ne.evaluate("gamma * X + beta")
@@ -1397,7 +1396,7 @@ class BatchNormalization(Layer):
         beta = self.beta
         x = self.Xstd
         out = self._Y
-        if numexpr_enabled:
+        if numexpr_enabled and isinstance(TYPE_FLOAT, (np.float, np.float64)):
             self._function_numexpr(x=x, gamma=gamma, beta=beta, out=out)
         elif numba_enabled:
             self._Y = self._function_numba(x=x, gamma=gamma, beta=beta)
@@ -1544,16 +1543,17 @@ class BatchNormalization(Layer):
                             = [ (dL/dXmd01 + dL/dXmd02) + (dL/dU / N) ]
         """
         name = "gradient"
-        assert isinstance(dY, TYPE_FLOAT) or (isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT)
+        if self.is_float_scalar(dY):
+            dY = self.to_tensor(X=dY)
+        if self.is_float_tensor(dY):
+            dY = self.reshape(dY, shape=(1, -1)) if self.tensor_rank(dY) < 2 else dY
+        else:
+            raise AssertionError(f"Unexpected dY \n{dY}\n")
 
-        dY = np.array(dY).reshape((1, -1)) if isinstance(dY, TYPE_FLOAT) or dY.ndim < 2 else dY
-        assert dY.shape == self.Y.shape, \
-            "dL/dY shape needs %s but %s" % (self.Y.shape, dY.shape)
-
+        self.dY = dY
         self.logger.debug("layer[%s].%s: dY.shape %s", self.name, name, dY.shape)
-        self._dY = dY
 
-        if numexpr_enabled:
+        if numexpr_enabled and isinstance(TYPE_FLOAT, (np.float, np.float64)):
             self._gradient_numexpr()
         else:
             self._gradient_numpy()

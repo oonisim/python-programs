@@ -27,6 +27,11 @@ TYPE_NN_FLOAT = tf.float32
 #
 # The values depend on the floating storage size. 1e-10 for the delta
 # to calculate the numerical gradient is too small for 32 bit.
+#
+# Deciding the appropriate values needs considerations and experiments to
+# verify where the log derivative clipping occurs due to the OFFSET_LOG
+# value, and when the catastrophic subtract cancellation happens for the
+# numerical gradient for the 'h' or OFFSET_DELTA value, etc.
 # --------------------------------------------------------------------------------
 # OFFSET_DELTA
 # OFFSET_LOG:
@@ -74,6 +79,10 @@ GN_DIFF_ACCEPTANCE_RATIO = TYPE_FLOAT(1e-15)
 # NOTE: Acceleration depends on conditions e.g. the size of the matrices
 # https://stackoverflow.com/questions/59347796/
 # For larger N x N matrices (aprox. size 20) a BLAS  is faster than Numba/Cython
+#
+# Can NOT use numexpr for 32 bit float as it cause the error.
+# "TypeError: Iterator requested dtype could not be cast from dtype('float64')
+# to dtype('float32'), the operand 0 dtype, according to the rule 'safe'"
 # --------------------------------------------------------------------------------
 ENABLE_NUMEXPR = False
 ENABLE_NUMBA = False

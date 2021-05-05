@@ -20,6 +20,9 @@ from common.constant import (
 from function.nn import (
     Function
 )
+from layer.constants import (
+    MAX_NEGATIVE_SAMPLE_SIZE
+)
 from layer.preprocessing import (
     EventIndexing,
     EventContext
@@ -657,24 +660,25 @@ def test_020_embedding_function_multi_lines(caplog):
     profiler.print_stats(sort="cumtime")
 
 
-def test_020_embedding_gradient_single_sentence(caplog):
+def test_020_embedding_gradient_vs_autodiff(caplog):
     """
     Objective:
-        Verify the EventIndexing gradient
+        Verify the Embedding analytical gradient with TF autodiff implemented
+        in the gradient_numerical() method of the layer.
     Expected:
-        gradient()
+        Gradients [dWe, dWs, dWc] calculated in gradient() method matches with
+        those calculated in the gradient_numerical().
     """
     caplog.set_level(logging.DEBUG)
     name = "test_020_embedding_gradient_multi_lines"
-
-    sentences = """
-    Verify the EventIndexing function can handle multi line sentences
-    the asbestos fiber <unk> is unusually <unk> once it enters the <unk> 
-    with even brief exposures to it causing symptoms that show up decades later researchers said
-    """
-    sentence = "I am a cat who has no name"
-
     dictionary: EventIndexing = _instantiate_event_indexing()
+
+    from function import text
+    from . test_020_embedding_sample_sentences import (
+        bbc_world_us_canada_56988381 as sentences
+    )
+    max_sentence_length = TYPE_INT(text.Function.max_sentence_length(sentences))
+    assert max_sentence_length >= 3
 
     profiler = cProfile.Profile()
     profiler.enable()
@@ -685,12 +689,31 @@ def test_020_embedding_gradient_single_sentence(caplog):
         )
         return loss
 
+    # --------------------------------------------------------------------------------
+    # Ye = einsum("nd,ncd->n",  Bc:(N,D), We:(N,E,D))
+    # dL/dWe:(N,E,D) = dL/dYe * dYe/dWe = dL/dYe * Bc
+    #
+    # Ys = einsum("nd,nsd->ns", Bc:(N,D), Ws:(N,SL,D))
+    # dL/dWs:(N,SL,D) = dL/dYs * dYs/dWs = dL/dYs * Bc
+    #
+    # By setting
+    # 1. dL/dY = np.c_[dL/dYe,dL/dYs] = I and
+    # 2. context_size C == negative_sample_size SL
+    # The constraint is dL/dWe = dL/dWs = Bc because dL/dYe, dL/dYs are I.
+    # --------------------------------------------------------------------------------
     for _ in range(NUM_MAX_TEST_TIMES):
-        # First validate the correct configuration, then change parameter one by one.
-        target_size = TYPE_INT(1)
-        context_size = TYPE_INT(2)
-        negative_sample_size = TYPE_INT(1)
-        event_vector_size: TYPE_INT = TYPE_INT(3)
+        # C must be even number
+        C = TYPE_INT(np.random.randint(1, max_sentence_length / 2) * 2)
+        assert C < max_sentence_length
+
+        # E=SL for (N,E,D) and (N,SL,D) has the same shape
+        E = SL = TYPE_INT(
+            np.random.randint(1, min(MAX_NEGATIVE_SAMPLE_SIZE, (max_sentence_length - C))+1)
+        )
+
+        target_size = negative_sample_size = TYPE_INT(E)
+        context_size = TYPE_INT(C)
+        event_vector_size: TYPE_INT = TYPE_INT(np.random.randint(1, 100))
         W: TYPE_TENSOR = np.random.randn(dictionary.vocabulary_size, event_vector_size)
 
         embedding, event_context = _must_succeed(
@@ -706,7 +729,7 @@ def test_020_embedding_gradient_single_sentence(caplog):
             msg="must succeed"
         )
         embedding.objective = L
-        sequences = dictionary.function(sentence)
+        sequences = dictionary.function(sentences)
         target_context_pairs = event_context.function(sequences)
 
         # --------------------------------------------------------------------------------
@@ -727,14 +750,168 @@ def test_020_embedding_gradient_single_sentence(caplog):
         dWe, dWs, dWc = embedding.update()
 
         # ********************************************************************************
-        # Constraint: dW is close to EDW
+        # Constraint:
+        # - dW is close to EDW
+        # - dL/dWe = dL/dWs = Bc when dL/dY = I
         # ********************************************************************************
-        Function.assert_all_close(EDWe, dWe, msg="Expected dWe:\n%s\nActual\n%s\n")
-        Function.assert_all_close(EDWs, dWs, msg="Expected dWs:\n%s\nActual\n%s\n")
-        Function.assert_all_close(EDWc, dWc, msg="Expected dWc:\n%s\nActual\n%s\n")
+        Function.assert_all_close(
+            EDWe, dWe, msg="Expected (EDWe==dWe)\n%s\ndifference\n%s\n" % (EDWe, EDWe-dWe)
+        )
+        Function.assert_all_close(
+            EDWs, dWs, msg="Expected (EDWs==dWs)\n%s\ndifference\n%s\n" % (EDWs, EDWs-dWs)
+        )
+        Function.assert_all_close(
+            EDWc, dWc, msg="Expected (EWc5==W[5])\n%s\ndifference\n%s\n" % (EDWc, EDWc-dWc)
+        )
+        Function.assert_all_close(
+            dWe, dWs, msg="Expected (dWe==dWs) but dWe:\n%s\ndifference\n%s\n" % (dWe, dWe-dWs)
+        )
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")
+
+
+def test_020_embedding_gradient_descent(caplog):
+    """
+    Objective:
+        Verify the gradient descent, especially np.ufunc.at, is working as expected.
+
+        W:(V, D=3) where all elements are initialized to 1.0.
+        dL/dY:(1,E+SL) = I and E=1,SL=1
+
+        X=(target,context)=[3,4,5,6,5] where target_index=3.
+
+    Expected:
+        The context index 5 occurs twice so that W[5] should be updated twice
+        at the gradient descent as W[5] = W[5] - [lr * (1 + l2)] * 2.
+        For other context indices at 4, 6:
+        W[3] = W[3] - [lr * (1 + l2) * dWe].
+        W[4] = W[4] - [lr * (1 + l2) * dWc].
+        W[6] = W[6] - [lr * (1 + l2) * dWc].
+    """
+    caplog.set_level(logging.DEBUG)
+    name = "test_020_embedding_gradient_multi_lines"
+    dictionary: EventIndexing = _instantiate_event_indexing()
+
+    def L(x):
+        loss = Function.sum(
+            x, axis=None, keepdims=False
+        )
+        return loss
+
+    target_size = negative_sample_size = TYPE_INT(1)
+    context_size = TYPE_INT(4)
+    event_vector_size = TYPE_INT(3)
+    W: TYPE_TENSOR = np.ones(
+        shape=(dictionary.vocabulary_size, event_vector_size),
+        dtype=TYPE_FLOAT
+    )
+
+    embedding, event_context = _must_succeed(
+        name=name,
+        num_nodes=(1 + negative_sample_size),
+        target_size=target_size,
+        context_size=context_size,
+        negative_sample_size=negative_sample_size,
+        event_vector_size=event_vector_size,
+        dictionary=dictionary,
+        W=W,
+        log_level=logging.DEBUG,
+        msg="must succeed"
+    )
+    del W   # embedding deepcopy W to avoid unexpected changes
+    embedding.objective = L
+
+    target_context_pairs = np.array([[3, 4, 5, 6, 5]], dtype=TYPE_INT)
+
+    # --------------------------------------------------------------------------------
+    # Forward path
+    # --------------------------------------------------------------------------------
+    Y = embedding.function(target_context_pairs)
+    EDWe, EDWs, EDWc = embedding.gradient_numerical()
+    print(f"Loss {L(Y)}\n")
+
+    # --------------------------------------------------------------------------------
+    # Backward path
+    # --------------------------------------------------------------------------------
+    dY = Function.ones(shape=Function.tensor_shape(Y))
+    embedding.gradient(dY)
+
+    # --------------------------------------------------------------------------------
+    # Expected We, Wc (we do not know Ws as negative sample is stochastic)
+    # This is for SGD as the optimizer.
+    # --------------------------------------------------------------------------------
+    lr = embedding.lr
+    l2 = embedding.l2
+
+    expected_diff_We = lr * (1+l2) * embedding.dWe
+    diff_We = embedding.optimizer.differential(dW=embedding.dWe)
+    msg_We = "dWe: expected\n%s\n but actual diff=:\n%s\n" % \
+             (expected_diff_We, (expected_diff_We-diff_We))
+    embedding.assert_all_close(
+        expected_diff_We, diff_We, msg=msg_We
+    )
+    EWe = embedding.W[3] - expected_diff_We
+
+    expected_diff_Wc = lr * (1+l2) * embedding.dWc
+    diff_Wc = embedding.optimizer.differential(dW=embedding.dWc)
+    msg_Wc = "dWc: expected\n%s\n but actual diff=:\n%s\n" % \
+             (expected_diff_Wc, (expected_diff_Wc-diff_Wc))
+    embedding.assert_all_close(
+        expected_diff_Wc, diff_Wc, msg=msg_Wc
+    )
+    EWc4 = np.subtract(embedding.W[4], expected_diff_Wc)
+    EWc5 = np.subtract(embedding.W[5], expected_diff_Wc * 2)
+    EWc6 = np.subtract(embedding.W[6], expected_diff_Wc)
+
+    # --------------------------------------------------------------------------------
+    # Backward path: Gradient descent
+    # --------------------------------------------------------------------------------
+    assert np.array_equal(embedding.target_indices, np.array([3], dtype=TYPE_INT))
+    assert np.array_equal(embedding.context_indices, np.array([4, 5, 6, 5], dtype=TYPE_INT))
+
+    dWe, dWs, dWc = embedding.update()
+
+    # ********************************************************************************
+    # Constraint:
+    # - dW is close to EDW
+    # - dL/dWe = dL/dWs = Bc when dL/dY = I
+    # ********************************************************************************
+    Function.assert_all_close(
+        EDWe, dWe, msg="Expected (EDWe==dWe)\n%s\ndifference\n%s\n" % (EDWe, EDWe - dWe)
+    )
+    Function.assert_all_close(
+        EDWs, dWs, msg="Expected (EDWs==dWs)\n%s\ndifference\n%s\n" % (EDWs, EDWs - dWs)
+    )
+    Function.assert_all_close(
+        EDWc, dWc, msg="Expected (EWc5==W[5])\n%s\ndifference\n%s\n" % (EDWc, EDWc - dWc)
+    )
+    Function.assert_all_close(
+        dWe, dWs, msg="Expected (dWe==dWs) but dWe:\n%s\ndifference\n%s\n" % (dWe, dWe - dWs)
+    )
+
+    # ********************************************************************************
+    # Constraint:
+    # ********************************************************************************
+    assert np.array_equal(expected_diff_We, lr * (1+l2) * dWe)
+    assert np.array_equal(expected_diff_Wc, lr * (1+l2) * dWc)
+
+    # - W[3] = W[3] - [lr * (1 + l2) * dWe].
+    Function.assert_all_close(
+        EWe, embedding.W[3], msg="Expected (EDWe==W[3])\n%s\ndifference\n%s\n" % (EWe, EWe - embedding.W[3])
+    )
+    # W[4] = W[4] - [lr * (1 + l2) * dWc]
+    Function.assert_all_close(
+        EWc4, embedding.W[4], msg="Expected (EWc4==W[4])\n%s\ndifference\n%s\n" % (EWc4, EWc4 - embedding.W[4])
+    )
+    # W[5] = W[5] - [lr * (1 + l2) * 2 * dWc]
+    Function.assert_all_close(
+        EWc5, embedding.W[5], msg="Expected (EWc5==W[5])\n%s\ndifference\n%s\n" % (EWc5, EWc5 - embedding.W[5])
+    )
+    # W[6] = W[6] - [lr * (1 + l2) * dWc]
+    Function.assert_all_close(
+        EWc6, embedding.W[6], msg="Expected (EWc6==W[6])\n%s\ndifference\n%s\n" % (EWc6, EWc6 - embedding.W[6])
+    )
 
 
 def test_020_embedding_save_load(caplog):

@@ -416,7 +416,9 @@ class Embedding(Layer):
         )
         assert \
             TYPE_INT(0) < negative_sample_size <= MAX_NEGATIVE_SAMPLE_SIZE and \
-            TYPE_INT(0) < negative_sample_size <= availability_for_negatives
+            TYPE_INT(0) < negative_sample_size <= availability_for_negatives, \
+            "negative_sample_size [%s] needs less than MAX_NEGATIVE_SAMPLE_SIZE [%s]" % \
+            (negative_sample_size, MAX_NEGATIVE_SAMPLE_SIZE)
         assert isinstance(optimizer, optimiser.Optimizer)
 
         # --------------------------------------------------------------------------------
@@ -703,15 +705,12 @@ class Embedding(Layer):
             If (Be(n),Bc(n)) is closer, then Be(n) should be away from Ws.
             Then label 0 for (Be(n), Ws(n)(s)) seems making a sense.
         """
+        assert self.is_float_tensor(dY) and "Need dY of float tensor but \n%s\n" % dY
         name = "gradient"
-        assert \
-            self.is_float_tensor(dY) and \
-            self.tensor_shape(dY) == self.tensor_shape(self.Y), \
-            "Need dY of float tensor in shape %s but got type %s instance \n%s\n" \
-            % (self.tensor_shape(self.Y), type(dY), dY)
-
         self.dY = dY
-        self.logger.debug("layer[%s].%s: dY.shape %s", self.name, name, dY.shape)
+        self.logger.debug(
+            "layer[%s].%s: dY.shape %s", self.name, name, self.tensor_shape(dY)
+        )
 
         dYe: TYPE_TENSOR = dY[
             ::,
@@ -732,26 +731,41 @@ class Embedding(Layer):
         # --------------------------------------------------------------------------------
         # Forward path:
         # F1. Be:(N,D) = einsum("ned->nd", We:(N,E,D))
-        #   F1-1. Summed itself along axis 1 and,
-        #   F1-2. Dropped the axis 1 (rank -1)
+        #   F1-1. Summed itself along axis 1 and,       "ned->n1d"
+        #   F1-2. Dropped the axis 1 (rank -1)          "n1d->nd"
+        #
         # F2. Ye = einsum("nd,nd->n", Be:(N,D), Bc:(N,D))
-        #   F2-1. Element-multiply along axis -1.
-        #   F2-2. Sum along axis -1.
-        #   F2-3. Drop the axis -1.
+        #   F2-1. Element-multiply along axis -1.       "nd,nd->nd"
+        #   F2-2. Sum along axis -1.                    "nd->n1"
+        #   F2-3. Drop the axis -1.                     "n1->n"
         #
         # B1. Gradient dL/dBe:(N,D)
-        #   dL/dBe:(N,D) = dL/dYe:(N,1) * dYe/dBe:(N,D)
-        #                = dL/dYe:(N,1) * Bc:(N,D)
-        #   dL/dYe is (N,1), NOT (N,) because of dY[::,0:1] instead of dY[::,0].
-        # B2. Gradient dL/dWe:(N,E,D) = dL/dBe:(N,D) OP I:(N,E,D)
-        #   B2-1. [OP]
-        #       Restore the rank of We.rank=3 by adding axis 1 dropped at F1-2 in
-        #       the forward path with either reshape (N,D)->(N,1,D), or newaxis.
-        #       dL/dBe:(N,1,D) = reshape(dL/dBe:(N,D), shape=(N,1,D))
-        #   B2-2. multiply with dBe/dWe:(N,E,D) = I:(N,E,D)
-        #       dL/dWe:(N,E,D) = dL/dBe:(N,1,D) * I:(N,E,D)
+        # Note: dL/dYe is (N,1), NOT (N,) because of dY[::,0:1] instead of dY[::,0].
         #
-        # Steps in B are reversing "ned->ed" as "ed->ned".
+        #   B1-1. dL/Ye:(N,) -> dL/dYe(N,1)
+        #       Restore the rank lost during "n1->n" at F2-3 by adding axis=-1
+        #       as (N,)->(N,1) as "n->n1" (reverse of F2-3).
+        #       This has been done dY[::,0:1] instead of dY[::,0].
+        #
+        #   B1-2. dL/dYe(N,1) -> dL/dYe(N,D)
+        #       Restore the shape (N,D) lost during "nd->n1" at F2-2 as "n1->nd",
+        #       (reverse of F2-2). This is done via the implicit broadcast at B1-3.
+        #
+        #   B1-3. dL/dBe:(N,D) = dL/dYe:(N,1) * dYe/dBe:(N,D)
+        #                      = dL/dYe:(N,1) * Bc:(N,D)
+        #       Gradient dL/dBe is the impact of dBe on L, which  has been amplified
+        #       by Bc:(N,D) at F2-1. Hence element-wise multiply dL/dYe to get dL/dBe.
+        #
+        # B2. Gradient dL/dWe:(N,E,D) = dL/dBe:(N,D) OP I:(N,E,D)
+        #   B2-1. [OP] dL/dBe:(N,D) -> dL/dBe:(N,1,D)
+        #       Restore the rank of We lost during "n1d->nd" at F1-2 by adding
+        #       axis=1 as (N,D)->(N,1,D) as "nd->n1d" (reverse of F1-2).
+        #       dL/dBe:(N,1,D) = reshape(dL/dBe:(N,D), shape=(N,1,D))
+        #
+        #   B2-2. dL/dBe:(N,1,D) -> dBe/dWe:(N,E,D)
+        #       Restore the shape of We:(N,E,D) lost during "ned->n1d" at F1-1 as
+        #       "n1d->ned" (reverse of F1-1) by multiply with dBe/dWe:(N,E,D) = I:(N,E,D).
+        #       dL/dWe:(N,E,D) = dL/dBe:(N,1,D) * I:(N,E,D)
         # --------------------------------------------------------------------------------
         dBe: TYPE_TENSOR = self.multiply(dYe, self.Bc)  # B1
         assert self.tensor_shape(dBe) == (self.N, self.D), \
@@ -772,22 +786,25 @@ class Embedding(Layer):
         #
         # Forward path:
         # F1. Bc = einsum("ncd->nd", Wc)
-        #   F1-1. Sum along axis 1 (bag of word vectors) as "ncd->n1d".
-        #   F1-2. Rank -1 by dropping axis 1 as "n1d->nd".
+        #   F1-1. Sum along axis 1 (bag of word vectors).       "ncd->n1d".
+        #   F1-2. Rank -1 by dropping axis 1.                   "n1d->nd".
+        #
         # F2. Ye = einsum("nd,nd->n", Be, Bc)
-        #   F2-1. Element-wise multiplication along axis -1. "nd,nd->nd"
-        #   F2-2. Sum along axis -1.                         "nd->n1"
-        #   F2-3. Rank -1 by dropping axis -1.               "n1->n"
+        #   F2-1. Element-wise multiplication along axis -1.    "nd,nd->nd"
+        #   F2-2. Sum along axis -1.                            "nd->n1"
+        #   F2-3. Rank -1 by dropping axis -1.                  "n1->n"
         #
         # B1. Gradient dL/dBc01:(N,D) = dL/dYe:(N,1) * Be:(N,D)
         #     dL/dYe is (N,1), NOT (N,) because of dY[::,0:1] instead of dY[::,0],
         #     which corresponds to reversing F2-3 as "n->n1".
         #     Then implicitly restore the shape (N,D) from (N,1) using broadcast,
         #     which corresponds to reversing F2-2 as "n1->nd".
+        #
         # B2. Gradient dL/dWc:(N,C,D) = dL/dBc01:(N,D) OP dBc01/dWc01:(N,C,D)
         #   B2-1. dL/dBc01:(N,1,D) = reshape(dL/dBc01:(N,D), shape=(N,1,D))
         #       Restore the rank of Wc by adding the axis 1, which corresponds
         #       to reversing "n1d->nd" as "nd->n1d".
+        #
         #   B2-2. dL/dWc01:(N,C,D) = dL/dBc01:(N,1,D) * dBc01/dWc01:(N,C,D)
         #                          = dL/dBc01:(N,1,D) * I:(N,C,D)
         #       Restore the Wc shape (N,C,D) by multiplying with I:(N,C,D),
@@ -958,8 +975,8 @@ class Embedding(Layer):
             condition: TYPE_TENSOR = None
     ) -> List[Union[TYPE_TENSOR, TYPE_FLOAT]]:
         """
-        Calculate numerical gradients:
-        dL/dWe:(N,E,D), dL/dWc:(N,C,D), dL/dWs:(N,SL,D)
+        Calculate gradients dL/dWe:(N,E,D), dL/dWc:(N,C,D), dL/dWs:(N,SL,D)
+        using TF autodiff.
 
         dL/dYe = dL/dY[0:1] is the gradient of target event vectors We.
                  (We=W[target_indices])
@@ -968,11 +985,11 @@ class Embedding(Layer):
 
         Args:
             h: small number for delta to calculate the numerical gradient
+               Not used but for compatibility.
             condition: boolean indices to select elements to run calculations
+                       Not used for TF autodiff
         Returns:
-            [dX, dW]: Numerical gradients for X and W without bias
-            dX is dL/dX of shape (N, D-1) without the bias to match the original input
-            dW is dL/dW of shape (M, D) including the bias weight w0.
+            [dWe, dWs, dWc]: gradients of We, Ws, Ws
         """
         name = "gradient_numerical"
         self.logger.debug("layer[%s].%s", self.name, name)
@@ -1101,27 +1118,50 @@ class Embedding(Layer):
         # self.N changes every time function() is called, hence the buffer
         # cannot be re-usable as the out buffer. Free them.
         # TODO:
-        #  * Make sure the property access will raise asserts.
+        #  * Make sure access to the deleted property access will raise asserts.
         #  * Make sure numerical gradient will not use them or raise asserts.
         del self._We, self._Wc, self._Ws, self._Be, self._Bc
 
         return self.dS
 
-    def predict(self, X: Union[TYPE_INT, TYPE_TENSOR]):
-        """Provides the event vector(s) for the given indices X
-        Args:
-            Index or indices to extract event vector(s) from event vector space W
-        """
-        if self.is_scalar(X):
-            assert type(X) == TYPE_INT
-            return self._extract_event_vectors(indices=X)
+    def predict(self, X: TYPE_TENSOR) -> TYPE_TENSOR:
+        """Calculate a prediction event vector from the given context X.
+        The model was trained to get the BoW of contexts Bc=einsum("ncd->nd")
+        to the BoW of targets Be=einsum("ned->nd").
 
+        The target events can be multiple in We but returns a single prediction
+        event vector.
+
+        TODO:
+            How to predict multiple target events from contexts at prediction?
+            Need to look at SkipGram (a context to targets) model.
+
+        Args:
+            X: Indices of the contexts in shape (C,) for single prediction or
+               (N,C) for batch.
+        Return: Single prediction p:(D,) or batch predictions P:(N,C)
+        """
         assert \
-            self.is_dtype_int(X) and \
-            self.tensor_dtype(X) == TYPE_INT, \
+            self.is_tensor(X) and \
+            self.is_same_dtype(self.tensor_dtype(X), TYPE_INT), \
             "Expected X dtype %s but %s" % (TYPE_INT, self.tensor_dtype(X))
 
-        return self._extract_event_vectors(indices=self.reshape(X=X, shape=(-1)))
+        rank = self.tensor_rank(X)
+        if rank == 1:       # Single prediction
+            context = self._extract_event_vectors(X)
+            predictions = self.einsum("cd->d", context)
+        elif rank == 2:     # Batch predictions
+            contexts = self._extract_event_vectors(
+                indices=self.reshape(X=X, shape=(-1))
+            )
+            predictions = self.einsum("ncd->nd", contexts)
+        else:
+            raise AssertionError(
+                "Expected shape (C,) or (N,C) but %s" %
+                self.tensor_shape(X)
+            )
+
+        return predictions
 
     def adapt_function_to_logistic_log_loss(self, loss: CrossEntropyLogLoss):
         """

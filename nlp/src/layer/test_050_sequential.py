@@ -580,7 +580,7 @@ def test_050_sequential_training():
         M: int = np.random.randint(2, NUM_MAX_NODES)
         D: int = np.random.randint(1, NUM_MAX_FEATURES)
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
-        optimizer = SGD(lr=1e-3, l2=1e-4)
+        optimizer = SGD(lr=TYPE_FLOAT(1e-3), l2=TYPE_FLOAT(1e-4))
         W = he(M, D+1)
 
         # --------------------------------------------------------------------------------

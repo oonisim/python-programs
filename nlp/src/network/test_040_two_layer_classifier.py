@@ -480,7 +480,7 @@ def test_two_layer_classifier(caplog):
     M2: int = 3                 # Number of categories to classify
     W2 = weights.he(M2, M1+1)   # Weights in the matmul 02 WITH bias (M1+1)
 
-    optimizer = SGD(lr=0.2)
+    optimizer = SGD(lr=TYPE_FLOAT(0.2))
 
     # X data
     # X, T, V = linear_separable_sectors(n=N, d=D, m=M)

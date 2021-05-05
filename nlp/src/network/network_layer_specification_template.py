@@ -24,7 +24,7 @@ _network_layer_specification_template = {
             _PARAMETERS: {
                 "name": "std000",
                 _NUM_NODES: 5,
-                "momentum": 0.9,
+                "momentum": TYPE_FLOAT(0.9),
                 "eps": TYPE_FLOAT(0.0),
                 _LOG_LEVEL: 40
             }
@@ -42,8 +42,8 @@ _network_layer_specification_template = {
                     _SCHEME: "SGD",
                     _PARAMETERS: {
                         "name": "sgd",
-                        "lr": 0.05,
-                        "l2": 0.001
+                        "lr": TYPE_FLOAT(0.05),
+                        "l2": TYPE_FLOAT(0.001)
                     }
                 }
             }
@@ -53,13 +53,13 @@ _network_layer_specification_template = {
             _PARAMETERS: {
                 "name": "bn001",
                 _NUM_NODES: 10,
-                "momentum": 0.9,
+                "momentum": TYPE_FLOAT(0.9),
                 _OPTIMIZER: {
                     _SCHEME: "SGD",
                     _PARAMETERS: {
                         "name": "sgd",
-                        "lr": 0.05,
-                        "l2": 0.001
+                        "lr": TYPE_FLOAT(0.05),
+                        "l2": TYPE_FLOAT(0.001)
                     }
                 },
                 "eps": TYPE_FLOAT(0.0),
@@ -71,7 +71,7 @@ _network_layer_specification_template = {
             _PARAMETERS: {
                 "name": "relu001",
                 _NUM_NODES: 10,
-                "slope": 1e-10
+                "slope": TYPE_FLOAT(1e-10)
             }
         },
         "matmul": {
@@ -87,8 +87,8 @@ _network_layer_specification_template = {
                     _SCHEME: "SGD",
                     _PARAMETERS: {
                         "name": "sgd",
-                        "lr": 0.05,
-                        "l2": 0.001
+                        "lr": TYPE_FLOAT(0.05),
+                        "l2": TYPE_FLOAT(0.001)
                     }
                 }
             }

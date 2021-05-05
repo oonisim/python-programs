@@ -775,7 +775,6 @@ def sigmoid_cross_entropy_log_loss(
         P: Activation value sigmoid(X) of shape () or (N,)
     """
     name = "sigmoid_cross_entropy_log_loss"
-    # P, T = transform_X_T(P, T)
     # --------------------------------------------------------------------------------
     # X is scalar and T is a scalar binary OHE label, or
     # T is 2D binary OHE labels e.g. T[[0],[1],[0]], X[[0.9],[0.1],[0.3]].
@@ -784,7 +783,7 @@ def sigmoid_cross_entropy_log_loss(
     X, T = transform_scalar_X_T(X, T)
     check_binary_classification_X_T(X, T)
 
-    Z1 = TYPE_FLOAT(1.0) + np.exp(-X)    # 1/Z where Z = sigmoid(X) = (1/1 + np.exp(-X))
+    Z1 = TYPE_FLOAT(1.0) + np.exp(-X, dtype=TYPE_FLOAT)    # 1/Z where Z = sigmoid(X) = (1/1 + np.exp(-X))
     P = TYPE_FLOAT(1.0) / Z1
 
     # --------------------------------------------------------------------------------

@@ -58,8 +58,17 @@ class Function(base.Function):
 
     @staticmethod
     def multiply(x, y, out=None) -> TYPE_TENSOR:
+        """
+        https://stackoverflow.com/a/54255819/4281353
+        TF Matmul expects float32, and causes errors otherwise.
+        'InvalidArgumentError: cannot compute Mul as input #1(zero-based)
+        was expected to be a float tensor but is a double tensor [Op:Mul]'
+        """
         assert out is None, "out is not supported for TF"
-        return tf.math.multiply(x, y)
+        if TYPE_FLOAT == np.float64:
+            return np.multiply(x, y)
+        else:
+            return tf.math.multiply(x, y)
 
     @staticmethod
     def einsum(equation, *inputs, **kwargs) -> TYPE_TENSOR:
@@ -364,7 +373,10 @@ class Function(base.Function):
     def assert_all_close(x, y, msg):
         try:
             tf.debugging.assert_near(
-                x, y, rtol=None, atol=tf.constant(1e-5), message=msg, summarize=None
+                x, y,
+                rtol=None, atol=tf.constant(1e-5, dtype=TYPE_FLOAT),
+                message=msg,
+                summarize=None
             )
         except tf.errors.InvalidArgumentError as e:
             raise AssertionError(str(e))

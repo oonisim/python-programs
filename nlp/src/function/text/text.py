@@ -85,7 +85,8 @@ class Function:
         table = str.maketrans(string.punctuation, replacement * len(string.punctuation))
         corpus.translate(table)
 
-        assert len(corpus) > 0, "corpus needs events other than punctuations."
+        # assert len(corpus) > 0, \
+        #     "corpus needs events other than punctuations but %s" % corpus
         return corpus
 
     @staticmethod
@@ -113,8 +114,22 @@ class Function:
             string=text,
             flags=re.IGNORECASE
         ).lower().strip()
-        assert len(standardized) > 0, f"Text [{text}] needs events other than punctuations."
+        # assert len(standardized) > 0, f"Text [{text}] needs events other than punctuations."
         return standardized
+
+    @staticmethod
+    def max_sentence_length(sentences: str) -> int:
+        """Max sentence length among the sentences"""
+        from function import text
+
+        max_length = 0
+        for line in sentences.split(EOL):
+            if len(line.strip()) > 0:   # Skip empty line
+                sentence = text.Function.standardize(line)
+                if sentence is not None and len(sentence.strip()) > 0:
+                    max_length = max(max_length, len(sentence.split(SPACE)))
+
+        return max_length
 
     @staticmethod
     def event_occurrence_probability(

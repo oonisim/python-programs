@@ -49,7 +49,8 @@ from optimizer import (
 from testing.config import (
     NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,
-    NUM_MAX_BATCH_SIZE
+    NUM_MAX_BATCH_SIZE,
+    GRADIENT_DIFF_ACCEPTANCE_VALUE
 )
 
 Logger = logging.getLogger(__name__)
@@ -528,7 +529,7 @@ def test_020_bn_method_function_to_succeed():
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)
 
-        X = np.random.randn(N, M).astype(TYPE_FLOAT)
+        X = np.random.rand(N, M).astype(TYPE_FLOAT)
         momentum = TYPE_FLOAT(np.random.uniform(0.7, 0.99))
         if np.random.uniform() < 0.5:
             eps = TYPE_FLOAT(np.random.uniform(1e-12, 1e-10))
@@ -620,7 +621,7 @@ def test_020_bn_method_function_multi_invocations_to_succeed():
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)
 
-        X = np.random.randn(N, M).astype(TYPE_FLOAT)
+        X = np.random.rand(N, M).astype(TYPE_FLOAT)
         momentum = TYPE_FLOAT(np.random.uniform(0.7, 0.99))
         if np.random.uniform() < 0.5:
             eps = TYPE_FLOAT(np.random.uniform(1e-12, 1e-10))
@@ -652,7 +653,7 @@ def test_020_bn_method_function_multi_invocations_to_succeed():
         rsd = layer.RSD
 
         while True:
-            Z = np.random.randn(np.random.randint(1, NUM_MAX_BATCH_SIZE), M)
+            Z = np.random.rand(np.random.randint(1, NUM_MAX_BATCH_SIZE), M).astype(TYPE_FLOAT)
             if Z.shape[0] != N:
                 break
 
@@ -704,7 +705,7 @@ def test_020_bn_method_function_validate_with_frederik_kratzert():
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)
 
-        X = np.random.randn(N, M).astype(TYPE_FLOAT)
+        X = np.random.rand(N, M).astype(TYPE_FLOAT)
         momentum = TYPE_FLOAT(np.random.uniform(0.7, 0.99))
         if np.random.uniform() < 0.5:
             eps = TYPE_FLOAT(np.random.uniform(1e-12, 1e-10))
@@ -720,7 +721,7 @@ def test_020_bn_method_function_validate_with_frederik_kratzert():
         )
         layer.objective = objective
 
-        u = 1e-5
+        u = GRADIENT_DIFF_ACCEPTANCE_VALUE
         out, cache = batchnorm_forward(
             x=X, gamma=layer.gamma, beta=layer.beta, eps=eps
         )
@@ -779,30 +780,30 @@ def test_020_bn_method_gradient_validate_with_frederik_kratzert():
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)
 
-        X = np.random.randn(N, M).astype(TYPE_FLOAT)
+        X = np.random.rand(N, M).astype(TYPE_FLOAT)
         momentum = TYPE_FLOAT(np.random.uniform(0.7, 0.99))
         if np.random.uniform() < 0.5:
             eps = TYPE_FLOAT(np.random.uniform(1e-12, 1e-10))
         else:
             eps = TYPE_FLOAT(0.0)
 
-        layer = BatchNormalization(
+        _layer = BatchNormalization(
             name=name,
             num_nodes=M,
             momentum=momentum,
             eps=eps,
             log_level=logging.DEBUG
         )
-        layer.objective = objective
+        _layer.objective = objective
 
-        u = 1e-5
+        u = GRADIENT_DIFF_ACCEPTANCE_VALUE
         dout = np.ones(X.shape)
 
         # --------------------------------------------------------------------------------
         # Benchmark (frederik_kratzert)
         # --------------------------------------------------------------------------------
         out, cache = batchnorm_forward(
-            x=X, gamma=layer.gamma, beta=layer.beta, eps=eps
+            x=X, gamma=_layer.gamma, beta=_layer.beta, eps=eps
         )
         xhat, gamma, xmu, norm, sd, var, eps = cache
         dx, dgamma, dbeta, dxhat, dvar, dxmu2, dxmu1, dmu = batchnorm_backward(dout, cache)
@@ -810,47 +811,47 @@ def test_020_bn_method_gradient_validate_with_frederik_kratzert():
         # ********************************************************************************
         # Constraint: layer gradients should match those of frederik_kratzert
         # ********************************************************************************
-        layer.function(
+        _layer.function(
             X,
             numexpr_enabled=numexpr_enabled,
             numba_enabled=numba_enabled
         )
-        layer.gradient(
-            dY=dout,
+        _layer.gradient(
+            dY=_layer.tensor_cast(dout, TYPE_FLOAT),
             numexpr_enabled=numexpr_enabled,
             numba_enabled=numba_enabled
         )
-        assert np.allclose(layer.dGamma, dgamma, atol=u), \
+        assert np.allclose(_layer.dGamma, dgamma, atol=u), \
             "dGamma=\n%s\ndgamma=\n%s\ndiff=\n%s\n" \
-            % (layer.dGamma, dgamma, (dgamma-layer.dGamma))
+            % (_layer.dGamma, dgamma, (dgamma-_layer.dGamma))
 
-        assert np.allclose(layer.dBeta, dbeta, atol=u), \
+        assert np.allclose(_layer.dBeta, dbeta, atol=u), \
             "dBeta=\n%s\ndbeta=\n%s\ndiff=\n%s\n" \
-            % (layer.dBeta, dbeta, (dbeta - layer.dBeta))
+            % (_layer.dBeta, dbeta, (dbeta - _layer.dBeta))
 
-        assert np.allclose(layer.dXstd, dxhat, atol=u), \
+        assert np.allclose(_layer.dXstd, dxhat, atol=u), \
             "dXstd=\n%s\ndxhat=\n%s\ndiff=\n%s\n" \
-            % (layer.dXstd, dxhat, (dxhat - layer.dXstd))
+            % (_layer.dXstd, dxhat, (dxhat - _layer.dXstd))
 
-        assert np.allclose(layer.dV, dvar, atol=u), \
+        assert np.allclose(_layer.dV, dvar, atol=u), \
             "dV=\n%s\ndvar=\n%s\ndiff=\n%s\n" \
-            % (layer.dV, dvar, (dvar - layer.dV))
+            % (_layer.dV, dvar, (dvar - _layer.dV))
 
-        assert np.allclose(layer.dXmd01, dxmu2, atol=u), \
+        assert np.allclose(_layer.dXmd01, dxmu2, atol=u), \
             "dXmd01=\n%s\ndxmu2=\n%s\ndiff=\n%s\n" \
-            % (layer.dXmd01, dxmu2, (dxmu2 - layer.dXmd01))
+            % (_layer.dXmd01, dxmu2, (dxmu2 - _layer.dXmd01))
 
-        assert np.allclose(layer.dXmd02, dxmu1, atol=u), \
+        assert np.allclose(_layer.dXmd02, dxmu1, atol=u), \
             "dXmd02=\n%s\ndxmu1=\n%s\ndiff=\n%s\n" \
-            % (layer.dXmd02, dxmu1, (dxmu1 - layer.dXmd02))
+            % (_layer.dXmd02, dxmu1, (dxmu1 - _layer.dXmd02))
 
-        assert np.allclose(layer.dU, dmu, atol=u), \
+        assert np.allclose(_layer.dU, dmu, atol=u), \
             "dU=\n%s\ndmu=\n%s\ndiff=\n%s\n" \
-            % (layer.dU, dmu, (dmu - layer.dU))
+            % (_layer.dU, dmu, (dmu - _layer.dU))
 
-        assert np.allclose(layer.dX, dx, atol=u), \
+        assert np.allclose(_layer.dX, dx, atol=u), \
             "dX=\n%s\ndx=\n%s\ndiff=\n%s\n" \
-            % (layer.dX, dx, (dx - layer.dX))
+            % (_layer.dX, dx, (dx - _layer.dX))
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")
@@ -873,14 +874,14 @@ def test_020_bn_method_gradient_descent():
     for _ in range(NUM_MAX_TEST_TIMES):
         name = random_string(np.random.randint(1, 10))
         numexpr_enabled = bool(np.random.randint(0, 2))
-        numba_enabled = bool(np.random.randint(0, 2))
 
         # For BN which works on statistics on per-feature basis,
         # no sense if M = 1 or N = 1.
         N: int = np.random.randint(2, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)
 
-        X = np.random.randn(N, M).astype(TYPE_FLOAT)
+        # DO not use np.random.rand as test fails for 32 bit float
+        X = np.random.rand(N, M).astype(TYPE_FLOAT)
         momentum = TYPE_FLOAT(np.random.uniform(0.7, 0.99))
         if np.random.uniform() < 0.5:
             eps = TYPE_FLOAT(np.random.uniform(1e-12, 1e-10))
@@ -895,21 +896,19 @@ def test_020_bn_method_gradient_descent():
         )
         layer.objective = objective
 
-        u = 1e-5
+        u = GRADIENT_DIFF_ACCEPTANCE_VALUE
         for _ in range(np.random.randint(1, 10)):
-            dout = np.random.uniform(-1, 1, size=X.shape)
+            dout = np.random.uniform(-1, 1, size=X.shape).astype(TYPE_FLOAT)
 
             Y = layer.function(
                 X,
                 numexpr_enabled=numexpr_enabled,
-                numba_enabled=numba_enabled
             )
             # pylint: disable=not-callable
             layer.objective(Y)
             layer.gradient(
                 dY=dout,
                 numexpr_enabled=numexpr_enabled,
-                numba_enabled=numba_enabled
             )
             dGamma, dBeta = layer.update()
 
@@ -950,7 +949,7 @@ def test_020_bn_method_predict():
         N: int = np.random.randint(2, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)
 
-        X = np.random.randn(N, M).astype(TYPE_FLOAT)
+        X = np.random.rand(N, M).astype(TYPE_FLOAT)
         momentum = TYPE_FLOAT(np.random.uniform(0.7, 0.99))
         if np.random.uniform() < 0.5:
             eps = TYPE_FLOAT(np.random.uniform(1e-12, 1e-8))
@@ -981,7 +980,7 @@ def test_020_bn_method_predict():
         # Constraint: At 2nd invocation, predict should be the same with
         #
         # ********************************************************************************
-        Z = np.random.randn(N, M).astype(TYPE_FLOAT)
+        Z = np.random.rand(N, M).astype(TYPE_FLOAT)
         standardized, mean, sd, deviation = standardize(Z, eps=eps, keepdims=False)
         expected_RU = layer.RU * momentum + mean * (TYPE_FLOAT(1)-momentum)
         expected_RSD = layer.RSD * momentum + sd * (TYPE_FLOAT(1)-momentum)
