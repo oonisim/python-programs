@@ -25,7 +25,8 @@ def rotate(X, radian):
             [np.cos(radian), -np.sin(radian)],
             [np.sin(radian), np.cos(radian)]
         ]),
-        X.T     # (N, 2) to (2, M) to be able to (2, 2) @ (2, N)
+        X.T,     # (N, 2) to (2, M) to be able to (2, 2) @ (2, N)
+        dtype=TYPE_FLOAT
     )
     return Z.T
 
@@ -39,7 +40,7 @@ def shift(X, offsets):
         Z: shifted X
     """
     if not isinstance(X, np.ndarray):
-        X = np.array(X)
+        X = np.array(X, dtype=TYPE_FLOAT)
     if not isinstance(offsets, np.ndarray):
         offsets = np.array(offsets)
 

@@ -70,7 +70,7 @@ Logger = logging.getLogger(__name__)
 
 
 def _instantiate(name: str, num_nodes: int, num_features: int, objective=None):
-    category = np.random.uniform()
+    category = TYPE_FLOAT(np.random.uniform())
     if category < 0.3:
         W=weights.he(num_nodes, num_features + 1)
     elif category < 0.7:
@@ -91,7 +91,7 @@ def _instantiate(name: str, num_nodes: int, num_features: int, objective=None):
 def _generate_X(N: int = -1, D: int = -1):
     N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE) if N <= 0 else N
     D: int = np.random.randint(1, NUM_MAX_FEATURES) if D <= 0 else D
-    return np.random.rand(N, D)
+    return np.random.rand(N, D).astype(TYPE_FLOAT)
 
 
 def test_020_matmul_instantiation_to_fail():
@@ -507,8 +507,8 @@ def test_020_matmul_builder_to_fail_optimizer_spec():
             _OPTIMIZER: {
                 _SCHEME: "sGd",
                 _PARAMETERS: {
-                    "lr": np.random.uniform(),
-                    "l2": np.random.uniform()
+                    "lr": TYPE_FLOAT(np.random.uniform()),
+                    "l2": TYPE_FLOAT(np.random.uniform())
                 }
             },
             "log_level": logging.ERROR
@@ -601,8 +601,8 @@ def test_020_matmul_builder_to_succeed():
         # NOTE: Invalidate one parameter at a time from the correct one.
         # Otherwise not sure what you are testing.
         # ----------------------------------------------------------------------
-        lr = np.random.uniform()
-        l2 = np.random.uniform()
+        lr = TYPE_FLOAT(np.random.uniform())
+        l2 = TYPE_FLOAT(np.random.uniform())
         valid_matmul_spec = {
             _NAME: "test_020_matmul_builder_to_fail_matmul_spec",
             _NUM_NODES: M,
@@ -681,7 +681,7 @@ def test_020_matmul_round_trip():
             return np.sum(X)
 
         # Test both static instantiation and build()
-        if np.random.uniform() < 0.5:
+        if TYPE_FLOAT(np.random.uniform()) < 0.5:
             matmul = Matmul(
                 name=name,
                 num_nodes=M,
@@ -767,7 +767,7 @@ def test_020_matmul_round_trip():
 
         # Constraint 5: Analytical gradient dL/dX close to the numerical gradient GN.
         assert np.all(np.abs(dX - GN[0]) < GRADIENT_DIFF_ACCEPTANCE_VALUE), \
-            "dX need close to GN[0] but dX \n%s\n GN[0] \n%s\n" % (dX, GN[0])
+            "dX need close to GN[0]. dX:\n%s\ndiff \n%s\n" % (dX, dX-GN[0])
 
         # --------------------------------------------------------------------------------
         # Gradient update.

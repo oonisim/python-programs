@@ -110,7 +110,7 @@ class Function:
     def tensor_shape(X):
         """The shape of a tensor
         """
-        assert Function.is_tensor(X)
+        assert Function.is_tensor(X) or isinstance(X, np.ndarray)
         return tuple(X.get_shape()) if tf.is_tensor(X) else X.shape
 
     @staticmethod

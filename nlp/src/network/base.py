@@ -218,8 +218,9 @@ class Network(Layer):
         """Back propagate gradients"""
         # pylint: disable=not-callable
 
-        dY = np.array(dY).astype(TYPE_FLOAT) if isinstance(dY, TYPE_FLOAT) else dY
-        assert isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT
+        if isinstance(dY, TYPE_FLOAT):
+            dY = np.array(dY, dtype=TYPE_FLOAT)
+        assert self.is_float_tensor(dY) or self.is_float_scalar(dY)
         return self._gradient(dY)
 
     def update(self) -> List[Union[TYPE_FLOAT, np.ndarray]]:

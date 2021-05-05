@@ -343,6 +343,6 @@ def test():
     for i in range(50):
         logistic_classifier.train(X=X, T=T)
 
-    prediction = logistic_classifier.predict(np.array([-1., -1.]))
+    prediction = logistic_classifier.predict(np.array([-1., -1.], dtype=TYPE_FLOAT))
     np.isin(prediction, [0, 1])
     print(prediction)

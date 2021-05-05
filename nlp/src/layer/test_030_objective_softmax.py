@@ -363,15 +363,15 @@ def test_030_objective_methods_1d_ohe():
         # ================================================================================
         # Layer forward path
         # ================================================================================
-        X = np.random.randn(M)
+        X = np.random.randn(M).astype(TYPE_FLOAT)
         T = np.zeros_like(X, dtype=TYPE_LABEL)     # OHE labels.
         T[
             np.random.randint(0, M)
-        ] = int(1)
+        ] = TYPE_LABEL(1)
         _layer.T = T
 
         P = softmax(X)
-        EG = ((P - T) / N).reshape(1, -1)     # Expected analytical gradient dL/dX = (P-T)/N
+        EG = ((P - T) / N).reshape(1, -1).astype(TYPE_FLOAT)     # Expected analytical gradient dL/dX = (P-T)/N
 
         Logger.debug(
             "%s: X is \n%s\nT is %s\nP is %s\nEG is %s\n",
@@ -382,7 +382,7 @@ def test_030_objective_methods_1d_ohe():
         # constraint: L/loss == np.sum(cross_entropy_log_loss(softmax(X), T)) / N.
         # --------------------------------------------------------------------------------
         L = _layer.function(X)
-        Z = np.array(np.sum(cross_entropy_log_loss(softmax(X), T))) / N
+        Z = np.array(np.sum(cross_entropy_log_loss(softmax(X), T)), dtype=TYPE_FLOAT) / TYPE_FLOAT(N)
         assert np.array_equal(L, Z), f"SoftmaxLogLoss output should be {L} but {Z}."
 
         # --------------------------------------------------------------------------------
@@ -414,7 +414,7 @@ def test_030_objective_methods_1d_ohe():
         # dummy.function(X)
         # --------------------------------------------------------------------------------
         # O = lambda x: dummy.objective(dummy.function(x))    # Objective function
-        O = lambda x: np.sum(cross_entropy_log_loss(softmax(x), T)) / N
+        O = lambda x: np.sum(cross_entropy_log_loss(softmax(x), T), dtype=TYPE_FLOAT) / TYPE_FLOAT(N)
         # --------------------------------------------------------------------------------
         EGN = numerical_jacobian(O, X).reshape(1, -1) # Expected numerical dL/dX
         assert np.array_equal(GN[0], EGN), \
@@ -426,7 +426,7 @@ def test_030_objective_methods_1d_ohe():
         # --------------------------------------------------------------------------------
         # constraint: Analytical gradient G: gradient() == (P-1)/N.
         # --------------------------------------------------------------------------------
-        dY = float(1)
+        dY = TYPE_FLOAT(1)
         G = _layer.gradient(dY)
         assert np.all(np.abs(G-EG) <= GRADIENT_DIFF_ACCEPTANCE_VALUE), \
             f"Layer gradient dL/dX \n{G} \nneeds to be \n{EG} but G-EG \n{np.abs(G-EG)}\n"
@@ -478,12 +478,12 @@ def test_030_objective_methods_2d_ohe():
         # ================================================================================
         # Layer forward path
         # ================================================================================
-        X = np.random.randn(N, M)
+        X = np.random.randn(N, M).astype(TYPE_FLOAT)
         T = np.zeros_like(X, dtype=TYPE_LABEL)     # OHE labels.
         T[
             np.arange(N),
             np.random.randint(0, M, N)
-        ] = int(1)
+        ] = TYPE_LABEL(1)
         _layer.T = T
 
         Logger.debug("%s: X is \n%s\nT is \n%s", name, X, T)
@@ -576,7 +576,7 @@ def test_040_softmax_log_loss_2d(caplog):
         # ================================================================================
         # Layer forward path
         # ================================================================================
-        X = np.random.randn(N, M)
+        X = np.random.randn(N, M).astype(TYPE_FLOAT)
         T = np.zeros_like(X, dtype=TYPE_LABEL)     # OHE labels.
         T[
             np.arange(N),
@@ -596,8 +596,8 @@ def test_040_softmax_log_loss_2d(caplog):
         EG[
             np.arange(N),
             T
-        ] -= 1   # Shape(N,), subtract from elements for T=1 only
-        EG /= N
+        ] -= TYPE_FLOAT(1)   # Shape(N,), subtract from elements for T=1 only
+        EG /= TYPE_FLOAT(N)
 
         # --------------------------------------------------------------------------------
         # Total loss Z = np.sum(J)/N
@@ -640,7 +640,7 @@ def test_040_softmax_log_loss_2d(caplog):
         # ================================================================================
 
         # constraint: Analytical gradient G: gradient() == EG == (P-1)/N.
-        dY = float(1)
+        dY = TYPE_FLOAT(1)
         G = _layer.gradient(dY)
         assert np.all(np.abs(G-EG) <= GRADIENT_DIFF_ACCEPTANCE_VALUE), \
             f"Layer gradient dL/dX \n{G} \nneeds to be \n{EG}."

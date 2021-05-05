@@ -28,20 +28,20 @@ def linear_separable(d: int = 2, n: int = 10000):
     _X = np.c_[
         np.ones(n),     # Bias
         X
-    ]
+    ].astype(TYPE_FLOAT)
 
     while True:
-        W = np.random.randn(d+1)    # +1 for bias weight w0
-        W = W / np.linalg.norm(W)
+        W = TYPE_FLOAT(np.random.randn(d+1))    # +1 for bias weight w0
+        W = W / TYPE_FLOAT(np.linalg.norm(W))
 
         # Label t = 1 if X dot w > 0 else 0
-        T = (np.einsum('ij,j', _X, W) > 0).astype(int)
+        T = (np.einsum('ij,j', _X, W) > 0).astype(TYPE_LABEL)
 
         # Each label has at least 30% of the data
         if 0.3 < np.sum(T[T == 1]) / n < 0.7:
             break
 
-    return X, T, W
+    return X.astype(TYPE_FLOAT), T.astype(TYPE_LABEL), W.astype(TYPE_FLOAT)
 
 
 def linear_separable_sectors(
@@ -71,12 +71,12 @@ def linear_separable_sectors(
     X = np.c_[
         radii * np.cos(Z),
         radii * np.sin(Z)
-    ]
+    ].astype(TYPE_FLOAT)
     T = np.zeros(n, dtype=TYPE_LABEL)
-    sector = (2 * np.pi) / float(m)  # angle of a sector
+    sector = TYPE_FLOAT(2 * np.pi) / TYPE_FLOAT(m)  # angle of a sector
 
     # The initial vector (1, 0) forms the start angle of the 0th sector.
-    B = np.array([[1.0, 0.0]])
+    B = np.array([[1.0, 0.0]], dtype=TYPE_FLOAT)
 
     # The label has been already set to 0 for the 0th sector. Hence, the
     # splitting the circle into m sectors starts with the 1st sector.
@@ -88,10 +88,10 @@ def linear_separable_sectors(
         B = np.r_[
             B,
             np.array([[np.cos(base), np.sin(base)]])
-        ]
+        ].astype(TYPE_FLOAT)
 
     # Rotate the circle and the start angles of the sectors
-    rotation = rotation % (2 * np.pi)
+    rotation = TYPE_FLOAT(rotation % (2 * np.pi))
     X = rotate(X, rotation)
     B = rotate(B, rotation)
-    return X, T, B
+    return X.astype(TYPE_FLOAT), T.astype(TYPE_LABEL), B.astype(TYPE_FLOAT)

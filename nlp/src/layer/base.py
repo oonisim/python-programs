@@ -32,6 +32,14 @@ Objective function L:
     from compose import compose
     Li = compose(*[ for layer.f in layers[::-1][i+1:n] ]) with 0 =< i < n=1
     ```
+Note:
+    Li is a composition of post layer functions. As each layer can have its state,
+    only layer output Yi=fi(Xi) should go into the next layer function fi+1.
+
+    If fi+1 is invoked from the layer i by other than fi, it would cause
+    unexpected state transfers in the network. Hence invoking the function of the
+    post layers from e.g. numerical gradient gn() must NOT happen.
+    Set a stateless Li to the objective function Li for the layer i.
 
 [Design]
 1. Use 'to' to clarify the goal

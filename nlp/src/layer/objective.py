@@ -191,7 +191,8 @@ class CrossEntropyLogLoss(Layer):
             L =  sigmoid_cross_entropy_log_loss(X, T) / N for sigmoid
 
         Args:
-            X: Input of shape (N,M) to calculate the probabilities for the M nodes.
+            X: Input in shape (N,M) where M is the classes to predict.
+               M=1 for logistic log loss.
         Returns:
             L: Objective value of shape ()
         """
@@ -217,7 +218,7 @@ class CrossEntropyLogLoss(Layer):
                 # Binary OHE labels P(N,M), T(N,M) e.g T[[0],[1],[0]], P[[0,1],[0.9],[0.]]
                 self.X.ndim >= 2 and self.T.ndim in {1, 2} and
                 self.X.shape[0] == self.T.shape[0] and
-                self.X.shape[1] == self.M       # M=1 for logistic binary
+                self.X.shape[1] == self.M       # M=1 for logistic log loss
             ), \
             "X shape %s with T.shape %s does not match with the Layer node number M[%s]" \
             % (self.X.shape, self.T.shape, self.M)
@@ -278,19 +279,17 @@ class CrossEntropyLogLoss(Layer):
             dL/dX: (P-T)/N of shape (N, M)
         """
         name = f"Layer[{self.name}].gradient()"
-        dY = np.array(dY) if isinstance(dY, float) else dY
+        if self.is_float_scalar(dY):
+            dY = np.array(dY, dtype=TYPE_FLOAT)
+        assert self.is_float_tensor(dY) or self.is_float_scalar(dY)
 
         # --------------------------------------------------------------------------------
         # Shapes of dL/dY and Y are the same because L is scalar.
         # --------------------------------------------------------------------------------
-        assert \
-            (isinstance(dY, np.ndarray) and dY.dtype == TYPE_FLOAT) and \
-            (dY.shape == self.Y.shape), \
-            "dY/dY shape needs %s of type float but %s of type %s" % \
-            (self.Y.shape, dY.shape, dY.dtype)
+        self.dY = dY
 
         # dL/dJ is 1/N of shape (N,) but transform into shape (N,1) to np-broadcast.
-        dJ: np.ndarray = (dY * np.ones(self.N, dtype=TYPE_FLOAT) / float(self.N)).reshape(-1, 1)
+        dJ: np.ndarray = (dY * np.ones(self.N, dtype=TYPE_FLOAT) / TYPE_FLOAT(self.N)).reshape(-1, 1)
 
         # --------------------------------------------------------------------------------
         # Calculate the layer gradient
@@ -316,7 +315,7 @@ class CrossEntropyLogLoss(Layer):
             # needs to be 2 to be able to use t=1 as index such as P[::, 1], which causes
             # index out of bound.
             # --------------------------------------------------------------------------------
-            dX = dJ * (self.P - self.T)     # (N,M) * (N,M)
+            dX = dJ * (self.P - self.T).astype(TYPE_FLOAT)     # (N,M) * (N,M)
 
         else:
             self.logger.debug("%s: Label is index format", name)
@@ -347,7 +346,7 @@ class CrossEntropyLogLoss(Layer):
                 cols
             ] -= TYPE_FLOAT(1.0)
             # dF/dY * dY/dJ * (P-T) = dF/dY * (P-T) / N
-            np.multiply(dJ, dX, out=dX)
+            np.multiply(dJ, dX, out=dX, dtype=TYPE_FLOAT)
 
         assert np.all(np.abs(dX) <= 1), \
             f"Need the gradient dL/dX between [-1, 1] but\n{dX}"

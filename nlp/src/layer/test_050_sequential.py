@@ -586,8 +586,8 @@ def test_050_sequential_training():
         # --------------------------------------------------------------------------------
         # Training
         # --------------------------------------------------------------------------------
-        X = np.random.rand(N, D)
-        T = np.random.randint(0, 2, N)
+        X = np.random.rand(N, D).astype(TYPE_FLOAT)
+        T = np.random.randint(0, 2, N).astype(TYPE_LABEL)
         train_matmul_relu_classifier(
             N=N,
             D=D,

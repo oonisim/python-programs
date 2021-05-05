@@ -976,7 +976,16 @@ class Embedding(Layer):
     ) -> List[Union[TYPE_TENSOR, TYPE_FLOAT]]:
         """
         Calculate gradients dL/dWe:(N,E,D), dL/dWc:(N,C,D), dL/dWs:(N,SL,D)
-        using TF autodiff.
+        using TF autodiff on L = Li(y=f(w)) where Li=self.objective
+
+        Li is a composition of post layer functions. As each layer can have
+        its state, only layer output Yi=fi(Xi) should go into the next layer
+        function fi+1.
+
+        If fi+1 is invoked from the layer i by other than fi, it would cause
+        unexpected state transfers in the network. Hence invoking the post
+        layers from e.g. numerical gradient gn() must NOT happen.
+        Set a stateless Li to the objective function Li for the layer i.
 
         dL/dYe = dL/dY[0:1] is the gradient of target event vectors We.
                  (We=W[target_indices])
@@ -1164,28 +1173,42 @@ class Embedding(Layer):
         return predictions
 
     def adapt_function_to_logistic_log_loss(self, loss: CrossEntropyLogLoss):
-        """
-        Provides an adapter function to bridge between Embedding function and
-        Logistic Log Loss layer function, because a Logistic Log Loss layer
-        expects one dimensional inputs X and labels T.
+        """Adapter function to bridge between Embedding layer function() and
+        Logistic Log Loss layer function() to adapt the shapes.
 
-        1. Create labels T for the Embedding outputs of shape:(N,(1+SL)).
-        2. Set true labels 1 for the targets at the column 0 in T.
-        3. Reshape X and T into (-1).
+        The logistic log loss layer expects the shape (N,1) for both X and T.
+        This is because of supporting labels in OHE format and index format.
+        For OHE label, X:(N,1), T(N,1). For index label, X:(N,M), T:(N,).
+
+        Due to the issue https://github.com/tensorflow/tensorflow/issues/37726,
+        gradient_numerical() method sends ye:(N,), ys:(N,S).
+
+        For shape Y:(N,1+SL): function() output.
+            1. Create labels T of shape:(N,1+SL) to match Y:(N,1+SL) as zeros.
+            2. Set true labels 1 for the targets at the column 0 in T.
+            3. Reshape Y and T into (1,-1).
+
+        For shape ye:(N,): objective_We() output.
+            1. Create labels T of shape:(N,1) to match ye:(N,1) as zeros.
+            2. Set true labels 1 for the targets at the column 0 in T.
+            3. Reshape ye and T into (1,-1).
+
+        For shape ys:(N,SL): objective_Ws() output.
+            1. Create labels T of shape:(N,SL) to match Y:(N,SL) as zeros.
+            2. Set true labels 1 for the targets at the column 0 in T.
+            3. Reshape ys and T into (1,-1).
 
         Args:
             loss: Logistic log loss layer instance
         Returns: Adapter function
         """
-        def f(X: TYPE_TENSOR):
-            assert self.tensor_shape(X) == (self.N, (1+self.SL))
-
+        def _adapt_function_handle_Y(Y: TYPE_TENSOR):
             # --------------------------------------------------------------------------------
             # Labels T.
             # 1. T[::, 0] = 1 for the targets and T[::, 1:] = 0 for negative samples.
-            # 2. Reshape into (-1) to align with what Log Loss expects.
+            # 2. Reshape into (-1,1) to align with what Log Loss expects.
             # --------------------------------------------------------------------------------
-            T: TYPE_TENSOR = np.zeros(shape=self.tensor_shape(X), dtype=TYPE_INT)
+            T: TYPE_TENSOR = np.zeros(shape=(self.N, 1+self.SL), dtype=TYPE_INT)
             T[
                 ::,
                 0
@@ -1202,17 +1225,54 @@ class Embedding(Layer):
             # the EventIndexing or the Embedding layer, labels are unknown.
             # Hence Embedding layer drives the labels settings.
             # --------------------------------------------------------------------------------
-            loss.T = self.reshape(T, (-1))
+            loss.T = self.reshape(T, (-1, 1))
 
             # --------------------------------------------------------------------------------
-            # Flatten the Embedding layer output.
+            # Reshape Y into (-1,1) to align with what Log Loss expects.
             # --------------------------------------------------------------------------------
-            Y = self.reshape(X=X, shape=(-1))
+            Y = self.reshape(X=Y, shape=(-1, 1))
             return Y
+
+        def _adapt_function_handle_ys(ys: TYPE_TENSOR):
+            T: TYPE_TENSOR = np.zeros(shape=(self.N, self.SL), dtype=TYPE_INT)
+            T[
+                ::,
+                0
+            ] = TYPE_INT(1)
+            loss.T = self.reshape(T, (-1, 1))
+            ys = self.reshape(X=ys, shape=(-1, 1))   # (N,1)
+            return ys
+
+        def _adapt_function_handle_ye(ye: TYPE_TENSOR):
+            T: TYPE_TENSOR = np.zeros(shape=(self.N, 1), dtype=TYPE_INT)
+            T[
+                ::,
+                0
+            ] = TYPE_INT(1)
+            loss.T = T
+            ye = self.reshape(X=ye, shape=(-1, 1))   # (N,1)
+            return ye
+
+        def f(Y: TYPE_TENSOR):
+            shape = self.tensor_shape(Y)
+            if shape == (self.N, (1+self.SL)):  # Y:(N,1+SL)
+                return _adapt_function_handle_Y(Y)
+            elif shape == (self.N, self.SL):    # ys:(N,SL)
+                return _adapt_function_handle_ys(Y)
+            elif shape == (self.N,):            # ye:(N,)
+                return _adapt_function_handle_ye(Y)
+            else:
+                raise AssertionError("Unexpected ")
 
         return f
 
     def adapt_gradient_to_logistic_log_loss(self):
+        """Adapter function to bridge between Logistic Log Loss layer gradient()
+        and Embedding layer gradient().
+
+        Logistic log loss back-propagates dL/dY of shape (N',1) via gradient(dY).
+        Transform the shape into (N, 1+SL) to match the Embedding output Y.
+        """
         def g(dY: TYPE_TENSOR):
             assert \
                 self.tensor_shape(dY) == (self.N * (1+self.SL),), \

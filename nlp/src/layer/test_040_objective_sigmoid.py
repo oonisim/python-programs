@@ -290,7 +290,7 @@ def test_040_objective_instantiation():
         L = layer.function(X)
         J, P = sigmoid_cross_entropy_log_loss(X, T)
         assert \
-            L.shape == () and L == (np.sum(J) / N) and L == layer.Y, \
+            L.shape == () and np.allclose(L, (np.sum(J) / N).astype(TYPE_FLOAT)) and L == layer.Y, \
             "After setting T, layer.function(X) generates the total loss L but %s" % L
 
         # layer.function(X) sets layer.P to sigmoid_cross_entropy_log_loss(X, T)
@@ -364,7 +364,7 @@ def test_040_objective_methods_1d_ohe():
 
         # Expected analytical gradient dL/dX = (P-T)/N of shape (N,M)
         A = sigmoid(X)
-        EG = ((A - T) / N).reshape(1, -1)
+        EG = ((A - T) / N).reshape(1, -1).astype(TYPE_FLOAT)
 
         Logger.debug("%s: X is \n%s\nT is %s\nP is %s\nEG is %s\n", name, X, T, A, EG)
 
@@ -374,7 +374,7 @@ def test_040_objective_methods_1d_ohe():
         # --------------------------------------------------------------------------------
         L = layer.function(X)       # L is shape ()
         J, P = sigmoid_cross_entropy_log_loss(X, T)
-        Z = np.array(np.sum(J)) / N
+        Z = np.array(np.sum(J), dtype=TYPE_FLOAT) / TYPE_FLOAT(N)
         assert np.array_equal(L, Z), f"LogLoss output should be {L} but {Z}."
 
         # --------------------------------------------------------------------------------
@@ -419,7 +419,7 @@ def test_040_objective_methods_1d_ohe():
         # --------------------------------------------------------------------------------
         # constraint: Analytical gradient G: gradient() == (P-1)/N.
         # --------------------------------------------------------------------------------
-        dY = float(1)
+        dY = TYPE_FLOAT(1)
         G = layer.gradient(dY)
         assert np.all(np.abs(G-EG) <= GRADIENT_DIFF_ACCEPTANCE_VALUE), \
             f"Layer gradient dL/dX \n{G} \nneeds to be \n{EG}."
@@ -468,12 +468,12 @@ def test_040_objective_methods_2d_ohe(caplog):
         # ================================================================================
         # Layer forward path
         # ================================================================================
-        X = np.random.randn(N, M)
+        X = np.random.randn(N, M).astype(TYPE_FLOAT)
         T = np.zeros_like(X, dtype=TYPE_LABEL)     # OHE labels.
         T[
             np.arange(N),
             np.random.randint(0, M, N)
-        ] = int(1)
+        ] = TYPE_LABEL(1)
 
         # log_loss function require (X, T) in X(N, M), and T(N, M) in OHE label format.
         X, T = transform_X_T(X, T)
@@ -484,7 +484,7 @@ def test_040_objective_methods_2d_ohe(caplog):
         # Expected analytical gradient EG = (dX/dL) = (A-T)/N
         # --------------------------------------------------------------------------------
         A = sigmoid(X)
-        EG = (A - T) / N
+        EG = ((A - T).astype(TYPE_FLOAT) / TYPE_FLOAT(N))
 
         # --------------------------------------------------------------------------------
         # Total loss Z = np.sum(J)/N
@@ -528,16 +528,15 @@ def test_040_objective_methods_2d_ohe(caplog):
         # Layer backward path
         # ================================================================================
         # constraint: Analytical gradient G: gradient() == (P-1)/N.
-        dY = float(1)
+        dY = TYPE_FLOAT(1)
         G = layer.gradient(dY)
         assert np.all(np.abs(G-EG) <= GRADIENT_DIFF_ACCEPTANCE_VALUE), \
             f"Layer gradient dL/dX \n{G} \nneeds to be \n{EG}."
 
         # constraint: Analytical gradient G is close to GN: gradient_numerical().
         assert \
-            np.all(np.abs(G - GN[0]) <= GRADIENT_DIFF_ACCEPTANCE_VALUE) or \
-            np.all(np.abs(G - GN[0]) <= np.abs(GRADIENT_DIFF_ACCEPTANCE_RATIO * GN[0])), \
-            f"dX is \n{G}\nGN[0] is \n{GN[0]}\nRatio * GN[0] is \n{GRADIENT_DIFF_ACCEPTANCE_RATIO * GN[0]}.\n"
+            np.allclose(GN[0], G, atol=GRADIENT_DIFF_ACCEPTANCE_VALUE, rtol=GRADIENT_DIFF_ACCEPTANCE_RATIO), \
+            f"dX is \n{G}\nGN[0] is \n{GN[0]}\nRDiff is \n{G-GN[0]}.\n"
 
         # constraint: Gradient g of the log loss layer needs -1 < g < 1
         # abs(P-T) = abs(sigmoid(X)-T) cannot be > 1.

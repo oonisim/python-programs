@@ -44,7 +44,8 @@ from optimizer import (
 from testing.config import (
     NUM_MAX_TEST_TIMES,
     NUM_MAX_NODES,
-    NUM_MAX_BATCH_SIZE
+    NUM_MAX_BATCH_SIZE,
+    GRADIENT_DIFF_ACCEPTANCE_VALUE
 )
 
 Logger = logging.getLogger(__name__)
@@ -268,8 +269,8 @@ def test_020_fss_builder_to_succeed():
         # Otherwise not sure what you are testing.
         # ----------------------------------------------------------------------
         valid_fss_parameters = FeatureScaleShift.specification_template()[_PARAMETERS]
-        lr = valid_fss_parameters[_OPTIMIZER][_PARAMETERS]["lr"]
-        l2 = valid_fss_parameters[_OPTIMIZER][_PARAMETERS]["l2"]
+        lr = TYPE_FLOAT(valid_fss_parameters[_OPTIMIZER][_PARAMETERS]["lr"])
+        l2 = TYPE_FLOAT(valid_fss_parameters[_OPTIMIZER][_PARAMETERS]["l2"])
         log_level = valid_fss_parameters[_LOG_LEVEL]
         try:
             fss: FeatureScaleShift = FeatureScaleShift.build(parameters=valid_fss_parameters)
@@ -297,10 +298,7 @@ def test_020_fss_function_method_to_fail():
 
         # For BN which works on statistics on per-feature basis,
         # no sense if M = 1 or N = 1.
-        N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)
-
-        X = np.random.randn(N, M)
 
         _layer = _instance(
             name=name,
@@ -348,7 +346,7 @@ def test_020_fss_method_function_to_succeed():
     """
     def objective(X: np.ndarray) -> Union[float, np.ndarray]:
         """Dummy objective function"""
-        return np.sum(X)
+        return np.sum(X, dtype=TYPE_FLOAT)
 
     profiler = cProfile.Profile()
     profiler.enable()
@@ -362,7 +360,7 @@ def test_020_fss_method_function_to_succeed():
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)
 
-        X = np.random.randn(N, M)
+        X = np.random.randn(N, M).astype(TYPE_FLOAT)
 
         _layer = FeatureScaleShift(
             name=name,
@@ -370,7 +368,7 @@ def test_020_fss_method_function_to_succeed():
             log_level=logging.DEBUG
         )
         _layer.objective = objective
-        Y = _layer.function(X)
+        _layer.function(X)
 
         # ********************************************************************************
         # Constraint:
@@ -396,7 +394,7 @@ def test_020_fss_method_function_multi_invocations_to_succeed():
     """
     def objective(X: np.ndarray) -> Union[float, np.ndarray]:
         """Dummy objective function"""
-        return np.sum(X)
+        return np.sum(X, dtype=TYPE_FLOAT)
 
     profiler = cProfile.Profile()
     profiler.enable()
@@ -409,7 +407,7 @@ def test_020_fss_method_function_multi_invocations_to_succeed():
         N: int = np.random.randint(1, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)
 
-        X = np.random.randn(N, M)
+        X = np.random.randn(N, M).astype(TYPE_FLOAT)
 
         # ********************************************************************************
         # Constraint:
@@ -431,6 +429,7 @@ def test_020_fss_method_function_multi_invocations_to_succeed():
         while True:
             Z = np.random.randn(np.random.randint(1, NUM_MAX_BATCH_SIZE), M)
             if Z.shape[0] != N:
+                Z = Z.astype(TYPE_FLOAT)
                 break
 
         _layer.function(
@@ -464,12 +463,11 @@ def test_020_fss_method_gradient_descent():
     for _ in range(NUM_MAX_TEST_TIMES):
         name = random_string(np.random.randint(1, 10))
         numexpr_enabled = bool(np.random.randint(0, 2))
-        numba_enabled = bool(np.random.randint(0, 2))
 
         N: int = np.random.randint(2, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)
 
-        X = np.random.randn(N, M)
+        X = np.random.randn(N, M).astype(TYPE_FLOAT)
         _layer = _instance(
             name=name,
             num_nodes=M,
@@ -477,9 +475,9 @@ def test_020_fss_method_gradient_descent():
         )
         _layer.objective = objective
 
-        u = 1e-5
+        u = GRADIENT_DIFF_ACCEPTANCE_VALUE
         for _ in range(np.random.randint(1, 10)):
-            dout = np.random.uniform(-1, 1, size=X.shape)
+            dout = np.random.uniform(-1, 1, size=X.shape).astype(TYPE_FLOAT)
 
             Y = _layer.function(
                 X,
@@ -496,8 +494,8 @@ def test_020_fss_method_gradient_descent():
             # ********************************************************************************
             # Constraint: expected gradients match with actual
             # ********************************************************************************
-            expected_dGamma = np.sum(dout * _layer.X, axis=0)
-            expected_dBeta = np.sum(dout, axis=0)
+            expected_dGamma = np.sum(dout * _layer.X, axis=0, dtype=TYPE_FLOAT)
+            expected_dBeta = np.sum(dout, axis=0, dtype=TYPE_FLOAT)
             assert np.allclose(expected_dGamma, dGamma, atol=u), \
                 "Need dGamma\n%s\nbut\n%s\ndiff=\n%s\n" \
                 % (expected_dGamma, dGamma, expected_dGamma-dGamma)
@@ -516,7 +514,7 @@ def test_020_fss_method_predict():
     # pylint: disable=not-callable
     def objective(X: np.ndarray) -> Union[float, np.ndarray]:
         """Dummy objective function"""
-        return np.sum(X)
+        return np.sum(X, dtype=TYPE_FLOAT)
 
     profiler = cProfile.Profile()
     profiler.enable()
@@ -524,14 +522,13 @@ def test_020_fss_method_predict():
     for _ in range(NUM_MAX_TEST_TIMES):
         name = random_string(np.random.randint(1, 10))
         numexpr_enabled = bool(np.random.randint(0, 2))
-        numba_enabled = bool(np.random.randint(0, 2))
 
         # For BN which works on statistics on per-feature basis,
         # no sense if M = 1 or N = 1.
         N: int = np.random.randint(2, NUM_MAX_BATCH_SIZE)
         M: int = np.random.randint(2, NUM_MAX_NODES)
 
-        X = np.random.randn(N, M)
+        X = np.random.randn(N, M).astype(TYPE_FLOAT)
 
         _layer = _instance(
             name=name,
@@ -546,4 +543,4 @@ def test_020_fss_method_predict():
         # ********************************************************************************
         # Constraint: With only 1 invocation, predict should be the same with Y.
         # ********************************************************************************
-        assert np.allclose(Y, _layer.predict(X), atol=1e-9, rtol=0)
+        assert np.allclose(Y, _layer.predict(X), atol=TYPE_FLOAT(1e-9), rtol=TYPE_FLOAT(0))

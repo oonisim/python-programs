@@ -10,7 +10,7 @@ import tensorflow as tf
 # --------------------------------------------------------------------------------
 TYPE_INT = np.int32
 TYPE_LABEL = np.int32
-TYPE_FLOAT = np.float64       # alias of Python float
+TYPE_FLOAT = np.float32       # alias of Python float
 assert not isinstance(TYPE_FLOAT, (float, np.float))
 # TYPE_FLOAT = np.float64   # Cannot use due to Numpy default is float.
 TYPE_TENSOR = TypeVar('TYPE_TENSOR', np.ndarray, tf.Tensor)
@@ -41,11 +41,11 @@ TYPE_NN_FLOAT = tf.float32
 #   because we need OFFSET_LOG > OFFSET_DELTA to avoid the numerical gradient from
 #   causing np.nan by f(log(x + OFFSET_LOG - OFFSET_DELTA)).
 # --------------------------------------------------------------------------------
-OFFSET_DELTA = TYPE_FLOAT(1e-10) if TYPE_FLOAT == np.float64 else TYPE_FLOAT(1e-5)
+OFFSET_DELTA = TYPE_FLOAT(1e-10) if TYPE_FLOAT == np.float64 else TYPE_FLOAT(1e-7)
 OFFSET_LOG = OFFSET_DELTA * TYPE_FLOAT(10.0)
 assert OFFSET_LOG > OFFSET_DELTA
 # Avoid div by zero at (X-u) / sqrt(variance + eps)
-OFFSET_STD = TYPE_FLOAT(1e-10) if TYPE_FLOAT == np.float64 else TYPE_FLOAT(1e-5)
+OFFSET_STD = TYPE_FLOAT(1e-10) if TYPE_FLOAT == np.float64 else TYPE_FLOAT(1e-7)
 
 # When True, set the element to the offset value only when it is below the offset,
 # clipping element values at the offset.

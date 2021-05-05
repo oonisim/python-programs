@@ -590,6 +590,7 @@ def test_020_std_method_function_multi_invocations_to_succeed():
         while True:
             Z = np.random.randn(np.random.randint(1, NUM_MAX_BATCH_SIZE), M)
             if Z.shape[0] != N:
+                Z = Z.astype(TYPE_FLOAT)
                 break
 
         _layer.function(

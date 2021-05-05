@@ -1188,6 +1188,7 @@ def prediction_grid_2d(x_min, x_max, y_min, y_max, prediction_function, add_bias
         x1,
         x2
     ]
+    X = X.astype(TYPE_FLOAT)
 
     P = prediction_function(X)
     P = P.reshape(x1_grid.shape)

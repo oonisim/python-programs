@@ -297,3 +297,61 @@ def test_010_sequential_train2():
     for loss in network.history:
         print(loss)
 
+
+def test():
+    from layer.constants import (
+        _WEIGHTS,
+        _NAME,
+        _SCHEME,
+        _OPTIMIZER,
+        _NUM_NODES,
+        _NUM_FEATURES,
+        _LOG_LEVEL,
+        _PARAMETERS
+    )
+    from layer import (
+        Matmul,
+        CrossEntropyLogLoss
+    )
+    from optimizer import (
+        SGD
+    )
+    from common.function import (
+        sigmoid_cross_entropy_log_loss
+    )
+    from data import (
+        linear_separable,
+        linear_separable_sectors,
+    )
+    M = 1
+    N = 500  # Number of plots
+    D = 2  # Number of features
+    sigmoid_classifier_specification = {
+        _NAME: "softmax_classifier",
+        _NUM_NODES: M,
+        _LOG_LEVEL: logging.ERROR,
+        _COMPOSITE_LAYER_SPEC: {
+            "matmul01": Matmul.specification(
+                name="matmul",
+                num_nodes=M,
+                num_features=D,
+                weights_initialization_scheme="he",
+                weights_optimizer_specification=SGD.specification(
+                    lr=TYPE_FLOAT(0.2),
+                    l2=TYPE_FLOAT(1e-3)
+                )
+            ),
+            "loss": CrossEntropyLogLoss.specification(
+                name="loss",
+                num_nodes=M,
+                loss_function=sigmoid_cross_entropy_log_loss.__qualname__
+            )
+        }
+    }
+    logistic_classifier = SequentialNetwork.build(
+        specification=sigmoid_classifier_specification,
+    )
+    MAX_TEST_TIMES = 50
+    X_Bin, T_Bin, V_Bin = linear_separable(d=D, n=N)
+    for i in range(MAX_TEST_TIMES):
+        logistic_classifier.train(X=X_Bin, T=T_Bin)
