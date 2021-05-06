@@ -673,7 +673,9 @@ class Embedding(Layer):
         # ================================================================================
         # Result of np.c_[Ye, Ys]
         # ================================================================================
-        self._Y = self.concat([self.reshape(Ye, shape=(-1, 1)), Ys], axis=1)
+        Y = self.concat([self.reshape(Ye, shape=(-1, 1)), Ys], axis=1)
+        Y = Y.numpy()     # for TF
+        self._Y = Y
         del Ye, Ys
         assert \
             self.is_finite(self.Y) and \
@@ -967,7 +969,7 @@ class Embedding(Layer):
         # trying to copy data into self.X which can cause unexpected effects.
         # --------------------------------------------------------------------------------
         self._dX = np.empty(shape=self._X_shape)
-        return self.X
+        return self.dX
 
     def gradient_numerical(
             self,
@@ -1194,8 +1196,8 @@ class Embedding(Layer):
             3. Reshape ye and T into (1,-1).
 
         For shape ys:(N,SL): objective_Ws() output.
-            1. Create labels T of shape:(N,SL) to match Y:(N,SL) as zeros.
-            2. Set true labels 1 for the targets at the column 0 in T.
+            1. Create labels T of shape:(N,SL) to match Y:(N,SL).
+            2. Set true labels 0 as for the negative samples
             3. Reshape ys and T into (1,-1).
 
         Args:
@@ -1238,7 +1240,7 @@ class Embedding(Layer):
             T[
                 ::,
                 0
-            ] = TYPE_INT(1)
+            ] = TYPE_INT(0)
             loss.T = self.reshape(T, (-1, 1))
             ys = self.reshape(X=ys, shape=(-1, 1))   # (N,1)
             return ys
@@ -1253,7 +1255,11 @@ class Embedding(Layer):
             ye = self.reshape(X=ye, shape=(-1, 1))   # (N,1)
             return ye
 
-        def f(Y: TYPE_TENSOR):
+        def f(Y: TYPE_TENSOR, adapter: Layer = None):
+            assert adapter.M == 1, \
+                "The number of adapter layer outputs must be 1 " \
+                "to adapt to logistic log loss but {}".format(adapter.M)
+
             shape = self.tensor_shape(Y)
             if shape == (self.N, (1+self.SL)):  # Y:(N,1+SL)
                 return _adapt_function_handle_Y(Y)
@@ -1270,14 +1276,20 @@ class Embedding(Layer):
         """Adapter function to bridge between Logistic Log Loss layer gradient()
         and Embedding layer gradient().
 
-        Logistic log loss back-propagates dL/dY of shape (N',1) via gradient(dY).
+        Logistic log loss back-propagates dL/dY of shape (N*(1+SL),1).
         Transform the shape into (N, 1+SL) to match the Embedding output Y.
         """
-        def g(dY: TYPE_TENSOR):
+        def g(dY: TYPE_TENSOR, adapter: Layer = None):
+            """Reshape the dY:(N*(1+SL), 1) from the Log Loss layer to
+            (N, 1+SL) to back-propagate to the Embedding.
+
+            Logistic Log Loss layer function () expects (N*(1+SL), 1) shape.
+            Hence the gradient dL/dY from the Loss has (N*(1+SL), 1) shape too.
+            """
             assert \
-                self.tensor_shape(dY) == (self.N * (1+self.SL),), \
+                self.tensor_shape(dY) == (self.N * (1+self.SL), 1), \
                 "Expected shape is %s but %s" \
-                % ((self.N * (1+self.SL),), self.tensor_shape(dY))
+                % ((self.N * (1+self.SL), 1), self.tensor_shape(dY))
 
             dY = self.reshape(X=dY, shape=(-1, (1+self.SL)))
             assert self.tensor_shape(self.Y) == self.tensor_shape(dY)

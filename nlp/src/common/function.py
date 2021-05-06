@@ -254,10 +254,13 @@ def sigmoid(
 
         To prevent such instability, limit the value range of X with boundary.
     """
-    assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) or isinstance(X, TYPE_FLOAT)
+    assert \
+        (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) \
+        or isinstance(X, TYPE_FLOAT), "Expected float array or scalar but %s" % X
     assert np.all(np.isfinite(X)), f"{X}"
 
-    boundary = BOUNDARY_SIGMOID if (boundary is None or boundary <= TYPE_FLOAT(0)) else boundary
+    boundary = BOUNDARY_SIGMOID \
+        if (boundary is None or boundary <= TYPE_FLOAT(0)) else boundary
     assert boundary > 0
 
     if np.all(np.abs(X) <= boundary):

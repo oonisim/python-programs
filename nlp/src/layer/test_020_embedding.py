@@ -754,18 +754,18 @@ def test_020_embedding_gradient_vs_autodiff(caplog):
         # - dW is close to EDW
         # - dL/dWe = dL/dWs = Bc when dL/dY = I
         # ********************************************************************************
-        Function.assert_all_close(
-            EDWe, dWe, msg="Expected (EDWe==dWe)\n%s\ndifference\n%s\n" % (EDWe, EDWe-dWe)
-        )
-        Function.assert_all_close(
-            EDWs, dWs, msg="Expected (EDWs==dWs)\n%s\ndifference\n%s\n" % (EDWs, EDWs-dWs)
-        )
-        Function.assert_all_close(
-            EDWc, dWc, msg="Expected (EWc5==W[5])\n%s\ndifference\n%s\n" % (EDWc, EDWc-dWc)
-        )
-        Function.assert_all_close(
-            dWe, dWs, msg="Expected (dWe==dWs) but dWe:\n%s\ndifference\n%s\n" % (dWe, dWe-dWs)
-        )
+        assert Function.all_close(
+            EDWe, dWe
+        ), "Expected (EDWe==dWe)\n%s\ndifference\n%s\n" % (EDWe, EDWe-dWe)
+        assert Function.all_close(
+            EDWs, dWs
+        ), "Expected (EDWs==dWs)\n%s\ndifference\n%s\n" % (EDWs, EDWs-dWs)
+        assert Function.all_close(
+            EDWc, dWc
+        ), "Expected (EWc5==W[5])\n%s\ndifference\n%s\n" % (EDWc, EDWc-dWc)
+        assert Function.all_close(
+            dWe, dWs
+        ), "Expected (dWe==dWs) but dWe:\n%s\ndifference\n%s\n" % (dWe, dWe-dWs)
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")
@@ -848,7 +848,7 @@ def test_020_embedding_gradient_descent(caplog):
     diff_We = embedding.optimizer.differential(dW=embedding.dWe)
     msg_We = "dWe: expected\n%s\n but actual diff=:\n%s\n" % \
              (expected_diff_We, (expected_diff_We-diff_We))
-    embedding.assert_all_close(
+    embedding.all_close(
         expected_diff_We, diff_We, msg=msg_We
     )
     EWe = embedding.W[3] - expected_diff_We
@@ -857,7 +857,7 @@ def test_020_embedding_gradient_descent(caplog):
     diff_Wc = embedding.optimizer.differential(dW=embedding.dWc)
     msg_Wc = "dWc: expected\n%s\n but actual diff=:\n%s\n" % \
              (expected_diff_Wc, (expected_diff_Wc-diff_Wc))
-    embedding.assert_all_close(
+    embedding.all_close(
         expected_diff_Wc, diff_Wc, msg=msg_Wc
     )
     EWc4 = np.subtract(embedding.W[4], expected_diff_Wc)
@@ -877,16 +877,16 @@ def test_020_embedding_gradient_descent(caplog):
     # - dW is close to EDW
     # - dL/dWe = dL/dWs = Bc when dL/dY = I
     # ********************************************************************************
-    Function.assert_all_close(
+    assert Function.all_close(
         EDWe, dWe, msg="Expected (EDWe==dWe)\n%s\ndifference\n%s\n" % (EDWe, EDWe - dWe)
     )
-    Function.assert_all_close(
+    assert Function.all_close(
         EDWs, dWs, msg="Expected (EDWs==dWs)\n%s\ndifference\n%s\n" % (EDWs, EDWs - dWs)
     )
-    Function.assert_all_close(
+    assert Function.all_close(
         EDWc, dWc, msg="Expected (EWc5==W[5])\n%s\ndifference\n%s\n" % (EDWc, EDWc - dWc)
     )
-    Function.assert_all_close(
+    assert Function.all_close(
         dWe, dWs, msg="Expected (dWe==dWs) but dWe:\n%s\ndifference\n%s\n" % (dWe, dWe - dWs)
     )
 
@@ -897,19 +897,19 @@ def test_020_embedding_gradient_descent(caplog):
     assert np.array_equal(expected_diff_Wc, lr * (1+l2) * dWc)
 
     # - W[3] = W[3] - [lr * (1 + l2) * dWe].
-    Function.assert_all_close(
+    assert Function.all_close(
         EWe, embedding.W[3], msg="Expected (EDWe==W[3])\n%s\ndifference\n%s\n" % (EWe, EWe - embedding.W[3])
     )
     # W[4] = W[4] - [lr * (1 + l2) * dWc]
-    Function.assert_all_close(
+    assert Function.all_close(
         EWc4, embedding.W[4], msg="Expected (EWc4==W[4])\n%s\ndifference\n%s\n" % (EWc4, EWc4 - embedding.W[4])
     )
     # W[5] = W[5] - [lr * (1 + l2) * 2 * dWc]
-    Function.assert_all_close(
+    assert Function.all_close(
         EWc5, embedding.W[5], msg="Expected (EWc5==W[5])\n%s\ndifference\n%s\n" % (EWc5, EWc5 - embedding.W[5])
     )
     # W[6] = W[6] - [lr * (1 + l2) * dWc]
-    Function.assert_all_close(
+    assert Function.all_close(
         EWc6, embedding.W[6], msg="Expected (EWc6==W[6])\n%s\ndifference\n%s\n" % (EWc6, EWc6 - embedding.W[6])
     )
 
@@ -999,4 +999,3 @@ def test_020_embedding_save_load(caplog):
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")
-

@@ -61,7 +61,7 @@ OFFSET_MODE_ELEMENT_WISE = True
 # Before it starts, need to stop X from getting closer to log(k).
 # Hence X < -np.log(OFFSET_LOG) * safety_margin_ratio.
 # --------------------------------------------------------------------------------
-BOUNDARY_SIGMOID = -np.log(OFFSET_LOG) * TYPE_FLOAT(0.5)
+BOUNDARY_SIGMOID = -np.log(OFFSET_LOG, dtype=TYPE_FLOAT) * TYPE_FLOAT(0.5)
 
 # Threshold below which the gradient is regarded as saturated.
 GRADIENT_SATURATION_THRESHOLD = TYPE_FLOAT(1e-10) if TYPE_FLOAT == np.float64 else TYPE_FLOAT(1e-5)

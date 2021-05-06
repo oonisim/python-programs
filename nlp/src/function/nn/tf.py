@@ -32,15 +32,39 @@ class Function(base.Function):
     # Tensors
     # --------------------------------------------------------------------------------
     @staticmethod
-    def is_finite(X) -> bool:
-        return tf.reduce_all(tf.math.is_finite(X))
-
-    @staticmethod
     def ones(shape=None, dtype=TYPE_NN_FLOAT):
         return tf.ones(
             shape=shape, dtype=dtype, name=None
         )
 
+    # --------------------------------------------------------------------------------
+    # Tensor validations
+    # --------------------------------------------------------------------------------
+    @staticmethod
+    def is_finite(X) -> bool:
+        return tf.reduce_all(tf.math.is_finite(X))
+
+    @staticmethod
+    def all_close(x, y, msg=None):
+        try:
+            tf.debugging.assert_near(
+                x, y,
+                # rtol=None,
+                atol=tf.constant(1e-4, dtype=TYPE_FLOAT),
+                message=msg,
+                summarize=None
+            )
+            return True
+        except tf.errors.InvalidArgumentError as e:
+            return False
+
+    @staticmethod
+    def all_equal(x, y):
+        return tf.reduce_all(tf.math.equal(x, y))
+
+    # --------------------------------------------------------------------------------
+    # Operations
+    # --------------------------------------------------------------------------------
     @staticmethod
     def concat(values, axis=0):
         return tf.concat(values, axis=axis)
@@ -365,21 +389,6 @@ class Function(base.Function):
             raise ValueError(f"{name} caused Nan or Inf \n%s\n" % dX.numpy())
 
         return dX
-
-    # --------------------------------------------------------------------------------
-    # Assertion
-    # --------------------------------------------------------------------------------
-    @staticmethod
-    def assert_all_close(x, y, msg):
-        try:
-            tf.debugging.assert_near(
-                x, y,
-                rtol=None, atol=tf.constant(1e-5, dtype=TYPE_FLOAT),
-                message=msg,
-                summarize=None
-            )
-        except tf.errors.InvalidArgumentError as e:
-            raise AssertionError(str(e))
 
     # ================================================================================
     # Instance

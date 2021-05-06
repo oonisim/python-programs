@@ -210,11 +210,12 @@ class Layer(nn.Function):
                 self.logger.warning("Input data X has not been standardized.")
 
         self._X = X
-        self._N = self.X.shape[0]
+        self._N = self.tensor_shape(X)[0]
 
         # Allocate the storage for np.func(out=dX).
-        if self._dX.shape != self.X.shape:
-            self._dX = np.empty(self.X.shape, dtype=self.X.dtype)
+        if not self.is_same_shape(self._dX, self._X):
+            # self._dX = np.empty(self._X.shape, dtype=self._X.dtype)
+            self._dX = np.empty(self.tensor_shape(X), dtype=TYPE_FLOAT)
 
         # DO NOT
         # self._D = X.shape[1]
@@ -226,7 +227,7 @@ class Layer(nn.Function):
         return self._N
 
     @property
-    def dX(self) -> np.ndarray:
+    def dX(self) -> TYPE_TENSOR:
         """Gradient dL/dX"""
         assert isinstance(self._dX, np.ndarray) and self._dX.size > 0, \
             "dX is not initialized"
@@ -239,7 +240,7 @@ class Layer(nn.Function):
         return self._dX
 
     @property
-    def T(self) -> np.ndarray:
+    def T(self) -> TYPE_TENSOR:
         """Label in OHE or index format"""
         assert self._T is not None and self._T.size > 0, "T is not initialized"
         return self._T
@@ -425,7 +426,7 @@ class Layer(nn.Function):
         # In case for the layer is a repeater, pass X through as the default behavior.
         return self.Y
 
-    def forward(self, X: np.ndarray) -> Union[np.ndarray, float]:
+    def forward(self, X: TYPE_TENSOR) -> TYPE_TENSOR:
         """Calculate and forward-propagate the matmul output Y to post layers if exist.
         Args:
             X: input to the layer
@@ -449,7 +450,9 @@ class Layer(nn.Function):
         list(map(_forward, Y, self._posteriors))
         return Y
 
-    def gradient(self, dY: Union[TYPE_TENSOR, TYPE_FLOAT]) -> Union[TYPE_TENSOR, TYPE_FLOAT]:
+    def gradient(
+            self, dY: Union[TYPE_TENSOR, TYPE_FLOAT]
+    ) -> Union[TYPE_TENSOR, TYPE_FLOAT]:
         """Calculate the gradient dL/dX, the impact on L by the input dX
         to back propagate to the previous layer, and other gradients on S
         dL/dS = dL/dY * dY/dS.
@@ -475,7 +478,8 @@ class Layer(nn.Function):
         # - dL/dY if it has the same shape of X
         # - dL/dY * Ones(shape=X.shape) if dL/dY can be broadcast to X
         # - X
-        if self.tensor_shape(dY) == self.tensor_shape(self.X):
+
+        if self.is_same_shape(dY, self.X):
             pass
         elif self.is_broadcastable(dY, self.X):
             dY = self.multiply(dY, self.X)
@@ -532,11 +536,11 @@ class Layer(nn.Function):
         dX = numerical_jacobian(L, self.X)
         return [dX]
 
-    def update(self) -> List[Union[float, np.ndarray]]:
+    def update(self) -> List[Union[TYPE_TENSOR, TYPE_FLOAT]]:
         """Calculate the gradient dL/dS and update S with gradient descent.
         Returns:
             dL/dS:
-                Gradient(s) on state S. There may be multiple dL/dS.
+                List of gradient(s) on state S. There may be multiple dL/dS.
 
                 Back-propagation to the previous layer is not included as
                 it is not part of the state S of the layer.
@@ -556,7 +560,7 @@ class Layer(nn.Function):
         # to update in a layer.
         return self.dS
 
-    def predict(self, X):
+    def predict(self, X: Union[TYPE_TENSOR, TYPE_FLOAT]):
         """Calculate the score for prediction
         Args:
             X: Input

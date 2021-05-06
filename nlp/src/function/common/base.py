@@ -81,12 +81,11 @@ class Function:
     @staticmethod
     def is_tensor(X):
         """Check if X is rank > 1 tensor
-        Scalar and vector are tensor, but "tensor" is re-defined as rank 2 or larger,
-        so as to handle scalar, and vector respectively.
         """
-        return \
-            (isinstance(X, np.ndarray) and X.ndim > 0) or \
-            (tf.is_tensor(X) and tf.rank(X) > 0)
+        # return \
+        #     (isinstance(X, np.ndarray) and X.ndim > 0) or \
+        #     (tf.is_tensor(X) and tf.rank(X) > 0)
+        return isinstance(X, np.ndarray) or tf.is_tensor(X)
 
     @staticmethod
     def is_float_tensor(X) -> bool:
