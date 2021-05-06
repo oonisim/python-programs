@@ -1,8 +1,11 @@
 import string
 import random
 import logging
+import json
+import decimal
 
 import numpy as np
+import tensorflow as tf
 
 import function.common.base as base
 from common.constant import (
@@ -11,6 +14,24 @@ from common.constant import (
 )
 
 Logger = logging.getLogger(__name__)
+
+
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, o):
+        if tf.is_tensor(o):
+            o = o.numpy()
+        if isinstance(o, np.ndarray):
+            if o.size == 1:
+                o = o.item()
+            else:
+                o = o.tolist()
+        if isinstance(o, decimal.Decimal) or isinstance(o, np.number):
+            if o % 1 > 0:
+                return float(o)
+            else:
+                return int(o)
+        else:
+            return super(DecimalEncoder, self).default(o)
 
 
 class Function(base.Function):
@@ -84,6 +105,17 @@ class Function(base.Function):
     def random_string(stringLength=8):
         letters = string.ascii_lowercase
         return ''.join(random.choice(letters) for i in range(stringLength))
+
+    @staticmethod
+    def pretty_json(dictionary):
+        """
+        Pretty print Python dictionary
+        Args:
+            dictionary: Python dictionary
+        Returns:
+            Pretty JSON
+        """
+        return json.dumps(dictionary, indent=4, cls=DecimalEncoder)
 
     # ================================================================================
     # Instance

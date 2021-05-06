@@ -72,4 +72,4 @@ class Adapter(Layer):
         return self.dX
 
     def update(self) -> List[Any]:
-        return self._update(...)
+        return self._update(self)
