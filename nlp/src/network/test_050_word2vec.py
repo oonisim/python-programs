@@ -35,7 +35,7 @@ from network.sequential import (
 Logger = logging.getLogger(__name__)
 
 
-@memory_profile
+## @memory_profile
 def test_word2vec():
     USE_PTB = True
     DEBUG = False
@@ -127,28 +127,42 @@ def test_word2vec():
         ]
     )
 
-    NUM_SENTENCES = 10
-    MAX_ITERATIONS = 10
+    NUM_SENTENCES = 100
+    MAX_ITERATIONS = 100000
 
     def train():
         stream = fileio.Function.file_line_stream(path_to_ptb)
         try:
             while True:
-                sentences = np.array(fileio.Function.take(NUM_SENTENCES, stream))
-                yield sentences
-        except StopIteration:
-            pass
+                lines = fileio.Function.take(NUM_SENTENCES, stream)
+                if len(''.join(lines).replace('\n', '').replace(' ', '')) > 0:
+                    sentences = np.array(lines)
+                    yield sentences
         finally:
             stream.close()
-
-    trainer = train()
 
     profiler = cProfile.Profile()
     profiler.enable()
 
-    for _ in range(MAX_ITERATIONS):
-        network.train(X=next(trainer), T=np.array([0]))
-        print(network.history[-1])
+    epochs = 0
+    trainer = train()
+    for i in range(MAX_ITERATIONS):
+        try:
+            network.train(X=next(trainer), T=np.array([0]))
+            if i % 25 == 0:
+                print(f"{i:05d}: Loss: {network.history[-1]:15f}")
+            if i % 1000 == 0:
+                embedding.save("wor2vec_embedding.pkl")
+        except StopIteration as e:
+            epochs += 1
+            trainer = train()
+            pass
+        except Exception as e:
+            print("Unexpected error {0}".format(str(e)))
+            trainer = train()
+            pass
+
+    embedding.save("wor2vec_embedding.pkl")
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")

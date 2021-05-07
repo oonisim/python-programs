@@ -107,6 +107,7 @@ Python relative import is defective. Use sys.path + absolute import ONLY.
 Or spend hours on "attempted relative import beyond top-level package"
 """
 import logging
+from traceback import print_stack
 from typing import (
     Any,
     Optional,
@@ -190,12 +191,14 @@ class Layer(nn.Function):
     @property
     def X(self) -> TYPE_TENSOR:
         """Latest batch input to the layer"""
-        assert \
-            (self.is_tensor(self._X) and self.tensor_size(self._X) > 0) or \
-            self.is_float_scalar(self._X), \
-            "X is not initialized or invalid. type(X)={} X=\n{}\n".format(
+        if not (
+            (self.is_tensor(self._X) and self.tensor_size(self._X) > 0) or
+            self.is_float_scalar(self._X)
+        ):
+            print_stack()
+            raise AssertionError("X is not initialized or invalid. type(X)={} X=\n{}\n".format(
                 type(self._X), self._X
-            )
+            ))
 
         return self._X
 
