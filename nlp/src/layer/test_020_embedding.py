@@ -20,9 +20,6 @@ from common.constant import (
 from function.nn import (
     Function
 )
-from layer.constants import (
-    MAX_NEGATIVE_SAMPLE_SIZE
-)
 from layer.preprocessing import (
     EventIndexing,
     EventContext
@@ -708,7 +705,14 @@ def test_020_embedding_gradient_vs_autodiff(caplog):
 
         # E=SL for (N,E,D) and (N,SL,D) has the same shape
         E = SL = TYPE_INT(
-            np.random.randint(1, min(MAX_NEGATIVE_SAMPLE_SIZE, (max_sentence_length - C))+1)
+            np.random.randint(
+                1,
+                min(
+                    Embedding.MAX_TARGET_SIZE,
+                    Embedding.MAX_NEGATIVE_SAMPLE_SIZE,
+                    (max_sentence_length - C)
+                )+1
+            )
         )
 
         target_size = negative_sample_size = TYPE_INT(E)
@@ -923,7 +927,7 @@ def test_020_embedding_save_load(caplog):
     caplog.set_level(logging.DEBUG)
     name = "test_020_embedding_save_load"
     sentences = """
-    Verify 
+    Verify the gradient descent, especially np.ufunc.at, is working as expected 
     """
 
     dictionary: EventIndexing = _instantiate_event_indexing()

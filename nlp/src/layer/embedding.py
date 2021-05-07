@@ -21,11 +21,9 @@ from common.constant import (
     EVENT_META_ENTITIES,
     TYPE_NN_FLOAT
 )
-from common.function import (
-    numerical_jacobian,
-)
-from layer.constants import (
-    MAX_NEGATIVE_SAMPLE_SIZE,
+from common.constant import (
+    EVENT_INDEX_NIL,
+    EVENT_INDEX_UNK
 )
 from layer.base import Layer
 from layer.objective import (
@@ -101,6 +99,15 @@ class Embedding(Layer):
     # ================================================================================
     # Class
     # ================================================================================
+    # --------------------------------------------------------------------------------
+    # EventEmbedding negative sampling size
+    # --------------------------------------------------------------------------------
+    MAX_NEGATIVE_SAMPLE_SIZE = 20
+    MAX_TARGET_SIZE = 5
+
+    # --------------------------------------------------------------------------------
+    # Static methods
+    # --------------------------------------------------------------------------------
     @staticmethod
     def specification_template():
         raise NotImplementedError("TBD")
@@ -415,10 +422,10 @@ class Embedding(Layer):
             - len(EVENT_META_ENTITIES)
         )
         assert \
-            TYPE_INT(0) < negative_sample_size <= MAX_NEGATIVE_SAMPLE_SIZE and \
+            TYPE_INT(0) < negative_sample_size <= Embedding.MAX_NEGATIVE_SAMPLE_SIZE and \
             TYPE_INT(0) < negative_sample_size <= availability_for_negatives, \
             "negative_sample_size [%s] needs less than MAX_NEGATIVE_SAMPLE_SIZE [%s]" % \
-            (negative_sample_size, MAX_NEGATIVE_SAMPLE_SIZE)
+            (negative_sample_size, Embedding.MAX_NEGATIVE_SAMPLE_SIZE)
         assert isinstance(optimizer, optimiser.Optimizer)
 
         # --------------------------------------------------------------------------------
@@ -465,6 +472,10 @@ class Embedding(Layer):
         else:
             self._W: TYPE_TENSOR = self.tensor_cast(copy.deepcopy(W), dtype=TYPE_FLOAT)
 
+        # Set the event vector for NIL and UNK to zero.
+        self._W[EVENT_INDEX_NIL] = TYPE_FLOAT(0)
+        self._W[EVENT_INDEX_UNK] = TYPE_FLOAT(0)
+
         assert isinstance(self._W, np.ndarray), "Needs NumPy array for array indexing"
         assert \
             self.is_same_dtype(self.tensor_dtype(self.W), TYPE_FLOAT), \
@@ -478,16 +489,25 @@ class Embedding(Layer):
 
         self._D = self.W.shape[1]
 
+        # --------------------------------------------------------------------------------
+        # Event vectors for target event vector(s)
+        # --------------------------------------------------------------------------------
         self._We: TYPE_TENSOR = np.empty(shape=(), dtype=TYPE_FLOAT)      # Event vectors for target
         self._Be: TYPE_TENSOR = np.empty(shape=(), dtype=TYPE_FLOAT)      # BoW of event vectors for targets
         self._dWe: TYPE_TENSOR = np.empty(shape=(), dtype=TYPE_FLOAT)     # dL/dWe
 
+        # --------------------------------------------------------------------------------
+        # Event vectors for context event vectors
+        # --------------------------------------------------------------------------------
         self._Wc: TYPE_TENSOR = np.empty(shape=(), dtype=TYPE_FLOAT)      # Event vectors for context
         self._Bc: TYPE_TENSOR = np.empty(shape=(), dtype=TYPE_FLOAT)      # BoW of event vectors for contexts
         self._dWc: TYPE_TENSOR = np.empty(shape=(), dtype=TYPE_FLOAT)     # dL/dWc:(N,C,D)=(dL/dWc01 + dL/dWc02).
         self._dWc01: TYPE_TENSOR = np.empty(shape=(), dtype=TYPE_FLOAT)   # dL/dWc01:(N,C,D) with Be (BoWs of target event vectors).
         self._dWc02: TYPE_TENSOR = np.empty(shape=(), dtype=TYPE_FLOAT)   # dL/dWc02:(N,S,D) with Ws (negative sample event vectors).
 
+        # --------------------------------------------------------------------------------
+        # Event vectors for negative samples
+        # --------------------------------------------------------------------------------
         self._Ws: TYPE_TENSOR = np.empty(shape=(), dtype=TYPE_FLOAT)      # Event vectors for negative samples
         self._dWs: TYPE_TENSOR = np.empty(shape=(), dtype=TYPE_FLOAT)     # dL/dWs
 
@@ -572,8 +592,8 @@ class Embedding(Layer):
 
         Args:
             X:  (event, context) pairs. The expected shape is either:
-                - Rank 2: (num_windows, E+C)    when X has one sequence.
-                - Rank 3: (N, num_windows, E+C) when X has multiple sequences.
+                - Rank 2 for (num_windows, E+C)    when X has one sequence.
+                - Rank 2 for (N*num_windows, E+C)  when X has multiple sequences.
 
                 num_windows is the number of context windows in a sequence which
                 varies per sequence.
@@ -674,7 +694,7 @@ class Embedding(Layer):
         # Result of np.c_[Ye, Ys]
         # ================================================================================
         Y = self.concat([self.reshape(Ye, shape=(-1, 1)), Ys], axis=1)
-        Y = Y.numpy()     # for TF
+        Y = Y.numpy() if tf.is_tensor(Y) else Y
         self._Y = Y
         del Ye, Ys
         assert \
@@ -1172,7 +1192,7 @@ class Embedding(Layer):
                 self.tensor_shape(X)
             )
 
-        return predictions
+        return predictions.numpy() if tf.is_tensor(predictions) else predictions
 
     def adapt_function_to_logistic_log_loss(self, loss: CrossEntropyLogLoss):
         """Adapter function to bridge between Embedding layer function() and

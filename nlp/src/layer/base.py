@@ -262,13 +262,15 @@ class Layer(nn.Function):
         """Latest layer output
         No need to allocate a storage for dY as it is allocated by the post layer.
         """
+        # Y can be TYPE_INT tensor for e.g. EventIndexing
         # assert \
-        #     (isinstance(self._Y, np.ndarray) and self._Y.dtype == TYPE_FLOAT) and \
-        #     self._Y.size > 0, \
+        #     (self.is_float_tensor(self._Y) and self.tensor_size(self._Y) > 0) or \
+        #     self.is_float_scalar(self._Y), \
         #     "Y %s of type %s is not initialized or invalid." % \
         #     (self._Y, type(self._Y))
         assert \
             (self.is_float_tensor(self._Y) and self.tensor_size(self._Y) > 0) or \
+            (self.is_integer_tensor(self._Y) and self.tensor_size(self._Y) > 0) or \
             self.is_float_scalar(self._Y), \
             "Y %s of type %s is not initialized or invalid." % \
             (self._Y, type(self._Y))

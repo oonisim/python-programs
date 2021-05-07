@@ -102,9 +102,22 @@ class Network(Layer):
         The inference layer can be a network which needs T. Hence set on both
         inference and objective layers.
         """
+        # Restart Jupyter kernel the error:
+        # TypeError: super(type, obj): obj must be an instance or subtype of type
+        # See
+        # - https://stackoverflow.com/a/52927102/4281353
+        # - http://thomas-cokelaer.info/blog/2011/09/382/
+        # """
+        # The problem resides in the mechanism of reloading modules.
+        # Reloading a module often changes the internal object in memory which
+        # makes the isinstance test of super return False.
+        # """
+        #
+        # super(Network, self).T.fset(self, T) will NOT work.
+        # See https://stackoverflow.com/a/66512976/4281353
         super(Network, type(self)).T.fset(self, T)
-        for __layer in self.layers_all:
-            __layer.T = T
+        for _layer in self.layers_all:
+            _layer.T = T
 
     @property
     def L(self) -> Union[TYPE_FLOAT, np.ndarray]:
@@ -263,8 +276,8 @@ class Network(Layer):
         Returns:
             Model S: Updated state of the network
         """
-        # pylint: disable=not-callable
-        self.X = X.astype(TYPE_FLOAT)
+        # self.X = X.astype(TYPE_FLOAT)
+        self.X = X
         self.T = T.astype(TYPE_LABEL)   # Set T to the layers. See @T.setter
 
         # --------------------------------------------------------------------------------

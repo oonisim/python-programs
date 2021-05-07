@@ -9,7 +9,9 @@ https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-
 https://stackoverflow.com/a/34102855/4281353
 """
 from typing import (
-    Generator
+    List,
+    Generator,
+    Iterable
 )
 import errno
 import os
@@ -18,6 +20,8 @@ import tempfile
 import pathlib
 import logging
 import pickle
+from itertools import islice
+
 import function.common.base as base
 
 # Sadly, Python fails to provide the following magic number for us.
@@ -204,12 +208,17 @@ class Function(base.Function):
             raise RuntimeError(f"Path {path} does not exist.")
 
     @staticmethod
+    def take(n: int, iterable: Iterable) -> List:
+        """Return next n items from the iterable as a list"""
+        return list(islice(iterable, n))
+
+    @staticmethod
     def file_line_stream(path: str) -> Generator[str, None, None]:
         """Stream  lines from the file.
         Args:
             path: file path
         Returns: line
-        Raises: FileNotFoundError
+        Raises: RuntimeError, StopIteration
 
         NOTE: Generator typing
             https://stackoverflow.com/questions/57363181/

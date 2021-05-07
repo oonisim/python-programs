@@ -70,6 +70,3 @@ class Adapter(Layer):
         self.dY = dY
         self._dX = self._gradient(dY, self)
         return self.dX
-
-    def update(self) -> List[Any]:
-        return self._update(self)

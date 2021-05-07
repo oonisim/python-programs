@@ -1,8 +1,6 @@
 import cProfile
-import copy
 import logging
 import os
-import random
 from typing import (
     Tuple,
     Callable,
@@ -10,40 +8,29 @@ from typing import (
 
 import numpy as np
 
-import testing.layer
 from common.constant import (
     TYPE_INT,
     TYPE_FLOAT,
     TYPE_LABEL,
-    TYPE_TENSOR,
-    EVENT_META_ENTITIES
+    TYPE_TENSOR
 )
 from common.function import (
     sigmoid_cross_entropy_log_loss,
     sigmoid
 )
-from function.nn import (
-    Function
+from layer.adapter import (
+    Adapter
 )
-from layer.constants import (
-    MAX_NEGATIVE_SAMPLE_SIZE
+from layer.objective import (
+    CrossEntropyLogLoss
 )
 from layer.preprocessing import (
     EventIndexing,
     EventContext
 )
-from layer.objective import (
-    CrossEntropyLogLoss
-)
-from layer.adapter import (
-    Adapter
-)
 from layer.test_020_embedding import (
     _instantiate_event_indexing,
     _instantiate as _instantiate_embedding
-)
-from optimizer import (
-    SGD
 )
 from testing.config import (
     NUM_MAX_TEST_TIMES

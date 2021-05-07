@@ -1,5 +1,8 @@
 import logging
-
+from typing import (
+    List,
+    Iterable
+)
 import numpy as np
 import tensorflow as tf
 
@@ -97,6 +100,14 @@ class Function:
             (tf.is_tensor(X) and X.dtype.is_floating)
 
     @staticmethod
+    def is_integer_tensor(X) -> bool:
+        """Confirm if X is int tensor of dimension > 0
+        """
+        return \
+            (isinstance(X, np.ndarray) and X.ndim > 0 and np.issubdtype(X.dtype, np.integer)) or \
+            (tf.is_tensor(X) and X.dtype.is_integer)
+
+    @staticmethod
     def is_finite(X) -> bool:
         return np.all(np.isfinite(X))
 
@@ -187,6 +198,21 @@ class Function:
             raise AssertionError(f"Float compatible type expected but {str(X)}")
 
         return X
+
+    @staticmethod
+    def to_list(X) -> List:
+        """Convert Tensor to list
+        """
+        if tf.is_tensor(X):
+            Y = X.numpy().tolist()
+        elif isinstance(X, np.ndarray):
+            Y = X.tolist()
+        elif isinstance(X, Iterable):
+            Y = list(X)
+        else:
+            raise AssertionError("Cannot convert to list \n%s\n" % X)
+
+        return Y
 
     @staticmethod
     def reshape(X, shape):

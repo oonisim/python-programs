@@ -2,14 +2,15 @@ import logging
 from typing import (
     Dict,
     List,
-    Iterable
+    Iterable,
+    Union
 )
 
 import numpy as np
 
+import function.fileio as fileio
 import function.text as text
 import function.utility as utility
-import function.fileio as fileio
 from common.constant import (
     EOL,
     TYPE_FLOAT,
@@ -17,6 +18,7 @@ from common.constant import (
     TYPE_TENSOR,
     EVENT_NIL,
     EVENT_UNK,
+    EVENT_INDEX_META_ENTITIES,
     EVENT_META_ENTITIES,
     EVENT_META_ENTITIES_COUNT,
     EVENT_META_ENTITY_TO_INDEX,
@@ -29,8 +31,7 @@ from layer.constants import (
     _NAME,
     _SCHEME,
     _NUM_NODES,
-    _PARAMETERS,
-    MAX_NEGATIVE_SAMPLE_SIZE
+    _PARAMETERS
 )
 
 
@@ -260,7 +261,7 @@ class EventIndexing(Layer):
         Return: Indices of events not included in negatives
         """
         excludes_length = len(list(excludes))
-        assert size <= MAX_NEGATIVE_SAMPLE_SIZE
+        assert size <= 20, "Verify if the sample size is correct"
         assert 0 < excludes_length <= (self.vocabulary_size - size - len(EVENT_META_ENTITIES))
 
         candidates = self.list_indices(self.sample(size+excludes_length))
@@ -304,7 +305,7 @@ class EventIndexing(Layer):
             f"Sequences has no valid indices\n{sequences}."
         return sentences
 
-    def function(self, X: str) -> TYPE_TENSOR:
+    def function(self, X: Union[str, TYPE_TENSOR]) -> TYPE_TENSOR:
         """Generate a event index sequence for a sentence
         Args:
               X: One more more sentences delimited by EOL to convert into event
@@ -317,14 +318,36 @@ class EventIndexing(Layer):
         Raises:
             AssertionError: When there is no valid sentences in X.
         """
-        sequences = self.to_tensor(self.sentence_to_sequence(X))
+        if self.is_tensor(X):
+            self.X = X
+            sentences = EOL.join(self.to_list(X))
+        elif isinstance(X, str):
+            sentences = X
+        else:
+            raise AssertionError("Unexpected input type %s" % type(X))
+
+        sequences = self.to_tensor(self.sentence_to_sequence(sentences))
+
         assert \
             self.tensor_size(sequences) > 0 and self.tensor_rank(sequences) == 2, \
             "Expected non-empty rank 2 tensor but rank is %s and sequence=\n%s\n" \
             % (self.tensor_rank(sequences), sequences)
 
         self.logger.debug("sequence generated \n%s", sequences)
-        return sequences
+        self._Y = sequences
+        return self.Y
+
+    def gradient(
+            self, dY: Union[TYPE_TENSOR, TYPE_FLOAT]
+    ) -> Union[TYPE_TENSOR, TYPE_FLOAT]:
+        # --------------------------------------------------------------------------------
+        # TODO: Need to consider what to return as dX, because X has no gradient.
+        # What to set to self._dx? Use empty for now and monitor how it goes.
+        # 'self._dX = self.X' is incorrect and can cause unexpected result e.g.
+        # trying to copy data into self.X which can cause unexpected effects.
+        # --------------------------------------------------------------------------------
+        self._dX = np.empty(shape=self.X.shape)
+        return self.dX
 
     def load(self, path: str) -> List:
         """Load and restore the layer state
@@ -512,29 +535,85 @@ class EventContext(Layer):
             X: One or more event index sequences of shape:(sequence_size,) or
                shape:(N, sequence_size)
 
-        Returns: (event, context) pairs. The output shape can be
-                 - (num_windows, E+C)    when X is one sequence.
-                 - (N, num_windows, E+C) when X is multiple sequences.
+        Returns:
+            (event, context) pairs. The output shape is (N*num_windows, (E+C))
+            regardless if X is one sequence (N,) or multiple sequences (N,-1).
 
-                 Not stacking N x (num_windows, E+C).
+            This is because of excluding the (event, context) pairs where
+            'event' has NIL or UNK. The objective of event embedding is
+            to identify the specific target 'event', which cannot be NIL or UNK.
+
+            Due to the restriction of not be able to have ragged tensor shape
+            (in numpy), it is not possible to have a shape (N, W, (E+C)) where
+            W varies, the shape must be (N*W, (E+C))
         """
         X = self.assure_tensor(X)
+        self.X = X
         if self.tensor_rank(X) == 1:
-            event_context: TYPE_TENSOR = utility.Function.event_context_pairs(
+            event_context_pairs: TYPE_TENSOR = utility.Function.event_context_pairs(
                 sequence=X,
                 window_size=self.window_size,
                 event_size=self.event_size
             )
         elif self.tensor_rank(X) == 2:
-            event_context: TYPE_TENSOR = np.array([
+            event_context_pairs: TYPE_TENSOR = self.reshape(self.to_tensor([
                 utility.Function.event_context_pairs(
                     sequence=_x,
                     window_size=self.window_size,
                     event_size=self.event_size
                 ) for _x in X
-            ])
+            ], dtype=TYPE_INT), shape=(-1, self.window_size))
         else:
             raise RuntimeError(f"Unexpected tensor dimension {X.ndim}.")
 
-        assert self.tensor_dtype(event_context) == TYPE_INT
-        return event_context
+        # --------------------------------------------------------------------------------
+        # The context needs to identify specific target event(s), hence the target
+        # cannot be all either NIL or UNK. It occurs as a sequence is padded to the
+        # longest sequence size in a batch.
+        #
+        # Hence remove the (event,context) pairs where 'event' includes UNK or NIL.
+        # However, when the event_size is long, chances are UNK can be included in
+        # the target. If all the sequences resulted in events that include NIL or UNK
+        # there will be no (event, context) pairs. Then need to reduce the event_size,
+        # or need to revise the original sources of the sequences not to include them.
+        #
+        # Note that the output shape will be rank 2.
+        # --------------------------------------------------------------------------------
+        event_context_pairs = event_context_pairs[
+            np.logical_not(         # Exclude those pairs.
+                np.sum(np.isin(     # Select pairs where 'event' is IN (NIL,UNK)
+                    event_context_pairs[
+                        ::,                 # All (event, context) pairs,
+                        :self.event_size    # 'event' part
+                    ],
+                    EVENT_INDEX_META_ENTITIES
+                ), axis=-1).astype(bool)
+            )
+        ]
+
+        # --------------------------------------------------------------------------------
+        # If the event_size is long,
+        # --------------------------------------------------------------------------------
+        assert \
+            self.tensor_size(event_context_pairs) > 0, \
+            "Resulted in no (event,context) pairs. Validate the input and target size." \
+            "Target event size [%s], Window size [%s], Input sequences:\n%s\n" % \
+            (self.event_size, self.window_size, X)
+        assert \
+            self.tensor_dtype(event_context_pairs) == TYPE_INT, \
+            "The output must be dtype %s" % TYPE_INT
+
+        self._Y = event_context_pairs
+        return self.Y
+
+    def gradient(
+            self, dY: Union[TYPE_TENSOR, TYPE_FLOAT]
+    ) -> Union[TYPE_TENSOR, TYPE_FLOAT]:
+        # --------------------------------------------------------------------------------
+        # TODO: Need to consider what to return as dX, because X has no gradient.
+        # What to set to self._dx? Use empty for now and monitor how it goes.
+        # 'self._dX = self.X' is incorrect and can cause unexpected result e.g.
+        # trying to copy data into self.X which can cause unexpected effects.
+        # --------------------------------------------------------------------------------
+        self._dX = np.empty(shape=self.X.shape)
+        return self.dX
