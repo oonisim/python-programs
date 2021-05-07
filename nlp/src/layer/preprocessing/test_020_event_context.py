@@ -179,10 +179,13 @@ def test_020_event_context_function_event_size_1(caplog):
         [3, 1, 2, 4, 5],
         [4, 2, 3, 5, 6]
     ])
+    # (event, context) where 'event' is UNK or NIL will be omitted, and
+    # the result Y=(event,context) shape is (N,M). See the explanation
+    # in EventContext.function()
     expected3 = np.array([
-        [[1, 2, 0, 3, 4]],
-        [[2, 3, 1, 4, 5]],
-        [[3, 4, 2, 5, 6]]
+        # [1, 2, 0, 3, 4]],
+        [2, 3, 1, 4, 5],
+        [3, 4, 2, 5, 6]
     ])
     Y3 = event_context.function(X3)
     assert np.array_equal(Y3, expected3), \
@@ -194,14 +197,10 @@ def test_020_event_context_function_event_size_1(caplog):
         [6, 7, 8, 9, 10, 11]
     ])
     expected4 = np.array([
-        [
-            [2, 0, 1, 3, 4],
-            [3, 1, 2, 4, 5]
-        ],
-        [
-            [8, 6, 7, 9, 10],
-            [9, 7, 8, 10, 11]
-        ]
+        [2, 0, 1, 3, 4],
+        [3, 1, 2, 4, 5],
+        [8, 6, 7, 9, 10],
+        [9, 7, 8, 10, 11]
     ])
     Y4 = event_context.function(X4)
     assert np.array_equal(Y4, expected4), \
@@ -228,9 +227,10 @@ def test_020_event_context_function_event_size_2(caplog):
     stride: TYPE_INT = 2
     event_size: TYPE_INT = 2
     window_size: TYPE_INT = 2 * stride + event_size
+    num_nodes = TYPE_INT(1)
 
     event_context = _must_succeed(
-        name=name, num_nodes=1, window_size=window_size, event_size=event_size, msg=msg
+        name=name, num_nodes=num_nodes, window_size=window_size, event_size=event_size, msg=msg
     )
 
     # 0, 1, 2, 3, 4, 5

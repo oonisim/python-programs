@@ -319,7 +319,6 @@ class EventIndexing(Layer):
             AssertionError: When there is no valid sentences in X.
         """
         if self.is_tensor(X):
-            self.X = X
             sentences = EOL.join(self.to_list(X))
         elif isinstance(X, str):
             sentences = X
@@ -327,11 +326,19 @@ class EventIndexing(Layer):
             raise AssertionError("Unexpected input type %s" % type(X))
 
         sequences = self.to_tensor(self.sentence_to_sequence(sentences))
-
         assert \
             self.tensor_size(sequences) > 0 and self.tensor_rank(sequences) == 2, \
             "Expected non-empty rank 2 tensor but rank is %s and sequence=\n%s\n" \
             % (self.tensor_rank(sequences), sequences)
+
+        if isinstance(X, str):
+            X = X.split(EOL)
+            if len(X) > 1:
+                self.X = self.to_tensor(X)
+            else:
+                self.X = self.reshape(self.to_tensor(X), shape=(1, -1))
+        else:
+            self.X = X
 
         self.logger.debug("sequence generated \n%s", sequences)
         self._Y = sequences
@@ -346,7 +353,7 @@ class EventIndexing(Layer):
         # 'self._dX = self.X' is incorrect and can cause unexpected result e.g.
         # trying to copy data into self.X which can cause unexpected effects.
         # --------------------------------------------------------------------------------
-        self._dX = np.empty(shape=self.X.shape)
+        self._dX = np.empty(shape=self.tensor_shape(self.X))
         return self.dX
 
     def load(self, path: str) -> List:

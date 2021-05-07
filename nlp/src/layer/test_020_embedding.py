@@ -481,7 +481,7 @@ def test_020_embedding_instance_properties_access_to_succeed(caplog):
         context_size = TYPE_INT(2 * np.random.randint(1, 10))
         negative_sample_size = TYPE_INT(np.random.randint(5, 20))
         event_vector_size: TYPE_INT = TYPE_INT(np.random.randint(5, 100))
-        W: TYPE_TENSOR = np.random.randn(dictionary.vocabulary_size, event_vector_size).astype(TYPE_FLOAT)
+        W: TYPE_TENSOR = np.random.rand(dictionary.vocabulary_size, event_vector_size).astype(TYPE_FLOAT)
 
         embedding, event_context = _must_succeed(
             name=name,
@@ -542,8 +542,12 @@ def test_020_embedding_instance_properties_access_to_succeed(caplog):
             raise RuntimeError("Access to dictionary should be allowed as already initialized.")
 
         try:
-            # if embedding.W is not W: # Embedding internally deepcopy W to avoid unexpected change
-            if not np.array_equal(embedding.W, W):
+            # Embedding internally deepcopy W to avoid unexpected change and
+            # event vector for UNK and NIL are zero cleared.
+            if not np.array_equal(
+                embedding.W[len(EVENT_META_ENTITIES):],
+                W[len(EVENT_META_ENTITIES):]
+            ):
                 raise RuntimeError("np.array_equal(embedding.W, W) should be true")
         except AssertionError:
             raise RuntimeError("Access to W should be allowed as already initialized.")
@@ -585,12 +589,6 @@ def test_020_embedding_instance_properties_access_to_succeed(caplog):
                 raise RuntimeError("embedding.SL == SL should be true")
         except AssertionError:
             raise RuntimeError("Access to S['negative_sample_size'] should be allowed as already initialized.")
-
-        try:
-            if embedding.S["dictionary"] is not embedding.dictionary:
-                raise RuntimeError("embedding.dictionary is dictionary should be true")
-        except AssertionError:
-            raise RuntimeError("Access to S['dictionary'] should be allowed as already initialized.")
 
         try:
             if not np.array_equal(embedding.S["W"], embedding.W):

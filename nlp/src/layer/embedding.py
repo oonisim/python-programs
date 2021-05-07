@@ -355,10 +355,10 @@ class Embedding(Layer):
             "target_size",
             "context_size",
             "negative_sample_size",
-            "dictionary",
+            # "dictionary",
             "W",
             "event_vector_size",
-            "optimizer"
+            # "optimizer"
         ]
 
     @property
@@ -369,10 +369,8 @@ class Embedding(Layer):
             "target_size": self._target_size,
             "context_size": self._context_size,
             "negative_sample_size": self._negative_sample_size,
-            "dictionary": self.dictionary,
             "W": self.W,
             "event_vector_size": self.D,
-            "optimizer": self.optimizer
         }
         assert set(self._S.keys()) == set(self.state_elements)
         return self._S
@@ -1319,23 +1317,14 @@ class Embedding(Layer):
 
     def load(self, path: str) -> Dict:
         """Load and restore the layer state
-        Consideration:
-            Need to be clear if update a reference to the state object OR
-            update the object memory area itself.
-
-            If switching the reference to the new state object, there would be
-            references to the old objects which could cause unexpected results.
-
-            Hence, if state object memory can be directly updated, do so.
-            If not, **delete** the object so that the references to the old
-            object will cause an error and fix the code not to hold a reference
-            but get the reference via the property method every time.
-
-        TODO:
-            Consider if resetting other properties (dW, X, etc) are required.
+        Restore only the variables, not class instances, e.g. dictionary or
+        optimizer. Such objects are set at the instantiation, and then the
+        load method is called to restore the variables only.
 
         Args:
             path: state file path
+        Returns:
+            Restored state
         """
         state = super().load(path)
         assert \
@@ -1343,12 +1332,16 @@ class Embedding(Layer):
             and len(state) == len(self.state_elements) \
             and all(element in state for element in self.state_elements)
 
-        if self.dictionary is not None:
-            del self._dictionary
         if self.W is not None:
             del self._W
-        if self.optimizer is not None:
-            del self._optimizer
+        # --------------------------------------------------------------------------------
+        # Class instances are initialized at the instantiation and reused at load().
+        # save() only serializes variables.
+        # --------------------------------------------------------------------------------
+        # if self.dictionary is not None:
+        #     del self._dictionary
+        # if self.optimizer is not None:
+        #     del self._optimizer
 
         self.__init__(
             name=state["name"],
@@ -1357,9 +1350,9 @@ class Embedding(Layer):
             context_size=state["context_size"],
             negative_sample_size=state["negative_sample_size"],
             event_vector_size=state["event_vector_size"],
-            dictionary=state["dictionary"],
+            dictionary=self.dictionary,
             W=state["W"],
-            optimizer=state["optimizer"]
+            optimizer=self.optimizer
         )
 
         return self.S

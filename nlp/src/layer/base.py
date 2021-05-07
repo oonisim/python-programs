@@ -193,7 +193,9 @@ class Layer(nn.Function):
         assert \
             (self.is_tensor(self._X) and self.tensor_size(self._X) > 0) or \
             self.is_float_scalar(self._X), \
-            "X is not initialized or invalid"
+            "X is not initialized or invalid. type(X)={} X=\n{}\n".format(
+                type(self._X), self._X
+            )
 
         return self._X
 
@@ -593,6 +595,13 @@ class Layer(nn.Function):
             object will cause an error and fix the code not to hold a reference
             but get the reference via the property method every time.
 
+        Decision"
+            1. load() method is responsible only for variables, not for
+               class instances or functions. save() method should not save
+               such objects.
+            2. Delete the old object otherwise orphaned before resetting
+               to a new one in the child classes.
+
         NOTE:
             self.S is a list of references to the layer state objects.
             Hence setting/updating self._S has no effect. You need to update
@@ -607,3 +616,4 @@ class Layer(nn.Function):
         # DO NOT limit the implementation. Let the actual class handles it.
         # assert isinstance(state, list) and len(state) > 0
         return state
+

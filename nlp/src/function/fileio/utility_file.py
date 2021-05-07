@@ -193,7 +193,7 @@ class Function(base.Function):
     @staticmethod
     def serialize(path: str, state: object):
         assert Function.is_path_creatable(path), f"Cannot create {path}."
-        with open(path, 'wb') as f:
+        with open(path, 'ab') as f:
             pickle.dump(state, f)
 
     @staticmethod

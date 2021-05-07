@@ -10,7 +10,7 @@ import tensorflow as tf
 # --------------------------------------------------------------------------------
 TYPE_INT = np.int32
 TYPE_LABEL = np.int32
-TYPE_FLOAT = np.float32       # alias of Python float
+TYPE_FLOAT = np.float64       # alias of Python float
 assert not isinstance(TYPE_FLOAT, (float, np.float))
 # TYPE_FLOAT = np.float64   # Cannot use due to Numpy default is float.
 TYPE_TENSOR = TypeVar('TYPE_TENSOR', np.ndarray, tf.Tensor)

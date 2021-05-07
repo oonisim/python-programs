@@ -202,7 +202,6 @@ class Matmul(Layer):
             "name",
             "num_nodes",
             "W",
-            "optimizer"
         ]
 
     @property
@@ -212,7 +211,6 @@ class Matmul(Layer):
             "name": self.name,
             "num_nodes": self._num_nodes,
             "W": self.W,
-            "optimizer": self.optimizer
         }
         assert set(self._S.keys()) == set(self.state_elements)
         return self._S
@@ -477,18 +475,25 @@ class Matmul(Layer):
             isinstance(state, dict) and len(state) == len(self.state_elements) \
             and all([element in state for element in self.state_elements])
 
-        self._name = state["name"]
-        self._num_nodes = state["num_nodes"]
+        assert self._num_nodes == state["num_nodes"], \
+            "The num_nodes must be the same"
 
         assert self.is_float_tensor(state["W"]), \
             "Expected TYPE_FLOAT tensor but \n%s\n" % state["W"]
-        if self.is_tensor(self._W) and self.tensor_shape(self._W) == self.tensor_shape(state["W"]):
+        if (
+            self.is_tensor(self._W) and
+            self.tensor_shape(self._W) == self.tensor_shape(state["W"])
+        ):
             np.copyto(self._W, state["W"])
         else:
             del self._W
-            self._W = state["W"]
 
-        if self.optimizer is not None: del self._optimizer
-        self._optimizer = state["optimizer"]
+        self.__init__(
+            name=state["name"],
+            num_nodes=state["num_nodes"],
+            W=state["W"],
+            optimizer=self.optimizer,
+            log_level=self.logger.getEffectiveLevel()
+        )
 
         return self.S
