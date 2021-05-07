@@ -128,6 +128,7 @@ def test_word2vec():
     )
 
     NUM_SENTENCES = 10
+    MAX_ITERATIONS = 10
 
     def train():
         stream = fileio.Function.file_line_stream(path_to_ptb)
@@ -145,7 +146,7 @@ def test_word2vec():
     profiler = cProfile.Profile()
     profiler.enable()
 
-    while True:
+    for _ in range(MAX_ITERATIONS):
         network.train(X=next(trainer), T=np.array([0]))
         print(network.history[-1])
 
