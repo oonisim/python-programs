@@ -11,7 +11,8 @@ https://stackoverflow.com/a/34102855/4281353
 from typing import (
     List,
     Generator,
-    Iterable
+    Iterable,
+    NoReturn
 )
 import errno
 import os
@@ -191,9 +192,15 @@ class Function(base.Function):
         return content
 
     @staticmethod
-    def serialize(path: str, state: object):
+    def serialize(path: str, state: object) -> NoReturn:
+        """Serialize the object to the file by overwriting.
+        Args:
+            path: file path
+            state: object to serialize
+
+        """
         assert Function.is_path_creatable(path), f"Cannot create {path}."
-        with open(path, 'ab') as f:
+        with open(path, 'wb+') as f:
             pickle.dump(state, f)
 
     @staticmethod

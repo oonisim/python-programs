@@ -127,9 +127,6 @@ def test_word2vec():
         ]
     )
 
-    NUM_SENTENCES = 100
-    MAX_ITERATIONS = 100000
-
     def train():
         stream = fileio.Function.file_line_stream(path_to_ptb)
         try:
@@ -141,8 +138,17 @@ def test_word2vec():
         finally:
             stream.close()
 
+    # Restore the state if exists.
+    STATE_FILE = "wor2vec_embedding.pkl"
+    if fileio.Function.is_file(STATE_FILE):
+        embedding.load(STATE_FILE)
+
+    # Continue training
     profiler = cProfile.Profile()
     profiler.enable()
+
+    NUM_SENTENCES = 100
+    MAX_ITERATIONS = 1000
 
     epochs = 0
     trainer = train()
@@ -151,18 +157,22 @@ def test_word2vec():
             network.train(X=next(trainer), T=np.array([0]))
             if i % 25 == 0:
                 print(f"{i:05d}: Loss: {network.history[-1]:15f}")
-            if i % 1000 == 0:
-                embedding.save("wor2vec_embedding.pkl")
+            if i % 200 == 0:
+                embedding.save(STATE_FILE)
         except StopIteration as e:
+            # Next epoch
             epochs += 1
             trainer = train()
             pass
         except Exception as e:
             print("Unexpected error {0}".format(str(e)))
-            trainer = train()
-            pass
-
-    embedding.save("wor2vec_embedding.pkl")
+            trainer.close()
+        finally:
+            embedding.save(STATE_FILE)
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")
+
+
+if __name__ == '__main__':
+    test_word2vec()
