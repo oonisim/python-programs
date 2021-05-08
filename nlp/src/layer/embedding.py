@@ -420,10 +420,13 @@ class Embedding(Layer):
             - len(EVENT_META_ENTITIES)
         )
         assert \
-            TYPE_INT(0) < negative_sample_size <= Embedding.MAX_NEGATIVE_SAMPLE_SIZE and \
-            TYPE_INT(0) < negative_sample_size <= availability_for_negatives, \
+            TYPE_INT(0) < negative_sample_size <= Embedding.MAX_NEGATIVE_SAMPLE_SIZE, \
             "negative_sample_size [%s] needs less than MAX_NEGATIVE_SAMPLE_SIZE [%s]" % \
             (negative_sample_size, Embedding.MAX_NEGATIVE_SAMPLE_SIZE)
+        assert \
+            TYPE_INT(0) < negative_sample_size <= availability_for_negatives, \
+            "negative_sample_size [%s] needs less than availability_for_negatives [%s]" % \
+            (negative_sample_size, availability_for_negatives)
         assert isinstance(optimizer, optimiser.Optimizer)
 
         # --------------------------------------------------------------------------------

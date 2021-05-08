@@ -1,4 +1,5 @@
 """Network base test cases"""
+import sys
 import cProfile
 import logging
 
@@ -35,28 +36,30 @@ from network.sequential import (
 Logger = logging.getLogger(__name__)
 
 
-## @memory_profile
+@memory_profile
 def test_word2vec():
-    USE_PTB = True
-    DEBUG = False
-    VALIDATION = True
-
     TARGET_SIZE = TYPE_INT(1)  # Size of the target event (word)
     CONTEXT_SIZE = TYPE_INT(4)  # Size of the context in which the target event ocuurs.
     WINDOW_SIZE = TARGET_SIZE + CONTEXT_SIZE
     SAMPLE_SIZE = TYPE_INT(5)  # Size of the negative samples
     VECTOR_SIZE = TYPE_INT(20)  # Number of features in the event vector.
 
-    corpus = "To be, or not to be, that is the question that matters"
+    # --------------------------------------------------------------------------------
+    # Corpus text
+    # --------------------------------------------------------------------------------
     _file = "ptb.train.txt"
-    if not fileio.Function.is_file(f"~/.keras/datasets/{_file}"):
-        path_to_ptb = tf.keras.utils.get_file(
+    path_to_corpus = f"~/.keras/datasets/{_file}"
+    if fileio.Function.is_file(path_to_corpus):
+        pass
+    else:
+        path_to_corpus = tf.keras.utils.get_file(
             _file,
             f'https://raw.githubusercontent.com/tomsercu/lstm/master/data/{_file}'
         )
-        corpus = fileio.Function.read_file(path_to_ptb)
-    else:
-        raise RuntimeError("%s does not exist" % _file)
+    corpus = fileio.Function.read_file(path_to_corpus)
+
+    # path_to_input = "ptb_excerpt.txt"
+    path_to_input = path_to_corpus
 
     # --------------------------------------------------------------------------------
     # Logistic Log Loss
@@ -127,21 +130,18 @@ def test_word2vec():
         ]
     )
 
-    def train():
-        stream = fileio.Function.file_line_stream(path_to_ptb)
+    def sentences_generator(path_to_file, num_sentences):
+        stream = fileio.Function.file_line_stream(path_to_file)
         try:
             while True:
-                lines = fileio.Function.take(NUM_SENTENCES, stream)
-                if len(''.join(lines).replace('\n', '').replace(' ', '')) > 0:
-                    sentences = np.array(lines)
-                    yield sentences
+                _lines = fileio.Function.take(num_sentences, stream)
+                yield np.array(_lines)
         finally:
             stream.close()
 
     # Restore the state if exists.
     STATE_FILE = "wor2vec_embedding.pkl"
-    if fileio.Function.is_file(STATE_FILE):
-        embedding.load(STATE_FILE)
+    embedding.load(STATE_FILE)
 
     # Continue training
     profiler = cProfile.Profile()
@@ -150,25 +150,36 @@ def test_word2vec():
     NUM_SENTENCES = 100
     MAX_ITERATIONS = 1000
 
+    total_sentences = 0
     epochs = 0
-    trainer = train()
+    source = sentences_generator(
+        path_to_file=path_to_input, num_sentences=NUM_SENTENCES
+    )
     for i in range(MAX_ITERATIONS):
         try:
-            network.train(X=next(trainer), T=np.array([0]))
-            if i % 25 == 0:
-                print(f"{i:05d}: Loss: {network.history[-1]:15f}")
+            sentences = next(source)
+            total_sentences += len(sentences)
+            print(sentences[0])
+            network.train(X=sentences, T=np.array([0]))
+            if i % 5 == 0:
+                print(f"Batch {i:05d} of {NUM_SENTENCES} sentences: Loss: {network.history[-1]:15f}")
             if i % 200 == 0:
+                print("saving states")
                 embedding.save(STATE_FILE)
-        except StopIteration as e:
+
+        except fileio.Function.GenearatorHasNoMore as e:
             # Next epoch
+            print(f"epoch {epochs} done")
             epochs += 1
-            trainer = train()
-            pass
+            source.close()
+            source = sentences_generator(
+                path_to_file=path_to_input, num_sentences=NUM_SENTENCES
+            )
+
         except Exception as e:
-            print("Unexpected error {0}".format(str(e)))
-            trainer.close()
-        finally:
-            embedding.save(STATE_FILE)
+            print("Unexpected error:", sys.exc_info()[0])
+            source.close()
+            raise e
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")

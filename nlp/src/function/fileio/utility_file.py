@@ -31,6 +31,10 @@ Logger = logging.getLogger(__name__)
 
 
 class Function(base.Function):
+    class GenearatorHasNoMore(Exception):
+        def __init__(self):
+            super().__init__("No more left to offer from the generator")
+
     @staticmethod
     def is_pathname_valid(pathname: str) -> bool:
         """
@@ -215,9 +219,63 @@ class Function(base.Function):
             raise RuntimeError(f"Path {path} does not exist.")
 
     @staticmethod
-    def take(n: int, iterable: Iterable) -> List:
-        """Return next n items from the iterable as a list"""
-        return list(islice(iterable, n))
+    def take(n: int, iterator: Iterable) -> List:
+        """Return n items from the iterable as a list
+        Args:
+            n: number of lines to take
+            iterator: iterable
+        Returns: List of lines
+        Raises: StopIteration when there is none to take
+        """
+
+        taken = list(islice(iterator, 0, n))
+        # --------------------------------------------------------------------------------
+        # list(generator) returns [] instead of raising the StopIteration.
+        # Need to verify if list(generator) size is > 0 or not.
+        # --------------------------------------------------------------------------------
+        if len(taken) > 0:
+            return taken
+        else:
+            # --------------------------------------------------------------------------------
+            # You can NOT raise StopIteration from within a Generator to notify
+            # no-more-to-yield from the generator. Must raise other exception or
+            # return None, [] etc.
+            # --------------------------------------------------------------------------------
+            # https://stackoverflow.com/a/63163984/4281353
+            # https://www.python.org/dev/peps/pep-0479/
+            # Raising StopIteration from within a Generator will end the generator.
+            # Python implicit conversion from StopItraton to RuntimeError.
+            #
+            # https://stackoverflow.com/questions/67444910
+            # StopIteration serves a very specific purpose
+            # (to allow a next method to indicate iteration is complete), and
+            # reusing it for other purposes will cause problems
+            # --------------------------------------------------------------------------------
+            # raise StopIteration("Nothing left to take")
+            raise Function.GenearatorHasNoMore
+
+    @staticmethod
+    def take_n_from_i(n, i, iterator: Iterable):
+        """Return n items from the i-th line from the iterable as a list
+        Args:
+            n: number of lines to take
+            i: start position from 0.
+            iterator: iterable
+        Returns: List of lines
+        Raises: StopIteration when there is none to take
+        """
+        if i <= 0:
+            raise IndexError(f"Invalid index {i}")
+        elif i == 0:
+            return Function.take(n, iterator)
+        else:
+            _last = 0
+            for _position, _line in enumerate(iterator):
+                _last = _position
+                if _position == (i - 1):
+                    return [_line] + Function.take(n - 1, iterator)
+
+            raise IndexError(f"i [Exceeded the max lines [{_last}]")
 
     @staticmethod
     def file_line_stream(path: str) -> Generator[str, None, None]:

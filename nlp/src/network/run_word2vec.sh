@@ -13,4 +13,5 @@ cd ${DIR}
 export PYTHONPATH=${PARENT}:${DIR}
 echo "PYTHONPATH=$PYTHONPATH"
 
+# python3 -m memory_profiler test_050_word2vec.py
 python test_050_word2vec.py
