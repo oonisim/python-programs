@@ -148,7 +148,7 @@ def test_word2vec():
     profiler.enable()
 
     NUM_SENTENCES = 100
-    MAX_ITERATIONS = 1000
+    MAX_ITERATIONS = 100000
 
     total_sentences = 0
     epochs = 0
@@ -180,6 +180,8 @@ def test_word2vec():
             print("Unexpected error:", sys.exc_info()[0])
             source.close()
             raise e
+
+    embedding.save(STATE_FILE)
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")

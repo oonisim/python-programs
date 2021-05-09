@@ -31,6 +31,15 @@ class Function(base.Function):
     # Tensor validations
     # --------------------------------------------------------------------------------
     @staticmethod
+    def is_finite(X) -> bool:
+        return np.all(np.isfinite(X))
+
+    @staticmethod
+    def all(x, axis=None) -> bool:
+        """Check if all true"""
+        return np.all(x, axis=axis)
+
+    @staticmethod
     def all_close(x, y):
         return np.allclose(
             x, y, atol=TYPE_FLOAT(1e-5)
@@ -41,12 +50,62 @@ class Function(base.Function):
         return np.array_equal(x, y)
 
     # --------------------------------------------------------------------------------
-    # Operations
+    # Operations - Statistics
+    # --------------------------------------------------------------------------------
+    @staticmethod
+    def min(x, axis=None, keepdims=False):
+        """Max value in x
+        """
+        return np.amin(
+            x, axis=axis, keepdims=keepdims
+        )
+
+    @staticmethod
+    def max(x, axis=None, keepdims=False):
+        """Max value in x
+        """
+        return np.amax(
+            x, axis=axis, keepdims=keepdims
+        )
+
+    # --------------------------------------------------------------------------------
+    # Operations - indices
+    # --------------------------------------------------------------------------------
+    @staticmethod
+    def argmin(x, axis=None):
+        return np.argmin(x, axis=axis)
+
+    @staticmethod
+    def argmax(x, axis=None):
+        return np.argmax(x, axis=axis)
+
+    @staticmethod
+    def argsort(x, axis: int = -1, direction: str = 'ASCENDING'):
+        direction = direction.upper()
+        if direction == 'ASCENDING':
+            return np.argsort(x, axis=axis)
+        elif direction == 'DESCENDING':
+            return np.argsort(-x, axis=axis)
+        else:
+            raise AssertionError(f"Unexpected direction {direction}")
+
+    # --------------------------------------------------------------------------------
+    # Operations - Update
+    # --------------------------------------------------------------------------------
+    @staticmethod
+    def where(condition, x, y):
+        return tf.where(condition, x, y)
+
+    # --------------------------------------------------------------------------------
+    # Operations - Transformation
     # --------------------------------------------------------------------------------
     @staticmethod
     def concat(values, axis=0):
         return np.concatenate(values, axis=axis)
 
+    # --------------------------------------------------------------------------------
+    # Operations - Math
+    # --------------------------------------------------------------------------------
     @staticmethod
     def add(x, y, out=None):
         assert out is None, "out is not supported for TF"
@@ -64,18 +123,26 @@ class Function(base.Function):
         return np.multiply(x, y, out=out)
 
     @staticmethod
+    def sqrt(X) -> TYPE_TENSOR:
+        return np.sqrt(X)
+
+    @staticmethod
+    def pow(x, y):
+        return np.pow(x, y)
+
+    @staticmethod
     def einsum(equation, *inputs, out=None) -> TYPE_TENSOR:
         return np.einsum(equation, *inputs, out=out)
 
     @staticmethod
     def random_bool_tensor(shape: tuple, num_trues: int):
-        """Generate bool tensor where num_trues elements are set to True
+        """Generate a bool tensor where num_trues elements are set to True
         Args:
             shape: shape of the tensor to generate
             num_trues: number of True to randomly set to the tensor
-        Returns: tensor of shape where num_trues elements are set to True
+        Returns: tensor of 'shape' where num_trues elements are set to True
         """
-        size = np.multiply.reduce(array=shape, axis=None)  # multiply.reduce(([])) -> 1
+        size = np.multiply.reduce(a=shape, axis=None)  # multiply.reduce(([])) -> 1
         assert len(shape) > 0 <= num_trues <= size
 
         indices = np.random.choice(a=np.arange(size), size=num_trues, replace=False)

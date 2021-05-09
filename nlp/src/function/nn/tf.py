@@ -9,6 +9,7 @@ import tensorflow as tf
 import function.nn.base as base
 from common.constant import (
     TYPE_FLOAT,
+    TYPE_INT,
     TYPE_TENSOR,
     BOUNDARY_SIGMOID,
     TYPE_NN_FLOAT,
@@ -45,6 +46,11 @@ class Function(base.Function):
         return tf.reduce_all(tf.math.is_finite(X))
 
     @staticmethod
+    def all(x, axis=None) -> bool:
+        """Check if all true"""
+        return tf.reduce_all(x, axis=axis)
+
+    @staticmethod
     def all_close(x, y, msg=None):
         try:
             tf.debugging.assert_near(
@@ -63,12 +69,56 @@ class Function(base.Function):
         return tf.reduce_all(tf.math.equal(x, y))
 
     # --------------------------------------------------------------------------------
-    # Operations
+    # Operations - Statistics
+    # --------------------------------------------------------------------------------
+    @staticmethod
+    def min(x, axis=None, keepdims=False):
+        """Max value in x
+        """
+        return tf.math.reduce_min(
+            x, axis=axis, keepdims=keepdims
+        )
+
+    @staticmethod
+    def max(x, axis=None, keepdims=False):
+        """Max value in x
+        """
+        return tf.math.reduce_max(
+            x, axis=axis, keepdims=keepdims
+        )
+
+    # --------------------------------------------------------------------------------
+    # Operations - indices
+    # --------------------------------------------------------------------------------
+    @staticmethod
+    def argmin(x, axis: int = 0):
+        return tf.math.argmin(x, axis=axis, output_type=tf.as_dtype(TYPE_INT))
+
+    @staticmethod
+    def argmax(x, axis: int = 0):
+        return tf.math.argmax(x, axis=axis, output_type=tf.as_dtype(TYPE_INT))
+
+    @staticmethod
+    def argsort(x, axis: int = -1, direction: str = 'ASCENDING'):
+        return tf.argsort(x, axis=axis, direction=direction.upper())
+
+    # --------------------------------------------------------------------------------
+    # Operations - Update
+    # --------------------------------------------------------------------------------
+    @staticmethod
+    def where(condition, x, y):
+        return tf.where(condition, x, y)
+
+    # --------------------------------------------------------------------------------
+    # Operations - Transformation
     # --------------------------------------------------------------------------------
     @staticmethod
     def concat(values, axis=0):
         return tf.concat(values, axis=axis)
 
+    # --------------------------------------------------------------------------------
+    # Operations - Math
+    # --------------------------------------------------------------------------------
     @staticmethod
     def add(x, y, out=None):
         assert out is None, "out is not supported for TF"
@@ -93,6 +143,14 @@ class Function(base.Function):
             return np.multiply(x, y)
         else:
             return tf.math.multiply(x, y)
+
+    @staticmethod
+    def sqrt(X) -> TYPE_TENSOR:
+        return tf.math.sqrt(X)
+
+    @staticmethod
+    def pow(x, y):
+        return tf.math.pow(x, y)
 
     @staticmethod
     def einsum(equation, *inputs, **kwargs) -> TYPE_TENSOR:

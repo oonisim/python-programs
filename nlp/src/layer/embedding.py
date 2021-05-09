@@ -19,7 +19,8 @@ from common.constant import (
     TYPE_TENSOR,
     EVENT_VECTOR_SIZE,
     EVENT_META_ENTITIES,
-    TYPE_NN_FLOAT
+    EVENT_META_ENTITIES_COUNT,
+    EVENT_INDEX_META_ENTITIES
 )
 from common.constant import (
     EVENT_INDEX_NIL,
@@ -1156,8 +1157,72 @@ class Embedding(Layer):
 
         return self.dS
 
-    def predict(self, X: TYPE_TENSOR) -> TYPE_TENSOR:
-        """Calculate a prediction event vector from the given context X.
+    # @tf.function
+    def _nearest_vector_arg_for_context(
+            self,
+            context: TYPE_TENSOR,
+            n: TYPE_INT = TYPE_INT(1)
+    ):
+        """Find the nearest target vector for the context
+        Select vectors whose distance^2 = sum((W-bow)^2) are smallest.
+        When context size = 1, e,g, the event is "woman", then "woman" cannot
+        be the target. Then select the second nearest target.
+
+        Args:
+            context: Context event vectors for which to predict the target
+        Returns:
+            Index to the target vector
+        """
+        assert 0 < n < self.dictionary.vocabulary_size - EVENT_META_ENTITIES_COUNT, \
+            "Cannot select more than available event vector size."
+        context_size = len(context)
+        assert context_size > 0
+
+        # --------------------------------------------------------------------------------
+        # Normalized BoW of the context as the target event must be independent
+        # from the context size.
+        # --------------------------------------------------------------------------------
+        bow = self.einsum("cd->d", context) / context_size if context_size > 1 else context
+
+        # --------------------------------------------------------------------------------
+        # Distances from event vectors (excluding UNK, NIL) to the BoW.
+        # The index into the "distances" is less than EVENT_META_ENTITIES_COUNT than
+        # the actual index. Need to restore the actual index later.
+        # --------------------------------------------------------------------------------
+        distances = self.sum(
+            # self.pow(self.W[EVENT_META_ENTITIES_COUNT:] - bow, TYPE_FLOAT(2)),
+            self.pow(self.W[EVENT_META_ENTITIES_COUNT:] - bow, TYPE_FLOAT(2)),
+            axis=-1
+        )
+        assert self.tensor_shape(distances) == \
+               (self.dictionary.vocabulary_size-EVENT_META_ENTITIES_COUNT,)
+
+        # --------------------------------------------------------------------------------
+        # When context_size = 1, bow is the context itself and the distances include
+        # to the context itself, which must be 0. Update its distance not to match.
+        # --------------------------------------------------------------------------------
+        min_index = self.argmin(distances)
+        if context_size == 1:
+            if distances[min_index] != TYPE_FLOAT(0):
+                raise RuntimeError("There must be distance 0 when context_size==1")
+            # distances[min_index] = self.max(distances) + 1e-5
+            distances = self.where(distances == 0, self.max(distances) + 1e-5, distances)
+            min_index = self.argmin(distances)
+
+        if n == 1:
+            args = min_index
+        else:
+            _sorted = self.argsort(x=distances)
+            args = _sorted[1:n+1] if context_size == 1 else _sorted[n]
+            # Restore the EVENT_META_ENTITIES excluded at distance calculation
+            args = self.add(args, self.to_tensor(EVENT_META_ENTITIES_COUNT))
+
+        # Target should not be NIL nor UNK
+        assert self.min(args) > self.to_tensor(EVENT_META_ENTITIES_COUNT)
+        return args
+
+    def predict(self, X: TYPE_TENSOR, n: TYPE_INT = TYPE_INT(1)) -> TYPE_TENSOR:
+        """Predict the target event() for the given context event(s) X.
         The model was trained to get the BoW of contexts Bc=einsum("ncd->nd")
         to the BoW of targets Be=einsum("ned->nd").
 
@@ -1171,29 +1236,43 @@ class Embedding(Layer):
         Args:
             X: Indices of the contexts in shape (C,) for single prediction or
                (N,C) for batch.
-        Return: Single prediction p:(D,) or batch predictions P:(N,C)
+            n: Number of candidates to provide
+        Return: Single target event vector p:(D,) or batch targets P:(N,C)
         """
         assert \
             self.is_tensor(X) and \
             self.is_same_dtype(self.tensor_dtype(X), TYPE_INT), \
             "Expected X dtype %s but %s" % (TYPE_INT, self.tensor_dtype(X))
 
+        # --------------------------------------------------------------------------------
+        # Context not include UNK nor NIL.
+        # TODO:
+        #   Consider the situation where UNK could be allowed.
+        # --------------------------------------------------------------------------------
+        assert self.all(X > self.max(self.to_tensor(EVENT_INDEX_META_ENTITIES))), \
+            "Context X cannot include NIL/UNK"
+
         rank = self.tensor_rank(X)
         if rank == 1:       # Single prediction
             context = self._extract_event_vectors(X)
-            predictions = self.einsum("cd->d", context)
+            indices = self._nearest_vector_arg_for_context(context, n)
+
         elif rank == 2:     # Batch predictions
             contexts = self._extract_event_vectors(
                 indices=self.reshape(X=X, shape=(-1))
             )
-            predictions = self.einsum("ncd->nd", contexts)
+            indices = self.to_tensor([
+                self._nearest_vector_arg_for_context(_context, n)
+                for _context in self.einsum("ncd->nd", contexts)
+            ])
+
         else:
             raise AssertionError(
                 "Expected shape (C,) or (N,C) but %s" %
                 self.tensor_shape(X)
             )
 
-        return predictions.numpy() if tf.is_tensor(predictions) else predictions
+        return indices
 
     def adapt_function_to_logistic_log_loss(self, loss: CrossEntropyLogLoss):
         """Adapter function to bridge between Embedding layer function() and
