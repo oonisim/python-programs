@@ -38,10 +38,10 @@ Logger = logging.getLogger(__name__)
 
 @memory_profile
 def test_word2vec():
-    TARGET_SIZE = TYPE_INT(1)  # Size of the target event (word)
+    TARGET_SIZE = TYPE_INT(1)   # Size of the target event (word)
     CONTEXT_SIZE = TYPE_INT(4)  # Size of the context in which the target event ocuurs.
     WINDOW_SIZE = TARGET_SIZE + CONTEXT_SIZE
-    SAMPLE_SIZE = TYPE_INT(5)  # Size of the negative samples
+    SAMPLE_SIZE = TYPE_INT(5)   # Size of the negative samples
     VECTOR_SIZE = TYPE_INT(20)  # Number of features in the event vector.
 
     # --------------------------------------------------------------------------------

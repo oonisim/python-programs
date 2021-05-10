@@ -49,6 +49,26 @@ class Function(base.Function):
     def all_equal(x, y):
         return np.array_equal(x, y)
 
+    @staticmethod
+    def in1d(target, source, invert: bool = False):
+        """
+        Return boolean tensor of the target shape that tells if an element of
+        'target' b is in 'source'.
+
+        Example:
+            target = np.array([1,2,3,4,5])
+            source = np.array([1,3,5])
+            is_in(target, source)
+            -----
+            [ True, False,  True, False,  True]
+
+        Args:
+            target: Target 1D array to test
+            source: list of elements to check if in 'target'
+            invert: If True, the values in the returned array are inverted
+        """
+        return np.in1d(target, source, invert=invert)
+
     # --------------------------------------------------------------------------------
     # Operations - Statistics
     # --------------------------------------------------------------------------------
@@ -90,11 +110,19 @@ class Function(base.Function):
             raise AssertionError(f"Unexpected direction {direction}")
 
     # --------------------------------------------------------------------------------
+    # Operations - Select
+    # --------------------------------------------------------------------------------
+    @staticmethod
+    def mask(x, mask):
+        """Select elements from array with boolean indices"""
+        return x[mask]
+
+    # --------------------------------------------------------------------------------
     # Operations - Update
     # --------------------------------------------------------------------------------
     @staticmethod
     def where(condition, x, y):
-        return tf.where(condition, x, y)
+        return np.where(condition, x, y)
 
     # --------------------------------------------------------------------------------
     # Operations - Transformation

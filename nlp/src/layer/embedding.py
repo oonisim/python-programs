@@ -544,9 +544,15 @@ class Embedding(Layer):
 
         Returns: vectors of shape:(N*?, D) where is C or E.
         """
-        assert self.tensor_rank(indices) in [0, 1], \
-            "Indices to extract event vectors from W must be rank 0 or 1"
-        vectors = self.W[indices]
+        if self.tensor_rank(indices) == 0:
+            vectors = self.W[indices:indices+1]     # shape:(1,D)
+        elif self.tensor_rank(indices) == 1:
+            vectors = self.W[indices]               # shape:(N*?,D)
+        else:
+            raise AssertionError(
+                "Indices to extract event vectors from W must be rank 0 or 1"
+            )
+
         return vectors
 
     def _bagging(self, w) -> TYPE_TENSOR:
@@ -1158,67 +1164,119 @@ class Embedding(Layer):
         return self.dS
 
     # @tf.function
-    def _nearest_vector_arg_for_context(
+    def _nearest_vector_indices_for_context(
             self,
-            context: TYPE_TENSOR,
-            n: TYPE_INT = TYPE_INT(1)
+            vectors: TYPE_TENSOR,
+            excludes: TYPE_TENSOR,
+            n: TYPE_INT = TYPE_INT(1),
     ):
-        """Find the nearest target vector for the context
-        Select vectors whose distance^2 = sum((W-bow)^2) are smallest.
-        When context size = 1, e,g, the event is "woman", then "woman" cannot
-        be the target. Then select the second nearest target.
+        """Indices for the nearest target vectors for the context
+        1. Calculate a normalized BoW from the context vectors.
+        2. Calculate distance^2 = sum((W-bow)^2) from the BoW to each vector in W.
+        3. Taken indices to the top 'n' nearest vectors, which do not include
+           those vectors in the context 'vectors'.
+
+        Note:
+            When context size = 1, e,g, the context is "woman", then "woman"
+            itself must not be the target. Then select the second nearest target.
 
         Args:
-            context: Context event vectors for which to predict the target
+            vectors:
+                Context event vectors of shape (C,D) where 'C' is the context_size.
+            excludes:
+                indices to exclude (e.g. indices to those in the context vectors).
         Returns:
-            Index to the target vector
+            Indices to W for the predicted target event vector(s).
+            Shape () for n==1 or (n,) for n>1.
         """
-        assert 0 < n < self.dictionary.vocabulary_size - EVENT_META_ENTITIES_COUNT, \
+        assert self.tensor_rank(vectors) == 2, \
+            f"Expected shape (C,{self.D}) but {self.tensor_shape(vectors)}"
+        context_size = self.tensor_shape(vectors)[0]
+        # --------------------------------------------------------------------------------
+        # NOT select NIL, UNK, and events in the context themselves.
+        # TODO:
+        #   Consider the situations where choosing the events in the context
+        #   as the target should be justified.
+        # --------------------------------------------------------------------------------
+        availability = \
+            self.dictionary.vocabulary_size - \
+            (EVENT_META_ENTITIES_COUNT + context_size)
+        assert 0 < n < availability, \
             "Cannot select more than available event vector size."
-        context_size = len(context)
-        assert context_size > 0
 
         # --------------------------------------------------------------------------------
         # Normalized BoW of the context as the target event must be independent
         # from the context size.
         # --------------------------------------------------------------------------------
-        bow = self.einsum("cd->d", context) / context_size if context_size > 1 else context
+        bow = self.einsum("cd->d", vectors) / context_size if context_size > 1 else vectors
 
         # --------------------------------------------------------------------------------
-        # Distances from event vectors (excluding UNK, NIL) to the BoW.
-        # The index into the "distances" is less than EVENT_META_ENTITIES_COUNT than
-        # the actual index. Need to restore the actual index later.
+        # Distances from event vectors (*excluding* UNK, NIL) to the BoW.
+        # The index into the "distances" is EVENT_META_ENTITIES_COUNT less than
+        # than the actual index because EVENT_META_ENTITIES are excluded.
+        # Need to restore the actual index later.
         # --------------------------------------------------------------------------------
         distances = self.sum(
             # self.pow(self.W[EVENT_META_ENTITIES_COUNT:] - bow, TYPE_FLOAT(2)),
             self.pow(self.W[EVENT_META_ENTITIES_COUNT:] - bow, TYPE_FLOAT(2)),
-            axis=-1
+            axis=-1,
         )
         assert self.tensor_shape(distances) == \
                (self.dictionary.vocabulary_size-EVENT_META_ENTITIES_COUNT,)
 
-        # --------------------------------------------------------------------------------
-        # When context_size = 1, bow is the context itself and the distances include
-        # to the context itself, which must be 0. Update its distance not to match.
-        # --------------------------------------------------------------------------------
-        min_index = self.argmin(distances)
         if context_size == 1:
-            if distances[min_index] != TYPE_FLOAT(0):
+            # --------------------------------------------------------------------------------
+            # When context_size = 1, bow is the context event vector itself.
+            # Hence the distances include a distance to the context event itself,
+            # which must be 0. Update its distance with the max distance value+
+            # so as not to match itself. There should be no other situation where
+            # the distance gets zero other than the distance to itself.
+            # --------------------------------------------------------------------------------
+            if distances[self.argmin(distances)] != TYPE_FLOAT(0):
                 raise RuntimeError("There must be distance 0 when context_size==1")
-            # distances[min_index] = self.max(distances) + 1e-5
-            distances = self.where(distances == 0, self.max(distances) + 1e-5, distances)
-            min_index = self.argmin(distances)
+            # distances[self.argmin(distances)] = self.max(distances) + 1e-5
+            distances = self.where(
+                distances == TYPE_FLOAT(0),
+                self.max(distances) + 1e-5,
+                distances
+            )
 
         if n == 1:
-            args = min_index
+            args = self.to_tensor(self.argmin(distances))
+            assert self.tensor_shape(args) == ()
         else:
-            _sorted = self.argsort(x=distances)
-            args = _sorted[1:n+1] if context_size == 1 else _sorted[n]
-            # Restore the EVENT_META_ENTITIES excluded at distance calculation
-            args = self.add(args, self.to_tensor(EVENT_META_ENTITIES_COUNT))
+            # --------------------------------------------------------------------------------
+            # Take indices to the top 'n' + context_size nearest distances.
+            # Top 'n' will not include the 'context' event(s).
+            # --------------------------------------------------------------------------------
+            # Take n+context_size to be able to remove those in 'context'.
+            args = self.argsort(x=distances)[0:n+context_size]
 
-        # Target should not be NIL nor UNK
-        assert self.min(args) > self.to_tensor(EVENT_META_ENTITIES_COUNT)
+            # --------------------------------------------------------------------------------
+            # Restore the actual indices into W.
+            # The 'distances' tensor does not include EVENT_META_ENTITIES.
+            # Hence the indices is EVENT_META_ENTITIES_COUNT less than the
+            # actual indices into W which includes EVENT_META_ENTITIES.
+            # --------------------------------------------------------------------------------
+            args = self.add(args, self.to_tensor(EVENT_META_ENTITIES_COUNT))
+            self.logger.debug(
+                "Selected event indices for predicted target events before "
+                "excluding those to the context vectors:\n%s\n",
+                args
+            )
+
+            # --------------------------------------------------------------------------------
+            # Excludes those args that point to those in context 'vectors'.
+            # --------------------------------------------------------------------------------
+            args = self.mask(x=args, mask=self.in1d(target=args, source=excludes, invert=True))
+            args = args[0:n]
+            self.logger.debug(
+                "Selected event indices for predicted target events:\n%s\n"
+                "excluding those to the context vectors=\n%s\n",
+                args
+            )
+            assert self.tensor_shape(args) == (n,), "expected shape:(n,) but %s" % args
+
         return args
 
     def predict(self, X: TYPE_TENSOR, n: TYPE_INT = TYPE_INT(1)) -> TYPE_TENSOR:
@@ -1237,7 +1295,7 @@ class Embedding(Layer):
             X: Indices of the contexts in shape (C,) for single prediction or
                (N,C) for batch.
             n: Number of candidates to provide
-        Return: Single target event vector p:(D,) or batch targets P:(N,C)
+        Return: Indices to W for the predicted target event vectors.
         """
         assert \
             self.is_tensor(X) and \
@@ -1253,17 +1311,21 @@ class Embedding(Layer):
             "Context X cannot include NIL/UNK"
 
         rank = self.tensor_rank(X)
-        if rank == 1:       # Single prediction
-            context = self._extract_event_vectors(X)
-            indices = self._nearest_vector_arg_for_context(context, n)
-
-        elif rank == 2:     # Batch predictions
-            contexts = self._extract_event_vectors(
-                indices=self.reshape(X=X, shape=(-1))
+        if rank == 1:       # X:(C,) for single prediction
+            indices = self._nearest_vector_indices_for_context(
+                vectors=self._extract_event_vectors(X),         # shape:(1,)
+                excludes=X,
+                n=n
             )
+
+        elif rank == 2:     # X:(N,C) for batch predictions
             indices = self.to_tensor([
-                self._nearest_vector_arg_for_context(_context, n)
-                for _context in self.einsum("ncd->nd", contexts)
+                self._nearest_vector_indices_for_context(
+                    vectors=self._extract_event_vectors(x),     # shape:(?,)
+                    excludes=x,
+                    n=n
+                )
+                for x in X
             ])
 
         else:

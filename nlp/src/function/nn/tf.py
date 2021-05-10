@@ -68,6 +68,28 @@ class Function(base.Function):
     def all_equal(x, y):
         return tf.reduce_all(tf.math.equal(x, y))
 
+    @staticmethod
+    def in1d(target, source, invert: bool = False):
+        """
+        Return boolean tensor of the target shape that tells if an element of
+        'target' b is in 'source'.
+
+        Example:
+            target = tf.constant([1,2,3,4,5])
+            source = tf.constant([1,3,5])
+            is_in(target, source)
+            -----
+            [ True, False,  True, False,  True]
+
+        Args:
+            target: Target 1D array to test
+            source: list of elements to check if in 'target'
+            invert: If True, the values in the returned array are inverted
+       """
+        assert Function.tensor_rank(target) == Function.tensor_rank(source) == 1
+        mask = tf.reduce_any(tf.equal(tf.reshape(source, shape=(-1, 1)), target), axis=0)
+        return tf.math.logical_not(mask) if invert else mask
+
     # --------------------------------------------------------------------------------
     # Operations - Statistics
     # --------------------------------------------------------------------------------
@@ -101,6 +123,16 @@ class Function(base.Function):
     @staticmethod
     def argsort(x, axis: int = -1, direction: str = 'ASCENDING'):
         return tf.argsort(x, axis=axis, direction=direction.upper())
+
+    # --------------------------------------------------------------------------------
+    # Operations - Select
+    # --------------------------------------------------------------------------------
+    @staticmethod
+    def mask(x, mask):
+        """Select elements from array with boolean indices
+        array[mask] in numpy where the mask is boolean nd.array
+        """
+        return tf.boolean_mask(tensor=x, mask=mask)
 
     # --------------------------------------------------------------------------------
     # Operations - Update
