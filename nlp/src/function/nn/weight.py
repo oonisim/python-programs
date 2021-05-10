@@ -54,7 +54,7 @@ def uniform(M: TYPE_INT, D: TYPE_INT) -> np.ndarray:
         W: weight matrix
     """
     assert all([D > 0, M > 0])
-    weights = (np.random.uniform(low=0.0, high=1.0, size=(M, D))).astype(TYPE_FLOAT)
+    weights = (np.random.uniform(low=-1.0, high=1.0, size=(M, D))).astype(TYPE_FLOAT)
     return weights
 
 

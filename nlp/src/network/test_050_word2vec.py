@@ -41,8 +41,8 @@ def test_word2vec():
     TARGET_SIZE = TYPE_INT(1)   # Size of the target event (word)
     CONTEXT_SIZE = TYPE_INT(4)  # Size of the context in which the target event ocuurs.
     WINDOW_SIZE = TARGET_SIZE + CONTEXT_SIZE
-    SAMPLE_SIZE = TYPE_INT(5)   # Size of the negative samples
-    VECTOR_SIZE = TYPE_INT(20)  # Number of features in the event vector.
+    SAMPLE_SIZE = TYPE_INT(10)   # Size of the negative samples
+    VECTOR_SIZE = TYPE_INT(50)  # Number of features in the event vector.
 
     # --------------------------------------------------------------------------------
     # Corpus text
@@ -143,12 +143,12 @@ def test_word2vec():
     STATE_FILE = "wor2vec_embedding.pkl"
     embedding.load(STATE_FILE)
 
+    NUM_SENTENCES = 50
+    MAX_ITERATIONS = 100000
+
     # Continue training
     profiler = cProfile.Profile()
     profiler.enable()
-
-    NUM_SENTENCES = 100
-    MAX_ITERATIONS = 100000
 
     total_sentences = 0
     epochs = 0
@@ -159,12 +159,10 @@ def test_word2vec():
         try:
             sentences = next(source)
             total_sentences += len(sentences)
-            print(sentences[0])
             network.train(X=sentences, T=np.array([0]))
-            if i % 5 == 0:
+            if i % 100 == 0:
                 print(f"Batch {i:05d} of {NUM_SENTENCES} sentences: Loss: {network.history[-1]:15f}")
-            if i % 200 == 0:
-                print("saving states")
+            if i % 500 == 0:
                 embedding.save(STATE_FILE)
 
         except fileio.Function.GenearatorHasNoMore as e:

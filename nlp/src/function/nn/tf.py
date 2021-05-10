@@ -177,6 +177,10 @@ class Function(base.Function):
             return tf.math.multiply(x, y)
 
     @staticmethod
+    def divide(x, y):
+        return tf.math.divide(x, y)
+
+    @staticmethod
     def sqrt(X) -> TYPE_TENSOR:
         return tf.math.sqrt(X)
 

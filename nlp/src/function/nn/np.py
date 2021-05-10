@@ -151,6 +151,10 @@ class Function(base.Function):
         return np.multiply(x, y, out=out)
 
     @staticmethod
+    def divide(x, y, out=None):
+        return np.divide(x, y, out)
+
+    @staticmethod
     def sqrt(X) -> TYPE_TENSOR:
         return np.sqrt(X)
 

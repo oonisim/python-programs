@@ -319,9 +319,24 @@ class Embedding(Layer):
         """Gradients dL/dWs for negative sample event vectors Ws
         dL/dWs:shape(N, SL, D)
         """
-        assert self.tensor_size(self._dWs) == (self.N * self.SL * self.D), \
+        assert self.tensor_shape(self._dWs) == (self.N, self.SL, self.D), \
             "dWs is not initialized or invalid"
         return self._dWs
+
+    @property
+    def U(self) -> TYPE_TENSOR:
+        """Normalized W=W/|W|
+        """
+        eps = 1e-8
+        if self.tensor_size(self._U) > 0:
+            assert self.tensor_shape(self._U) == self.tensor_shape(self._W)
+            pass
+        else:
+            self._U = self.divide(
+                x=self.W,
+                y=self.sqrt(self.einsum("vd,vd->v", self.W, self.W)) + eps
+            )
+        return self._U
 
     @property
     def optimizer(self) -> optimiser.Optimizer:
@@ -492,6 +507,11 @@ class Embedding(Layer):
         self._D = self.W.shape[1]
 
         # --------------------------------------------------------------------------------
+        # W/|W| for cosine calculation
+        # --------------------------------------------------------------------------------
+        self._U = np.empty(shape=(), dtype=TYPE_FLOAT)
+
+        # --------------------------------------------------------------------------------
         # Event vectors for target event vector(s)
         # --------------------------------------------------------------------------------
         self._We: TYPE_TENSOR = np.empty(shape=(), dtype=TYPE_FLOAT)      # Event vectors for target
@@ -532,7 +552,7 @@ class Embedding(Layer):
     # --------------------------------------------------------------------------------
     # Instance methods
     # --------------------------------------------------------------------------------
-    def _extract_event_vectors(self, indices: TYPE_TENSOR):
+    def _extract_event_vectors(self, W: TYPE_TENSOR, indices: TYPE_TENSOR):
         """Extract vectors from event vector space W.
         Use numpy 1D array indexing to extract rows from W.
         W[
@@ -540,14 +560,15 @@ class Embedding(Layer):
         ]
 
         Args:
-            X: rank 1 vector
+            W: vector space
+            indices: indices to extract vectors from W
 
         Returns: vectors of shape:(N*?, D) where is C or E.
         """
         if self.tensor_rank(indices) == 0:
-            vectors = self.W[indices:indices+1]     # shape:(1,D)
+            vectors = W[indices:indices+1]     # shape:(1,D)
         elif self.tensor_rank(indices) == 1:
-            vectors = self.W[indices]               # shape:(N*?,D)
+            vectors = W[indices]               # shape:(N*?,D)
         else:
             raise AssertionError(
                 "Indices to extract event vectors from W must be rank 0 or 1"
@@ -650,7 +671,7 @@ class Embedding(Layer):
             0: self.E
         ], shape=(-1))
         self._We = self.reshape(
-            X=self._extract_event_vectors(self.target_indices),
+            X=self._extract_event_vectors(self.W, self.target_indices),
             shape=(self.N, self.E, self.D)
         )
         self._Be = self._bagging(self.We)
@@ -663,7 +684,7 @@ class Embedding(Layer):
             self.E: self.window_size
         ], shape=(-1))
         self._Wc = self.reshape(
-            X=self._extract_event_vectors(self.context_indices),
+            X=self._extract_event_vectors(self.W, self.context_indices),
             shape=(self.N, self.C, self.D)
         )
         self._Bc = self._bagging(self.Wc)
@@ -689,7 +710,7 @@ class Embedding(Layer):
             for row in range(self.N)
         ]), shape=(-1))
         self._Ws = self.reshape(
-            X=self._extract_event_vectors(self.negative_sample_indices),
+            X=self._extract_event_vectors(self.W, self.negative_sample_indices),
             shape=(self.N, self.SL, self.D)
         )
 
@@ -1164,13 +1185,13 @@ class Embedding(Layer):
         return self.dS
 
     # @tf.function
-    def _nearest_vector_indices_for_context(
+    def _smallest_vector_indices_for_context(
             self,
             vectors: TYPE_TENSOR,
             excludes: TYPE_TENSOR,
             n: TYPE_INT = TYPE_INT(1),
     ):
-        """Indices for the nearest target vectors for the context
+        """Indices to the nearest distance vectors to the context BoW
         1. Calculate a normalized BoW from the context vectors.
         2. Calculate distance^2 = sum((W-bow)^2) from the BoW to each vector in W.
         3. Taken indices to the top 'n' nearest vectors, which do not include
@@ -1247,7 +1268,6 @@ class Embedding(Layer):
         else:
             # --------------------------------------------------------------------------------
             # Take indices to the top 'n' + context_size nearest distances.
-            # Top 'n' will not include the 'context' event(s).
             # --------------------------------------------------------------------------------
             # Take n+context_size to be able to remove those in 'context'.
             args = self.argsort(x=distances)[0:n+context_size]
@@ -1278,6 +1298,114 @@ class Embedding(Layer):
             assert self.tensor_shape(args) == (n,), "expected shape:(n,) but %s" % args
 
         return args
+
+    def _largest_cosine_vector_indices_for_context(
+            self,
+            vectors: TYPE_TENSOR,
+            excludes: TYPE_TENSOR,
+            n: TYPE_INT = TYPE_INT(1),
+    ):
+        """Indices to the largest cosine vectors to the context BoW
+        1. Calculate a normalized BoW from the context vectors.
+        2. Calculate cosine (dot product) from the BoW to each vector in W.
+        3. Taken indices to the top 'n' largest cosines, which do not include
+           the cosines to those in the context 'vectors'.
+
+        Note:
+            When context size = 1, e,g, the context is "woman", then "woman"
+            itself must not be the target. Then select the second nearest target.
+
+        Args:
+            vectors:
+                Context norm vectors of shape (C,D) where 'C' is the context_size.
+            excludes:
+                indices to exclude (e.g. indices to those in the context vectors).
+        Returns:
+            Indices to W for the predicted target event vector(s).
+            Shape () for n==1 or (n,) for n>1.
+        """
+        assert self.tensor_rank(vectors) == 2, \
+            f"Expected shape (C,{self.D}) but {self.tensor_shape(vectors)}"
+        context_size = self.tensor_shape(vectors)[0]
+        # --------------------------------------------------------------------------------
+        # NOT select NIL, UNK, and events in the context themselves.
+        # TODO:
+        #   Consider the situations where choosing the events in the context
+        #   as the target should be justified.
+        # --------------------------------------------------------------------------------
+        availability = \
+            self.dictionary.vocabulary_size - \
+            (EVENT_META_ENTITIES_COUNT + context_size)
+        assert 0 < n < availability, \
+            "Cannot select more than available event vector size."
+
+        # --------------------------------------------------------------------------------
+        # Normalized BoW of the context as the target event must be independent
+        # from the context size.
+        # --------------------------------------------------------------------------------
+        bow = self.einsum("cd->d", vectors) / context_size if context_size > 1 else vectors
+
+        # --------------------------------------------------------------------------------
+        # Cosines from event vectors (*excluding* UNK, NIL) to the BoW.
+        # The index into the "cosines" is EVENT_META_ENTITIES_COUNT less than
+        # than the actual index because EVENT_META_ENTITIES are excluded.
+        # Need to restore the actual index later.
+        # --------------------------------------------------------------------------------
+        cosines = self.einsum("d,vd->v", bow, self.U[EVENT_META_ENTITIES_COUNT:])
+        assert self.tensor_shape(cosines) == \
+               (self.dictionary.vocabulary_size-EVENT_META_ENTITIES_COUNT,)
+
+        # --------------------------------------------------------------------------------
+        # Take indices to the top 'n' + context_size largest cosines,
+        # to be able to remove those in 'context'.
+        # --------------------------------------------------------------------------------
+        args = self.argsort(x=cosines, direction='DESCENDING')[0:n+context_size]
+
+        # --------------------------------------------------------------------------------
+        # Restore the actual indices into W.
+        # The 'cosines' tensor does not include EVENT_META_ENTITIES.
+        # Hence the indices is EVENT_META_ENTITIES_COUNT less than the
+        # actual indices into W which includes EVENT_META_ENTITIES.
+        # --------------------------------------------------------------------------------
+        args = self.add(args, self.to_tensor(EVENT_META_ENTITIES_COUNT))
+        self.logger.debug(
+            "Selected event indices for predicted target events before "
+            "excluding those to the context vectors:\n%s\n",
+            args
+        )
+
+        # --------------------------------------------------------------------------------
+        # Excludes those args that point to those in context 'vectors'.
+        # --------------------------------------------------------------------------------
+        args = self.mask(x=args, mask=self.in1d(target=args, source=excludes, invert=True))
+        args = args[0:n]
+        self.logger.debug(
+            "Selected event indices for predicted target events:\n%s\n"
+            "excluding those to the context vectors=\n%s\n",
+            args
+        )
+        assert self.tensor_shape(args) == (n,), "expected shape:(n,) but %s" % args
+        return args
+
+    def _predict_by_distance(
+            self, x: TYPE_TENSOR, n: TYPE_INT
+    ):
+        indices = self._smallest_vector_indices_for_context(
+            vectors=self._extract_event_vectors(self.W, x),  # shape:(1,)
+            excludes=x,
+            n=n
+        )
+        return indices
+
+    def _predict_by_cosine(
+            self, x: TYPE_TENSOR, n: TYPE_INT
+    ):
+        indices = self._largest_cosine_vector_indices_for_context(
+            vectors=self._extract_event_vectors(self.U, x),  # shape:(1,)
+            excludes=x,
+            n=n
+        )
+        return indices
 
     def predict(self, X: TYPE_TENSOR, n: TYPE_INT = TYPE_INT(1)) -> TYPE_TENSOR:
         """Predict the target event() for the given context event(s) X.
@@ -1310,21 +1438,14 @@ class Embedding(Layer):
         assert self.all(X > self.max(self.to_tensor(EVENT_INDEX_META_ENTITIES))), \
             "Context X cannot include NIL/UNK"
 
+        _predict = self._predict_by_distance
         rank = self.tensor_rank(X)
         if rank == 1:       # X:(C,) for single prediction
-            indices = self._nearest_vector_indices_for_context(
-                vectors=self._extract_event_vectors(X),         # shape:(1,)
-                excludes=X,
-                n=n
-            )
+            indices = _predict(x=X, n=n)
 
         elif rank == 2:     # X:(N,C) for batch predictions
             indices = self.to_tensor([
-                self._nearest_vector_indices_for_context(
-                    vectors=self._extract_event_vectors(x),     # shape:(?,)
-                    excludes=x,
-                    n=n
-                )
+                _predict(x=x, n=n)
                 for x in X
             ])
 
