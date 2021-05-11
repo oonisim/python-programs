@@ -74,7 +74,7 @@ class Sum(Layer):
 
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
 
-        self.mask: np.ndarray = np.empty(())    # To zero clear the outputs where x <= 0
+        self.mask: np.ndarray = np.empty(0)    # To zero clear the outputs where x <= 0
         self._M: int = num_nodes                     # Number of nodes alias
         self._shape_X = ()                      # Original shape of X
         self._is_averaged: bool = is_averaged

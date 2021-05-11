@@ -140,7 +140,7 @@ def test_word2vec():
             stream.close()
 
     # Restore the state if exists.
-    STATE_FILE = "wor2vec_embedding.pkl"
+    STATE_FILE = f"/home/oonisim/home/repository/git/oonisim/python_programs/nlp/models/word2vec_vecsize_{VECTOR_SIZE}.pkl"
     embedding.load(STATE_FILE)
 
     NUM_SENTENCES = 50

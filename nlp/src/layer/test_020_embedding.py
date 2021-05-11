@@ -967,7 +967,7 @@ def test_020_embedding_save_load(caplog):
         tester = testing.layer.Function(instance=embedding)
         tester.test_save()
         backup_W = copy.deepcopy(embedding.W)
-        embedding._W = np.empty(())
+        embedding._W = np.empty(0)
 
         # --------------------------------------------------------------------------------
         # Confirm the layer does not function anymore

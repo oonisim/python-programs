@@ -216,7 +216,12 @@ class Function:
 
     @staticmethod
     def reshape(X, shape):
-        return np.reshape(X, shape)
+        if tf.is_tensor(X):
+            return tf.reshape(X, shape)
+        elif isinstance(X, np.ndarray):
+            return np.reshape(X, shape)
+        else:
+            raise AssertionError("Cannot reshape \n%s\n" % X)
 
     # ================================================================================
     # Instance

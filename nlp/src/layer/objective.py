@@ -136,8 +136,8 @@ class CrossEntropyLogLoss(Layer):
 
         # At the objective layer, features in X is the same with num nodes.
         self._D = num_nodes
-        self._P: np.ndarray = np.empty(())  # Probabilities of shape (N, M)
-        self._J: np.ndarray = np.empty(())  # Cross entropy log loss of shape (N,).
+        self._P: np.ndarray = np.empty(0)  # Probabilities of shape (N, M)
+        self._J: np.ndarray = np.empty(0)  # Cross entropy log loss of shape (N,).
         # Use Y for output in the consistent manner.
         # self._L: np.ndarray = -np.inf       # Objective value of shape ()
 

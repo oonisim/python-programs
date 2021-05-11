@@ -325,17 +325,26 @@ class Embedding(Layer):
 
     @property
     def U(self) -> TYPE_TENSOR:
-        """Normalized W=W/|W|
+        """Normalized W=W/|W| as NumPy array to use numpy indexing to extract
+        scattered elements.
+        TODO:
+            Use framework native element extraction, e.g. gather_nd with
+            [[index0, 1], [index1,1],...]  for TF to extract from W:(V,D).
         """
         eps = 1e-8
-        if self.tensor_size(self._U) > 0:
-            assert self.tensor_shape(self._U) == self.tensor_shape(self._W)
-            pass
-        else:
+        if self.tensor_size(self._U) <= 0:
             self._U = self.divide(
                 x=self.W,
-                y=self.sqrt(self.einsum("vd,vd->v", self.W, self.W)) + eps
+                y=self.reshape(
+                    self.sqrt(self.einsum("vd,vd->v", self.W, self.W)) + eps,
+                    shape=(self.tensor_shape(self.W)[0], 1)
+                )
             )
+            self._U = self._U.numpy() if tf.is_tensor(self._U) else self._U
+
+        assert self.tensor_shape(self._U) == self.tensor_shape(self._W), \
+            "Expected shape %s but %s" %\
+            (self.tensor_shape(self._W), self.tensor_shape(self._U))
         return self._U
 
     @property
@@ -466,20 +475,23 @@ class Embedding(Layer):
         # --------------------------------------------------------------------------------
         self._X_shape: tuple = ()                           # Original shape of input X
         self._target_size: TYPE_INT = target_size
-        self._target_indices: TYPE_TENSOR = np.empty(())    # 1D array
+        self._target_indices: TYPE_TENSOR = np.empty(0)    # 1D array
         self._context_size: TYPE_INT = context_size
-        self._context_indices: TYPE_TENSOR = np.empty(())
+        self._context_indices: TYPE_TENSOR = np.empty(0)
 
         # --------------------------------------------------------------------------------
         # Negative sampling property
         # --------------------------------------------------------------------------------
         self._dictionary: EventIndexing = dictionary
         self._negative_sample_size: TYPE_TENSOR = negative_sample_size
-        self._negative_sample_indices: TYPE_TENSOR = np.empty(())
+        self._negative_sample_indices: TYPE_TENSOR = np.empty(0)
 
         # --------------------------------------------------------------------------------
         # Event vector space
         # Gradient dL/dW varies because only the extracted W rows need to be processed.
+        # TODO:
+        #   Use framework native element extraction, e.g. gather_nd with
+        #   [[index0, 1], [index1,1],...]  for TF to extract from W:(V,D).
         # --------------------------------------------------------------------------------
         if W is None:
             self._W: TYPE_TENSOR = self.build_weights(
@@ -509,29 +521,29 @@ class Embedding(Layer):
         # --------------------------------------------------------------------------------
         # W/|W| for cosine calculation
         # --------------------------------------------------------------------------------
-        self._U = np.empty(shape=(), dtype=TYPE_FLOAT)
+        self._U = np.empty(shape=0, dtype=TYPE_FLOAT)
 
         # --------------------------------------------------------------------------------
         # Event vectors for target event vector(s)
         # --------------------------------------------------------------------------------
-        self._We: TYPE_TENSOR = np.empty(shape=(), dtype=TYPE_FLOAT)      # Event vectors for target
-        self._Be: TYPE_TENSOR = np.empty(shape=(), dtype=TYPE_FLOAT)      # BoW of event vectors for targets
-        self._dWe: TYPE_TENSOR = np.empty(shape=(), dtype=TYPE_FLOAT)     # dL/dWe
+        self._We: TYPE_TENSOR = np.empty(shape=0, dtype=TYPE_FLOAT)      # Event vectors for target
+        self._Be: TYPE_TENSOR = np.empty(shape=0, dtype=TYPE_FLOAT)      # BoW of event vectors for targets
+        self._dWe: TYPE_TENSOR = np.empty(shape=0, dtype=TYPE_FLOAT)     # dL/dWe
 
         # --------------------------------------------------------------------------------
         # Event vectors for context event vectors
         # --------------------------------------------------------------------------------
-        self._Wc: TYPE_TENSOR = np.empty(shape=(), dtype=TYPE_FLOAT)      # Event vectors for context
-        self._Bc: TYPE_TENSOR = np.empty(shape=(), dtype=TYPE_FLOAT)      # BoW of event vectors for contexts
-        self._dWc: TYPE_TENSOR = np.empty(shape=(), dtype=TYPE_FLOAT)     # dL/dWc:(N,C,D)=(dL/dWc01 + dL/dWc02).
-        self._dWc01: TYPE_TENSOR = np.empty(shape=(), dtype=TYPE_FLOAT)   # dL/dWc01:(N,C,D) with Be (BoWs of target event vectors).
-        self._dWc02: TYPE_TENSOR = np.empty(shape=(), dtype=TYPE_FLOAT)   # dL/dWc02:(N,S,D) with Ws (negative sample event vectors).
+        self._Wc: TYPE_TENSOR = np.empty(shape=0, dtype=TYPE_FLOAT)      # Event vectors for context
+        self._Bc: TYPE_TENSOR = np.empty(shape=0, dtype=TYPE_FLOAT)      # BoW of event vectors for contexts
+        self._dWc: TYPE_TENSOR = np.empty(shape=0, dtype=TYPE_FLOAT)     # dL/dWc:(N,C,D)=(dL/dWc01 + dL/dWc02).
+        self._dWc01: TYPE_TENSOR = np.empty(shape=0, dtype=TYPE_FLOAT)   # dL/dWc01:(N,C,D) with Be (BoWs of target event vectors).
+        self._dWc02: TYPE_TENSOR = np.empty(shape=0, dtype=TYPE_FLOAT)   # dL/dWc02:(N,S,D) with Ws (negative sample event vectors).
 
         # --------------------------------------------------------------------------------
         # Event vectors for negative samples
         # --------------------------------------------------------------------------------
-        self._Ws: TYPE_TENSOR = np.empty(shape=(), dtype=TYPE_FLOAT)      # Event vectors for negative samples
-        self._dWs: TYPE_TENSOR = np.empty(shape=(), dtype=TYPE_FLOAT)     # dL/dWs
+        self._Ws: TYPE_TENSOR = np.empty(shape=0, dtype=TYPE_FLOAT)      # Event vectors for negative samples
+        self._dWs: TYPE_TENSOR = np.empty(shape=0, dtype=TYPE_FLOAT)     # dL/dWs
 
         # --------------------------------------------------------------------------------
         # Optimizer for gradient descent
@@ -1227,9 +1239,10 @@ class Embedding(Layer):
 
         # --------------------------------------------------------------------------------
         # Normalized BoW of the context as the target event must be independent
-        # from the context size.
+        # from the context size. bow needs the shape (D,) to be 'd'.
         # --------------------------------------------------------------------------------
-        bow = self.einsum("cd->d", vectors) / context_size if context_size > 1 else vectors
+        bow = self.einsum("cd->d", vectors) / context_size \
+            if context_size > 1 else self.reshape(vectors, shape=(-1))
 
         # --------------------------------------------------------------------------------
         # Distances from event vectors (*excluding* UNK, NIL) to the BoW.
@@ -1317,7 +1330,8 @@ class Embedding(Layer):
 
         Args:
             vectors:
-                Context norm vectors of shape (C,D) where 'C' is the context_size.
+                Context *norm* vectors of shape (C,D) where 'C' is the context_size.
+
             excludes:
                 indices to exclude (e.g. indices to those in the context vectors).
         Returns:
@@ -1341,9 +1355,10 @@ class Embedding(Layer):
 
         # --------------------------------------------------------------------------------
         # Normalized BoW of the context as the target event must be independent
-        # from the context size.
+        # from the context size. bow needs the shape (D,) to be 'd'.
         # --------------------------------------------------------------------------------
-        bow = self.einsum("cd->d", vectors) / context_size if context_size > 1 else vectors
+        bow = self.einsum("cd->d", vectors) / context_size \
+            if context_size > 1 else self.reshape(vectors, shape=(-1))
 
         # --------------------------------------------------------------------------------
         # Cosines from event vectors (*excluding* UNK, NIL) to the BoW.
@@ -1438,14 +1453,20 @@ class Embedding(Layer):
         assert self.all(X > self.max(self.to_tensor(EVENT_INDEX_META_ENTITIES))), \
             "Context X cannot include NIL/UNK"
 
-        _predict = self._predict_by_distance
+        #_predict = self._predict_by_distance
+        _predict = self._predict_by_cosine
         rank = self.tensor_rank(X)
         if rank == 1:       # X:(C,) for single prediction
-            indices = _predict(x=X, n=n)
-
+            # indices = _predict(x=X, n=n)
+            indices_distance = self._predict_by_distance(X, n)
+            indices_cosine = self._predict_by_cosine(X, n)
         elif rank == 2:     # X:(N,C) for batch predictions
-            indices = self.to_tensor([
-                _predict(x=x, n=n)
+            indices_distance = self.to_tensor([
+                self._predict_by_distance(x=x, n=n)
+                for x in X
+            ])
+            indices_cosine = self.to_tensor([
+                self._predict_by_cosine(x, n)
                 for x in X
             ])
 
@@ -1455,6 +1476,7 @@ class Embedding(Layer):
                 self.tensor_shape(X)
             )
 
+        indices = indices_cosine, indices_distance
         return indices
 
     def adapt_function_to_logistic_log_loss(self, loss: CrossEntropyLogLoss):

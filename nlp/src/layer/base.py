@@ -195,7 +195,7 @@ class Layer(nn.Function):
             (self.is_tensor(self._X) and self.tensor_size(self._X) > 0) or
             self.is_float_scalar(self._X)
         ):
-            print_stack()
+            # print_stack()     # pytest comes here and show lots of lines...
             raise AssertionError("X is not initialized or invalid. type(X)={} X=\n{}\n".format(
                 type(self._X), self._X
             ))

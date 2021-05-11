@@ -100,8 +100,8 @@ class ReLU(Layer):
         """
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
 
-        self.mask: np.ndarray = np.empty(())    # To zero clear the outputs where x <= 0
-        self._A: np.ndarray = np.empty(())      # Activation
+        self.mask: np.ndarray = np.empty(0)    # To zero clear the outputs where x <= 0
+        self._A: np.ndarray = np.empty(0)      # Activation
         self._M = num_nodes                     # Number of nodes alias
         self._slope: TYPE_FLOAT = slope
         assert self.slope >= TYPE_FLOAT(0), "Leaky ReLU slope value needs to be positive."
@@ -199,8 +199,8 @@ class Sigmoid(Layer):
     # ================================================================================
     def __init__(self, name: str, num_nodes: int, log_level: int = logging.ERROR):
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
-        self.mask: np.ndarray = np.empty(())    # To zero clear the outputs where x <= 0
-        self._A: np.ndarray = np.empty(())       # Activation
+        self.mask: np.ndarray = np.empty(0)    # To zero clear the outputs where x <= 0
+        self._A: np.ndarray = np.empty(0)       # Activation
         self._M = num_nodes                     # Number of nodes alias
 
     # --------------------------------------------------------------------------------
