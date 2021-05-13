@@ -15,7 +15,7 @@ class Function(base.Function):
     # Class
     # ================================================================================
     @staticmethod
-    def build_weights(M: TYPE_INT, D: TYPE_INT, scheme: str = "uniform") -> TYPE_TENSOR:
+    def build_weights(M: TYPE_INT, D: TYPE_INT, scheme: str = "normal") -> TYPE_TENSOR:
         return weight.Weights(M=M, D=D, initialization_scheme=scheme).weights
 
     # ================================================================================

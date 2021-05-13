@@ -11,6 +11,37 @@ from common.constant import (
 )
 
 
+def uniform(M: TYPE_INT, D: TYPE_INT) -> np.ndarray:
+    """Uniform weight distribution to initialize a weight W:(D,M) of shape (D, M),
+    where D is the number of features to a node and M is the number of nodes in a layer.
+
+    Args:
+        M: Number of nodes in a layer
+        D: Number of feature in a node to process
+    Returns:
+        W: weight matrix
+    """
+    assert all([D > 0, M > 0])
+    weights = (np.random.uniform(low=-1.0, high=1.0, size=(M, D))).astype(TYPE_FLOAT)
+    return weights
+
+
+def normal(M: TYPE_INT, D: TYPE_INT, std=TYPE_FLOAT(0.01)) -> np.ndarray:
+    """Standard normal distribution of
+    a weight W:(D,M) of shape (D, M), where D is the number of features to a node and
+    M is the number of nodes in a layer.
+
+    Args:
+        M: Number of nodes in a layer
+        D: Number of feature in a node to process
+        std: STD of the normal distribution
+    Returns:
+        W: weight matrix
+    """
+    assert all([D > 0, M > 0])
+    return std * np.random.randn(M, D).astype(TYPE_FLOAT)
+
+
 def xavier(M: TYPE_INT, D: TYPE_INT) -> np.ndarray:
     """Xavier weight initialization for base-symmetric activations e.g. sigmoid/tanh
     Gaussian distribution with the standard deviation of sqrt(1/D) to initialize
@@ -43,23 +74,9 @@ def he(M: TYPE_INT, D: TYPE_INT) -> np.ndarray:
     return (np.random.randn(M, D) / np.sqrt(2*D)).astype(TYPE_FLOAT)
 
 
-def uniform(M: TYPE_INT, D: TYPE_INT) -> np.ndarray:
-    """Uniform weight distribution to initialize a weight W:(D,M) of shape (D, M),
-    where D is the number of features to a node and M is the number of nodes in a layer.
-
-    Args:
-        M: Number of nodes in a layer
-        D: Number of feature in a node to process
-    Returns:
-        W: weight matrix
-    """
-    assert all([D > 0, M > 0])
-    weights = (np.random.uniform(low=-1.0, high=1.0, size=(M, D))).astype(TYPE_FLOAT)
-    return weights
-
-
 SCHEMES = {
     "uniform": uniform,
+    "normal": normal,
     "he": he,
     "xavier": xavier,
 }

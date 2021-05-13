@@ -2,14 +2,18 @@
 import sys
 import cProfile
 import logging
+import time
 
-from memory_profiler import profile as memory_profile
 import numpy as np
 import tensorflow as tf
 
+from memory_profiler import profile as memory_profile
+import ray
+
 import function.fileio as fileio
 from common.constant import (
-    TYPE_INT
+    TYPE_INT,
+    TYPE_FLOAT
 )
 from common.function import (
     sigmoid_cross_entropy_log_loss
@@ -32,16 +36,19 @@ from layer.preprocessing import (
 from network.sequential import (
     SequentialNetwork
 )
+from optimizer import (
+    SGD
+)
 
 Logger = logging.getLogger(__name__)
 
 
-@memory_profile
+# @memory_profile
 def test_word2vec():
     TARGET_SIZE = TYPE_INT(1)   # Size of the target event (word)
-    CONTEXT_SIZE = TYPE_INT(4)  # Size of the context in which the target event ocuurs.
+    CONTEXT_SIZE = TYPE_INT(10)  # Size of the context in which the target event occurs.
     WINDOW_SIZE = TARGET_SIZE + CONTEXT_SIZE
-    SAMPLE_SIZE = TYPE_INT(10)   # Size of the negative samples
+    SAMPLE_SIZE = TYPE_INT(5)   # Size of the negative samples
     VECTOR_SIZE = TYPE_INT(50)  # Number of features in the event vector.
 
     # --------------------------------------------------------------------------------
@@ -75,7 +82,8 @@ def test_word2vec():
     # --------------------------------------------------------------------------------
     word_indexing = EventIndexing(
         name="word_indexing_on_ptb",
-        corpus=corpus
+        corpus=corpus,
+        min_sequence_length=WINDOW_SIZE
     )
     del corpus
 
@@ -98,6 +106,7 @@ def test_word2vec():
         context_size=CONTEXT_SIZE,
         negative_sample_size=SAMPLE_SIZE,
         event_vector_size=VECTOR_SIZE,
+        optimizer=SGD(lr=TYPE_FLOAT(0.5)),
         dictionary=word_indexing
     )
 
@@ -134,17 +143,32 @@ def test_word2vec():
         stream = fileio.Function.file_line_stream(path_to_file)
         try:
             while True:
-                _lines = fileio.Function.take(num_sentences, stream)
-                yield np.array(_lines)
+                yield np.array(fileio.Function.take(num_sentences, stream))
         finally:
             stream.close()
 
     # Restore the state if exists.
     STATE_FILE = f"/home/oonisim/home/repository/git/oonisim/python_programs/nlp/models/word2vec_vecsize_{VECTOR_SIZE}.pkl"
-    embedding.load(STATE_FILE)
+    if fileio.Function.is_file(STATE_FILE):
+        print("Loading model...\nSTATE_FILE: %s" % STATE_FILE)
+        state = embedding.load(STATE_FILE)
+
+        fmt = """Model loaded.
+        event_size %s
+        context_size: %s
+        event_vector_size: %s
+        """
+        print(fmt % (
+            state["target_size"],
+            state["context_size"],
+            state["event_vector_size"]
+        ))
+    else:
+        print("State file does not exist. Saving the initial model.")
+        embedding.save(STATE_FILE)
 
     NUM_SENTENCES = 50
-    MAX_ITERATIONS = 100000
+    MAX_ITERATIONS = 1000000
 
     # Continue training
     profiler = cProfile.Profile()
@@ -155,19 +179,28 @@ def test_word2vec():
     source = sentences_generator(
         path_to_file=path_to_input, num_sentences=NUM_SENTENCES
     )
+
     for i in range(MAX_ITERATIONS):
         try:
             sentences = next(source)
             total_sentences += len(sentences)
+
+            start = time.time()
             network.train(X=sentences, T=np.array([0]))
+
             if i % 100 == 0:
-                print(f"Batch {i:05d} of {NUM_SENTENCES} sentences: Loss: {network.history[-1]:15f}")
-            if i % 500 == 0:
+                print(
+                    f"Batch {i:05d} of {NUM_SENTENCES} sentences: "
+                    f"Average Loss: {np.mean(network.history[-1]):15f} "
+                    f"Duration {time.time() - start}"
+                )
+            if i % 100 == 0:
                 embedding.save(STATE_FILE)
 
         except fileio.Function.GenearatorHasNoMore as e:
             # Next epoch
             print(f"epoch {epochs} done")
+            embedding.save(STATE_FILE)
             epochs += 1
             source.close()
             source = sentences_generator(
@@ -186,4 +219,9 @@ def test_word2vec():
 
 
 if __name__ == '__main__':
-    test_word2vec()
+    try:
+        # ray.init(num_cpus=8, num_gpus=0)
+        test_word2vec()
+    finally:
+        # ray.shutdown()
+        pass

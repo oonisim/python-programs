@@ -88,6 +88,11 @@ class Function(base.Function):
             x, axis=axis, keepdims=keepdims
         )
 
+    @staticmethod
+    def unique(x, out_idx=None):
+        values = np.unique(x=x)
+        return values
+
     # --------------------------------------------------------------------------------
     # Operations - indices
     # --------------------------------------------------------------------------------

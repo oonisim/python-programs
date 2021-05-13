@@ -95,8 +95,8 @@ def test_020_event_context_instance_properties(caplog):
     profiler = cProfile.Profile()
     profiler.enable()
     for _ in range(NUM_MAX_TEST_TIMES):
-        stride: TYPE_INT = np.random.randint(1, 100)
-        event_size: TYPE_INT = np.random.randint(1, 100)
+        stride: TYPE_INT = TYPE_INT(np.random.randint(1, 100))
+        event_size: TYPE_INT = TYPE_INT(np.random.randint(1, 100))
         window_size: TYPE_INT = 2 * stride + event_size
 
         name = random_string(np.random.randint(1, 10))

@@ -496,7 +496,8 @@ class Embedding(Layer):
         if W is None:
             self._W: TYPE_TENSOR = self.build_weights(
                 M=dictionary.vocabulary_size,
-                D=event_vector_size
+                D=event_vector_size,
+                scheme="normal"
             )
         else:
             self._W: TYPE_TENSOR = self.tensor_cast(copy.deepcopy(W), dtype=TYPE_FLOAT)
@@ -687,6 +688,7 @@ class Embedding(Layer):
             shape=(self.N, self.E, self.D)
         )
         self._Be = self._bagging(self.We)
+        assert self.is_finite(self.Be), f"NaN or inf detected in {self.Be}"
 
         # --------------------------------------------------------------------------------
         # BoW vectors for contexts
@@ -700,6 +702,7 @@ class Embedding(Layer):
             shape=(self.N, self.C, self.D)
         )
         self._Bc = self._bagging(self.Wc)
+        assert self.is_finite(self.Bc), f"NaN or inf detected in {self.Bc}"
 
         # --------------------------------------------------------------------------------
         # Positive score (BoW dot Target)
@@ -714,10 +717,25 @@ class Embedding(Layer):
         # --------------------------------------------------------------------------------
         # Event vectors of negative samples
         # --------------------------------------------------------------------------------
+        # Prevent negative samples from including any events in all the (event, context).
+        # If v is event or context of a sequence Xi but not Xj, then negative samples of
+        # Xj may include v. Then rewarding and penalizing on v happen at the same time.
+        # --------------------------------------------------------------------------------
+        # self._negative_sample_indices = self.reshape(X=self.to_tensor([
+        #     self.dictionary.negative_sample_indices(
+        #         size=self.SL,
+        #         excludes=set(tuple(self.to_flat_list(X[row]))
+        #     )
+        #     for row in range(self.N)
+        # ]), shape=(-1))
+
+        # unique values. set() cannot take a list as it is mutable.
+        # set([1,2,3]) is a Python runtime hack. It should be set((1,2,3))
+        excludes = set(tuple(self.to_flat_list(X)))
         self._negative_sample_indices = self.reshape(X=self.to_tensor([
             self.dictionary.negative_sample_indices(
                 size=self.SL,
-                excludes=X[row]
+                excludes=excludes
             )
             for row in range(self.N)
         ]), shape=(-1))
@@ -725,6 +743,7 @@ class Embedding(Layer):
             X=self._extract_event_vectors(self.W, self.negative_sample_indices),
             shape=(self.N, self.SL, self.D)
         )
+        assert self.is_finite(self.Ws), f"NaN or inf detected in {self.Ws}"
 
         # --------------------------------------------------------------------------------
         # Negative score (BoW dot Negatives)
@@ -1028,8 +1047,10 @@ class Embedding(Layer):
         # What to set to self._dx? Use empty for now and monitor how it goes.
         # 'self._dX = self.X' is incorrect and can cause unexpected result e.g.
         # trying to copy data into self.X which can cause unexpected effects.
+        #
+        # Changed to zeros from empty as empty includes "Nan".
         # --------------------------------------------------------------------------------
-        self._dX = np.empty(shape=self._X_shape)
+        self._dX = np.zeros(shape=self._X_shape, dtype=TYPE_FLOAT)
         return self.dX
 
     def gradient_numerical(

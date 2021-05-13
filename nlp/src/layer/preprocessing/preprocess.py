@@ -7,6 +7,7 @@ from typing import (
 )
 
 import numpy as np
+import ray
 
 import function.fileio as fileio
 import function.text as text
@@ -18,10 +19,10 @@ from common.constant import (
     TYPE_TENSOR,
     EVENT_NIL,
     EVENT_UNK,
+    EVENT_INDEX_UNK,
     EVENT_INDEX_META_ENTITIES,
     EVENT_META_ENTITIES,
     EVENT_META_ENTITIES_COUNT,
-    EVENT_META_ENTITY_TO_INDEX,
     EVENT_CONTEXT_WINDOW_SIZE
 )
 from layer import (
@@ -170,6 +171,10 @@ class EventIndexing(Layer):
             The number of outputs (num_nodes) is not fixed as the length of
             sequence(s) generated varies depending on the incoming sentences.
             Hence set to 1.
+
+            min_sequence_length depends on the window_size of the EventContext.
+            To be able to create a (event, context) pair, the requirement is:
+            min_sequence_length >= window_size = (event_size + context_size)
         """
         super().__init__(name=name, num_nodes=num_nodes, log_level=log_level)
         assert len(corpus) > 0
@@ -187,6 +192,7 @@ class EventIndexing(Layer):
         self._event_to_index, _, _vocabulary, self._event_to_probability = \
             text.Function.event_indexing(corpus=corpus, power=power)
         del _
+        # self._ray_event_to_index_id = ray.put(self._event_to_index)
 
         # --------------------------------------------------------------------------------
         # Vocabulary as np.array so as to select multiple events with its list indexing.
@@ -219,17 +225,24 @@ class EventIndexing(Layer):
             for event in events
         ]
 
+    @staticmethod
+    @ray.remote
+    def _get_index(event_to_index, event: str):
+        return event_to_index.get(event, EVENT_INDEX_UNK)
+
     def list_indices(self, events: Iterable[str]) -> Iterable[TYPE_INT]:
         """Provides indices of events
         Args:
             events: events to get the indices
         """
         return [
-            self.event_to_index.get(
-                event, TYPE_INT(EVENT_META_ENTITY_TO_INDEX[EVENT_UNK.lower()])
-            )
+            self.event_to_index.get(event, EVENT_INDEX_UNK)
             for event in events
         ]
+        # return ray.get([
+        #     EventIndexing._get_index.remote(self._ray_event_to_index_id, event)
+        #     for event in events
+        # ])
 
     def take(self, start: TYPE_INT = 0, size: TYPE_INT = 5) -> Iterable[str]:
         assert 0 <= start < (self.vocabulary_size - EVENT_META_ENTITIES_COUNT)
@@ -240,14 +253,32 @@ class EventIndexing(Layer):
 
     def sample(self, size: TYPE_INT) -> Iterable[str]:
         assert 0 < size <= (self.vocabulary_size - len(EVENT_META_ENTITIES))
-        candidates: List[str] = list(np.random.choice(
-            a=self.vocabulary,
-            size=size + EVENT_META_ENTITIES_COUNT,
-            replace=False,
-            p=self.probabilities
-        ))
-        # Do not sample meta events
-        return list(set(candidates) - set(EVENT_META_ENTITIES))[:size]
+
+        # --------------------------------------------------------------------------------
+        # choice is an expensive operation costing nearly half of the entire
+        # word2vec CPU time
+        # {method 'choice' of 'numpy.random.mtrand.RandomState' objects}
+        #     77061   15.993    0.000   41.261    0.001
+        # --------------------------------------------------------------------------------
+        USE_PROBABILITY = False
+        if USE_PROBABILITY:
+            sampled: List[str] = list(np.random.choice(
+                a=self.vocabulary,
+                size=size + EVENT_META_ENTITIES_COUNT,
+                replace=False,
+                p=self.probabilities
+            ))
+            # Do not sample meta events
+            return list(set(sampled) - set(EVENT_META_ENTITIES))[:size]
+        else:
+            sampled: List[str] = self.vocabulary[
+                np.random.randint(
+                    low=EVENT_META_ENTITIES_COUNT,
+                    high=self.vocabulary_size,
+                    size=size
+                )
+            ]
+            return sampled
 
     def negative_sample_indices(
             self, size: TYPE_INT,
@@ -261,8 +292,10 @@ class EventIndexing(Layer):
         Return: Indices of events not included in negatives
         """
         excludes_length = len(list(excludes))
-        assert size <= 20, "Verify if the sample size is correct"
-        assert 0 < excludes_length <= (self.vocabulary_size - size - len(EVENT_META_ENTITIES))
+        availability = (self.vocabulary_size - excludes_length - EVENT_META_ENTITIES_COUNT)
+        assert size <= 20, "Verify if the negative sample size is correct"
+        assert 0 < size <= availability, \
+            "availability %s > sample size %s" % (availability, size)
 
         candidates = self.list_indices(self.sample(size+excludes_length))
         self.list_indices(candidates)
@@ -352,8 +385,10 @@ class EventIndexing(Layer):
         # What to set to self._dx? Use empty for now and monitor how it goes.
         # 'self._dX = self.X' is incorrect and can cause unexpected result e.g.
         # trying to copy data into self.X which can cause unexpected effects.
+        #
+        # Changed to zeros as empty includes nan
         # --------------------------------------------------------------------------------
-        self._dX = np.empty(shape=self.tensor_shape(self.X))
+        self._dX = np.zeros(shape=self.tensor_shape(self.X), dtype=TYPE_FLOAT)
         return self.dX
 
     def load(self, path: str) -> List:
@@ -599,13 +634,17 @@ class EventContext(Layer):
         ]
 
         # --------------------------------------------------------------------------------
-        # If the event_size is long,
+        # Because of padding, when there are only a few sentence provided,
+        # the 'event' in (event,context) can result in 0.
+        # [[562  58 117   0   0   0   0   0   0   0   0]]
         # --------------------------------------------------------------------------------
         assert \
             self.tensor_size(event_context_pairs) > 0, \
-            "Resulted in no (event,context) pairs. Validate the input and target size." \
+            "Resulted in no (event,context) pairs. " \
+            "Validate the input and target size, or increase sentences to feed." \
             "Target event size [%s], Window size [%s], Input sequences:\n%s\n" % \
             (self.event_size, self.window_size, X)
+
         assert \
             self.tensor_dtype(event_context_pairs) == TYPE_INT, \
             "The output must be dtype %s" % TYPE_INT
@@ -621,6 +660,8 @@ class EventContext(Layer):
         # What to set to self._dx? Use empty for now and monitor how it goes.
         # 'self._dX = self.X' is incorrect and can cause unexpected result e.g.
         # trying to copy data into self.X which can cause unexpected effects.
+        #
+        # Changed to np.zeros as empty include nan
         # --------------------------------------------------------------------------------
-        self._dX = np.empty(shape=self.X.shape)
+        self._dX = np.zeros(shape=self.X.shape, dtype=TYPE_FLOAT)
         return self.dX

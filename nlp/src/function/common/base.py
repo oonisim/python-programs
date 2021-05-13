@@ -215,6 +215,21 @@ class Function:
         return Y
 
     @staticmethod
+    def to_flat_list(X) -> List:
+        """Convert Tensor to list
+        """
+        if tf.is_tensor(X):
+            Y = X.numpy().ravel().tolist()
+        elif isinstance(X, np.ndarray):
+            Y = X.ravel().tolist()
+        elif isinstance(X, Iterable):
+            Y = np.array(list(X)).ravel().tolist()
+        else:
+            raise AssertionError("Cannot convert to list \n%s\n" % X)
+
+        return Y
+
+    @staticmethod
     def reshape(X, shape):
         if tf.is_tensor(X):
             return tf.reshape(X, shape)

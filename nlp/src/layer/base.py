@@ -208,7 +208,12 @@ class Layer(nn.Function):
         2. Allocate _dX storage.
         3. DO NOT set/update _D as it can be set with the weight shape.
         """
-        assert X is not None and self.is_tensor(X)
+        # X can be string e.g EventIndexing
+        # assert X is not None and self.is_tensor(X) and self.is_finite(X), \
+        assert X is not None and self.is_tensor(X), f"Invalid X {X}"
+        if self.tensor_dtype(X) == TYPE_FLOAT:
+            assert self.is_finite(X)
+
         if self.is_float_tensor(X):
             assert np.all(np.isfinite(X)), f"{X}"
             if np.all(np.abs(X) > TYPE_FLOAT(1.0)):
@@ -237,6 +242,7 @@ class Layer(nn.Function):
         assert isinstance(self._dX, np.ndarray) and self._dX.size > 0, \
             "dX is not initialized"
 
+        assert self.is_finite(self._dX), "Nan/inf detected \n%s\n" % self._dX
         if np.all(np.abs(self._dX) < GRADIENT_SATURATION_THRESHOLD):
             self.logger.warning(
                 "Gradient dL/dX \n[%s] may have been saturated." % self._dX
@@ -279,6 +285,8 @@ class Layer(nn.Function):
             self.is_float_scalar(self._Y), \
             "Y %s of type %s is not initialized or invalid." % \
             (self._Y, type(self._Y))
+        if self.tensor_dtype(self._Y) == TYPE_FLOAT:
+            assert self.is_finite(self._Y), "nan/inf detected\n%s\n" % self._Y
         return self._Y
 
     @property
@@ -287,6 +295,9 @@ class Layer(nn.Function):
         assert \
             self.is_float_tensor(self._dY) and self.tensor_size(self._dY) > 0, \
             "dY is not initialized or invalid"
+
+        if self.tensor_dtype(self._dY) == TYPE_FLOAT:
+            assert self.is_finite(self._dY), "nan/inf detected\n%s\n" % self._dY
 
         if np.all(np.abs(self._dY) < GRADIENT_SATURATION_THRESHOLD):
             self.logger.warning(

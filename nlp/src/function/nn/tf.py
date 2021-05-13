@@ -109,6 +109,11 @@ class Function(base.Function):
             x, axis=axis, keepdims=keepdims
         )
 
+    @staticmethod
+    def unique(x, out_idx=tf.as_dtype(TYPE_INT)):
+        values, indices = tf.unique(x=x)
+        return values
+
     # --------------------------------------------------------------------------------
     # Operations - indices
     # --------------------------------------------------------------------------------
