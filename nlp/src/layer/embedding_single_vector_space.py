@@ -232,11 +232,6 @@ class Embedding(Layer):
         return self._W
 
     @property
-    def WO(self) -> TYPE_TENSOR:
-        """Layer weight vectors W to take event and sample vectors"""
-        return self._WO
-
-    @property
     def dW(self) -> TYPE_TENSOR:
         """Weight gradients as np.c_[dL/dWe, dL/dWc, dL/dWs]
         dL/dWe:shape(N, E, D)
@@ -385,9 +380,10 @@ class Embedding(Layer):
             "target_size",
             "context_size",
             "negative_sample_size",
-            "event_vector_size",
+            # "dictionary",
             "W",
-            "WO",
+            "event_vector_size",
+            # "optimizer"
         ]
 
     @property
@@ -398,9 +394,8 @@ class Embedding(Layer):
             "target_size": self._target_size,
             "context_size": self._context_size,
             "negative_sample_size": self._negative_sample_size,
-            "event_vector_size": self.D,
             "W": self.W,
-            "WO": self.WO,
+            "event_vector_size": self.D,
         }
         assert set(self._S.keys()) == set(self.state_elements)
         return self._S
@@ -418,7 +413,6 @@ class Embedding(Layer):
             event_vector_size: TYPE_INT = EVENT_VECTOR_SIZE,
             dictionary: EventIndexing = None,
             W: Optional[TYPE_TENSOR] = None,
-            WO: Optional[TYPE_TENSOR] = None,
             optimizer: optimiser.Optimizer = optimiser.SGD(),
             posteriors: Optional[List[Layer]] = None,
             log_level: int = logging.ERROR
@@ -511,6 +505,7 @@ class Embedding(Layer):
         # Set the event vector for NIL and UNK to zero.
         self._W[EVENT_INDEX_NIL] = TYPE_FLOAT(0)
         self._W[EVENT_INDEX_UNK] = TYPE_FLOAT(0)
+
         assert isinstance(self._W, np.ndarray), "Needs NumPy array for array indexing"
         assert \
             self.is_same_dtype(self.tensor_dtype(self.W), TYPE_FLOAT), \
@@ -523,26 +518,6 @@ class Embedding(Layer):
             % (dictionary.vocabulary_size, event_vector_size, self.W.shape)
 
         self._D = self.W.shape[1]
-
-        # --------------------------------------------------------------------------------
-        # 2nd weights to take event and negative samples
-        # --------------------------------------------------------------------------------
-        if WO is None:
-            self._WO = copy.deepcopy(self.W)
-        else:
-            assert isinstance(WO, np.ndarray), "Needs NumPy array for array indexing"
-            assert \
-                self.is_same_dtype(self.tensor_dtype(WO), TYPE_FLOAT), \
-                f"Expected {TYPE_FLOAT} but {self.tensor_dtype(WO)}"
-            assert \
-                self.tensor_shape(WO)[0] >= dictionary.vocabulary_size and \
-                self.tensor_shape(WO)[1] == event_vector_size > 0 and \
-                self.tensor_size(WO) >= dictionary.vocabulary_size * event_vector_size, \
-                "WO shape needs (%s,%s) but %s." \
-                % (dictionary.vocabulary_size, event_vector_size, WO.shape)
-            self._WO = copy.deepcopy(WO)
-            self._WO[EVENT_INDEX_NIL] = TYPE_FLOAT(0)
-            self._WO[EVENT_INDEX_UNK] = TYPE_FLOAT(0)
 
         # --------------------------------------------------------------------------------
         # W/|W| for cosine calculation
@@ -709,8 +684,7 @@ class Embedding(Layer):
             0: self.E
         ], shape=(-1))
         self._We = self.reshape(
-            # X=self._extract_event_vectors(self.W, self.target_indices),
-            X=self._extract_event_vectors(self.WO, self.target_indices),
+            X=self._extract_event_vectors(self.W, self.target_indices),
             shape=(self.N, self.E, self.D)
         )
         self._Be = self._bagging(self.We)
@@ -744,30 +718,27 @@ class Embedding(Layer):
         # Prevent negative samples from including any events in all the (event, context).
         # If v is event or context of a sequence Xi but not Xj, then negative samples of
         # Xj may include v. Then rewarding and penalizing on v happen at the same time.
-        #
-        # set() cannot take a list as it is mutable.
-        # set([1,2,3]) is a Python runtime hack. It should be set((1,2,3))
         # --------------------------------------------------------------------------------
-        self._negative_sample_indices = self.reshape(X=self.to_tensor([
-            self.dictionary.negative_sample_indices(
-                size=self.SL,
-                excludes=set(tuple(self.to_flat_list(X[row])))  # unique values
-            )
-            for row in range(self.N)
-        ]), shape=(-1))
-
-        # excludes = set(tuple(self.to_flat_list(X)))
         # self._negative_sample_indices = self.reshape(X=self.to_tensor([
         #     self.dictionary.negative_sample_indices(
         #         size=self.SL,
-        #         excludes=excludes
+        #         excludes=set(tuple(self.to_flat_list(X[row])f))
         #     )
         #     for row in range(self.N)
         # ]), shape=(-1))
 
+        # unique values. set() cannot take a list as it is mutable.
+        # set([1,2,3]) is a Python runtime hack. It should be set((1,2,3))
+        excludes = set(tuple(self.to_flat_list(X)))
+        self._negative_sample_indices = self.reshape(X=self.to_tensor([
+            self.dictionary.negative_sample_indices(
+                size=self.SL,
+                excludes=excludes
+            )
+            for row in range(self.N)
+        ]), shape=(-1))
         self._Ws = self.reshape(
-            # X=self._extract_event_vectors(self.W, self.negative_sample_indices),
-            X=self._extract_event_vectors(self.WO, self.negative_sample_indices),
+            X=self._extract_event_vectors(self.W, self.negative_sample_indices),
             shape=(self.N, self.SL, self.D)
         )
 
@@ -783,8 +754,9 @@ class Embedding(Layer):
         Y = Y.numpy() if tf.is_tensor(Y) else Y
         self._Y = Y
         del Ye, Ys
-        assert self.tensor_shape(self.Y) == (self.N, (1 + self.SL))
-        assert self.is_finite(self.Y), f"NaN or inf detected in {self.Y}"
+        assert \
+            self.is_finite(self.Y) and \
+            self.tensor_shape(self.Y) == (self.N, (1 + self.SL))
         return self.Y
 
     # @memory_profile
@@ -1227,11 +1199,9 @@ class Embedding(Layer):
             update() is to update the state of the layer S. Hence not
             include dL/dX which is not part of the layer state.
        """
-        # self._gradient_descent(w=self._W, dw=self.dWe, indices=self.target_indices)
-        # self._gradient_descent(w=self._W, dw=self.dWs, indices=self.negative_sample_indices)
-        self._gradient_descent(w=self._WO, dw=self.dWe, indices=self.target_indices)
-        self._gradient_descent(w=self._WO, dw=self.dWs, indices=self.negative_sample_indices)
-        self._gradient_descent(w=self._W, dw=self.dWc, indices=self.context_indices)
+        self._gradient_descent(w=self.W, dw=self.dWe, indices=self.target_indices)
+        self._gradient_descent(w=self.W, dw=self.dWs, indices=self.negative_sample_indices)
+        self._gradient_descent(w=self.W, dw=self.dWc, indices=self.context_indices)
         self._dS = [self.dWe, self.dWs, self.dWc]
 
         # self.N changes every time function() is called, hence the buffer
@@ -1686,7 +1656,6 @@ class Embedding(Layer):
             event_vector_size=state["event_vector_size"],
             dictionary=self.dictionary,
             W=state["W"],
-            WO=state["WO"],
             optimizer=self.optimizer
         )
 

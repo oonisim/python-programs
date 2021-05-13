@@ -900,7 +900,8 @@ def test_020_embedding_gradient_descent(caplog):
 
     # - W[3] = W[3] - [lr * (1 + l2) * dWe].
     assert Function.all_close(
-        EWe, embedding.W[3], msg="Expected (EDWe==W[3])\n%s\ndifference\n%s\n" % (EWe, EWe - embedding.W[3])
+        # EWe, embedding.W[3], msg="Expected (EDWe==W[3])\n%s\ndifference\n%s\n" % (EWe, EWe - embedding.W[3])
+        EWe, embedding.WO[3], msg="Expected (EDWe==W[3])\n%s\ndifference\n%s\n" % (EWe, EWe - embedding.W[3])
     )
     # W[4] = W[4] - [lr * (1 + l2) * dWc]
     assert Function.all_close(

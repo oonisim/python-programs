@@ -168,7 +168,7 @@ def test_word2vec():
         embedding.save(STATE_FILE)
 
     NUM_SENTENCES = 50
-    MAX_ITERATIONS = 1000000
+    MAX_ITERATIONS = 100000
 
     # Continue training
     profiler = cProfile.Profile()
@@ -191,10 +191,10 @@ def test_word2vec():
             if i % 100 == 0:
                 print(
                     f"Batch {i:05d} of {NUM_SENTENCES} sentences: "
-                    f"Average Loss: {np.mean(network.history[-1]):15f} "
+                    f"Average Loss: {np.mean(network.history):15f} "
                     f"Duration {time.time() - start}"
                 )
-            if i % 100 == 0:
+            if i % 10 == 0:
                 embedding.save(STATE_FILE)
 
         except fileio.Function.GenearatorHasNoMore as e:

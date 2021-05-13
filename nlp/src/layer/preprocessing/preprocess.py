@@ -260,7 +260,7 @@ class EventIndexing(Layer):
         # {method 'choice' of 'numpy.random.mtrand.RandomState' objects}
         #     77061   15.993    0.000   41.261    0.001
         # --------------------------------------------------------------------------------
-        USE_PROBABILITY = False
+        USE_PROBABILITY = True
         if USE_PROBABILITY:
             sampled: List[str] = list(np.random.choice(
                 a=self.vocabulary,
