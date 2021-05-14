@@ -191,7 +191,7 @@ def test_word2vec():
             if i % 100 == 0:
                 print(
                     f"Batch {i:05d} of {NUM_SENTENCES} sentences: "
-                    f"Average Loss: {np.mean(network.history):15f} "
+                    f"Average Loss: {np.mean(network.history):10f} "
                     f"Duration {time.time() - start}"
                 )
             if i % 10 == 0:

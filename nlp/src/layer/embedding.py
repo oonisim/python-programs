@@ -528,21 +528,21 @@ class Embedding(Layer):
         # 2nd weights to take event and negative samples
         # --------------------------------------------------------------------------------
         if WO is None:
-            self._WO = copy.deepcopy(self.W)
+            self._WO: TYPE_TENSOR = self.tensor_cast(copy.deepcopy(self.W), dtype=TYPE_FLOAT)
         else:
             assert isinstance(WO, np.ndarray), "Needs NumPy array for array indexing"
-            assert \
-                self.is_same_dtype(self.tensor_dtype(WO), TYPE_FLOAT), \
-                f"Expected {TYPE_FLOAT} but {self.tensor_dtype(WO)}"
-            assert \
-                self.tensor_shape(WO)[0] >= dictionary.vocabulary_size and \
-                self.tensor_shape(WO)[1] == event_vector_size > 0 and \
-                self.tensor_size(WO) >= dictionary.vocabulary_size * event_vector_size, \
-                "WO shape needs (%s,%s) but %s." \
-                % (dictionary.vocabulary_size, event_vector_size, WO.shape)
-            self._WO = copy.deepcopy(WO)
+            self._WO = self.tensor_cast(copy.deepcopy(WO), dtype=TYPE_FLOAT)
             self._WO[EVENT_INDEX_NIL] = TYPE_FLOAT(0)
             self._WO[EVENT_INDEX_UNK] = TYPE_FLOAT(0)
+            assert \
+                self.is_same_dtype(self.tensor_dtype(self.WO), TYPE_FLOAT), \
+                f"Expected {TYPE_FLOAT} but {self.tensor_dtype(self.WO)}"
+            assert \
+                self.tensor_shape(self.WO)[0] >= dictionary.vocabulary_size and \
+                self.tensor_shape(self.WO)[1] == event_vector_size > 0 and \
+                self.tensor_size(self.WO) >= dictionary.vocabulary_size * event_vector_size, \
+                "WO shape needs (%s,%s) but %s." \
+                % (dictionary.vocabulary_size, event_vector_size, WO.shape)
 
         # --------------------------------------------------------------------------------
         # W/|W| for cosine calculation
