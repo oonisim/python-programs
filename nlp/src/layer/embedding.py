@@ -434,7 +434,8 @@ class Embedding(Layer):
             negative_sample_size: size of the negative samples
             event_vector_size: size of the event vector
             dictionary: Dictionary to consult event probabilities and event samples.
-            W: Weight of shape(V=vocabulary_size, D).
+            W: Weight for context in shape(V=vocabulary_size, D).
+            W: Weight for event and negative samples in shape(V=vocabulary_size, D).
             posteriors: Post layers to which forward the Embedding layer output
             optimizer: Gradient descent implementation e.g SGD, Adam.
             log_level: logging level
@@ -493,7 +494,7 @@ class Embedding(Layer):
         self._negative_sample_indices: TYPE_TENSOR = np.empty(0)
 
         # --------------------------------------------------------------------------------
-        # Event vector space
+        # Event vector space for context(s)
         # Gradient dL/dW varies because only the extracted W rows need to be processed.
         # TODO:
         #   Use framework native element extraction, e.g. gather_nd with
@@ -1315,10 +1316,12 @@ class Embedding(Layer):
             # --------------------------------------------------------------------------------
             if distances[self.argmin(distances)] != TYPE_FLOAT(0):
                 raise RuntimeError("There must be distance 0 when context_size==1")
+
+            # TF has no in place update
             # distances[self.argmin(distances)] = self.max(distances) + 1e-5
             distances = self.where(
                 distances == TYPE_FLOAT(0),
-                self.max(distances) + 1e-5,
+                self.add(self.max(distances), TYPE_FLOAT(1e-5)),
                 distances
             )
 
@@ -1328,8 +1331,8 @@ class Embedding(Layer):
         else:
             # --------------------------------------------------------------------------------
             # Take indices to the top 'n' + context_size nearest distances.
+            # +context_size to be able to remove those in 'context'.
             # --------------------------------------------------------------------------------
-            # Take n+context_size to be able to remove those in 'context'.
             args = self.argsort(x=distances)[0:n+context_size]
 
             # --------------------------------------------------------------------------------

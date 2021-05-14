@@ -106,7 +106,7 @@ def test_word2vec():
         context_size=CONTEXT_SIZE,
         negative_sample_size=SAMPLE_SIZE,
         event_vector_size=VECTOR_SIZE,
-        optimizer=SGD(lr=TYPE_FLOAT(0.5)),
+        optimizer=SGD(lr=TYPE_FLOAT(0.1)),
         dictionary=word_indexing
     )
 

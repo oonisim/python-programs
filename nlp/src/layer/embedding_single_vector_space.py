@@ -1493,6 +1493,7 @@ class Embedding(Layer):
                 self.tensor_shape(X)
             )
 
+        # TODO: Decide which to use, cosine or distance. Or combine both.
         indices = indices_cosine, indices_distance
         return indices
 
