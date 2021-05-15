@@ -1,4 +1,5 @@
 EOL = '\n'
+EMPTY = ''
 SPACE = ' '
 DELIMITER = SPACE
 EVENT_NIL = "<nil>".lower()  # Lower letter as lower() will be applied.

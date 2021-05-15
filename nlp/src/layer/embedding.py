@@ -419,6 +419,7 @@ class Embedding(Layer):
             dictionary: EventIndexing = None,
             W: Optional[TYPE_TENSOR] = None,
             WO: Optional[TYPE_TENSOR] = None,
+            weight_initialization_scheme: str = "uniform",
             optimizer: optimiser.Optimizer = optimiser.SGD(),
             posteriors: Optional[List[Layer]] = None,
             log_level: int = logging.ERROR
@@ -714,7 +715,9 @@ class Embedding(Layer):
             X=self._extract_event_vectors(self.WO, self.target_indices),
             shape=(self.N, self.E, self.D)
         )
+        # self._Be = self._bagging(self.We)
         self._Be = self._bagging(self.We)
+        self._Be = self.divide(self.Be, self.E) if self.E > 1 else self.Be
 
         # --------------------------------------------------------------------------------
         # BoW vectors for contexts
@@ -727,7 +730,8 @@ class Embedding(Layer):
             X=self._extract_event_vectors(self.W, self.context_indices),
             shape=(self.N, self.C, self.D)
         )
-        self._Bc = self._bagging(self.Wc)
+        # self._Bc = self._bagging(self.Wc)
+        self._Bc = self.divide(self._bagging(self.Wc), self.C)
 
         # --------------------------------------------------------------------------------
         # Positive score (BoW dot Target)
@@ -757,6 +761,12 @@ class Embedding(Layer):
             for row in range(self.N)
         ]), shape=(-1))
 
+        # --------------------------------------------------------------------------------
+        # [Obsolete] An attempt to take negative samples from the set of events
+        # where all the events in (event, targets) in the batch are excluded,
+        # so that all events in (event, targets) in the batch will never include
+        # those in negative sampels in the batch.
+        # --------------------------------------------------------------------------------
         # excludes = set(tuple(self.to_flat_list(X)))
         # self._negative_sample_indices = self.reshape(X=self.to_tensor([
         #     self.dictionary.negative_sample_indices(
@@ -766,6 +776,7 @@ class Embedding(Layer):
         #     for row in range(self.N)
         # ]), shape=(-1))
 
+        # No need to normalize with SL because (n)(s) is independent.
         self._Ws = self.reshape(
             # X=self._extract_event_vectors(self.W, self.negative_sample_indices),
             X=self._extract_event_vectors(self.WO, self.negative_sample_indices),
@@ -837,7 +848,7 @@ class Embedding(Layer):
         # - dBe/dWe:(N,E,D) = I:(N,E,D) = ones(shape=(N,E,D))
         # --------------------------------------------------------------------------------
         # Forward path:
-        # F1. Be:(N,D) = einsum("ned->nd", We:(N,E,D))
+        # F1. Be:(N,D) = einsum("ned->nd", We:(N,E,D)) / self.E
         #   F1-1. Summed itself along axis 1 and,       "ned->n1d"
         #   F1-2. Dropped the axis 1 (rank -1)          "n1d->nd"
         #
@@ -869,7 +880,7 @@ class Embedding(Layer):
         #       axis=1 as (N,D)->(N,1,D) as "nd->n1d" (reverse of F1-2).
         #       dL/dBe:(N,1,D) = reshape(dL/dBe:(N,D), shape=(N,1,D))
         #
-        #   B2-2. dL/dBe:(N,1,D) -> dBe/dWe:(N,E,D)
+        #   B2-2. dL/dBe:(N,1,D) -> dBe/dWe:(N,E,D) / E
         #       Restore the shape of We:(N,E,D) lost during "ned->n1d" at F1-1 as
         #       "n1d->ned" (reverse of F1-1) by multiply with dBe/dWe:(N,E,D) = I:(N,E,D).
         #       dL/dWe:(N,E,D) = dL/dBe:(N,1,D) * I:(N,E,D)
@@ -878,8 +889,8 @@ class Embedding(Layer):
         assert self.tensor_shape(dBe) == (self.N, self.D), \
             f"Expected dBe shape {(self.N, self.D)} but {self.tensor_shape(dBe)}"
         self._dWe = self.multiply(
-            x=self.reshape(X=dBe, shape=(self.N, 1, self.D)),   # B2-1
-            y=np.ones(shape=(self.N, self.E, self.D))           # B2-2
+            x=self.reshape(X=dBe, shape=(self.N, 1, self.D)),               # B2-1
+            y=self.full(shape=(self.N, self.E, self.D), value=(1/self.E))   # B2-2
         )
         del dBe
 
@@ -889,12 +900,14 @@ class Embedding(Layer):
         # dL/dWc01:(N,C,D) = dL/dBc01:(N,D) OP1 dBc01/dWc01:(N,C,D)
         # - dL/dBc01:(N,D) = dL/dYe:(N,1) * dYe/dBc01:(N,D)
         #                  = dL/dYe:(N,1) * Be:(N,D)
+        #                  = dL/dYe:(N,D) * Be:(N,D) via broadcast
         # - dBc/dWc:(N,C,D) = I:(N,C,D)
         #
         # Forward path:
-        # F1. Bc = einsum("ncd->nd", Wc)
+        # F1. Bc = einsum("ncd->nd", Wc) / C
         #   F1-1. Sum along axis 1 (bag of word vectors).       "ncd->n1d".
         #   F1-2. Rank -1 by dropping axis 1.                   "n1d->nd".
+        #   F1-3. Normalize to be independent from C.
         #
         # F2. Ye = einsum("nd,nd->n", Be, Bc)
         #   F2-1. Element-wise multiplication along axis -1.    "nd,nd->nd"
@@ -902,28 +915,37 @@ class Embedding(Layer):
         #   F2-3. Rank -1 by dropping axis -1.                  "n1->n"
         #
         # B1. Gradient dL/dBc01:(N,D) = dL/dYe:(N,1) * Be:(N,D)
-        #     dL/dYe is (N,1), NOT (N,) because of dY[::,0:1] instead of dY[::,0],
-        #     which corresponds to reversing F2-3 as "n->n1".
-        #     Then implicitly restore the shape (N,D) from (N,1) using broadcast,
-        #     which corresponds to reversing F2-2 as "n1->nd".
+        #   B1-1:
+        #       dL/dYe is (N,1), NOT (N,) due to dY[::,0:1] instead of dY[::,0]
+        #       which corresponds to reversing F2-3 as "n->n1".
         #
-        # B2. Gradient dL/dWc:(N,C,D) = dL/dBc01:(N,D) OP dBc01/dWc01:(N,C,D)
-        #   B2-1. dL/dBc01:(N,1,D) = reshape(dL/dBc01:(N,D), shape=(N,1,D))
+        #   B1-2:
+        #       Restore the shape (N,D) from (N,1). Implicitly done by broadcast
+        #       which corresponds to reversing F2-2 as "n1->nd".
+        #
+        #   B1-3: dL/dYe:(N,D) * Be:(N,D)
+        #     Amplify by Be as at F2-1. This is NOT reversing the forward step.
+        #
+        # B2. dL/dWc:(N,C,D) = 1/C * [ dL/dBc01:(N,D) OP dBc01/dWc01:(N,C,D) ]
+        #   B2-1.
+        #       Amplify with 1/C as at F1-3
+        #
+        #   B2-2. dL/dBc01:(N,1,D) = reshape(dL/dBc01:(N,D), shape=(N,1,D))
         #       Restore the rank of Wc by adding the axis 1, which corresponds
-        #       to reversing "n1d->nd" as "nd->n1d".
+        #       to reversing "n1d->nd" at F1-2 as "nd->n1d".
         #
-        #   B2-2. dL/dWc01:(N,C,D) = dL/dBc01:(N,1,D) * dBc01/dWc01:(N,C,D)
+        #   B2-3. dL/dWc01:(N,C,D) = dL/dBc01:(N,1,D) * dBc01/dWc01:(N,C,D)
         #                          = dL/dBc01:(N,1,D) * I:(N,C,D)
         #       Restore the Wc shape (N,C,D) by multiplying with I:(N,C,D),
-        #       which corresponds to reversing "ncd->n1d" as "n1d->ncd".
+        #       which corresponds to reversing "ncd->n1d" at F1-1 as "n1d->ncd".
         # --------------------------------------------------------------------------------
         dBc01: TYPE_TENSOR = self.multiply(dYe, self.Be)    # B1 where dYe:(N,1)
         assert self.tensor_shape(dBc01) == self.tensor_shape(self.Bc) == (self.N, self.D),\
             f"Expected dBc shape {(self.N, self.D)} but {self.tensor_shape(dBc01)}"
 
         self._dWc01 = self.multiply(
-            x=self.reshape(X=dBc01, shape=(self.N, 1, self.D)),     # B2-1
-            y=np.ones(shape=(self.N, self.C, self.D))               # B2-2
+            x=self.reshape(X=dBc01, shape=(self.N, 1, self.D)),             # B2-2
+            y=self.full(shape=(self.N, self.C, self.D), value=(1/self.C))   # B2-3,B2-1
         )
         del dBc01
 
@@ -936,9 +958,10 @@ class Embedding(Layer):
         # - dBc/dWc:(N,C,D) = I:((N,C,D))
         #
         # Forward path:
-        # F1. Bc:(N,D) = einsum("ncd->nd", Wc)
-        #   F1-1. Sum along axis 1 (bag of word vectors) as "ncd->n1d".
-        #   F2-2. Rank -1 by dropping axis 1 as "n1d->nd".
+        # F1. Bc:(N,D) = einsum("ncd->nd", Wc) / C
+        #   F1-1. Sum along axis 1 (bag of word vectors) as  "ncd->n1d".
+        #   F1-2. Rank -1 by dropping axis 1 as "n1d->nd".   "n1d->nd"
+        #
         # F2. Ys:(N,SL) = einsum("nd,nsd->ns", Bc, Ws)
         #   F2-1. Implicit broadcast                         "nd,nsd"->"nsd,nsd".
         #   F2-2. Element-wise multiplication along axis -1. "nsd,nsd->nsd"
@@ -987,22 +1010,26 @@ class Embedding(Layer):
         #       (N*SL) because the loss layer is logistic los loss and the
         #       number of outputs from the layer is 1.
         #
-        # B2. Gradient dL/dWc02:(N,C,D) = dL/dBc02:(N,D) OP2 dBc/dWc:(N,C,D)
-        #   B2-1. dL/dBc02:(N,1,D) = reshape(dL/dBc01:(N,D), shape=(N,1,D))
+        # B2. dL/dWc02:(N,C,D) = 1/C * [dL/dBc02:(N,D) OP2 dBc/dWc:(N,C,D)]
+        #   B2-1.
+        #       Amplify with 1/C as at F1-3
+        #
+        #   B2-2. dL/dBc02:(N,1,D) = reshape(dL/dBc01:(N,D), shape=(N,1,D))
         #       Restore the rank of Wc by adding the axis 1, which corresponds
-        #       to reversing "n1d->nd" as "nd->n1d".
-        #   B2-2. dL/dWc02:(N,C,D) = dL/dBc02:(N,1,D) * dBc02/dWc02:(N,C,D)
+        #       to reversing "n1d->nd" at F1-2 as "nd->n1d".
+        #
+        #   B2-3. dL/dWc02:(N,C,D) = dL/dBc02:(N,1,D) * dBc02/dWc02:(N,C,D)
         #                          = dL/dBc02:(N,1,D) * I:(N,C,D)
         #       Restore the Wc shape (N,C,D) by multiplying with I:(N,C,D),
-        #       which corresponds to reversing "ncd->n1d" as "n1d->ncd".
+        #       which corresponds to reversing "ncd->n1d" at F1-1 as "n1d->ncd".
         # --------------------------------------------------------------------------------
         dBc02: TYPE_TENSOR = self.einsum("ns,nsd->nd", dYs, self.Ws)    # B1 (all)
         assert self.tensor_shape(dBc02) == (self.N, self.D),\
             f"Expected dBc shape {(self.N, self.D)} but {self.tensor_shape(dBc02)}"
 
         self._dWc02 = self.multiply(
-            x=self.reshape(X=dBc02, shape=(self.N, 1, self.D)),     # B2-1
-            y=np.ones((self.N, self.C, self.D))                     # B2-2
+            x=self.reshape(X=dBc02, shape=(self.N, 1, self.D)),     # B2-2
+            y=self.full(shape=(self.N, self.C, self.D), value=(1 / self.C))  # B2-3,B2-1
         )
         del dBc02
 
@@ -1174,7 +1201,7 @@ class Embedding(Layer):
             # _be = self._bagging(we)
             # _ye = self.reshape(self.einsum("nd,nd->n", self.Bc, _be), shape=(-1, 1))
             # return self.objective(self.concat([_ye, Ys], axis=1))
-            _be = self._bagging(we)
+            _be = self._bagging(we) / self.E
             _ye = self.einsum("nd,nd->n", self.Bc, _be)
             # _ye = self.einsum("nd,ncd->n", self.Bc, we)
             return self.objective(_ye)
@@ -1191,7 +1218,7 @@ class Embedding(Layer):
             # _ye = self.reshape(self.einsum("nd,nd->n", _bc, self.Be), shape=(-1, 1))
             # _ys = self.einsum("nd,nsd->ns", _bc, self.Ws)
             # return self.objective(self.concat([_ye, _ys], axis=1))
-            _bc = self._bagging(wc)
+            _bc = self._bagging(wc) / self.C
             _ye = self.einsum("nd,nd->n", _bc, self.Be)
             _ys = self.einsum("nd,nsd->ns", _bc, self.Ws)
             return self.objective(_ye) + self.objective(_ys)

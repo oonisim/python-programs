@@ -38,6 +38,10 @@ class Function(base.Function):
             shape=shape, dtype=dtype, name=None
         )
 
+    @staticmethod
+    def full(shape, value, dtype=TYPE_NN_FLOAT):
+        return tf.fill(dims=shape, value=tf.constant(value, dtype=dtype))
+
     # --------------------------------------------------------------------------------
     # Tensor validations
     # --------------------------------------------------------------------------------

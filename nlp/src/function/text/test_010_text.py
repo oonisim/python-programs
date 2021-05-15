@@ -56,6 +56,7 @@ def test_010_text_function_event_indexing_to_fail():
 
       %s
     """ % string.punctuation
+    # """ % string.punctuation.translate(str.maketrans('', '', '-'))  # Allow '-'
     msg = "event_indexing must fail with lines of non-events"
     _must_fail_event_indexing(corpus=corpus, msg=msg)
 

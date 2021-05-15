@@ -27,6 +27,10 @@ class Function(base.Function):
             shape=shape, dtype=dtype
         )
 
+    @staticmethod
+    def full(shape, value, dtype=TYPE_FLOAT):
+        return np.full(shape=shape, fill_value=value, dtype=dtype)
+
     # --------------------------------------------------------------------------------
     # Tensor validations
     # --------------------------------------------------------------------------------

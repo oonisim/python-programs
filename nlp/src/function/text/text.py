@@ -14,6 +14,7 @@ from common.constant import (
     EVENT_NIL,
     EVENT_UNK,
     EOL,
+    EMPTY,
     SPACE,
     EVENT_META_ENTITIES,
     EVENT_META_ENTITY_TO_INDEX
@@ -106,6 +107,9 @@ class Function:
         # pattern: str = '(?<!%s)[%s%s]+(?!unk>)' % ('<EVENT_UNK', re.escape(string.punctuation), r"\s")
         # pattern: str = rf'(?:(?!{EVENT_UNK.lower()})[\W_](?<!{EVENT_UNK.lower()}))+'
         # --------------------------------------------------------------------------------
+        # excludes: str = r'`~!@#$%^&*()_=+\[\]{}\\\|;:\"\'<>.,/? '
+        # pattern: str = rf'(?:(?!{EVENT_UNK.lower()})(?!{EVENT_NIL.lower()})([{excludes}])(?<!{EVENT_UNK.lower()})(?<!{EVENT_NIL.lower()}))+'
+        # replacement = EMPTY
         pattern: str = rf'(?:(?!{EVENT_UNK.lower()})(?!{EVENT_NIL.lower()})[\W_](?<!{EVENT_UNK.lower()})(?<!{EVENT_NIL.lower()}))+'
         replacement = SPACE
         standardized: str = re.sub(
@@ -160,7 +164,7 @@ class Function:
 
     @staticmethod
     def event_indexing(corpus: str, power: TYPE_FLOAT = TYPE_FLOAT(1)):
-        """Generate event indices
+        """Generate event indices from a text corpus
         Add meta-events EVENT_NIL at 0 and EVENT_UNK at 1.
         events are all lower-cased.
 
@@ -181,7 +185,8 @@ class Function:
         # --------------------------------------------------------------------------------
         # Preliminary event probabilities from the standardized event sequence.
         # --------------------------------------------------------------------------------
-        _event_probabilities: Dict[str, TYPE_FLOAT] = Function.event_occurrence_probability(events=events, power=power)
+        _event_probabilities: Dict[str, TYPE_FLOAT] = \
+            Function.event_occurrence_probability(events=events, power=power)
         assert _event_probabilities.get(EVENT_NIL.lower(), None) is None, \
             f"EVENT_NIL {EVENT_NIL.lower()} should not be included in the corpus. Change EVENT_NIL"
         del events

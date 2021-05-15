@@ -575,7 +575,7 @@ def test_050_sequential_training():
     profiler = cProfile.Profile()
     profiler.enable()
 
-    for _ in range(NUM_MAX_TEST_TIMES):
+    for _ in range(20):
         name = random_string(np.random.randint(1, 10))
         M: int = np.random.randint(2, NUM_MAX_NODES)
         D: int = np.random.randint(1, NUM_MAX_FEATURES)

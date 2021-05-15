@@ -11,8 +11,7 @@ import numpy as np
 
 import common.weights as weights
 from common.constant import (
-    TYPE_FLOAT,
-    TYPE_LABEL
+    TYPE_FLOAT
 )
 from common.function import (
     softmax,
@@ -29,8 +28,19 @@ from layer import (
     Matmul,
     CrossEntropyLogLoss
 )
+from layer.constants import (
+    _NAME,
+    _NUM_NODES,
+    _COMPOSITE_LAYER_SPEC,
+    _LOG_LEVEL
+)
+from network.sequential import (
+    SequentialNetwork
+)
 from optimizer import (
-    Optimizer,
+    Optimizer
+)
+from optimizer import (
     SGD
 )
 from testing.layer import (
@@ -168,7 +178,7 @@ def train_binary_classifier(
         # 2. Gradient descent to update Wn+1 = Wn - lr * dL/dX.
         # --------------------------------------------------------------------------------
         before = copy.deepcopy(matmul.W)
-        dY = loss.gradient(float(1))
+        dY = loss.gradient(TYPE_FLOAT(1))
         dX = matmul.gradient(dY)
 
         # gradient descent and get the analytical gradients dS=[dL/dX, dL/dW]
@@ -287,24 +297,6 @@ def test_categorical_classifier(
     profiler.print_stats(sort="cumtime")
 
 
-from layer.constants import (
-    _WEIGHTS,
-    _NAME,
-    _SCHEME,
-    _OPTIMIZER,
-    _NUM_NODES,
-    _NUM_FEATURES,
-    _PARAMETERS,
-    _LOSS_FUNCTION,
-    _COMPOSITE_LAYER_SPEC,
-    _LOG_LEVEL
-)
-from optimizer import (
-    SGD
-)
-from network.sequential import (
-    SequentialNetwork
-)
 def test():
     M = 1
     D = 2

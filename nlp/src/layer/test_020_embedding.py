@@ -694,7 +694,8 @@ def test_020_embedding_gradient_vs_autodiff(caplog):
     # By setting
     # 1. dL/dY = np.c_[dL/dYe,dL/dYs] = I and
     # 2. context_size C == negative_sample_size SL
-    # The constraint is dL/dWe = dL/dWs = Bc because dL/dYe, dL/dYs are I.
+    # The constraint is E * dL/dWe == dL/dWs == Bc because dL/dYe, dL/dYs are I.
+    # dL/dWe is normalized with E to be independent from the event (target) size.
     # --------------------------------------------------------------------------------
     for _ in range(NUM_MAX_TEST_TIMES):
         # C must be even number
@@ -766,7 +767,7 @@ def test_020_embedding_gradient_vs_autodiff(caplog):
             EDWc, dWc
         ), "Expected (EWc5==W[5])\n%s\ndifference\n%s\n" % (EDWc, EDWc-dWc)
         assert Function.all_close(
-            dWe, dWs
+            dWe * E, dWs
         ), "Expected (dWe==dWs) but dWe:\n%s\ndifference\n%s\n" % (dWe, dWe-dWs)
 
     profiler.disable()
@@ -846,25 +847,25 @@ def test_020_embedding_gradient_descent(caplog):
     lr = embedding.lr
     l2 = embedding.l2
 
-    expected_diff_We = lr * (1+l2) * embedding.dWe
+    expected_dWe = lr * (1+l2) * embedding.dWe
     diff_We = embedding.optimizer.differential(dW=embedding.dWe)
     msg_We = "dWe: expected\n%s\n but actual diff=:\n%s\n" % \
-             (expected_diff_We, (expected_diff_We-diff_We))
+             (expected_dWe, (expected_dWe-diff_We))
     embedding.all_close(
-        expected_diff_We, diff_We, msg=msg_We
+        expected_dWe, diff_We, msg=msg_We
     )
-    EWe = embedding.W[3] - expected_diff_We
+    EWe = embedding.W[3] - expected_dWe
 
-    expected_diff_Wc = lr * (1+l2) * embedding.dWc
+    expected_dWc = lr * (1+l2) * embedding.dWc
     diff_Wc = embedding.optimizer.differential(dW=embedding.dWc)
     msg_Wc = "dWc: expected\n%s\n but actual diff=:\n%s\n" % \
-             (expected_diff_Wc, (expected_diff_Wc-diff_Wc))
+             (expected_dWc, (expected_dWc-diff_Wc))
     embedding.all_close(
-        expected_diff_Wc, diff_Wc, msg=msg_Wc
+        expected_dWc, diff_Wc, msg=msg_Wc
     )
-    EWc4 = np.subtract(embedding.W[4], expected_diff_Wc)
-    EWc5 = np.subtract(embedding.W[5], expected_diff_Wc * 2)
-    EWc6 = np.subtract(embedding.W[6], expected_diff_Wc)
+    EWc4 = np.subtract(embedding.W[4], expected_dWc)
+    EWc5 = np.subtract(embedding.W[5], expected_dWc * 2)
+    EWc6 = np.subtract(embedding.W[6], expected_dWc)
 
     # --------------------------------------------------------------------------------
     # Backward path: Gradient descent
@@ -895,8 +896,8 @@ def test_020_embedding_gradient_descent(caplog):
     # ********************************************************************************
     # Constraint:
     # ********************************************************************************
-    assert np.array_equal(expected_diff_We, lr * (1+l2) * dWe)
-    assert np.array_equal(expected_diff_Wc, lr * (1+l2) * dWc)
+    assert np.array_equal(expected_dWe, lr * (1+l2) * dWe)
+    assert np.array_equal(expected_dWc, lr * (1+l2) * dWc)
 
     # - W[3] = W[3] - [lr * (1 + l2) * dWe].
     assert Function.all_close(
