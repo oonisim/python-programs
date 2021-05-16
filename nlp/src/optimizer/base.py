@@ -68,7 +68,8 @@ class Optimizer(nn.Function):
     @lr.setter
     def lr(self, lr: Union[TYPE_FLOAT, np.ndarray]):
         """Set Learning rate"""
-        assert self.is_float_scalar(lr) and (TYPE_FLOAT(0) < lr < TYPE_FLOAT(1))
+        # assert self.is_float_scalar(lr) and (TYPE_FLOAT(0) < lr < TYPE_FLOAT(1))
+        assert self.is_float_scalar(lr) and (TYPE_FLOAT(0) < lr)
         self._lr = lr
 
     @property

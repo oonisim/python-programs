@@ -118,7 +118,7 @@ class Embedding(Layer):
             name: str,
             num_nodes: int,
             num_features: int,
-            weights_initialization_scheme: str = "uniform",
+            weights_initialization_scheme: str = "normal",
             weights_optimizer_specification: dict = None
     ):
         """Generate Embedding specification
@@ -419,7 +419,8 @@ class Embedding(Layer):
             dictionary: EventIndexing = None,
             W: Optional[TYPE_TENSOR] = None,
             WO: Optional[TYPE_TENSOR] = None,
-            weight_initialization_scheme: str = "uniform",
+            weight_initialization_scheme: str = "normal",
+            weight_initialization_parameters: dict = {},
             optimizer: optimiser.Optimizer = optimiser.SGD(),
             posteriors: Optional[List[Layer]] = None,
             log_level: int = logging.ERROR
@@ -505,7 +506,8 @@ class Embedding(Layer):
             self._W: TYPE_TENSOR = self.build_weights(
                 M=dictionary.vocabulary_size,
                 D=event_vector_size,
-                scheme="normal"
+                scheme=weight_initialization_scheme,
+                **weight_initialization_parameters
             )
         else:
             self._W: TYPE_TENSOR = self.tensor_cast(copy.deepcopy(W), dtype=TYPE_FLOAT)

@@ -45,28 +45,57 @@ Logger = logging.getLogger(__name__)
 
 # @memory_profile
 def test_word2vec():
-    TARGET_SIZE = TYPE_INT(1)   # Size of the target event (word)
-    CONTEXT_SIZE = TYPE_INT(10)  # Size of the context in which the target event occurs.
+    USE_TEXT8 = True
+    USE_PTB = False
+
+    CORPUS_FILE = "text8_512" if USE_TEXT8 else "ptb_train"
+    CORPUS_URL = "https://data.deepai.org/text8.zip" \
+        if USE_TEXT8 else f'https://raw.githubusercontent.com/tomsercu/lstm/master/data/ptb.train.txt' \
+
+    TARGET_SIZE = TYPE_INT(1)       # Size of the target event (word)
+    CONTEXT_SIZE = TYPE_INT(10)     # Size of the context in which the target event occurs.
     WINDOW_SIZE = TARGET_SIZE + CONTEXT_SIZE
-    SAMPLE_SIZE = TYPE_INT(5)   # Size of the negative samples
-    VECTOR_SIZE = TYPE_INT(50)  # Number of features in the event vector.
+    SAMPLE_SIZE = TYPE_INT(10)      # Size of the negative samples
+    VECTOR_SIZE = TYPE_INT(100)     # Number of features in the event vector.
+
+    WEIGHT_SCHEME = "normal"
+    WEIGHT_PARAMS = {
+        "std": 0.01
+    }
+    LR = TYPE_FLOAT(100.0)
+
+    NUM_SENTENCES = 1
+
+    STATE_FILE = \
+        "/home/oonisim/home/repository/git/oonisim/python_programs/nlp/models/" \
+        "word2vec_%s_E%s_C%s_W%s_%s_%s_V%s_LR%s_S%s_N%s.pkl" % (
+            CORPUS_FILE,
+            TARGET_SIZE,
+            CONTEXT_SIZE,
+            WEIGHT_SCHEME,
+            "std",
+            WEIGHT_PARAMS["std"],
+            VECTOR_SIZE,
+            LR,
+            SAMPLE_SIZE,
+            NUM_SENTENCES,
+        )
+
+    MAX_ITERATIONS = 100000
 
     # --------------------------------------------------------------------------------
     # Corpus text
     # --------------------------------------------------------------------------------
-    _file = "ptb.train.txt"
-    path_to_corpus = f"~/.keras/datasets/{_file}"
+    path_to_corpus = f"~/.keras/datasets/{CORPUS_FILE}"
     if fileio.Function.is_file(path_to_corpus):
         pass
     else:
         path_to_corpus = tf.keras.utils.get_file(
-            _file,
-            f'https://raw.githubusercontent.com/tomsercu/lstm/master/data/{_file}'
+            fname=CORPUS_FILE,
+            origin=CORPUS_URL,
+            extract=True
         )
     corpus = fileio.Function.read_file(path_to_corpus)
-
-    # path_to_input = "ptb_excerpt.txt"
-    path_to_input = path_to_corpus
 
     # --------------------------------------------------------------------------------
     # Logistic Log Loss
@@ -81,7 +110,7 @@ def test_word2vec():
     # Event indexing
     # --------------------------------------------------------------------------------
     word_indexing = EventIndexing(
-        name="word_indexing_on_ptb",
+        name="word_indexing",
         corpus=corpus,
         min_sequence_length=WINDOW_SIZE
     )
@@ -106,8 +135,10 @@ def test_word2vec():
         context_size=CONTEXT_SIZE,
         negative_sample_size=SAMPLE_SIZE,
         event_vector_size=VECTOR_SIZE,
-        optimizer=SGD(lr=TYPE_FLOAT(0.1)),
-        dictionary=word_indexing
+        optimizer=SGD(lr=LR),
+        dictionary=word_indexing,
+        weight_initialization_scheme=WEIGHT_SCHEME,
+        weight_initialization_parameters=WEIGHT_PARAMS
     )
 
     # --------------------------------------------------------------------------------
@@ -148,7 +179,6 @@ def test_word2vec():
             stream.close()
 
     # Restore the state if exists.
-    STATE_FILE = f"/home/oonisim/home/repository/git/oonisim/python_programs/nlp/models/word2vec_vecsize_{VECTOR_SIZE}.pkl"
     if fileio.Function.is_file(STATE_FILE):
         print("Loading model...\nSTATE_FILE: %s" % STATE_FILE)
         state = embedding.load(STATE_FILE)
@@ -167,9 +197,6 @@ def test_word2vec():
         print("State file does not exist. Saving the initial model.")
         embedding.save(STATE_FILE)
 
-    NUM_SENTENCES = 50
-    MAX_ITERATIONS = 100000
-
     # Continue training
     profiler = cProfile.Profile()
     profiler.enable()
@@ -177,7 +204,7 @@ def test_word2vec():
     total_sentences = 0
     epochs = 0
     source = sentences_generator(
-        path_to_file=path_to_input, num_sentences=NUM_SENTENCES
+        path_to_file=path_to_corpus, num_sentences=NUM_SENTENCES
     )
 
     for i in range(MAX_ITERATIONS):
@@ -192,7 +219,7 @@ def test_word2vec():
                 print(
                     f"Batch {i:05d} of {NUM_SENTENCES} sentences: "
                     f"Average Loss: {np.mean(network.history):10f} "
-                    f"Duration {time.time() - start}"
+                    f"Duration {time.time() - start:3f}"
                 )
             if i % 10 == 0:
                 embedding.save(STATE_FILE)
@@ -204,7 +231,7 @@ def test_word2vec():
             epochs += 1
             source.close()
             source = sentences_generator(
-                path_to_file=path_to_input, num_sentences=NUM_SENTENCES
+                path_to_file=path_to_corpus, num_sentences=NUM_SENTENCES
             )
 
         except Exception as e:

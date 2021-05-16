@@ -105,7 +105,7 @@ class Weights:
     def specification(
             M: TYPE_INT,
             D: TYPE_INT,
-            **kwargs
+            **parameters
     ):
         """Generate Weights specification
         Args:
@@ -119,7 +119,7 @@ class Weights:
             "parameters": {
                 "M": M,
                 "D": D,
-                **kwargs
+                **parameters
             }
         }
 
@@ -137,13 +137,15 @@ class Weights:
             M: TYPE_INT,
             D: TYPE_INT,
             initialization_scheme: str = list(SCHEMES.keys())[0],
-            **kwargs
+            **initialization_parameters
     ):
         assert M > 0, D > 0 and initialization_scheme in Weights.SCHEMES
         self._initialization_scheme = initialization_scheme
         self._M = M
         self._D = D
-        self._weights = Weights.SCHEMES[self.initialization_scheme](M=M, D=D, **kwargs)
+        self._weights = Weights.SCHEMES[self.initialization_scheme](
+            M=M, D=D, **initialization_parameters
+        )
         assert self._weights is not None and self._weights.shape == (self.M, self.D)
 
     @property
