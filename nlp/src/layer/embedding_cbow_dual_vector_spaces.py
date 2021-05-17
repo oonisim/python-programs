@@ -1184,14 +1184,6 @@ class Embedding(Layer):
         # dWs = numerical_jacobian(objective_Ws, self.Ws, delta=h)
         # return [dWe, dWc, dWs]
         # --------------------------------------------------------------------------------
-        Ye = self.Y[
-            ::,
-            0:1
-        ]
-        Ys = self.Y[
-            ::,
-            1:
-        ]
 
         # --------------------------------------------------------------------------------
         # Tensorflow bug: tape.gradient(objective, X) returns None after tf.concat.

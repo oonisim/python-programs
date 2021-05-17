@@ -49,7 +49,7 @@ def test_word2vec():
 
     CORPUS_FILE = "text8_256" if USE_TEXT8 else "ptb_train"
     CORPUS_URL = "https://data.deepai.org/text8.zip" \
-        if USE_TEXT8 else f'https://raw.githubusercontent.com/tomsercu/lstm/master/data/ptb.train.txt' \
+        if USE_TEXT8 else 'https://raw.githubusercontent.com/tomsercu/lstm/master/data/ptb.train.txt'
 
     TARGET_SIZE = TYPE_INT(1)       # Size of the target event (word)
     CONTEXT_SIZE = TYPE_INT(10)     # Size of the context in which the target event occurs.

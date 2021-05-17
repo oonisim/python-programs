@@ -1068,14 +1068,6 @@ class Embedding(Layer):
         # dWs = numerical_jacobian(objective_Ws, self.Ws, delta=h)
         # return [dWe, dWc, dWs]
         # --------------------------------------------------------------------------------
-        Yc = self.Y[
-            ::,
-            0:self.C
-        ]
-        Ys = self.Y[
-            ::,
-            self.C:
-        ]
 
         # --------------------------------------------------------------------------------
         # Tensorflow bug: tape.gradient(objective, X) returns None after tf.concat.
@@ -1142,7 +1134,7 @@ class Embedding(Layer):
         # TODO:
         #  * Make sure access to the deleted property access will raise asserts.
         #  * Make sure numerical gradient will not use them or raise asserts.
-        del self._We, self._Wc, self._Ws, self._Be, self._Bc
+        del self._We, self._Wc, self._Ws, self._Be
 
         return self.dS
 
@@ -1529,18 +1521,18 @@ class Embedding(Layer):
         Transform the shape into (N, 1+SL) to match the Embedding output Y.
         """
         def g(dY: TYPE_TENSOR, adapter: Layer = None):
-            """Reshape the dY:(N*(1+SL), 1) from the Log Loss layer to
-            (N, 1+SL) to back-propagate to the Embedding.
+            """Reshape the dY:(N*(C+SL), 1) from the Log Loss layer to
+            (N, C+SL) to back-propagate to the Embedding.
 
             Logistic Log Loss layer function () expects (N*(1+SL), 1) shape.
             Hence the gradient dL/dY from the Loss has (N*(1+SL), 1) shape too.
             """
             assert \
-                self.tensor_shape(dY) == (self.N * (1+self.SL), 1), \
+                self.tensor_shape(dY) == (self.N * (self.C+self.SL), 1), \
                 "Expected shape is %s but %s" \
-                % ((self.N * (1+self.SL), 1), self.tensor_shape(dY))
+                % ((self.N * (self.C+self.SL), 1), self.tensor_shape(dY))
 
-            dY = self.reshape(X=dY, shape=(-1, (1+self.SL)))
+            dY = self.reshape(X=dY, shape=(-1, (self.C+self.SL)))
             assert self.tensor_shape(self.Y) == self.tensor_shape(dY)
             return dY
 
