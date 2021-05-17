@@ -17,7 +17,7 @@ from common.constant import (
 from common.function import (
     sigmoid_cross_entropy_log_loss
 )
-from layer import (
+from layer.embedding_sgram import (
     Embedding
 )
 from layer.adapter import (
@@ -47,7 +47,7 @@ def test_word2vec():
     USE_TEXT8 = False
     USE_PTB = not USE_TEXT8
 
-    CORPUS_FILE = "text8_512" if USE_TEXT8 else "ptb_train"
+    CORPUS_FILE = "text8_256" if USE_TEXT8 else "ptb_train"
     CORPUS_URL = "https://data.deepai.org/text8.zip" \
         if USE_TEXT8 else f'https://raw.githubusercontent.com/tomsercu/lstm/master/data/ptb.train.txt' \
 
@@ -61,13 +61,13 @@ def test_word2vec():
     WEIGHT_PARAMS = {
         "std": 0.01
     }
-    LR = TYPE_FLOAT(1.0)
+    LR = TYPE_FLOAT(5.0)
 
     NUM_SENTENCES = 10
 
     STATE_FILE = \
         "/home/oonisim/home/repository/git/oonisim/python_programs/nlp/models/" \
-        "word2vec_%s_E%s_C%s_S%s_W%s_%s_%s_V%s_LR%s_N%s.pkl" % (
+        "word2vec_sgram_%s_E%s_C%s_S%s_W%s_%s_%s_V%s_LR%s_N%s.pkl" % (
             CORPUS_FILE,
             TARGET_SIZE,
             CONTEXT_SIZE,

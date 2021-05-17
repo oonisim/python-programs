@@ -37,7 +37,7 @@ from optimizer import (
 from testing.config import (
     NUM_MAX_TEST_TIMES
 )
-from layer.embedding import (
+from layer.embedding_sgram import (
     Embedding
 )
 
@@ -685,38 +685,39 @@ def test_020_embedding_gradient_vs_autodiff(caplog):
         return loss
 
     # --------------------------------------------------------------------------------
-    # Ye = einsum("nd,ncd->n",  Bc:(N,D), We:(N,E,D))
-    # dL/dWe:(N,E,D) = dL/dYe * dYe/dWe = dL/dYe * Bc
+    # Yc = einsum("ncd,nd->nc",  Wc:(N,C,D), Be:(N,D))
+    # dL/dWc:(N,C,D) = dL/dYc * dYc/dWc = dL/dYc:(N,C) * Be
     #
-    # Ys = einsum("nd,nsd->ns", Bc:(N,D), Ws:(N,SL,D))
-    # dL/dWs:(N,SL,D) = dL/dYs * dYs/dWs = dL/dYs * Bc
+    # Ys = einsum("nd,nsd->ns", Be:(N,D), Ws:(N,SL,D))
+    # dL/dWs:(N,SL,D) = dL/dYs * dYs/dWs = dL/dYs:(N,SL) * Be
     #
     # By setting
-    # 1. dL/dY = np.c_[dL/dYe,dL/dYs] = I and
+    # 1. dL/dY = np.c_[dL/dYc,dL/dYs] = I and
     # 2. context_size C == negative_sample_size SL
-    # The constraint is E * dL/dWe == dL/dWs == Bc because dL/dYe, dL/dYs are I.
-    # dL/dWe is normalized with E to be independent from the event (target) size.
+    # Constraint:
+    #   dL/dWc == dL/dWs == Be.
     # --------------------------------------------------------------------------------
     for _ in range(NUM_MAX_TEST_TIMES):
-        # C must be even number
-        C = TYPE_INT(np.random.randint(1, max_sentence_length / 2) * 2)
-        assert C < max_sentence_length
+        E = TYPE_INT(np.random.randint(1, 5))
+        assert E < max_sentence_length
 
-        # E=SL for (N,E,D) and (N,SL,D) has the same shape
-        E = SL = TYPE_INT(
+        # C=SL for (N,C,D) and (N,SL,D) has the same shape
+        C = SL = TYPE_INT(
             np.random.randint(
                 1,
                 min(
-                    Embedding.MAX_TARGET_SIZE,
                     Embedding.MAX_NEGATIVE_SAMPLE_SIZE,
-                    (max_sentence_length - C)
-                )+1
+                    (max_sentence_length - E)
+                )
             )
         )
+        # Context size needs to be even number
+        if (C % 2) > 0:
+            C += 1
 
-        target_size = negative_sample_size = TYPE_INT(E)
-        context_size = TYPE_INT(C)
-        event_vector_size: TYPE_INT = TYPE_INT(np.random.randint(1, 100))
+        target_size = E
+        context_size = negative_sample_size = TYPE_INT(C)
+        event_vector_size: TYPE_INT = TYPE_INT(np.random.randint(5, 100))
         W: TYPE_TENSOR = np.random.randn(dictionary.vocabulary_size, event_vector_size)
 
         embedding, event_context = _must_succeed(
@@ -767,8 +768,8 @@ def test_020_embedding_gradient_vs_autodiff(caplog):
             EDWc, dWc
         ), "Expected (EWc5==W[5])\n%s\ndifference\n%s\n" % (EDWc, EDWc-dWc)
         assert Function.all_close(
-            dWe * E, dWs
-        ), "Expected (dWe==dWs) but dWe:\n%s\ndifference\n%s\n" % (dWe, dWe-dWs)
+            dWc, dWs
+        ), "Expected (dWe==dWs) but dWe:\n%s\ndifference\n%s\n" % (dWc, dWc-dWs)
 
     profiler.disable()
     profiler.print_stats(sort="cumtime")
@@ -780,7 +781,7 @@ def test_020_embedding_gradient_descent(caplog):
         Verify the gradient descent, especially np.ufunc.at, is working as expected.
 
         W:(V, D=3) where all elements are initialized to 1.0.
-        dL/dY:(1,E+SL) = I and E=1,SL=1
+        dL/dY:(1,C+SL) = I and E=1,SL=1
 
         X=(target,context)=[3,4,5,6,5] where target_index=3.
 
@@ -802,8 +803,8 @@ def test_020_embedding_gradient_descent(caplog):
         )
         return loss
 
-    target_size = negative_sample_size = TYPE_INT(1)
-    context_size = TYPE_INT(4)
+    target_size = TYPE_INT(1)
+    context_size = negative_sample_size = TYPE_INT(4)
     event_vector_size = TYPE_INT(3)
     W: TYPE_TENSOR = np.ones(
         shape=(dictionary.vocabulary_size, event_vector_size),
@@ -812,7 +813,7 @@ def test_020_embedding_gradient_descent(caplog):
 
     embedding, event_context = _must_succeed(
         name=name,
-        num_nodes=(1 + negative_sample_size),
+        num_nodes=(context_size + negative_sample_size),
         target_size=target_size,
         context_size=context_size,
         negative_sample_size=negative_sample_size,
@@ -838,6 +839,7 @@ def test_020_embedding_gradient_descent(caplog):
     # Backward path
     # --------------------------------------------------------------------------------
     dY = Function.ones(shape=Function.tensor_shape(Y))
+    Function.reshape(dY, shape=(1, negative_sample_size+context_size, 1))
     embedding.gradient(dY)
 
     # --------------------------------------------------------------------------------
@@ -847,25 +849,25 @@ def test_020_embedding_gradient_descent(caplog):
     lr = embedding.lr
     l2 = embedding.l2
 
-    expected_dWe = lr * (1+l2) * embedding.dWe
-    diff_We = embedding.optimizer.differential(dW=embedding.dWe)
+    expected_we_differential = lr * (1+l2) * embedding.dWe
+    actual_we_differential = embedding.optimizer.differential(dW=embedding.dWe)
     msg_We = "dWe: expected\n%s\n but actual diff=:\n%s\n" % \
-             (expected_dWe, (expected_dWe-diff_We))
+             (expected_we_differential, (expected_we_differential-actual_we_differential))
     embedding.all_close(
-        expected_dWe, diff_We, msg=msg_We
+        expected_we_differential, actual_we_differential, msg=msg_We
     )
-    EWe = embedding.W[3] - expected_dWe
+    EWe = embedding.W[3] - expected_we_differential
 
-    expected_dWc = lr * (1+l2) * embedding.dWc
-    diff_Wc = embedding.optimizer.differential(dW=embedding.dWc)
+    expected_wc_differential = lr * (1+l2) * embedding.dWc
+    actual_wc_differential = embedding.optimizer.differential(dW=embedding.dWc)
     msg_Wc = "dWc: expected\n%s\n but actual diff=:\n%s\n" % \
-             (expected_dWc, (expected_dWc-diff_Wc))
+             (expected_wc_differential, (expected_wc_differential-actual_wc_differential))
     embedding.all_close(
-        expected_dWc, diff_Wc, msg=msg_Wc
+        expected_wc_differential, actual_wc_differential, msg=msg_Wc
     )
-    EWc4 = np.subtract(embedding.W[4], expected_dWc)
-    EWc5 = np.subtract(embedding.W[5], expected_dWc * 2)
-    EWc6 = np.subtract(embedding.W[6], expected_dWc)
+    EWc4 = np.subtract(embedding.WO[4], expected_wc_differential)
+    EWc5 = np.subtract(embedding.WO[5], expected_wc_differential * 2)
+    EWc6 = np.subtract(embedding.WO[6], expected_wc_differential)
 
     # --------------------------------------------------------------------------------
     # Backward path: Gradient descent
@@ -878,7 +880,7 @@ def test_020_embedding_gradient_descent(caplog):
     # ********************************************************************************
     # Constraint:
     # - dW is close to EDW
-    # - dL/dWe = dL/dWs = Bc when dL/dY = I
+    # - dL/dWc = dL/dWs = Be when dL/dY = I
     # ********************************************************************************
     assert Function.all_close(
         EDWe, dWe, msg="Expected (EDWe==dWe)\n%s\ndifference\n%s\n" % (EDWe, EDWe - dWe)
@@ -890,31 +892,31 @@ def test_020_embedding_gradient_descent(caplog):
         EDWc, dWc, msg="Expected (EWc5==W[5])\n%s\ndifference\n%s\n" % (EDWc, EDWc - dWc)
     )
     assert Function.all_close(
-        dWe, dWs, msg="Expected (dWe==dWs) but dWe:\n%s\ndifference\n%s\n" % (dWe, dWe - dWs)
+        dWc, dWs, msg="Expected (dWc==dWs) but dWc:\n%s\ndifference\n%s\n" % (dWc, dWc - dWs)
     )
 
     # ********************************************************************************
     # Constraint:
     # ********************************************************************************
-    assert np.array_equal(expected_dWe, lr * (1+l2) * dWe)
-    assert np.array_equal(expected_dWc, lr * (1+l2) * dWc)
+    assert np.array_equal(expected_we_differential, lr * (1+l2) * dWe)
+    assert np.array_equal(expected_wc_differential, lr * (1+l2) * dWc)
 
     # - W[3] = W[3] - [lr * (1 + l2) * dWe].
     assert Function.all_close(
         # EWe, embedding.W[3], msg="Expected (EDWe==W[3])\n%s\ndifference\n%s\n" % (EWe, EWe - embedding.W[3])
-        EWe, embedding.WO[3], msg="Expected (EDWe==W[3])\n%s\ndifference\n%s\n" % (EWe, EWe - embedding.W[3])
+        EWe, embedding.W[3], msg="Expected (EDWe==W[3])\n%s\ndifference\n%s\n" % (EWe, EWe - embedding.W[3])
     )
     # W[4] = W[4] - [lr * (1 + l2) * dWc]
     assert Function.all_close(
-        EWc4, embedding.W[4], msg="Expected (EWc4==W[4])\n%s\ndifference\n%s\n" % (EWc4, EWc4 - embedding.W[4])
+        EWc4, embedding.WO[4], msg="Expected (EWc4==W[4])\n%s\ndifference\n%s\n" % (EWc4, EWc4 - embedding.W[4])
     )
     # W[5] = W[5] - [lr * (1 + l2) * 2 * dWc]
     assert Function.all_close(
-        EWc5, embedding.W[5], msg="Expected (EWc5==W[5])\n%s\ndifference\n%s\n" % (EWc5, EWc5 - embedding.W[5])
+        EWc5, embedding.WO[5], msg="Expected (EWc5==W[5])\n%s\ndifference\n%s\n" % (EWc5, EWc5 - embedding.W[5])
     )
     # W[6] = W[6] - [lr * (1 + l2) * dWc]
     assert Function.all_close(
-        EWc6, embedding.W[6], msg="Expected (EWc6==W[6])\n%s\ndifference\n%s\n" % (EWc6, EWc6 - embedding.W[6])
+        EWc6, embedding.WO[6], msg="Expected (EWc6==W[6])\n%s\ndifference\n%s\n" % (EWc6, EWc6 - embedding.W[6])
     )
 
 

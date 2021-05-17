@@ -39,6 +39,12 @@ class Function(base.Function):
         )
 
     @staticmethod
+    def zeros(shape=None, dtype=TYPE_NN_FLOAT):
+        return tf.zeros(
+            shape=shape, dtype=dtype, name=None
+        )
+
+    @staticmethod
     def full(shape, value, dtype=TYPE_NN_FLOAT):
         return tf.fill(dims=shape, value=tf.constant(value, dtype=dtype))
 

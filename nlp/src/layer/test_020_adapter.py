@@ -28,7 +28,7 @@ from layer.preprocessing import (
     EventIndexing,
     EventContext
 )
-from layer.test_020_embedding import (
+from layer.test_020_embedding_cbow import (
     _instantiate_event_indexing,
     _instantiate as _instantiate_embedding
 )

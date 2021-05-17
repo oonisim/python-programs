@@ -742,7 +742,7 @@ class Embedding(Layer):
         # make the context Bc closer to the truth Be, hence 'primary' is Bc.
         # --------------------------------------------------------------------------------
         # Ye = positive_scores = self.einsum("nd,nd->n", self.Bc, self.Be)
-        Yc = positive_scores = self.einsum("ncd,nd->n", self.Wc, self.Be)
+        Yc = positive_scores = self.einsum("ncd,nd->nc", self.Wc, self.Be)
 
         # ================================================================================
         # Score (Negative) for label=0 (False) classification
@@ -796,23 +796,25 @@ class Embedding(Layer):
         # ================================================================================
         # Result of np.c_[Yc, Ys]
         # ================================================================================
-        Y = self.concat([self.reshape(Yc, shape=(-1, 1)), Ys], axis=1)
+        Y = self.concat([Yc, Ys], axis=1)
         Y = Y.numpy() if tf.is_tensor(Y) else Y
         self._Y = Y
         del Yc, Ys
         # assert self.tensor_shape(self.Y) == (self.N, (1 + self.SL))
-        assert self.tensor_shape(self.Y) == (self.N, (self.C + self.SL))
+        assert self.tensor_shape(self.Y) == (self.N, (self.C + self.SL)), \
+            "Expected shape %s but %s" % \
+            ((self.N, (self.C + self.SL)), self.tensor_shape(self.Y))
         assert self.is_finite(self.Y), f"NaN or inf detected in {self.Y}"
         return self.Y
 
     # @memory_profile
     def gradient(self, dY: Union[TYPE_TENSOR, TYPE_FLOAT]) -> TYPE_TENSOR:
         """Calculate gradients dL/dWe:(N,E,D), dL/dWc:(N,C,D), dL/dWs:(N,SL,D)
-        dL/dWe = dL/dW[target_indices] = dL/dYe * Bc
-        dL/dWc = dL/dW[target_indices] = dL/dYe * Be
+        dL/dWe = dL/dW[target_indices] = dL/dYc * Wc
+        dL/dWc = dL/dW[target_indices] = dL/dYc * Be
 
-        dL/dYe=dL/dY[0:1] is the gradient of target event vectors We=W[target_indices].
-        dL/dYs=dL/dY[1:] is the gradient of negative sample vectors Ws=W[negative_sample_indices].
+        dL/dYc=dL/dY[0:C] is the gradient of context event vectors Wc=W[context_indices].
+        dL/dYs=dL/dY[C::] is the gradient of negative sample vectors Ws=W[negative_sample_indices].
 
         Args:
             dY: Gradient dL/dY
@@ -836,12 +838,11 @@ class Embedding(Layer):
             "layer[%s].%s: dY.shape %s", self.name, name, self.tensor_shape(dY)
         )
 
-        dYe: TYPE_TENSOR = dY[
+        dYc: TYPE_TENSOR = dY[
             ::,
-            0: self.C  # To make dYe:(N,1), NOT (N,) so as to multiply (N,1) * (N,D)
+            0: self.C
         ]
-        # assert self.tensor_shape(dYe) == (self.N, 1)    # Make sure dYe:(N,1), NOT (N,)
-        assert self.tensor_shape(dYe) == (self.N, self.C)
+        assert self.tensor_shape(dYc) == (self.N, self.C)
         dYs: TYPE_TENSOR = dY[
             ::,
             self.C:
@@ -864,17 +865,17 @@ class Embedding(Layer):
         #   F2-5. Drop the axis -1.                     "nc1->nc"
         #
         # B1. Gradient dL/dBe:(N,D)
-        #   B1-1. dL/Yc:(N,C) -> dL/dYe(N,C,1)          "nc->nc1"
+        #   B1-1. dL/Yc:(N,C) -> dL/dYc(N,C,1)          "nc->nc1"
         #       Restore the rank lost during "nc1->nc" at F2-5 by adding axis=-1
         #
-        #   B1-2. dL/dYe(N,C,1) -> dL/dYe(N,C,D)        "nc1->ncd"
+        #   B1-2. dL/dYc(N,C,1) -> dL/dYc(N,C,D)        "nc1->ncd"
         #       Restore the shape (N,C,D) lost during "ncd->nc1" at F2-4.
         #       This is done via the implicit broadcast.
         #
         #   B1-3. dL/dBe:(N,C,D)                        "ncd->n1d" & "n1d->nd"
-        #       = dL/dYe:(N,C,D) * dYe/dBe:(N,C,D)
-        #       = dL/dYe:(N,C,D) * Wc:(N,C,D)
-        #       = einsum("ncd,ncd->nd", dL/dYe:(N,C,D) * Wc:(N,C,D))
+        #       = dL/dYc:(N,C,D) * dYc/dBe:(N,C,D)
+        #       = dL/dYc:(N,C,D) * Wc:(N,C,D)
+        #       = einsum("ncd,ncd->nd", dL/dYc:(N,C,D) * Wc:(N,C,D))
         #       Impact on L by dBe has been amplified by Wc:(N,C,D).
         #
         # B2. Gradient dL/dWe:(N,E,D) = dL/dBe:(N,D) OP I:(N,E,D)
@@ -888,20 +889,27 @@ class Embedding(Layer):
         #       "n1d->ned" (reverse of F1-1) by multiply with dBe/dWe:(N,E,D) = I:(N,E,D).
         #       dL/dWe:(N,E,D) = dL/dBe:(N,1,D) * I:(N,E,D)
         # --------------------------------------------------------------------------------
-        # dBe: TYPE_TENSOR = self.multiply(dYe, self.Bc)  # B1
+        # dBe: TYPE_TENSOR = self.multiply(dYc, self.Bc)  # B1
         dWe01: TYPE_TENSOR = self.einsum(
             "ncd,ncd->nd",
-            self.reshape(dYe, shape=(self.N, self.C, 1)),
+            self.multiply(  # TF einsum does not auto-broadcast as NumPy does
+                self.reshape(dYc, shape=(self.N, self.C, 1)),
+                self.ones(shape=(self.N, self.C, self.D))
+            ),
             self.Wc
         )
         dWe02: TYPE_TENSOR = self.einsum(
             "nsd,nsd->nd",
-            self.reshape(dYs, shape=(self.N, self.S, 1)),
+            self.multiply(  # TF einsum does not auto-broadcast as NumPy does
+                self.reshape(dYs, shape=(self.N, self.SL, 1)),
+                self.ones(shape=(self.N, self.SL, self.D))
+            ),
             self.Ws
         )
         assert self.tensor_shape(dWe01) == self.tensor_shape(dWe02) == (self.N, self.D), \
             f"Expected dWe shape {(self.N, self.D)} but " \
             f"dWe01:{self.tensor_shape(dWe01)} dWe02:{self.tensor_shape(dWe02)}"
+
         self._dWe = self.multiply(
             x=self.reshape(X=self.add(dWe01, dWe02), shape=(self.N, 1, self.D)),
             y=self.full(shape=(self.N, self.E, self.D), value=(1/self.E))
@@ -925,13 +933,19 @@ class Embedding(Layer):
         #
         # Backward path:
         # B1: dL/dWc:(N,C,D)
-        #   = dL/dYe:(N,C) * dYe/dWc:(N,D)
-        #   = dL/dYe:(N,C) * Be:(N,D)
+        #   = dL/dYc:(N,C) * dYc/dWc:(N,D)
+        #   = dL/dYc:(N,C) * Be:(N,D)
         # --------------------------------------------------------------------------------
         self._dWc = self.einsum(
             "ncd,ncd->ncd",
-            self.reshape(dYe, shape=(self.N, self.C, 1)),
-            self.reshape(self.Be, shape=(self.N, 1, self.D))
+            self.multiply(
+                self.reshape(dYc, shape=(self.N, self.C, 1)),
+                self.ones(shape=(self.N, self.C, self.D))
+            ),
+            self.multiply(
+                self.reshape(self.Be, shape=(self.N, 1, self.D)),
+                self.ones(shape=(self.N, self.C, self.D))
+            )
         )
         assert self.is_finite(self.dWc), "NaN/inf in \n%s\n" % self.dWc
         assert \
@@ -949,8 +963,14 @@ class Embedding(Layer):
         # --------------------------------------------------------------------------------
         self._dWs = self.einsum(
             "nsd,nsd->nsd",
-            self.reshape(dYs, shape=(self.N, self.SL, 1)),
-            self.reshape(self.Be, shape=(self.N, 1, self.D))
+            self.multiply(
+                self.reshape(dYs, shape=(self.N, self.SL, 1)),
+                self.ones(shape=(self.N, self.SL, self.D))
+            ),
+            self.multiply(
+                self.reshape(self.Be, shape=(self.N, 1, self.D)),
+                self.ones(shape=(self.N, self.SL, self.D))
+            )
         )
         assert self.is_finite(self.dWs), "NaN/inf in \n%s\n" % self.dWs
         assert \
@@ -966,7 +986,9 @@ class Embedding(Layer):
         #
         # Changed to zeros from empty as empty includes "Nan".
         # --------------------------------------------------------------------------------
+        # TODO: Replace np.zeros with self.zeros()
         self._dX = np.zeros(shape=self._X_shape, dtype=TYPE_FLOAT)
+        # self._dX = self.zeros(shape=self._X_shape, dtype=TYPE_FLOAT)
         return self.dX
 
     def gradient_numerical(
@@ -987,7 +1009,7 @@ class Embedding(Layer):
         layers from e.g. numerical gradient gn() must NOT happen.
         Set a stateless Li to the objective function Li for the layer i.
 
-        dL/dYe = dL/dY[0:1] is the gradient of target event vectors We.
+        dL/dYc = dL/dY[0:1] is the gradient of target event vectors We.
                  (We=W[target_indices])
         dL/dYs = dL/dY[1:] is the gradient of negative sample vectors Ws.
                  (Ws=W[negative_sample_indices])
@@ -1057,14 +1079,15 @@ class Embedding(Layer):
 
         # --------------------------------------------------------------------------------
         # Tensorflow bug: tape.gradient(objective, X) returns None after tf.concat.
-        # https://github.com/tensorflow/tensorflow/issues/37726
         # Gradients do not exist for variables after tf.concat()
+        # https://github.com/tensorflow/tensorflow/issues/37726
         # --------------------------------------------------------------------------------
         def objective_We(we: TYPE_TENSOR):
             """Objective function for We to calculate numerical dL/dWe"""
             _be = self._bagging(we) / self.E
             _yc = self.einsum("nd,ncd->nc", _be, self.Wc)
             _ys = self.einsum("nd,nsd->ns", _be, self.Ws)
+            del _be
             return self.objective(_yc) + self.objective(_ys)
 
         def objective_Wc(wc: TYPE_TENSOR):
@@ -1092,7 +1115,7 @@ class Embedding(Layer):
         differential: TYPE_TENSOR = self.reshape(
             self.optimizer.differential(dW=dw), shape=(-1, self.D)
         )
-        assert self.tensor_size(differential) == len(indices) * self.D, \
+        assert self.tensor_size(differential) == (len(indices) * self.D), \
             "dW size is expected to be %s but %s" % \
             (self.tensor_size(differential)/self.D, len(indices))
         np.subtract.at(w, indices, differential)
