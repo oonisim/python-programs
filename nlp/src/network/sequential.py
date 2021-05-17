@@ -212,7 +212,7 @@ class SequentialNetwork(Network):
         layer_objective = layer.Sequential(
             name=name + "_objective",
             num_nodes=num_nodes,
-            layers=objective_layers,
+            layers=list(filter(lambda x: x is not None, objective_layers)),
             log_level=log_level
         )
         # The objective function of the layer.Sequential class is initialized
@@ -223,7 +223,7 @@ class SequentialNetwork(Network):
         layer_inference = layer.Sequential(
             name=name + "_inference",
             num_nodes=num_nodes,
-            layers=inference_layers,
+            layers=list(filter(lambda x: x is not None, inference_layers)),
             log_level=log_level
         )
         # Explicitly set "compose(objective.function o objective.objective)"

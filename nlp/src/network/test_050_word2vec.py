@@ -44,8 +44,8 @@ Logger = logging.getLogger(__name__)
 
 # @memory_profile
 def test_word2vec():
-    USE_TEXT8 = True
-    USE_PTB = False
+    USE_TEXT8 = False
+    USE_PTB = not USE_TEXT8
 
     CORPUS_FILE = "text8_512" if USE_TEXT8 else "ptb_train"
     CORPUS_URL = "https://data.deepai.org/text8.zip" \
@@ -61,22 +61,22 @@ def test_word2vec():
     WEIGHT_PARAMS = {
         "std": 0.01
     }
-    LR = TYPE_FLOAT(10.0)
+    LR = TYPE_FLOAT(1.0)
 
-    NUM_SENTENCES = 1
+    NUM_SENTENCES = 10
 
     STATE_FILE = \
         "/home/oonisim/home/repository/git/oonisim/python_programs/nlp/models/" \
-        "word2vec_%s_E%s_C%s_W%s_%s_%s_V%s_LR%s_S%s_N%s.pkl" % (
+        "word2vec_%s_E%s_C%s_S%s_W%s_%s_%s_V%s_LR%s_N%s.pkl" % (
             CORPUS_FILE,
             TARGET_SIZE,
             CONTEXT_SIZE,
+            SAMPLE_SIZE,
             WEIGHT_SCHEME,
             "std",
             WEIGHT_PARAMS["std"],
             VECTOR_SIZE,
             LR,
-            SAMPLE_SIZE,
             NUM_SENTENCES,
         )
 
@@ -223,16 +223,17 @@ def test_word2vec():
                     f"Average Loss: {np.mean(network.history):10f} "
                     f"Duration {time.time() - start:3f}"
                 )
-            if i % 10 == 0:
+            if i % 1000 == 0:
                 # embedding.save(STATE_FILE)
                 pass
 
         except fileio.Function.GenearatorHasNoMore as e:
-            # Next epoch
-            print(f"epoch {epochs} done")
-            embedding.save(STATE_FILE)
-            epochs += 1
             source.close()
+            embedding.save(STATE_FILE)
+
+            # Next epoch
+            print(f"epoch {epochs} batches {i:05d} done")
+            epochs += 1
             source = sentences_generator(
                 path_to_file=path_to_corpus, num_sentences=NUM_SENTENCES
             )

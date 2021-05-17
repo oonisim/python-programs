@@ -730,7 +730,7 @@ class Embedding(Layer):
             self.E: self.window_size
         ], shape=(-1))
         self._Wc = self.reshape(
-            X=self._extract_event_vectors(self.W, self.context_indices),
+            X=self._extract_event_vectors(self.WO, self.context_indices),
             shape=(self.N, self.C, self.D)
         )
         # self._Bc = self._bagging(self.Wc)
@@ -838,14 +838,12 @@ class Embedding(Layer):
 
         dYe: TYPE_TENSOR = dY[
             ::,
-            # 0:1     # To make dYe:(N,1), NOT (N,) so as to multiply (N,1) * (N,D)
             0: self.C  # To make dYe:(N,1), NOT (N,) so as to multiply (N,1) * (N,D)
         ]
         # assert self.tensor_shape(dYe) == (self.N, 1)    # Make sure dYe:(N,1), NOT (N,)
         assert self.tensor_shape(dYe) == (self.N, self.C)
         dYs: TYPE_TENSOR = dY[
             ::,
-            # 1:
             self.C:
         ]
         assert self.tensor_shape(dYs) == (self.N, self.SL)
@@ -899,7 +897,7 @@ class Embedding(Layer):
         dWe02: TYPE_TENSOR = self.einsum(
             "nsd,nsd->nd",
             self.reshape(dYs, shape=(self.N, self.S, 1)),
-            self.Wc
+            self.Ws
         )
         assert self.tensor_shape(dWe01) == self.tensor_shape(dWe02) == (self.N, self.D), \
             f"Expected dWe shape {(self.N, self.D)} but " \
@@ -909,6 +907,11 @@ class Embedding(Layer):
             y=self.full(shape=(self.N, self.E, self.D), value=(1/self.E))
         )
         del dWe01, dWe02
+        assert self.is_finite(self.dWe), "NaN/inf in \n%s\n" % self.dWe
+        assert \
+            self.tensor_shape(self.dWe) == (self.N, self.E, self.D), \
+            "Expected shape %s but dWe.shape %s" \
+            % ((self.N, self.E, self.D), self.tensor_shape(self.dWe))
 
         # --------------------------------------------------------------------------------
         # dL/dWc:(N,C,D) for the forward path with Be.
@@ -930,6 +933,11 @@ class Embedding(Layer):
             self.reshape(dYe, shape=(self.N, self.C, 1)),
             self.reshape(self.Be, shape=(self.N, 1, self.D))
         )
+        assert self.is_finite(self.dWc), "NaN/inf in \n%s\n" % self.dWc
+        assert \
+            self.tensor_shape(self.dWc) == (self.N, self.C, self.D), \
+            "Expected shape %s but dWc.shape %s" \
+            % ((self.N, self.C, self.D), self.tensor_shape(self.dWc))
 
         # --------------------------------------------------------------------------------
         # Forward path:
@@ -946,8 +954,7 @@ class Embedding(Layer):
         )
         assert self.is_finite(self.dWs), "NaN/inf in \n%s\n" % self.dWs
         assert \
-            self.tensor_shape(self.dWs) == \
-            (self.N, self.SL, self.D), \
+            self.tensor_shape(self.dWs) == (self.N, self.SL, self.D), \
             "Expected shape %s but dWs.shape %s" \
             % ((self.N, self.SL, self.D), self.tensor_shape(self.dWs))
 
@@ -1045,7 +1052,7 @@ class Embedding(Layer):
         ]
         Ys = self.Y[
             ::,
-            1:
+            self.C:
         ]
 
         # --------------------------------------------------------------------------------
@@ -1103,7 +1110,7 @@ class Embedding(Layer):
             include dL/dX which is not part of the layer state.
        """
         self._gradient_descent(w=self._W, dw=self.dWe, indices=self.target_indices)
-        self._gradient_descent(w=self._W, dw=self.dWc, indices=self.context_indices)
+        self._gradient_descent(w=self._WO, dw=self.dWc, indices=self.context_indices)
         self._gradient_descent(w=self._WO, dw=self.dWs, indices=self.negative_sample_indices)
         self._dS = [self.dWe, self.dWs, self.dWc]
 
