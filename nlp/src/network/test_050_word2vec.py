@@ -54,14 +54,14 @@ def test_word2vec():
     TARGET_SIZE = TYPE_INT(1)       # Size of the target event (word)
     CONTEXT_SIZE = TYPE_INT(10)     # Size of the context in which the target event occurs.
     WINDOW_SIZE = TARGET_SIZE + CONTEXT_SIZE
-    SAMPLE_SIZE = TYPE_INT(10)      # Size of the negative samples
+    SAMPLE_SIZE = TYPE_INT(5)      # Size of the negative samples
     VECTOR_SIZE = TYPE_INT(100)     # Number of features in the event vector.
 
     WEIGHT_SCHEME = "normal"
     WEIGHT_PARAMS = {
         "std": 0.01
     }
-    LR = TYPE_FLOAT(100.0)
+    LR = TYPE_FLOAT(10.0)
 
     NUM_SENTENCES = 1
 
@@ -179,7 +179,7 @@ def test_word2vec():
 
     # Restore the state if exists.
     if fileio.Function.is_file(STATE_FILE):
-        print("Loading model...\nSTATE_FILE: %s" % STATE_FILE)
+        print("Loading model %s\n" % STATE_FILE)
         state = embedding.load(STATE_FILE)
 
         fmt = """Model loaded.
@@ -193,7 +193,10 @@ def test_word2vec():
             state["event_vector_size"]
         ))
     else:
-        print("State file does not exist. Saving the initial model.")
+        print(
+            "State file does not exist. Saving the initial model %s." %
+            STATE_FILE
+        )
         embedding.save(STATE_FILE)
 
     # Continue training
@@ -221,7 +224,8 @@ def test_word2vec():
                     f"Duration {time.time() - start:3f}"
                 )
             if i % 10 == 0:
-                embedding.save(STATE_FILE)
+                # embedding.save(STATE_FILE)
+                pass
 
         except fileio.Function.GenearatorHasNoMore as e:
             # Next epoch
