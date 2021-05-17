@@ -8,7 +8,6 @@ import numpy as np
 import tensorflow as tf
 
 from memory_profiler import profile as memory_profile
-import ray
 
 import function.fileio as fileio
 from common.constant import (

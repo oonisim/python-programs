@@ -37,7 +37,7 @@ from optimizer import (
 from testing.config import (
     NUM_MAX_TEST_TIMES
 )
-from .embedding import (
+from layer.embedding import (
     Embedding
 )
 

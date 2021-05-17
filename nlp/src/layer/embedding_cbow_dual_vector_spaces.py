@@ -1621,20 +1621,12 @@ class Embedding(Layer):
 
         def _adapt_function_handle_ys(ys: TYPE_TENSOR):
             T: TYPE_TENSOR = np.zeros(shape=(self.N, self.SL), dtype=TYPE_INT)
-            T[
-                ::,
-                0
-            ] = TYPE_INT(0)
             loss.T = self.reshape(T, (-1, 1))
             ys = self.reshape(X=ys, shape=(-1, 1))   # (N,1)
             return ys
 
         def _adapt_function_handle_ye(ye: TYPE_TENSOR):
-            T: TYPE_TENSOR = np.zeros(shape=(self.N, 1), dtype=TYPE_INT)
-            T[
-                ::,
-                0
-            ] = TYPE_INT(1)
+            T: TYPE_TENSOR = np.ones(shape=(self.N, 1), dtype=TYPE_INT)
             loss.T = T
             ye = self.reshape(X=ye, shape=(-1, 1))   # (N,1)
             return ye
