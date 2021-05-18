@@ -44,10 +44,10 @@ Logger = logging.getLogger(__name__)
 
 # @memory_profile
 def test_word2vec():
-    USE_TEXT8 = False
+    USE_TEXT8 = True
     USE_PTB = not USE_TEXT8
 
-    CORPUS_FILE = "text8_256" if USE_TEXT8 else "ptb_train"
+    CORPUS_FILE = "text8_512" if USE_TEXT8 else "ptb_train"
     CORPUS_URL = "https://data.deepai.org/text8.zip" \
         if USE_TEXT8 else 'https://raw.githubusercontent.com/tomsercu/lstm/master/data/ptb.train.txt'
 
@@ -61,9 +61,9 @@ def test_word2vec():
     WEIGHT_PARAMS = {
         "std": 0.01
     }
-    LR = TYPE_FLOAT(5.0)
+    LR = TYPE_FLOAT(20.0)
 
-    NUM_SENTENCES = 10
+    NUM_SENTENCES = 1
 
     STATE_FILE = \
         "/home/oonisim/home/repository/git/oonisim/python_programs/nlp/models/" \
@@ -223,8 +223,8 @@ def test_word2vec():
                     f"Average Loss: {np.mean(network.history):10f} "
                     f"Duration {time.time() - start:3f}"
                 )
-            if i % 1000 == 0:
-                # embedding.save(STATE_FILE)
+            if i % 10000 == 0:
+                embedding.save(STATE_FILE)
                 pass
 
         except fileio.Function.GenearatorHasNoMore as e:
