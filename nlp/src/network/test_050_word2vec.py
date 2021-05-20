@@ -52,9 +52,9 @@ def test_word2vec():
         if USE_TEXT8 else 'https://raw.githubusercontent.com/tomsercu/lstm/master/data/ptb.train.txt'
 
     TARGET_SIZE = TYPE_INT(1)       # Size of the target event (word)
-    CONTEXT_SIZE = TYPE_INT(10)     # Size of the context in which the target event occurs.
+    CONTEXT_SIZE = TYPE_INT(6)     # Size of the context in which the target event occurs.
     WINDOW_SIZE = TARGET_SIZE + CONTEXT_SIZE
-    SAMPLE_SIZE = TYPE_INT(5)      # Size of the negative samples
+    SAMPLE_SIZE = TYPE_INT(6)      # Size of the negative samples
     VECTOR_SIZE = TYPE_INT(100)     # Number of features in the event vector.
 
     WEIGHT_SCHEME = "normal"
@@ -80,7 +80,7 @@ def test_word2vec():
             NUM_SENTENCES,
         )
 
-    MAX_ITERATIONS = 100000
+    MAX_ITERATIONS = 30000
 
     # --------------------------------------------------------------------------------
     # Corpus text
