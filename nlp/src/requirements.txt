@@ -18,6 +18,9 @@ notebook
 matplotlib
 seaborn
 pandas
+scikit-learn
+spacy
+textblob
 
 #--------------------------------------------------------------------------------
 # Math
@@ -29,6 +32,8 @@ numba
 
 #--------------------------------------------------------------------------------
 # NLP
+# conda install -c huggingface transformers
 #--------------------------------------------------------------------------------
 # gensim # need pip
 python-Levenshtein
+nltk

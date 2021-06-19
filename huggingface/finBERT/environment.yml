@@ -1,3 +1,4 @@
+# conda env update --file environment.yml
 name: finbert
 channels:
   - huggingface
