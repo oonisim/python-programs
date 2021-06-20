@@ -62,7 +62,7 @@ def test_020_numerical_jacobian_avg(caplog):
         # Jacobian matrix of shame (N,M), each element of which is df/dXij
         J = numerical_jacobian(f, X)
 
-        assert np.all(np.abs(T - J) < u), \
+        assert np.allclose(T, J, atol=u), \
             f"(T - Z) < {u} is expected but {np.abs(T - J)}."
 
 
@@ -326,56 +326,3 @@ def test_020_cross_entropy_log_loss_2d(caplog):
 
         check.equal(np.all(np.abs(A-G) < u), True, "A-G %s\n" % np.abs(A-G))
 
-
-# ================================================================================
-# Softmax + log loss
-# ================================================================================
-def test_020_softmax_1d(caplog):
-    """Test case for softmax for 1D
-    Constraint:
-        Delta between the analytical and numerical gradient < u.
-    """
-    # caplog.set_level(logging.DEBUG, logger=Logger.name)
-
-    def L(X: np.ndarray, T: np.ndarray):
-        """Loss function for the softmax input A (activations)
-        Args:
-            X: Softmax input A
-            T: Labels
-        Returns:
-            L: Loss value of from the softmax with log loss.
-        """
-        # return np.sum(cross_entropy_log_loss(softmax(X), T))
-        J, _ = softmax_cross_entropy_log_loss(
-            X,
-            T,
-            use_reformula=bool(np.random.randint(0, 2)),
-            need_softmax=False
-        )
-        return np.sum(J)
-
-    u: TYPE_FLOAT = GRADIENT_DIFF_ACCEPTANCE_VALUE
-
-    for _ in range(NUM_MAX_TEST_TIMES):
-        N: TYPE_INT = np.random.randint(1, NUM_MAX_BATCH_SIZE)   # Batch size
-        M: TYPE_INT = np.random.randint(2, NUM_MAX_NODES)        # Number of activations
-        T = np.random.randint(0, M, N).astype(TYPE_LABEL)        # N rows of labels, max label value is M-1
-        A = np.random.uniform(
-            -TYPE_FLOAT(MAX_ACTIVATION_VALUE),
-            TYPE_FLOAT(MAX_ACTIVATION_VALUE),
-            (N, M)
-        ).astype(TYPE_FLOAT)
-        G = numerical_jacobian(partial(L, T=T), A)
-
-        # Analytical gradient P-T
-        dA = softmax(A)
-        dA[
-            np.arange(N),
-            T
-        ] -= TYPE_FLOAT(1)
-
-        # Constraint: Delta between the analytical and numerical gradient < u
-        assert \
-            np.all(np.abs(dA - G) < u) or \
-            np.all(np.abs(dA - G) < np.abs(GRADIENT_DIFF_ACCEPTANCE_RATIO * G)), \
-            f"For T {T} and A: \n{A}\nthe delta between G\n{G}\n and dA: \n{dA}\nwas expected to be < {u} but \n{np.abs(dA-G)}"

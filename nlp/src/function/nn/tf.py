@@ -61,12 +61,12 @@ class Function(base.Function):
         return tf.reduce_all(x, axis=axis)
 
     @staticmethod
-    def all_close(x, y, msg=None):
+    def all_close(expected, actual, msg=None):
         try:
             tf.debugging.assert_near(
-                x, y,
-                # rtol=None,
-                atol=tf.constant(1e-4, dtype=TYPE_FLOAT),
+                expected, actual,
+                rtol=tf.constant(0.1, dtype=TYPE_FLOAT),
+                atol=tf.constant(1e-2, dtype=TYPE_FLOAT),
                 message=msg,
                 summarize=None
             )

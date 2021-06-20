@@ -12,8 +12,8 @@ from common.constant import (
 from . base import Optimizer
 
 _SGD_NAME_DEFAULT = "sgd"
-_SGD_LR_DEFAULT = 1e-2
-_SGD_L2_DEFAULT = 1e-3
+_SGD_LR_DEFAULT = TYPE_FLOAT(1e-2)
+_SGD_L2_DEFAULT = TYPE_FLOAT(1e-3)
 
 
 class SGD(Optimizer):
@@ -79,7 +79,7 @@ class SGD(Optimizer):
         """Calculate the differential to update W"""
         if out is not None:
             raise NotImplementedError("out is not supported for TF")
-        return self.multiply(x=dW, y=self.lr * (1 + self.l2))
+        return self.multiply(x=dW, y=self.lr * (TYPE_FLOAT(1.0) + self.l2))
 
     def update(self, W, dW, out=None) -> np.ndarray:
         """Default method to update the weight matrix W
@@ -95,7 +95,7 @@ class SGD(Optimizer):
         # in a batch has the same value, such as a specific pixel in images is all black
         # then the standardized value xi_std = 0 -> dL/dGamma = sum(dL/dY * xi_std) = 0.
         # --------------------------------------------------------------------------------
-        if np.all(np.abs(dW) < np.abs(W / 100.0)):
+        if np.all(np.abs(dW) < np.abs(W / TYPE_FLOAT(100.0))):
             self.logger.warning(
                 "SGD[%s].update(): Gradient descent potentially stalling with dW < W/100.",
                 self.name
@@ -110,5 +110,6 @@ class SGD(Optimizer):
         # --------------------------------------------------------------------------------
         l2 = self.l2
         lr = self.lr
-        # return np.subtract(W, dW * (1 + l2), out=out)
-        return ne.evaluate("W - lr * dW * (1 + l2)", out=out)
+        scale = TYPE_FLOAT(1.0) + l2
+        # return np.subtract(W, dW * scale, out=out)
+        return ne.evaluate("W - lr * dW * scale", out=out)

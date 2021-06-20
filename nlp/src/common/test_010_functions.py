@@ -202,7 +202,6 @@ def test_010_standardize_sd_is_zero_eps():
         # Expected
         mean = np.mean(X, axis=0, dtype=TYPE_FLOAT)
         E = (X - mean) / np.sqrt(eps, dtype=TYPE_FLOAT)
-        assert np.allclose(E, TYPE_FLOAT(0), atol=u, rtol=0)
 
         # Actual
         A, __mean, __sd, _ = standardize(X, keepdims=keepdims, eps=eps)

@@ -3,6 +3,7 @@ import sys
 import cProfile
 import logging
 import time
+from pathlib import Path
 
 import numpy as np
 import tensorflow as tf
@@ -44,12 +45,17 @@ Logger = logging.getLogger(__name__)
 
 # @memory_profile
 def test_word2vec():
-    USE_TEXT8 = True
+    USE_TEXT8 = False
     USE_PTB = not USE_TEXT8
 
-    CORPUS_FILE = "text8_512" if USE_TEXT8 else "ptb_train"
+    # --------------------------------------------------------------------------------
+    # text8 is one gigantic line having millions of words, which cannot fit in a vector.
+    # Need to split into N words per line.
+    # cat text8 | xargs -n $N > text8_$N
+    # --------------------------------------------------------------------------------
+    CORPUS_FILE = "text8_512" if USE_TEXT8 else "ptb"
     CORPUS_URL = "https://data.deepai.org/text8.zip" \
-        if USE_TEXT8 else 'https://raw.githubusercontent.com/tomsercu/lstm/master/data/ptb.train.txt'
+        if USE_TEXT8 else 'https://raw.githubusercontent.com/tomsercu/lstm/master/data/ptb.test.txt'
 
     TARGET_SIZE = TYPE_INT(1)       # Size of the target event (word)
     CONTEXT_SIZE = TYPE_INT(6)     # Size of the context in which the target event occurs.
@@ -63,7 +69,13 @@ def test_word2vec():
     }
     LR = TYPE_FLOAT(20.0)
 
-    NUM_SENTENCES = 1
+    # For text8_512 where one line has 512 words, the number of sentences to take in is small.
+    # For ptb_train where one line may have only a few words, take in more lines to avoid a
+    # (event, context) pair where event is an invalid padding word.
+    # Because of padding, when there are only a few sentence provided,
+    # the 'event' in (event,context) can result in 0.
+    # [[562  58 117   0   0   0   0   0   0   0   0]]
+    NUM_SENTENCES = 1 if USE_TEXT8 else 10
 
     STATE_FILE = \
         "/home/oonisim/home/repository/git/oonisim/python_programs/nlp/models/" \
@@ -80,12 +92,12 @@ def test_word2vec():
             NUM_SENTENCES,
         )
 
-    MAX_ITERATIONS = 30000
+    MAX_ITERATIONS = 30
 
     # --------------------------------------------------------------------------------
     # Corpus text
     # --------------------------------------------------------------------------------
-    path_to_corpus = f"~/.keras/datasets/{CORPUS_FILE}"
+    path_to_corpus = f"{str(Path.home())}/.keras/datasets/{CORPUS_FILE}"
     if fileio.Function.is_file(path_to_corpus):
         pass
     else:
@@ -179,7 +191,6 @@ def test_word2vec():
 
     # Restore the state if exists.
     if fileio.Function.is_file(STATE_FILE):
-        print("Loading model %s\n" % STATE_FILE)
         state = embedding.load(STATE_FILE)
 
         fmt = """Model loaded.

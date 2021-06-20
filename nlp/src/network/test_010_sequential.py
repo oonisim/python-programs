@@ -89,8 +89,8 @@ def test_010_sequential_instantiation_to_fail():
     # NOTE: Invalidate one parameter at a time from the correct one.
     # Otherwise not sure what you are testing.
     # ----------------------------------------------------------------------
-    lr = np.random.uniform()
-    l2 = np.random.uniform()
+    lr = TYPE_FLOAT(np.random.uniform())
+    l2 = TYPE_FLOAT(np.random.uniform())
     composite_layer_spec = valid_network_specification_mamao[_COMPOSITE_LAYER_SPEC]
     composite_layer_spec["matmul01"][_PARAMETERS][_OPTIMIZER][_PARAMETERS]["lr"] = lr
     composite_layer_spec["matmul01"][_PARAMETERS][_OPTIMIZER][_PARAMETERS]["l2"] = l2

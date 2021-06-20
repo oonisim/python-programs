@@ -633,7 +633,7 @@ def test_020_adapt_embedding_loss_adapter_gradient_to_succeed(caplog):
         C = context_size = TYPE_INT(2 * np.random.randint(1, 5))
         SL = negative_sample_size = TYPE_INT(np.random.randint(1, 5))
         event_vector_size: TYPE_INT = TYPE_INT(np.random.randint(5, 20))
-        W: TYPE_TENSOR = np.random.randn(dictionary.vocabulary_size, event_vector_size)
+        W: TYPE_TENSOR = np.random.rand(dictionary.vocabulary_size, event_vector_size)
 
         loss, adapter, embedding, event_context = _instantiate(
             name=name,

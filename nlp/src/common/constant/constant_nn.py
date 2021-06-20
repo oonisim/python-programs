@@ -41,11 +41,11 @@ TYPE_NN_FLOAT = tf.float32
 #   because we need OFFSET_LOG > OFFSET_DELTA to avoid the numerical gradient from
 #   causing np.nan by f(log(x + OFFSET_LOG - OFFSET_DELTA)).
 # --------------------------------------------------------------------------------
-OFFSET_DELTA = TYPE_FLOAT(1e-10) if TYPE_FLOAT == np.float64 else TYPE_FLOAT(1e-7)
+OFFSET_DELTA = TYPE_FLOAT(1e-10) if TYPE_FLOAT == np.float64 else TYPE_FLOAT(1e-4)
 OFFSET_LOG = OFFSET_DELTA * TYPE_FLOAT(10.0)
 assert OFFSET_LOG > OFFSET_DELTA
 # Avoid div by zero at (X-u) / sqrt(variance + eps)
-OFFSET_STD = TYPE_FLOAT(1e-10) if TYPE_FLOAT == np.float64 else TYPE_FLOAT(1e-7)
+# OFFSET_STD = TYPE_FLOAT(1e-10) if TYPE_FLOAT == np.float64 else TYPE_FLOAT(1e-4)
 
 # When True, set the element to the offset value only when it is below the offset,
 # clipping element values at the offset.
@@ -64,7 +64,7 @@ OFFSET_MODE_ELEMENT_WISE = True
 BOUNDARY_SIGMOID = -np.log(OFFSET_LOG, dtype=TYPE_FLOAT) * TYPE_FLOAT(0.5)
 
 # Threshold below which the gradient is regarded as saturated.
-GRADIENT_SATURATION_THRESHOLD = TYPE_FLOAT(1e-10) if TYPE_FLOAT == np.float64 else TYPE_FLOAT(1e-5)
+GRADIENT_SATURATION_THRESHOLD = TYPE_FLOAT(1e-10) if TYPE_FLOAT == np.float64 else TYPE_FLOAT(1e-4)
 
 # Min difference between f(x+h) and f(x-h) at numerical gradient to avoid
 # floating precision error. If f(x+h) - f(x-h) is small

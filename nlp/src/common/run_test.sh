@@ -38,6 +38,9 @@ done
 #--------------------------------------------------------------------------------
 echo "--------------------------------------------------------------------------------"
 echo "Running PyTest..."
+rm -rf __pycache__/
+rm -rf .pytest_cache/
+
 # pytest --log-level=DEBUG -o log_cli=True -o log_cli_level=DEBUG --verbose --cache-clear -x -capture=tee-sys ${DIR} | tee pytest.log
 
 # To disable assert
@@ -52,6 +55,12 @@ echo "Running PyTest..."
 # [NOTE]
 # Cannot use live cli log with pytest-xdist <--- !!!
 #  -o log_cli=False -o log_cli_level=WARNING \
+#
+# [Selector]
+# https://docs.pytest.org/en/latest/example/markers.html#using-k-expr-to-select-tests-based-on-their-name
+# use -k option to specify which tests to run or NOT to run.
+# $ pytest -k "http or quick"
+# $ pytest -k "not send_http"
 #--------------------------------------------------------------------------------
 NUM_CPU=6
 #python3 -m cProfile -o profile -m pytest \
