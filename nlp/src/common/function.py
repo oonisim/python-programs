@@ -78,7 +78,8 @@ def standardize(
         sd: standard deviation of X
         deviation: X-mean
     """
-    assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT and X.size > 0)
+    assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT and X.size > 0), \
+        "type X %s, dtype %s size %s" % (type(X), X.dtype, X.size)
     assert np.all(np.isfinite(X)), f"{X}"
 
     if X.ndim <= 1:
