@@ -36,7 +36,7 @@ def test_mnist():
         specification=specification
     )
 
-    MAX_TEST_TIMES = 10
+    MAX_TEST_TIMES = 100
 
     elapsed = []
     history_recall = []
