@@ -193,7 +193,7 @@ class Function:
 
         # --------------------------------------------------------------------------------
         # Event probability with NIL, UNK at the top, so that the vocabulary, probabilities
-        # both have the same event orders.
+        # both have the same event orders. UNK may be in corpus.
         # --------------------------------------------------------------------------------
         event_to_probability: Dict[str, TYPE_FLOAT] = {
             EVENT_NIL.lower(): TYPE_FLOAT(0),
