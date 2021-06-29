@@ -1,0 +1,9 @@
+# HuggingFace
+MAX_SEQUENTH_LENGTH = 256   # Max token length to accept. 512 taks 1 hour/epoch on Google Colab
+
+# Model training
+NUM_EPOCHS = 20
+BATCH_SIZE = 32
+LEARNING_RATE = 5e-3
+REDUCE_LR_PATIENCE = 2
+EARLY_STOP_PATIENCE = 5
