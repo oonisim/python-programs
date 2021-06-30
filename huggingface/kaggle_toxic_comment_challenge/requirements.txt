@@ -1,3 +1,13 @@
 transformers
 pandas
 scikit-learn
+nltk
+tensorflow
+spacy
+gensim
+h5py
+clean-text
+unidecode
+wordcloud
+matplotlib
+seaborn
