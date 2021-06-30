@@ -1,3 +1,6 @@
+# Notebook
+toxic_comment_classification.ipynb
+
 # HuggingFace
 MAX_SEQUENTH_LENGTH = 256   # Max token length to accept. 512 taks 1 hour/epoch on Google Colab
 
