@@ -107,7 +107,7 @@ class Function:
         # pattern: str = '(?<!%s)[%s%s]+(?!unk>)' % ('<EVENT_UNK', re.escape(string.punctuation), r"\s")
         # pattern: str = rf'(?:(?!{EVENT_UNK.lower()})[\W_](?<!{EVENT_UNK.lower()}))+'
         # --------------------------------------------------------------------------------
-        # excludes: str = r'`~!@#$%^&*()_=+\[\]{}\\\|;:\"\'<>.,/? '
+        # excludes: str = r'`~!@#$%^&*()_=+\[\]{}\\\|;:\"\'<>.,/?'
         # pattern: str = rf'(?:(?!{EVENT_UNK.lower()})(?!{EVENT_NIL.lower()})([{excludes}])(?<!{EVENT_UNK.lower()})(?<!{EVENT_NIL.lower()}))+'
         # replacement = EMPTY
         pattern: str = rf'(?:(?!{EVENT_UNK.lower()})(?!{EVENT_NIL.lower()})[\W_](?<!{EVENT_UNK.lower()})(?<!{EVENT_NIL.lower()}))+'
