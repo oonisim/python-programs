@@ -20,7 +20,7 @@ nbmerge "${files[@]}" > toxic_comment_challenge.ipynb
 #--------------------------------------------------------------------------------
 # Generate a analysis notebook for a specific category
 #--------------------------------------------------------------------------------
-nbmerge 01_setup.ipynb 02_analysis.ipynb > toxic_comment_analysis.ipynb
+nbmerge 01_setup.ipynb 02_analysis.ipynb > toxic_comment_classification.ipynb
 
 #--------------------------------------------------------------------------------
 # Generate a training notebook for a specific category
