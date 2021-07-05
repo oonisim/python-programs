@@ -1,3 +1,10 @@
 jigsaw-toxic-comment-classification-challenge.zip
 sample_submission.csv.zip
 *.csv
+/toxic_comment_analysis.ipynb
+/toxic_comment_identity.ipynb
+/toxic_comment_insult.ipynb
+/toxic_comment_obscene.ipynb
+/toxic_comment_severe.ipynb
+/toxic_comment_threat.ipynb
+/toxic_comment_toxic.ipynb
