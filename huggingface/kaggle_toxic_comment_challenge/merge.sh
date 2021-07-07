@@ -15,11 +15,13 @@ files=($(ls | grep  '^[0-9][0-9]*.*\.ipynb' | sort -g))
 #  10_model_history.ipynb 
 #  11_evaluation.ipynb
 #--------------------------------------------------------------------------------
+echo "generating the merged notebook as toxic_comment_classification.ipynb"
 nbmerge "${files[@]}" > toxic_comment_classification.ipynb
 
 #--------------------------------------------------------------------------------
 # Generate a analysis notebook for a specific category
 #--------------------------------------------------------------------------------
+echo "generating the analysis notebook as toxic_comment_analysis.ipynb"
 nbmerge 01_setup.ipynb 02_analysis.ipynb > toxic_comment_analysis.ipynb
 
 #--------------------------------------------------------------------------------
