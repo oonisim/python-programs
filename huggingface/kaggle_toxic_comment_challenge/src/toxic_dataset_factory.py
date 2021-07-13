@@ -285,7 +285,8 @@ class TrainingSequence(TFToxicDataSetSequence):
         super().__init__(factory=factory, dataset=factory.X, size=factory.X_size)
 
     def on_epoch_end(self):
-        """Acquire the new dataset from the Factory"""
+        """Acquire the new dataset from the Factory
+        """
         super().__init__(factory=self.factory, dataset=self.factory.X, size=self.factory.X_size)
 
 
@@ -294,7 +295,11 @@ class ValidationSequence(TFToxicDataSetSequence):
         super().__init__(factory=factory, dataset=factory.V, size=factory.V_size)
 
     def on_epoch_end(self):
-        """Acquire the new dataset from the Factory"""
+        """Acquire the new dataset from the Factory
+        TODO:
+            If callbacks are using the validation data e.g. to calculate AUC,
+            you need to update the data there as well.
+        """
         super().__init__(factory=self.factory, dataset=self.factory.V, size=self.factory.V_size)
 
 
