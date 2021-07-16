@@ -335,9 +335,12 @@ def decode(tokens):
     Returns: List of string sentence
     """
     sentences = []
-    for sequence in tokens['input_ids']:
-        sentences.append(tokenizer.decode(sequence.numpy().tolist()))
-
+    if isinstance(tokens, list) or tf.is_tensor(tokens):
+        for sequence in tokens:
+            sentences.append(tokenizer.decode(sequence))
+    elif 'input_ids' in tokens:
+        for sequence in tokens['input_ids']:
+            sentences.append(tokenizer.decode(sequence))
     return sentences
 
 
@@ -391,8 +394,11 @@ def test():
     # --------------------------------------------------------------------------------
     train_data_seq = TrainingSequence(factory)
     batch = train_data_seq.next()
+    sequences = list(batch)[0][0]['input_ids']
+    print(sequences)
+
     count_in_batch = 0
-    for sentence, (sequence, label) in zip(sentences, batch):
+    for sentence, sequence in zip(sentences, sequences):
         # Note the batch has been shuffled, hence the original order is not there.
         print(decode(sequence))
         count_in_batch += 1

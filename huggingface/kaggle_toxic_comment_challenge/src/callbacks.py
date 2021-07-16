@@ -1,9 +1,8 @@
-import os
 import sys
 import numpy as np
 import tensorflow as tf
 from sklearn.metrics import roc_auc_score
-from keras import backend
+from tensorflow.python.keras import backend
 
 
 class ROCCallback(tf.keras.callbacks.Callback):
