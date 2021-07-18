@@ -1,0 +1,128 @@
+2021JUL18_0950
+
+[objective]
+Reducing Classification layers on top 768 -> 384 -> 192 to see it has PCA effect (denoise)
+
+[toxic        ] Threshold 0.50000
+[toxic        ] TP 0.092 FP 0.126 TN: 0.778 FN 0.003
+[toxic        ] True Positive Rate (Recall)      : 0.967
+[toxic        ] Positive Precision               : 0.421
+[toxic        ] True Negative Rate (Specificity) : 0.860
+[toxic        ] Negative Precision               : 0.996
+[toxic        ] Accuracy                         : 0.870
+[toxic        ] AUC                              : 0.961
+
+[toxic        ] Threshold 0.51023
+[toxic        ] TP 0.092 FP 0.126 TN: 0.779 FN 0.003
+[toxic        ] True Positive Rate (Recall)      : 0.967
+[toxic        ] Positive Precision               : 0.422
+[toxic        ] True Negative Rate (Specificity) : 0.861
+[toxic        ] Negative Precision               : 0.996
+[toxic        ] Accuracy                         : 0.871
+[toxic        ] AUC                              : 0.961
+
+[toxic        ] Threshold 0.99970
+[toxic        ] TP 0.016 FP 0.007 TN: 0.898 FN 0.080
+[toxic        ] True Positive Rate (Recall)      : 0.164
+[toxic        ] Positive Precision               : 0.705
+[toxic        ] True Negative Rate (Specificity) : 0.993
+[toxic        ] Negative Precision               : 0.919
+[toxic        ] Accuracy                         : 0.914
+[toxic        ] AUC                              : 0.961
+
+[toxic        ] Threshold 0.99993
+[toxic        ] TP 0.000 FP 0.000 TN: 0.905 FN 0.095
+[toxic        ] True Positive Rate (Recall)      : 0.000
+[toxic        ] True Negative Rate (Specificity) : 1.000
+[toxic        ] Negative Precision               : 0.905
+[toxic        ] Accuracy                         : 0.905
+[toxic        ] AUC                              : 0.961
+
+TIMESTAMP = 2021JUL18_0950
+CLEANING_FOR_TRAINING = False
+MAX_SEQUENCE_LENGTH = 256
+FREEZE_BASE_MODEL = False
+NUM_LABELS = 2
+NUM_EPOCHS = 10
+BATCH_SIZE = 32
+LEARNING_RATE = 2e-05
+L2 = 0.0001
+METRIC_NAME = loss
+REDUCE_LR_PATIENCE = 1
+EARLY_STOP_PATIENCE = 3
+RESULT_DIRECTORY = /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification/toxicity_classification_2021JUL18_0950
+
+
+Model: "2021JUL18_0950_DISTILBERT-BASE-UNCASED"
+__________________________________________________________________________________________________
+Layer (type)                    Output Shape         Param #     Connected to
+==================================================================================================
+input_ids (InputLayer)          [(None, 256)]        0
+__________________________________________________________________________________________________
+attention_mask (InputLayer)     [(None, 256)]        0
+__________________________________________________________________________________________________
+tf_distil_bert_model_2 (TFDisti TFBaseModelOutput(la 66362880    input_ids[0][0]
+                                                                 attention_mask[0][0]
+__________________________________________________________________________________________________
+tf.__operators__.getitem_2 (Sli (None, 768)          0           tf_distil_bert_model_2[0][0]
+__________________________________________________________________________________________________
+01_dropout (Dropout)            (None, 768)          0           tf.__operators__.getitem_2[0][0]
+__________________________________________________________________________________________________
+01_dense_relu_no_regularizer (D (None, 384)          295296      01_dropout[0][0]
+__________________________________________________________________________________________________
+01_bn (BatchNormalization)      (None, 384)          1536        01_dense_relu_no_regularizer[0][0
+__________________________________________________________________________________________________
+01_relu (Activation)            (None, 384)          0           01_bn[0][0]
+__________________________________________________________________________________________________
+02_dense_relu_no_regularizer (D (None, 192)          73920       01_relu[0][0]
+__________________________________________________________________________________________________
+02_bn (BatchNormalization)      (None, 192)          768         02_dense_relu_no_regularizer[0][0
+__________________________________________________________________________________________________
+02_relu (Activation)            (None, 192)          0           02_bn[0][0]
+__________________________________________________________________________________________________
+softmax (Dense)                 (None, 2)            386         02_relu[0][0]
+==================================================================================================
+Total params: 66,734,786
+Trainable params: 66,733,634
+Non-trainable params: 1,152
+__________________________________________________________________________________________________
+Epoch 1/10
+4329/4329 [==============================] - 1251s 287ms/step - loss: 0.1166 - accuracy: 0.9623 - val_loss: 0.0558 - val_accuracy: 0.9845
+
+Epoch 00001: val_loss improved from inf to 0.05578, saving model to /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification/toxicity_classification_2021JUL18_0950/model_Ctoxic_B32_L256/model.h5
+Epoch 2/10
+4329/4329 [==============================] - 1240s 286ms/step - loss: 0.0427 - accuracy: 0.9885 - val_loss: 0.0417 - val_accuracy: 0.9891
+
+Epoch 00002: val_loss improved from 0.05578 to 0.04173, saving model to /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification/toxicity_classification_2021JUL18_0950/model_Ctoxic_B32_L256/model.h5
+Epoch 3/10
+4329/4329 [==============================] - 1243s 287ms/step - loss: 0.0228 - accuracy: 0.9943 - val_loss: 0.0448 - val_accuracy: 0.9897
+
+Epoch 00003: ReduceLROnPlateau reducing learning rate to 3.999999898951501e-06.
+
+Epoch 00003: val_loss did not improve from 0.04173
+Epoch 4/10
+4329/4329 [==============================] - 1246s 288ms/step - loss: 0.0088 - accuracy: 0.9981 - val_loss: 0.0342 - val_accuracy: 0.9923
+
+Epoch 00004: val_loss improved from 0.04173 to 0.03420, saving model to /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification/toxicity_classification_2021JUL18_0950/model_Ctoxic_B32_L256/model.h5
+Epoch 5/10
+4329/4329 [==============================] - 1248s 288ms/step - loss: 0.0055 - accuracy: 0.9989 - val_loss: 0.0364 - val_accuracy: 0.9925
+
+Epoch 00005: ReduceLROnPlateau reducing learning rate to 7.999999979801942e-07.
+
+Epoch 00005: val_loss did not improve from 0.03420
+Epoch 6/10
+4329/4329 [==============================] - 1248s 288ms/step - loss: 0.0033 - accuracy: 0.9994 - val_loss: 0.0381 - val_accuracy: 0.9925
+
+Epoch 00006: ReduceLROnPlateau reducing learning rate to 1.600000018697756e-07.
+
+Epoch 00006: val_loss did not improve from 0.03420
+Epoch 7/10
+4329/4329 [==============================] - 1246s 288ms/step - loss: 0.0026 - accuracy: 0.9996 - val_loss: 0.0367 - val_accuracy: 0.9930
+Restoring model weights from the end of the best epoch.
+
+Epoch 00007: ReduceLROnPlateau reducing learning rate to 3.199999980552093e-08.
+
+Epoch 00007: val_loss did not improve from 0.03420
+Epoch 00007: early stopping
+
+

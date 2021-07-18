@@ -1,6 +1,5 @@
 **/.idea/**
 */*.pyc
-**/*.log
 **/.ipynb_checkpoints/**
 .idea/**
 **/*.pyc

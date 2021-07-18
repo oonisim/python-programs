@@ -1,0 +1,104 @@
+[objective]
+See if monitor on val_accuracy improves the performance.
+
+[toxic        ] Threshold 0.50000
+[toxic        ] TP 0.092 FP 0.134 TN: 0.771 FN 0.003
+[toxic        ] True Positive Rate (Recall) : 0.967
+[toxic        ] Positive Precision          : 0.408
+[toxic        ] True Negative Rate (Recall) : 0.852
+[toxic        ] Negative Precision          : 0.996
+[toxic        ] Accuracy                    : 0.863
+[toxic        ] AUC                         : 0.965
+
+[Monitor metric loss]
+METRIC_NAME = 'accuracy'
+MONITOR_MODE = 'max'
+
+positive_negative_ratio=5.0,
+negative_replication_factor=0.2,
+
+TIMESTAMP = 2021JUL16_1217
+CLEANING_FOR_TRAINING = False
+MAX_SEQUENCE_LENGTH = 256
+FREEZE_BASE_MODEL = False
+NUM_LABELS = 2
+NUM_EPOCHS = 10
+BATCH_SIZE = 32
+LEARNING_RATE = 2e-05
+L2 = 0.0001
+METRIC_NAME = accuracy
+MONITOR_MODE = max
+REDUCE_LR_PATIENCE = 1
+EARLY_STOP_PATIENCE = 3
+RESULT_DIRECTORY = /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification/toxicity_classification_2021JUL16_1217
+
+
+Model: "2021JUL16_1217_DISTILBERT-BASE-UNCASED"
+__________________________________________________________________________________________________
+Layer (type)                    Output Shape         Param #     Connected to
+==================================================================================================
+input_ids (InputLayer)          [(None, 256)]        0
+__________________________________________________________________________________________________
+attention_mask (InputLayer)     [(None, 256)]        0
+__________________________________________________________________________________________________
+tf_distil_bert_model (TFDistilB TFBaseModelOutput(la 66362880    input_ids[0][0]
+                                                                 attention_mask[0][0]
+__________________________________________________________________________________________________
+tf.__operators__.getitem (Slici (None, 768)          0           tf_distil_bert_model[0][0]
+__________________________________________________________________________________________________
+softmax (Dense)                 (None, 2)            1538        tf.__operators__.getitem[0][0]
+==================================================================================================
+Total params: 66,364,418
+Trainable params: 66,364,418
+Non-trainable params: 0
+
+Epoch 1/10
+4329/4329 [==============================] - 2194s 505ms/step - loss: 0.0770 - accuracy: 0.9748 - val_loss: 0.0414 - val_accuracy: 0.9895
+
+Epoch 00001: val_accuracy improved from -inf to 0.98952, saving model to /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification/toxicity_classification_2021JUL16_1217/model_Ctoxic_B32_L256/model.h5
+Epoch 2/10
+4329/4329 [==============================] - 2189s 506ms/step - loss: 0.0264 - accuracy: 0.9928 - val_loss: 0.0406 - val_accuracy: 0.9905
+
+Epoch 00002: val_accuracy improved from 0.98952 to 0.99053, saving model to /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification/toxicity_classification_2021JUL16_1217/model_Ctoxic_B32_L256/model.h5
+Epoch 3/10
+4329/4329 [==============================] - 2190s 506ms/step - loss: 0.0131 - accuracy: 0.9965 - val_loss: 0.0508 - val_accuracy: 0.9902
+
+Epoch 00003: ReduceLROnPlateau reducing learning rate to 3.999999898951501e-06.
+
+Epoch 00003: val_accuracy did not improve from 0.99053
+Epoch 4/10
+4329/4329 [==============================] - 2190s 506ms/step - loss: 0.0030 - accuracy: 0.9993 - val_loss: 0.0641 - val_accuracy: 0.9915
+
+Epoch 00004: val_accuracy improved from 0.99053 to 0.99145, saving model to /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification/toxicity_classification_2021JUL16_1217/model_Ctoxic_B32_L256/model.h5
+Epoch 5/10
+4329/4329 [==============================] - 2190s 506ms/step - loss: 0.0015 - accuracy: 0.9996 - val_loss: 0.0695 - val_accuracy: 0.9911
+
+Epoch 00005: ReduceLROnPlateau reducing learning rate to 7.999999979801942e-07.
+
+Epoch 00005: val_accuracy did not improve from 0.99145
+Epoch 6/10
+4329/4329 [==============================] - 2190s 506ms/step - loss: 4.8005e-04 - accuracy: 0.9999 - val_loss: 0.0686 - val_accuracy: 0.9919
+
+Epoch 00006: val_accuracy improved from 0.99145 to 0.99186, saving model to /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification/toxicity_classification_2021JUL16_1217/model_Ctoxic_B32_L256/model.h5
+Epoch 7/10
+4329/4329 [==============================] - 2195s 507ms/step - loss: 4.8290e-04 - accuracy: 0.9999 - val_loss: 0.0693 - val_accuracy: 0.9916
+
+Epoch 00007: ReduceLROnPlateau reducing learning rate to 1.600000018697756e-07.
+
+Epoch 00007: val_accuracy did not improve from 0.99186
+Epoch 8/10
+4329/4329 [==============================] - 2192s 506ms/step - loss: 2.3175e-04 - accuracy: 0.9999 - val_loss: 0.0637 - val_accuracy: 0.9923
+
+Epoch 00008: val_accuracy improved from 0.99186 to 0.99232, saving model to /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification/toxicity_classification_2021JUL16_1217/model_Ctoxic_B32_L256/model.h5
+Epoch 9/10
+4329/4329 [==============================] - 2191s 506ms/step - loss: 1.9860e-04 - accuracy: 0.9999 - val_loss: 0.0676 - val_accuracy: 0.9920
+
+Epoch 00009: ReduceLROnPlateau reducing learning rate to 3.199999980552093e-08.
+
+Epoch 00009: val_accuracy did not improve from 0.99232
+Epoch 10/10
+4329/4329 [==============================] - 2192s 506ms/step - loss: 1.4010e-04 - accuracy: 1.0000 - val_loss: 0.0674 - val_accuracy: 0.9921
+
+Epoch 00010: ReduceLROnPlateau reducing learning rate to 6.399999818995639e-09.
+
+Epoch 00010: val_accuracy did not improve from 0.99232

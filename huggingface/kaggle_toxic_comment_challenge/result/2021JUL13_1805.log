@@ -1,0 +1,74 @@
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Model evaluation on [toxic]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+2000/2000 [==============================] - 313s 156ms/step - loss: 0.4602 - accuracy: 0.9090
+Evaluation: ['loss', 'accuracy']:[0.4601893723011017, 0.908984363079071]
+
+[toxic        ] Threshold 0.03755
+[toxic        ] TP 0.088 FP 0.103 TN: 0.802 FN 0.007
+[toxic        ] True Positive Rate (Recall) : 0.929
+[toxic        ] Positive Precision          : 0.462
+[toxic        ] True Negative Rate (Recall) : 0.886
+[toxic        ] Negative Precision          : 0.992
+[toxic        ] Accuracy                    : 0.890
+[toxic        ] AUC                         : 0.962
+
+
+TIMESTAMP = 2021JUL13_1805
+CLEANING_FOR_TRAINING = True
+MAX_SEQUENCE_LENGTH = 256
+FREEZE_BASE_MODEL = False
+NUM_LABELS = 2
+NUM_EPOCHS = 5
+BATCH_SIZE = 32
+LEARNING_RATE = 2e-05
+L2 = 0.0001
+REDUCE_LR_PATIENCE = 1
+EARLY_STOP_PATIENCE = 3
+RESULT_DIRECTORY = /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification/toxicity_classification_2021JUL13_1805
+
+Model: "2021JUL13_1805_DISTILBERT-BASE-UNCASED"
+__________________________________________________________________________________________________
+Layer (type)                    Output Shape         Param #     Connected to
+==================================================================================================
+input_ids (InputLayer)          [(None, 256)]        0
+__________________________________________________________________________________________________
+attention_mask (InputLayer)     [(None, 256)]        0
+__________________________________________________________________________________________________
+tf_distil_bert_model (TFDistilB TFBaseModelOutput(la 66362880    input_ids[0][0]
+                                                                 attention_mask[0][0]
+__________________________________________________________________________________________________
+tf.__operators__.getitem (Slici (None, 768)          0           tf_distil_bert_model[0][0]
+__________________________________________________________________________________________________
+softmax (Dense)                 (None, 2)            1538        tf.__operators__.getitem[0][0]
+==================================================================================================
+Total params: 66,364,418
+Trainable params: 66,364,418
+Non-trainable params: 0
+__________________________________________________________________________________________________
+Epoch 1/5
+6883/6883 [==============================] - 3488s 506ms/step - loss: 0.1237 - accuracy: 0.9531 - val_loss: 0.0609 - val_accuracy: 0.9796
+
+Epoch 00001: val_loss improved from inf to 0.06089, saving model to /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification/toxicity_classification_2021JUL13_1805/model_Ctoxic_B32_L256/model.h5
+Epoch 2/5
+6883/6883 [==============================] - 3480s 506ms/step - loss: 0.0429 - accuracy: 0.9868 - val_loss: 0.0783 - val_accuracy: 0.9770
+
+Epoch 00002: ReduceLROnPlateau reducing learning rate to 3.999999898951501e-06.
+
+Epoch 00002: val_loss did not improve from 0.06089
+Epoch 3/5
+6883/6883 [==============================] - 3478s 505ms/step - loss: 0.0138 - accuracy: 0.9964 - val_loss: 0.0469 - val_accuracy: 0.9890
+
+Epoch 00003: val_loss improved from 0.06089 to 0.04695, saving model to /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification/toxicity_classification_2021JUL13_1805/model_Ctoxic_B32_L256/model.h5
+Epoch 4/5
+6883/6883 [==============================] - 3479s 505ms/step - loss: 0.0084 - accuracy: 0.9979 - val_loss: 0.0512 - val_accuracy: 0.9887
+
+Epoch 00004: ReduceLROnPlateau reducing learning rate to 7.999999979801942e-07.
+
+Epoch 00004: val_loss did not improve from 0.04695
+Epoch 5/5
+6883/6883 [==============================] - 3481s 506ms/step - loss: 0.0049 - accuracy: 0.9987 - val_loss: 0.0523 - val_accuracy: 0.9903
+
+Epoch 00005: ReduceLROnPlateau reducing learning rate to 1.600000018697756e-07.
+
+Epoch 00005: val_loss did not improve from 0.04695

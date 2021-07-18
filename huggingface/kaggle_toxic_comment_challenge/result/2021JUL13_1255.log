@@ -1,0 +1,70 @@
+2021JUL13_1255
+
+[toxic        ] Threshold 0.00104
+[toxic        ] TP 0.090 FP 0.113 TN: 0.792 FN 0.006
+[toxic        ] True Positive Rate (Recall) : 0.941
+[toxic        ] Positive Precision          : 0.443
+[toxic        ] True Negative Rate (Recall) : 0.875
+[toxic        ] Negative Precision          : 0.993
+[toxic        ] Accuracy                    : 0.882
+[toxic        ] AUC                         : 0.963
+
+
+TIMESTAMP = 2021JUL13_1255
+MAX_SEQUENCE_LENGTH = 256
+FREEZE_BASE_MODEL = False
+NUM_LABELS = 1
+NUM_EPOCHS = 5
+BATCH_SIZE = 32
+LEARNING_RATE = 2e-05
+L2 = 0.0001
+REDUCE_LR_PATIENCE = 1
+EARLY_STOP_PATIENCE = 3
+
+CLEANING_FOR_ANALYSIS = True
+CLEANING_FOR_TRAINING = True
+
+DATA_DIR: /content/drive/MyDrive/home/data/kaggle/toxic_comment_classification
+BASE_DIR: /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification
+OUTPUT_DIR: /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification
+RESULT_DIRECTORY: /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification/toxicity_classification_2021JUL13_1255
+
+
+Model: "2021JUL13_1255_DISTILBERT-BASE-UNCASED"
+__________________________________________________________________________________________________
+Layer (type)                    Output Shape         Param #     Connected to
+==================================================================================================
+input_ids (InputLayer)          [(None, 256)]        0
+__________________________________________________________________________________________________
+attention_mask (InputLayer)     [(None, 256)]        0
+__________________________________________________________________________________________________
+tf_distil_bert_model (TFDistilB TFBaseModelOutput(la 66362880    input_ids[0][0]
+                                                                 attention_mask[0][0]
+__________________________________________________________________________________________________
+tf.__operators__.getitem (Slici (None, 768)          0           tf_distil_bert_model[0][0]
+__________________________________________________________________________________________________
+sigmoid (Dense)                 (None, 1)            769         tf.__operators__.getitem[0][0]
+==================================================================================================
+Total params: 66,363,649
+Trainable params: 66,363,649
+Non-trainable params: 0
+__________________________________________________________________________________________________
+Epoch 1/5
+6883/6883 [==============================] - 1990s 288ms/step - loss: 0.1243 - auc: 0.9894 - recall: 0.9648 - accuracy: 0.9534 - val_loss: 0.0635 - val_auc: 0.9961 - val_recall: 0.9960 - val_accuracy: 0.9803
+Model improved auc [0.996135 > -1.000000] val_loss [0.063503 <   inf]. Saving to /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification/toxicity_classification_2021JUL13_1255/model_Ctoxic_B32_L256/model.h5
+Epoch 2/5
+6883/6883 [==============================] - 1976s 287ms/step - loss: 0.0436 - auc: 0.9975 - recall: 0.9931 - accuracy: 0.9866 - val_loss: 0.0643 - val_auc: 0.9967 - val_recall: 0.9997 - val_accuracy: 0.9809
+val_loss [0.064317] did not improve from [0.063503].
+Reducing learning rate to 3.999999898951501e-06.
+Epoch 3/5
+6883/6883 [==============================] - 1976s 287ms/step - loss: 0.0144 - auc: 0.9993 - recall: 0.9986 - accuracy: 0.9962 - val_loss: 0.0487 - val_auc: 0.9965 - val_recall: 1.0000 - val_accuracy: 0.9884
+Model improved auc [0.998119 > 0.996135] val_loss [0.048730 < 0.063503]. Saving to /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification/toxicity_classification_2021JUL13_1255/model_Ctoxic_B32_L256/model.h5
+Epoch 4/5
+6883/6883 [==============================] - 1975s 287ms/step - loss: 0.0085 - auc: 0.9996 - recall: 0.9992 - accuracy: 0.9979 - val_loss: 0.0479 - val_auc: 0.9961 - val_recall: 0.9999 - val_accuracy: 0.9893
+AUC [0.998109] did not improve from [0.998119].
+Reducing learning rate to 7.999999979801942e-07.
+Epoch 5/5
+6883/6883 [==============================] - 1975s 287ms/step - loss: 0.0050 - auc: 0.9998 - recall: 0.9996 - accuracy: 0.9988 - val_loss: 0.0487 - val_auc: 0.9958 - val_recall: 1.0000 - val_accuracy: 0.9905
+Model improved auc [0.998273 > 0.998119] val_loss [0.048670 < 0.048730]. Saving to /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification/toxicity_classification_2021JUL13_1255/model_Ctoxic_B32_L256/model.h5
+
+

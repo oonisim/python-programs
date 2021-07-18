@@ -1,0 +1,83 @@
+[Objective]
+Comparison to 2021JUL15_0945 to see if the performance is better with cleaned data and more positives.
+
+[toxic        ] Threshold 0.68551
+[toxic        ] TP 0.090 FP 0.116 TN: 0.789 FN 0.005
+[toxic        ] True Positive Rate (Recall) : 0.946
+[toxic        ] Positive Precision          : 0.437
+[toxic        ] True Negative Rate (Recall) : 0.872
+[toxic        ] Negative Precision          : 0.993
+[toxic        ] Accuracy                    : 0.879
+[toxic        ] AUC                         : 0.966
+
+
+[Monitor metric loss]
+METRIC_NAME = 'loss'
+MONITOR_MODE = 'min'
+
+positive_negative_ratio=5.0,
+negative_replication_factor=0.2,
+
+TIMESTAMP = 2021JUL16_0800
+CLEANING_FOR_TRAINING = True
+MAX_SEQUENCE_LENGTH = 256
+FREEZE_BASE_MODEL = False
+NUM_LABELS = 2
+NUM_EPOCHS = 5
+BATCH_SIZE = 32
+LEARNING_RATE = 2e-05
+L2 = 0.0001
+METRIC_NAME = loss
+MONITOR_MODE = min
+REDUCE_LR_PATIENCE = 1
+EARLY_STOP_PATIENCE = 3
+RESULT_DIRECTORY = /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification/toxicity_classification_2021JUL16_0800
+
+
+Model: "2021JUL16_0800_DISTILBERT-BASE-UNCASED"
+__________________________________________________________________________________________________
+Layer (type)                    Output Shape         Param #     Connected to
+==================================================================================================
+input_ids (InputLayer)          [(None, 256)]        0
+__________________________________________________________________________________________________
+attention_mask (InputLayer)     [(None, 256)]        0
+__________________________________________________________________________________________________
+tf_distil_bert_model_2 (TFDisti TFBaseModelOutput(la 66362880    input_ids[0][0]
+                                                                 attention_mask[0][0]
+__________________________________________________________________________________________________
+tf.__operators__.getitem_2 (Sli (None, 768)          0           tf_distil_bert_model_2[0][0]
+__________________________________________________________________________________________________
+softmax (Dense)                 (None, 2)            1538        tf.__operators__.getitem_2[0][0]
+==================================================================================================
+Total params: 66,364,418
+Trainable params: 66,364,418
+Non-trainable params: 0
+
+Epoch 1/5
+4329/4329 [==============================] - 2219s 510ms/step - loss: 0.0938 - accuracy: 0.9681 - val_loss: 0.0497 - val_accuracy: 0.9864
+
+Epoch 00001: val_loss improved from inf to 0.04973, saving model to /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification/toxicity_classification_2021JUL16_0800/model_Ctoxic_B32_L256/model.h5
+Epoch 2/5
+4329/4329 [==============================] - 2208s 510ms/step - loss: 0.0331 - accuracy: 0.9907 - val_loss: 0.0380 - val_accuracy: 0.9899
+
+Epoch 00002: val_loss improved from 0.04973 to 0.03801, saving model to /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification/toxicity_classification_2021JUL16_0800/model_Ctoxic_B32_L256/model.h5
+Epoch 3/5
+4329/4329 [==============================] - 2208s 510ms/step - loss: 0.0163 - accuracy: 0.9955 - val_loss: 0.0765 - val_accuracy: 0.9826
+
+Epoch 00003: ReduceLROnPlateau reducing learning rate to 3.999999898951501e-06.
+
+Epoch 00003: val_loss did not improve from 0.03801
+Epoch 4/5
+4329/4329 [==============================] - 2207s 510ms/step - loss: 0.0044 - accuracy: 0.9988 - val_loss: 0.0545 - val_accuracy: 0.9910
+
+Epoch 00004: ReduceLROnPlateau reducing learning rate to 7.999999979801942e-07.
+
+Epoch 00004: val_loss did not improve from 0.03801
+Epoch 5/5
+4329/4329 [==============================] - 2208s 510ms/step - loss: 0.0018 - accuracy: 0.9995 - val_loss: 0.0592 - val_accuracy: 0.9909
+Restoring model weights from the end of the best epoch.
+
+Epoch 00005: ReduceLROnPlateau reducing learning rate to 1.600000018697756e-07.
+
+Epoch 00005: val_loss did not improve from 0.03801
+Epoch 00005: early stopping
