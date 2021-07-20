@@ -1,0 +1,75 @@
+[objective]
+Huggingface mode with more positive data
+
+positive_negative_ratio=5.0,
+negative_replication_factor=0.5,
+
+[toxic        ] Threshold 0.99828
+[toxic        ] TP 0.070 FP 0.037 TN: 0.868 FN 0.025
+[toxic        ] True Positive Rate (Recall)      : 0.739
+[toxic        ] Positive Precision               : 0.657
+[toxic        ] True Negative Rate (Specificity) : 0.959
+[toxic        ] Negative Precision               : 0.972
+[toxic        ] Accuracy                         : 0.938
+[toxic        ] AUC                              : 0.961
+
+[toxic        ] Threshold 0.50000
+[toxic        ] TP 0.084 FP 0.076 TN: 0.829 FN 0.012
+[toxic        ] True Positive Rate (Recall)      : 0.878
+[toxic        ] Positive Precision               : 0.523
+[toxic        ] True Negative Rate (Specificity) : 0.916
+[toxic        ] Negative Precision               : 0.986
+[toxic        ] Accuracy                         : 0.912
+[toxic        ] AUC                              : 0.961
+
+TIMESTAMP = 2021JUL19_0900
+CLEANING_FOR_TRAINING = False
+MAX_SEQUENCE_LENGTH = 256
+FREEZE_BASE_MODEL = False
+NUM_LABELS = 2
+NUM_EPOCHS = 5
+BATCH_SIZE = 32
+LEARNING_RATE = 2e-05
+L2 = 0.0001
+METRIC_NAME = loss
+REDUCE_LR_PATIENCE = 1
+EARLY_STOP_PATIENCE = 3
+RESULT_DIRECTORY = /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification/toxicity_classification_2021JUL19_0900
+
+
+Model: "tf_distil_bert_for_sequence_classification"
+_________________________________________________________________
+Layer (type)                 Output Shape              Param #
+=================================================================
+distilbert (TFDistilBertMain multiple                  66362880
+_________________________________________________________________
+pre_classifier (Dense)       multiple                  590592
+_________________________________________________________________
+classifier (Dense)           multiple                  1538
+_________________________________________________________________
+dropout_19 (Dropout)         multiple                  0
+=================================================================
+Total params: 66,955,010
+Trainable params: 66,955,010
+Non-trainable params: 0
+_________________________________________________________________
+Epoch 1/5
+10821/10821 [==============================] - 3101s 286ms/step - loss: 0.0230 - accuracy: 0.9942 - val_loss: 0.0156 - val_accuracy: 0.9961
+Model val_loss improved from [inf] to [0.01561]
+Saving to /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification/toxicity_classification_2021JUL19_0900/model_Ctoxic_B32_L256
+Epoch 2/5
+10821/10821 [==============================] - 3096s 286ms/step - loss: 0.0099 - accuracy: 0.9976 - val_loss: 0.0193 - val_accuracy: 0.9954
+
+Epoch 00002: ReduceLROnPlateau reducing learning rate to 3.999999898951501e-06.
+Epoch 3/5
+10821/10821 [==============================] - 3094s 286ms/step - loss: 0.0029 - accuracy: 0.9994 - val_loss: 0.0110 - val_accuracy: 0.9978
+Model val_loss improved from [0.01561] to [0.01102]
+Saving to /content/drive/MyDrive/home/repository/mon/kaggle/toxic_comment_classification/toxicity_classification_2021JUL19_0900/model_Ctoxic_B32_L256
+Epoch 4/5
+10821/10821 [==============================] - 3092s 286ms/step - loss: 0.0015 - accuracy: 0.9997 - val_loss: 0.0161 - val_accuracy: 0.9972
+
+Epoch 00004: ReduceLROnPlateau reducing learning rate to 7.999999979801942e-07.
+Epoch 5/5
+10821/10821 [==============================] - 3092s 286ms/step - loss: 6.2175e-04 - accuracy: 0.9999 - val_loss: 0.0195 - val_accuracy: 0.9972
+
+Epoch 00005: ReduceLROnPlateau reducing learning rate to 1.600000018697756e-07.
