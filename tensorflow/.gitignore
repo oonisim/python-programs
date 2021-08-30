@@ -3,3 +3,4 @@
 /data/text/*.txt
 /.idea/
 **/ptb.*.txt
+/tfrecord/amazon_product_review.tfrecord
