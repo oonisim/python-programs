@@ -312,16 +312,18 @@ class Network(Layer):
 
     def predict(
             self,
-            X: np.ndarray
-    ) -> np.ndarray:
+            X
+    ):
         """Calculate the prediction on X
         TODO: Research if put through softmax, etc. The same used by the objective.
         Since the gradient descent process includes dL/dA at the softmax etc at the
         objective layer, the state should be depending on what the softmax has done.
         Hence it seems rational to incorporate the same activation at the objective.
         """
-        assert isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT, \
-            f"Only np array of type {TYPE_FLOAT} is accepted"
+        # assert isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT, \
+        #    f"Only np array of type {TYPE_FLOAT} is accepted"
+        assert X is not None and self.is_tensor(X) and self.is_float_tensor(X), \
+            f"Invalid X {type(X)} dtype {self.tensor_dtype(X)}"
 
         # pylint: disable=not-callable
         return self._predict(X).astype(TYPE_LABEL)

@@ -469,7 +469,7 @@ def transform_X_T(
     """
     name = "transform_X_T"
     assert (isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT) or isinstance(X, TYPE_FLOAT), \
-        f"Type of P must be {TYPE_FLOAT}"
+        f"Type of P must be {TYPE_FLOAT} but {type(X)} {X.dtype}"
     assert (isinstance(T, np.ndarray) and np.issubdtype(T.dtype, np.integer)) or \
            isinstance(T, TYPE_LABEL), "Type of T %s must be %s but %s" % (T, TYPE_LABEL, type(T))
 
@@ -962,7 +962,7 @@ def numerical_jacobian(
         J: Jacobian matrix that has the same shape of X.
     """
     name = "numerical_jacobian"
-    X = np.array(X, dtype=TYPE_FLOAT) if isinstance(X, (TYPE_FLOAT, int)) else X
+    X = np.array(X, dtype=TYPE_FLOAT)
     J = np.zeros_like(X, dtype=TYPE_FLOAT)
     delta = OFFSET_DELTA if (delta is None or delta <= TYPE_FLOAT(0.0)) else delta
     divider = 2 * delta
@@ -976,7 +976,8 @@ def numerical_jacobian(
     # X and tmp must be float, or it will be int causing float calculation fail.
     # e.g. f(1-h) = log(1-h) causes log(0) instead of log(1-h).
     # --------------------------------------------------------------------------------
-    assert (X.dtype == TYPE_FLOAT), f"X must be type {TYPE_FLOAT}"
+    assert (X.dtype == TYPE_FLOAT), f"X must be type {TYPE_FLOAT} but {X.dtype}"
+
     assert delta > TYPE_FLOAT(0.0) and isinstance(delta, TYPE_FLOAT)
 
     # --------------------------------------------------------------------------------
@@ -1015,8 +1016,8 @@ def numerical_jacobian(
         )
 
         assert \
-            ((isinstance(fx1, np.ndarray) and fx1.size == 1) or isinstance(fx1, TYPE_FLOAT)), \
-            f"The f function needs to return scalar or shape () but {fx1}"
+            ((isinstance(fx1, np.ndarray) and fx1.size == 1) or isinstance(fx1, (float, TYPE_FLOAT))), \
+            f"The f function needs to return scalar or shape () type {TYPE_FLOAT} but {fx1} of type {type(fx1)}"
         assert np.isfinite(fx1), \
             "f(x+h) caused nan for f %s for X %s" % (fx1, (tmp + delta))
 
@@ -1030,7 +1031,7 @@ def numerical_jacobian(
             name, idx, tmp, tmp-delta, fx2
         )
         assert \
-            ((isinstance(fx2, np.ndarray) and fx2.size == 1) or isinstance(fx2, TYPE_FLOAT)), \
+            ((isinstance(fx2, np.ndarray) and fx2.size == 1) or isinstance(fx2, (float, TYPE_FLOAT))), \
             f"The f function needs to return scalar or shape () but {fx2}"
         assert np.isfinite(fx2), \
             "f(x-h) caused nan for f %s for X %s" % (fx2, (tmp - delta))

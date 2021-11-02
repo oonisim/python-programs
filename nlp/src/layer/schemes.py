@@ -1,6 +1,7 @@
 """Non composite layer class information"
 DO NOT import composite layer classes in this file.
 """
+import layer
 from layer.matmul import (
     Matmul
 )
@@ -35,17 +36,17 @@ PREPROCESS_LAYERS = (
     EventIndexing,
 )
 FEATURE_LAYERS = (
-    Matmul,
-    Sum
+    Matmul, layer.matmul.Matmul,
+    Sum, layer.sum.Sum
 )
 ACTIVATION_LAYERS = (
-    Sigmoid,
-    ReLU,
+    Sigmoid, layer.activation.Sigmoid,
+    ReLU, layer.activation.ReLU
 )
 NORMALIZATION_LAYERS = (
-    Standardization,
-    FeatureScaleShift,
-    BatchNormalization
+    Standardization, layer.normalization.Standardization,
+    FeatureScaleShift, layer.normalization.FeatureScaleShift,
+    BatchNormalization, layer.normalization.BatchNormalization
 )
 
 # --------------------------------------------------------------------------------

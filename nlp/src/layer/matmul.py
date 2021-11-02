@@ -304,8 +304,10 @@ class Matmul(Layer):
         Returns:
             Y: Layer value of X@W.T
         """
-        assert isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT, \
-            f"Only np array of type {TYPE_FLOAT} is accepted"
+        # assert isinstance(X, np.ndarray) and X.dtype == TYPE_FLOAT, \
+        #     f"Only np array of type {TYPE_FLOAT} is accepted"
+        assert X is not None and self.is_tensor(X) and self.is_float_tensor(X), \
+            f"Invalid X {type(X)} dtype {self.tensor_dtype(X)}"
 
         name = "function"
         # --------------------------------------------------------------------------------
