@@ -1,0 +1,6 @@
+[submodule "alexreed/interactive-brokers-api"]
+	path = alexreed/interactive-brokers-api
+	url = https://github.com/areed1192/interactive-brokers-api.git
+[submodule "alexreed/python-sec"]
+	path = alexreed/python-sec
+	url = https://github.com/areed1192/python-sec.git
