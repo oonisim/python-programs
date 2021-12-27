@@ -89,9 +89,11 @@ Logger = logging.getLogger(__name__)
 # Full index files for 2006 QTR 3.
 # <img src="../image/edgar_full_index_quarter_2006QTR3.png" align="left" width="800"/>
 # --------------------------------------------------------------------------------
+FS_TYPE_10K = "10-K"
+FS_TYPE_10Q = "10-Q"
 EDGAR_BASE_URL = "https://sec.gov/Archives"
 EDGAR_HTTP_HEADERS = {"User-Agent": "Company Name myname@company.com"}
-DIR = os.path.realpath(__file__)
+DIR = os.path.dirname(os.path.realpath(__file__))
 DATA_DIR = f"{DIR}/../data/listings/XBRL"
 
 
@@ -115,7 +117,8 @@ def list_files(directory, year=None, qtr=None):
     pattern += "QTR"
     pattern += f"{qtr}" if qtr else "?"
 
-    return glob.glob(directory + os.sep + pattern)
+    # Sort the files alphabetically
+    return sorted(filter(os.path.isfile, glob.glob(directory + os.sep + pattern)))
 
 
 def index_xml_url(filename):
@@ -130,7 +133,7 @@ def index_xml_url(filename):
     return url
 
 
-def edgar_xbrl_listing_file_datafarme(directory, year=None, qtr=None, types=['10-K', '10-Q']):
+def edgar_xbrl_listing_file_datafarme(directory, year=None, qtr=None, types=[FS_TYPE_10K, FS_TYPE_10K]):
     """
     Generate a pandas dataframe for each XBRL listing file.
     'Filename' column is updated with the URL for the EDGAR directory listing index.xml.
@@ -296,6 +299,7 @@ def generate_xbrl_xml_urls(index_xml_urls):
     Identify the XBRL XML in the directory and generate the URL to the XML.
     """
     # TODO: Parallel execution
+    raise NotImplementedError("To be implemented")
 
 
 def save_to_csv(df, directory, filename):
@@ -336,10 +340,10 @@ def get_command_line_arguments():
 
 if __name__ == "__main__":
     args = get_command_line_arguments()
-    year = args['year']
-    qtr = args['qtr']
+    year = str(args['year'])
+    qtr = str(args['qtr'])
 
-    for filename, df in edgar_xbrl_listing_file_datafarme(directory=DATA_DIR):
+    for filename, df in edgar_xbrl_listing_file_datafarme(directory=DATA_DIR, year=year, qtr=qtr, types=[FS_TYPE_10Q]):
         print(f"Processing the listing [{filename}]...")
 
         # df['XBRL'] = df['Filename'].apply(xbrl_url)
