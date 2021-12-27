@@ -29,7 +29,44 @@ directory either as index.html, index.json, or index.xml. Parse the index.xml
 to identify the XBRL XML file.
 
 https://sec.gov/Archives/edgar/full-index/${YEAR}/${QTR}/${ACCESSION}/index.xml
+
+# EDGAR
+* Investopedia -[Where Can I Find a Company's Annual Report and Its SEC Filings?](https://www.investopedia.com/ask/answers/119.asp)
+
+> If you want to dig deeper and go beyond the slick marketing version of the annual report found on corporate websites, you'll have to search through required filings made to the Securities and Exchange Commission. All publicly-traded companies in the U.S. must file regular financial reports with the SEC. These filings include the annual report (known as the 10-K), quarterly report (10-Q), and a myriad of other forms containing all types of financial data.45
+
+# Quarterly filing indices
+* [Accessing EDGAR Data](https://www.sec.gov/os/accessing-edgar-data)
+
+> Using the EDGAR index files  
+Indexes to all public filings are available from 1994Q3 through the present and located in the following browsable directories:
+> * https://www.sec.gov/Archives/edgar/daily-index/ — daily index files through the current year; (**DO NOT forget the trailing slash '/'**)
+> * https://www.sec.gov/Archives/edgar/full-index/ — full indexes offer a "bridge" between quarterly and daily indexes, compiling filings from the beginning of the current quarter through the previous business day. At the end of the quarter, the full index is rolled into a static quarterly index.
+> 
+> Each directory and all child sub directories contain three files to assist in automated crawling of these directories. Note that these are not visible through directory browsing.
+> * index.html (the web browser would normally receive these)
+> * index.xml (an XML structured version of the same content)
+> * index.json (a JSON structured vision of the same content)
+> 
+> Four types of indexes are available:
+> * company — sorted by company name
+> * form — sorted by form type
+> * master — sorted by CIK number 
+> * **XBRL** — list of submissions containing XBRL financial files, sorted by CIK number; these include Voluntary Filer Program submissions
+> 
+> The EDGAR indexes list the following information for each filing:
+> * company name
+> * form type
+> * central index key (CIK)
+> * date filed
+> * file name (including folder path)
+
+## Example
+
+Full index files for 2006 QTR 3.
+<img src="../image/edgar_full_index_quarter_2006QTR3.png" align="left" width="800"/>
 """
+
 # --------------------------------------------------------------------------------
 # Setup
 # --------------------------------------------------------------------------------
@@ -42,6 +79,7 @@ import json
 import time
 import requests
 
+import ray
 from bs4 import BeautifulSoup
 import pandas as pd
 import Levenshtein as levenshtein 
@@ -50,45 +88,7 @@ pd.set_option('display.max_colwidth', None)
 logging.basicConfig(level=logging.ERROR)
 Logger = logging.getLogger(__name__)
 
-# --------------------------------------------------------------------------------
-# # EDGAR
-# 
-# * Investopedia -[Where Can I Find a Company's Annual Report and Its SEC Filings?](https://www.investopedia.com/ask/answers/119.asp)
-# 
-# > If you want to dig deeper and go beyond the slick marketing version of the annual report found on corporate websites, you'll have to search through required filings made to the Securities and Exchange Commission. All publicly-traded companies in the U.S. must file regular financial reports with the SEC. These filings include the annual report (known as the 10-K), quarterly report (10-Q), and a myriad of other forms containing all types of financial data.45
-
-# # Quarterly filing indices
-# 
-# * [Accessing EDGAR Data](https://www.sec.gov/os/accessing-edgar-data)
-# 
-# > Using the EDGAR index files  
-# Indexes to all public filings are available from 1994Q3 through the present and located in the following browsable directories:
-# > * https://www.sec.gov/Archives/edgar/daily-index/ — daily index files through the current year; (**DO NOT forget the trailing slash '/'**)
-# > * https://www.sec.gov/Archives/edgar/full-index/ — full indexes offer a "bridge" between quarterly and daily indexes, compiling filings from the beginning of the current quarter through the previous business day. At the end of the quarter, the full index is rolled into a static quarterly index.
-# > 
-# > Each directory and all child sub directories contain three files to assist in automated crawling of these directories. Note that these are not visible through directory browsing.
-# > * index.html (the web browser would normally receive these)
-# > * index.xml (an XML structured version of the same content)
-# > * index.json (a JSON structured vision of the same content)
-# > 
-# > Four types of indexes are available:
-# > * company — sorted by company name
-# > * form — sorted by form type
-# > * master — sorted by CIK number 
-# > * **XBRL** — list of submissions containing XBRL financial files, sorted by CIK number; these include Voluntary Filer Program submissions
-# > 
-# > The EDGAR indexes list the following information for each filing:
-# > * company name
-# > * form type
-# > * central index key (CIK)
-# > * date filed
-# > * file name (including folder path)
-# 
-# ## Example
-# 
-# Full index files for 2006 QTR 3.
-# <img src="../image/edgar_full_index_quarter_2006QTR3.png" align="left" width="800"/>
-# --------------------------------------------------------------------------------
+NUM_CPUS = 8
 FS_TYPE_10K = "10-K"
 FS_TYPE_10Q = "10-Q"
 EDGAR_BASE_URL = "https://sec.gov/Archives"
@@ -189,12 +189,13 @@ def xbrl_url(index_xml_url: str):
     Logger.debug(f"Identifying XBRL URLs for the listing [%s]" % index_xml_url)
 
     # --------------------------------------------------------------------------------
-    # Filing directory path whose format is "/Archives/edgar/data/{CIK}/{ACCESSION}/".
-    # Remove "https://[www.]sec.gov" and "index.xml" from the index_xml_url.
+    # Get the filing directory path "/Archives/edgar/data/{CIK}/{ACCESSION}/" from
+    # index_xml_url by removing "https://[www.]sec.gov" and "index.xml".
     # --------------------------------------------------------------------------------
     pattern = r"(http|https)://(www\.sec\.gov|sec\.gov)(.*/)index.xml"
     match = re.search(pattern, index_xml_url, re.IGNORECASE)
-    assert match and re.match(r"^/Archives/edgar/data/[0-9]*/[0-9]*/", match.group(3)),         f"No matching path found by regexp [{pattern}], but got {match}"
+    assert match and re.match(r"^/Archives/edgar/data/[0-9]*/[0-9]*/", match.group(3)), \
+        f"No matching path found by regexp [{pattern}], but got {match}"
 
     directory = match.group(3)
     Logger.debug("Filing directory path is [%s]" % directory)
@@ -330,7 +331,8 @@ def get_command_line_arguments():
     """Get command line arguments"""
     parser = argparse.ArgumentParser(description='argparse test program')
     parser.add_argument('-y', '--year', type=int, required=False, help='specify the target year')
-    parser.add_argument('-q', '--qtr', type=int, choices=[1, 2, 3, 4], required=False, help='specify the target quarter', )
+    parser.add_argument('-q', '--qtr', type=int, choices=[1, 2, 3, 4], required=False, help='specify the target quarter')
+    parser.add_argument('-n', '--num-cpus', type=int, required=False, help='specify the number of cpus to use')
     parser.add_argument(
         '-l', '--log_level', type=int, choices=[10, 20, 30, 40], required=False,
         help='specify the logging level (10 for INFO)',
@@ -342,13 +344,18 @@ if __name__ == "__main__":
     args = get_command_line_arguments()
     year = str(args['year'])
     qtr = str(args['qtr'])
+    num_cpus = args['num-cpus'] if args['num-cpus'] else NUM_CPUS
 
-    for filename, df in edgar_xbrl_listing_file_datafarme(directory=DATA_DIR, year=year, qtr=qtr, types=[FS_TYPE_10Q]):
-        print(f"Processing the listing [{filename}]...")
+    try:
+        ray.init(num_cpus=NUM_CPUS, num_gpus=0, logging_level=logging.ERROR)
 
-        # df['XBRL'] = df['Filename'].apply(xbrl_url)
-        df['XBRL'] = generate_xbrl_xml_urls(df['Filename'].tolist())
+        for filename, df in edgar_xbrl_listing_file_datafarme(directory=DATA_DIR, year=year, qtr=qtr, types=[FS_TYPE_10Q]):
+            print(f"Processing the listing [{filename}]...")
 
-        save_to_csv(df, directory=DATA_DIR, filename=filename)
+            # df['XBRL'] = df['Filename'].apply(xbrl_url)
+            df['XBRL'] = generate_xbrl_xml_urls(df['Filename'].tolist())
 
+            save_to_csv(df, directory=DATA_DIR, filename=filename)
+    finally:
+        ray.shutdown()
 
