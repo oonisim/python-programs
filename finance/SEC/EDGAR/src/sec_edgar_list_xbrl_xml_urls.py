@@ -5,23 +5,28 @@
 ## Objective
 Navigate through the EDGAR XBRL listings to generate the URLs to XBRL XML files.
 
-## XBRL Listing File
-Each row in https://sec.gov/Archives/edgar/full-index/${YEAR}/${QTR}/xbrl.gz
-tells where the TXT file of 10-Q or 10-K for a CIK.
+## XBRL master index file
+https://www.sec.gov/Archives/edgar/full-index stores the master index files.
+[xbrl.gz] master index file for  TXT file in XBRL version
 
-| CIK    | Company Name | Form Type          | Date Filed | Filename   |                                           
-|--------|--------------|--------------------|------------|------------|
-|1047127|AMKOR TECHNOLOGY INC|10-K|2014-02-28|edgar/data/1047127/0001047127-14-000006.txt|
+[Format]
+|CIK    |Company Name|Form Type|Filing Date|TXT Path                                   |
+|-------|------------|---------|-----------|-------------------------------------------|
+|1002047|NetApp, Inc.|10-Q     |2020-02-18 |edgar/data/1002047/0001564590-20-005025.txt|
 
-## TXT File
-TXT file has multiple <DOCUMENT> tags, each of which corresponds to a document
-in the SEC filing for (CIK, YEAR, QTR).
+[Background]
+Previously, XBRL was not introduced or not mandatory, hence the documents are
+in HTML format and the TXT is the all-in-one including all the filing data
+sectioned by <DOCUMENT>.
 
-## XBRL File
-A filing has a XBRL XML file which has the Item 8 F/S data. Instead of parsing
-the TXT file, directly part the XML file. However, the format fo the filename
-is not consistent, e.g. <name>_htm.xml, <name>.xml. Hence needs to identify the
-XBRL XML file in each listing.
+After the introduction of XBRL and recent mandates, the XBRL master index points
+to the TXT file which is al-in-one including all the filing data in XML format. 
+However, it is not straight-forward to parse the TXT for XBRL and there is
+.xml file which has all the XML data only.
+
+Hence, need to identify the URL to XBRL XML. However, the format fo the filename
+is not consistent, e.g. <name>_htm.xml, <name>.xml. Needs to identify the XML
+filename, then create the UR.
 
 ## EDGAR Directory Listing
 Each filing directory provides the listing which lists all the files in the
@@ -84,29 +89,32 @@ import glob
 import re
 import json
 import time
-
-import bs4
 import requests
-
 import ray
-from bs4 import BeautifulSoup
+import bs4
 import pandas as pd
-import Levenshtein as levenshtein 
+from bs4 import (
+    BeautifulSoup
+)
+import Levenshtein as levenshtein
+from sec_edgar_constant import (
+    NUM_CPUS,
+    FS_TYPE_10K,
+    FS_TYPE_10Q,
+    EDGAR_BASE_URL,
+    EDGAR_HTTP_HEADERS,
+    DEFAULT_LOG_LEVEL,
+)
+
+DIR = os.path.dirname(os.path.realpath(__file__))
+DATA_DIR_INDEX = f"{DIR}/../data/listing"
+DATA_DIR_XBRL = f"{DIR}/../data/XBRL"
+
 
 pd.set_option('display.max_colwidth', None)
 logging.basicConfig(level=logging.INFO)
 Logger = logging.getLogger(__name__)
-Logger.addHandler(logging.StreamHandler())
-
-
-NUM_CPUS = 8
-FS_TYPE_10K = "10-K"
-FS_TYPE_10Q = "10-Q"
-EDGAR_BASE_URL = "https://sec.gov/Archives"
-EDGAR_HTTP_HEADERS = {"User-Agent": "Company Name myname@company.com"}
-DIR = os.path.dirname(os.path.realpath(__file__))
-DATA_DIR_INDEX = f"{DIR}/../data/listing"
-DATA_DIR_XBRL = f"{DIR}/../data/XBRL"
+# Logger.addHandler(logging.StreamHandler())
 
 
 # ================================================================================
@@ -124,7 +132,19 @@ def get_command_line_arguments():
         '-l', '--log-level', type=int, choices=[10, 20, 30, 40], required=False,
         help='specify the logging level (10 for INFO)',
     )
-    return vars(parser.parse_args())
+    args = vars(parser.parse_args())
+
+    # Mandatory
+    input_directory = args['input_directory']
+    output_directory = args['output_directory']
+
+    # Optional
+    year = str(args['year']) if args['year'] else None
+    qtr = str(args['qtr']) if args['qtr'] else None
+    num_workers = args['num_workers'] if args['num_workers'] else NUM_CPUS
+    log_level = args['log_level'] if args['log_level'] else DEFAULT_LOG_LEVEL
+
+    return input_directory, output_directory, year, qtr, num_workers, log_level
 
 
 def http_get_content(url, headers):
@@ -174,12 +194,7 @@ def list_files(input_directory, output_directory, year=None, qtr=None):
     assert (re.match(r"[1-2][0-9][0-9][0-9]", year) if year else True), f"Invalid year {year}"
     assert (re.match(r"[1-4]", qtr) if qtr else True), f"Invalid quarter {qtr}"
 
-    pattern = ""
-    pattern += f"{year}" if year else "*"
-    pattern += "QTR"
-    pattern += f"{qtr}" if qtr else "?"
-
-    def is_vaild_source_file(filepath):
+    def is_file_to_process(filepath):
         """Verify if the filepath points to a file that has not been processed yet.
         If XBRL file has been already created and exists, then skip the filepath.
         """
@@ -200,7 +215,15 @@ def list_files(input_directory, output_directory, year=None, qtr=None):
             Logger.info("[%s] does not exist or not a file. skipping." % filepath)
             return False
 
-    return sorted(filter(is_vaild_source_file, glob.glob(input_directory + os.sep + pattern)))
+    pattern = ""
+    pattern += f"{year}" if year else "*"
+    pattern += "QTR"
+    pattern += f"{qtr}" if qtr else "?"
+
+    Logger.info("Listing the files to process in the directory %s ..." % input_directory)
+    files = sorted(filter(is_file_to_process, glob.glob(input_directory + os.sep + pattern)))
+    Logger.info("No files to process in the directory %s" % input_directory)
+    return files
 
 
 def save_to_csv(df, directory, filename):
@@ -443,10 +466,21 @@ def xbrl_url(index_xml_url: str):
         URL to the XBRL file in the filing directory, or None
     """
     # --------------------------------------------------------------------------------
-    # Directory listing (index.xml)
+    # URL to directory listing index.xml
     # --------------------------------------------------------------------------------
     index_xml_url = index_xml_url.strip()
     Logger.info(f"Identifying XBRL URL for the filing directory index [%s]" % index_xml_url)
+
+    # --------------------------------------------------------------------------------
+    # https://www.sec.gov/oit/announcement/new-rate-control-limits
+    # If a user or application submits more than 10 requests per second to EDGAR websites,
+    # SEC may limit further requests from the relevant IP address(es) for a brief period.
+    #
+    # TODO:
+    #  Synchronization among workers to limit the rate 10/sec from the same IP.
+    #  For now, just wait 1 sec at each worker.
+    # --------------------------------------------------------------------------------
+    time.sleep(1)
     content = http_get_content(index_xml_url, EDGAR_HTTP_HEADERS)
 
     # --------------------------------------------------------------------------------
@@ -473,7 +507,6 @@ def xbrl_url(index_xml_url: str):
         # assert False, "No XBRL found. Check [%s] to identify the XBRL." % index_xml_url
 
     return url
-    time.sleep(0.1)
 
 
 def test_xbrl_url():
@@ -531,7 +564,7 @@ def split(tasks: pd.DataFrame, num: int):
 
 
 @ray.remote(num_returns=1)
-def worker(df):
+def worker(df, log_level=logging.INFO):
     """GET XBRL XML URL
     Args:
         df: Pandas dataframe |CIK|Company Name|Form Type|Date Filed|Filename|
@@ -596,38 +629,35 @@ if __name__ == "__main__":
     # Command line arguments
     # --------------------------------------------------------------------------------
     args = get_command_line_arguments()
-
-    # Mandatory
-    input_directory = args['input_directory']
-    output_directory = args['output_directory']
-
-    # Optional
-    year = str(args['year']) if args['year'] else None
-    qtr = str(args['qtr']) if args['qtr'] else None
-    num_workers = args['num_workers'] if args['num_workers'] else NUM_CPUS
-    log_level = args['log_level'] if args['log_level'] else logging.INFO
-
-    Logger.setLevel(log_level)
+    input_directory, output_directory, year, qtr, num_workers, log_level = args
 
     # --------------------------------------------------------------------------------
-    # XBRL XML
+    # XBRL XML logic
     # --------------------------------------------------------------------------------
     try:
         # --------------------------------------------------------------------------------
         # Setup Ray
         # --------------------------------------------------------------------------------
-        ray.init(num_cpus=NUM_CPUS, num_gpus=0, logging_level=log_level)
+        Logger.info("main(): initializing Ray using %s workers..." % num_workers)
+        ray.init(num_cpus=num_workers, num_gpus=0, logging_level=log_level)
 
-        for filepath in list_files(input_directory=input_directory, output_directory=output_directory, year=year, qtr=qtr):
+        for filepath in list_files(
+                input_directory=input_directory, output_directory=output_directory, year=year, qtr=qtr
+        ):
             filename = os.path.basename(filepath)
-            Logger.info("Processing the listing [%s]..." % filename)
+            Logger.info("main(): processing the listing [%s]..." % filename)
 
             result = director(
                 df=load_edgar_xbrl_index_file(filepath=filepath, types=[FS_TYPE_10Q, FS_TYPE_10K]),
                 num_workers=num_workers
             )
-            Logger.info("main(): number of results is %s" % len(result))
+            Logger.info("main(): processed %s records for %s" % (len(result), filename))
+
             save_to_csv(result, directory=output_directory, filename=filename)
     finally:
+        # --------------------------------------------------------------------------------
+        # Clean up resource
+        # --------------------------------------------------------------------------------
+        Logger.info("main(): shutting down Ray...")
         ray.shutdown()
 
