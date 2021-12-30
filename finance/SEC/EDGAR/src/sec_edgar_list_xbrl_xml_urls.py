@@ -624,8 +624,6 @@ if __name__ == "__main__":
     # Logging
     # --------------------------------------------------------------------------------
     logging.basicConfig(level=log_level)
-    # logging.addHandler(logging.StreamHandler())
-    logging.info("main hoge")
 
     # --------------------------------------------------------------------------------
     # XBRL XML logic
