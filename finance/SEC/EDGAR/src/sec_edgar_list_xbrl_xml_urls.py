@@ -649,7 +649,7 @@ if __name__ == "__main__":
                 log_level=log_level
             )
             failure_df = result.loc[result['Filename'].isna()]
-            success_df = result.loc[result['Filename'].inotna()]
+            success_df = result.loc[result['Filename'].notna()]
             if len(failure_df) > 0:
                 logging.error("main(): %s records failed." % len(failure_df))
                 logging.error("main(): Failed records:\n%s." % failure_df)
