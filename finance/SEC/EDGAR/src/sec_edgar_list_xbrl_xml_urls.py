@@ -86,6 +86,7 @@ import glob
 import re
 import json
 import time
+import random
 import requests
 import ray
 import bs4
@@ -112,17 +113,6 @@ from sec_edgar_utility import(
 
 pd.set_option('display.max_colwidth', None)
 
-# --------------------------------------------------------------------------------
-# TODO:
-#  Logging setup for Ray as in https://docs.ray.io/en/master/ray-logging.html.
-#  In Ray, all of the tasks and actors are executed remotely in the worker processes.
-#  Since Python logger module creates a singleton logger per process, loggers should
-#  be configured on per task/actor basis.
-# --------------------------------------------------------------------------------
-logging.basicConfig(level=logging.INFO)
-Logger = logging.getLogger(__name__)
-# Logger.addHandler(logging.StreamHandler())
-
 
 # ================================================================================
 # Utilities
@@ -130,13 +120,28 @@ Logger = logging.getLogger(__name__)
 def get_command_line_arguments():
     """Get command line arguments"""
     parser = argparse.ArgumentParser(description='argparse test program')
-    parser.add_argument('-i', '--input-directory', type=str, required=False, default=DATA_DIR_INDEX, help='specify the input data directory')
-    parser.add_argument('-o', '--output-directory', type=str, required=False, default=DATA_DIR_LISTING, help='specify the output data directory')
-    parser.add_argument('-y', '--year', type=int, required=False, help='specify the target year')
-    parser.add_argument('-q', '--qtr', type=int, choices=[1, 2, 3, 4], required=False, help='specify the target quarter')
-    parser.add_argument('-n', '--num-workers', type=int, required=False, help='specify the number of workers to use')
+    parser.add_argument(
+        '-i', '--input-directory', type=str, required=False, default=DATA_DIR_INDEX,
+        help='specify the input data directory'
+    )
+    parser.add_argument(
+        '-o', '--output-directory', type=str, required=False, default=DATA_DIR_LISTING,
+        help='specify the output data directory'
+    )
+    parser.add_argument(
+        '-y', '--year', type=int, required=False, help='specify the target year'
+    )
+    parser.add_argument(
+        '-q', '--qtr', type=int, choices=[1, 2, 3, 4], required=False,
+        help='specify the target quarter'
+    )
+    parser.add_argument(
+        '-n', '--num-workers', type=int, required=False,
+        help='specify the number of workers to use'
+    )
     parser.add_argument(
         '-l', '--log-level', type=int, choices=[10, 20, 30, 40], required=False,
+        default=DEFAULT_LOG_LEVEL,
         help='specify the logging level (10 for INFO)',
     )
     args = vars(parser.parse_args())
@@ -160,9 +165,9 @@ def listing_file_path_to_save(directory, filename):
         pathlib.Path(directory).mkdir(mode=0o775, parents=True, exist_ok=True)
         setattr(listing_file_path_to_save, "mkdired", True)
 
-    destination = f"{directory}/{filename}_XBRL.gz"
+    destination = f"{directory}/{filename}_LIST.gz"
 
-    Logger.debug("listing_file_path_to_save(): Path to save XBML is [%s]" % destination)
+    logging.debug("listing_file_path_to_save(): Path to save XBML is [%s]" % destination)
     return destination
 
 
@@ -191,16 +196,16 @@ def list_files(input_directory, output_directory, year=None, qtr=None):
 
         if source.is_file():
             if target.exists():
-                Logger.info(
+                logging.info(
                     "list_files(): XBRL file [%s] already exits. skipping [%s]."
                     % (target.absolute(), filepath)
                 )
                 return False
             else:
-                Logger.info("list_files(): adding [%s] to handle" % filepath)
+                logging.info("list_files(): adding [%s] to handle" % filepath)
                 return True
         else:
-            Logger.info("[%s] does not exist or not a file. skipping." % filepath)
+            logging.info("[%s] does not exist or not a file. skipping." % filepath)
             return False
 
     pattern = ""
@@ -208,15 +213,16 @@ def list_files(input_directory, output_directory, year=None, qtr=None):
     pattern += "QTR"
     pattern += f"{qtr}" if qtr else "?"
 
-    Logger.info("Listing the files to process in the directory %s ..." % input_directory)
+    logging.info("Listing the files to process in the directory %s ..." % input_directory)
     files = sorted(filter(is_file_to_process, glob.glob(input_directory + os.sep + pattern)))
-    Logger.info("No files to process in the directory %s" % input_directory)
+    logging.info("No files to process in the directory %s" % input_directory)
     return files
 
 
 def save_to_csv(df, directory, filename):
     """Save the XBRL"""
     destination = listing_file_path_to_save(directory, filename)
+    logging.info("save_to_csv(): saving XBRL dataframe to [%s]..." % destination)
     df.to_csv(
         destination,
         sep="|",
@@ -224,7 +230,6 @@ def save_to_csv(df, directory, filename):
         header=True,
         index=False
     )
-    Logger.info("save_to_csv(): saved XBRL dataframe to [%s]" % destination)
 
 
 # ================================================================================
@@ -253,7 +258,7 @@ def index_xml_url(filename):
             "index.xml"
         ])
     else:
-        Logger.error("Expected the format [{}] but got [{}]".format(expected, filename))
+        logging.error("Expected the format [{}] but got [{}]".format(expected, filename))
         url = None
 
     return url
@@ -271,7 +276,7 @@ def load_edgar_xbrl_index_file(filepath, types=[FS_TYPE_10K, FS_TYPE_10K]):
     Returns:
         pandas dataframe
     """
-    Logger.info("load_edgar_xbrl_index_file(): filepath [%s]" % filepath)
+    logging.info("load_edgar_xbrl_index_file(): filepath [%s]" % filepath)
     assert os.path.isfile(filepath) and os.access(filepath, os.R_OK), \
         f"{filepath} is not a file, cannot read, or does not exist."
 
@@ -296,7 +301,7 @@ def load_edgar_xbrl_index_file(filepath, types=[FS_TYPE_10K, FS_TYPE_10K]):
     # Update the 'Filename' column with the URL to index.xml
     # --------------------------------------------------------------------------------
     indices.loc[:, 'Filename'] = indices['Filename'].apply(index_xml_url)
-    Logger.info("load_edgar_xbrl_index_file(): size of indices [%s]" % len(indices))
+    logging.info("load_edgar_xbrl_index_file(): size of indices [%s]" % len(indices))
 
     return indices
 
@@ -325,7 +330,7 @@ def filing_directory_path(index_xml_url: str):
         f"regexp [{pattern}] found No matching directory path in url {index_xml_url}.\n{match}"
 
     path = match.group(3)
-    Logger.debug("Filing directory path is [%s]" % path)
+    logging.debug("Filing directory path is [%s]" % path)
     return path
 
 
@@ -333,6 +338,8 @@ def find_xbrl_url_from_html_xml(source, directory):
     """Find XBRL XML with suffix _htm.xml in the Filing directory
     Args:
         source: Content of filing directory listing index.xml (as BS4)
+        directory: Filing directory path "/Archives/edgar/data/{CIK}/{ACCESSION}/"
+        logger: worker logger
     Returns:
         URL to the XBRL XML if found, else None
     """
@@ -340,10 +347,10 @@ def find_xbrl_url_from_html_xml(source, directory):
     path_to_xbrl = source.find('href', string=re.compile(".*_htm\.xml"))
     if path_to_xbrl:
         url = "https://sec.gov" + path_to_xbrl.string.strip()
-        Logger.info("XBRL XML [%s] identified" % url)
+        logging.info("XBRL XML [%s] identified" % url)
         return url
     else:
-        Logger.warning("No XBRL XML pattern [%s.*_htm,.xml] identified." % directory)
+        logging.warning("No XBRL XML pattern [%s.*_htm,.xml] identified." % directory)
         return None
 
 
@@ -358,6 +365,7 @@ def find_xbrl_url_from_xsd(source, directory):
     Args:
         source: Content of filing directory listing index.xml (as BS4)
         directory: Filing directory path "/Archives/edgar/data/{CIK}/{ACCESSION}/"
+        logger: worker logger
     Returns:
         URL to XBRL XML if found, else None
     """
@@ -388,7 +396,7 @@ def find_xbrl_url_from_xsd(source, directory):
             if new_distance < distance:
                 distance = new_distance
                 candidate = potential
-                Logger.debug(
+                logging.debug(
                     "Candidate [%s] is picked with the distance from [%s] is [%s]."
                     % (candidate, filename, distance)
                 )
@@ -397,19 +405,20 @@ def find_xbrl_url_from_xsd(source, directory):
         if distance < MAX_LEVENSHTEIN_DISTANCE:
             path_to_xml = directory + candidate.strip() + ".xml"
             url = "https://sec.gov" + path_to_xml
-            Logger.debug(
+            logging.debug(
                 "Selected the candidate [%s] of distance [%s]. \nURL to XBRL is [%s]"
                 % (candidate, distance, url)
             )
-            Logger.info("XBRL XML [%s] identified" % url)
+            logging.info("XBRL XML [%s] identified" % url)
             return url
         else:
-            Logger.warning(
+            logging.warning(
                 "No XBRL XML identified from the XSD file [%s%s]."
                 % (directory, filename + ".xsd")
             )
+            return None
     else:
-        Logger.error("No XBRL identified from XSD [%s]." % path_to_xsd)
+        logging.error("No XBRL identified from XSD [%s]." % path_to_xsd)
         return None
 
 
@@ -421,20 +430,21 @@ def find_xbrl_url_from_auxiliary_regexp(source, directory):
     Args:
         source: Content of filing directory listing index.xml (as BS4)
         directory: Filing directory path "/Archives/edgar/data/{CIK}/{ACCESSION}/"
+        logger: worker logger
     Returns:
         URL to the XBRL XML if found, else None
     """
     assert isinstance(source, bs4.BeautifulSoup)
     regexp = re.escape(directory) + r"[^R][a-zA-Z_-]*[0-9][0-9][0-9][0-9][0-9].*\.xml"
-    Logger.debug("Look for XBRL XML with the regexp [%s]." % regexp)
+    logging.debug("Look for XBRL XML with the regexp [%s]." % regexp)
 
     path_to_xbrl = source.find('href', string=re.compile(regexp))
     if path_to_xbrl:
         url = "https://sec.gov" + path_to_xbrl.string.strip()
-        Logger.info("XBRL XML [%s] identified" % url)
+        logging.info("XBRL XML [%s] identified" % url)
         return url
     else:
-        Logger.warning(
+        logging.warning(
             "No XBRL XML identified with the regexp [%s] in [%s]." % (regexp, directory)
         )
         return None
@@ -453,44 +463,66 @@ def xbrl_url(index_xml_url: str):
     # URL to directory listing index.xml
     # --------------------------------------------------------------------------------
     index_xml_url = index_xml_url.strip()
-    Logger.info(f"Identifying XBRL URL for the filing directory index [%s]" % index_xml_url)
+    max_retries_allowed = 3
+    while True:
+        try:
+            # --------------------------------------------------------------------------------
+            # https://www.sec.gov/oit/announcement/new-rate-control-limits
+            # If a user or application submits more than 10 requests per second to EDGAR websites,
+            # SEC may limit further requests from the relevant IP address(es) for a brief period.
+            #
+            # TODO:
+            #  Synchronization among workers to limit the rate 10/sec from the same IP.
+            #  For now, just wait 1 sec at each invocation from the worker.
+            # --------------------------------------------------------------------------------
+            time.sleep(1)
 
-    # --------------------------------------------------------------------------------
-    # https://www.sec.gov/oit/announcement/new-rate-control-limits
-    # If a user or application submits more than 10 requests per second to EDGAR websites,
-    # SEC may limit further requests from the relevant IP address(es) for a brief period.
-    #
-    # TODO:
-    #  Synchronization among workers to limit the rate 10/sec from the same IP.
-    #  For now, just wait 1 sec at each worker.
-    # --------------------------------------------------------------------------------
-    # time.sleep(1)
-    content = http_get_content(index_xml_url, EDGAR_HTTP_HEADERS)
+            logging.info("xbrl_url(): getting filing directory index [%s]..." % index_xml_url)
+            content = http_get_content(index_xml_url, EDGAR_HTTP_HEADERS)
+            break
+        except RuntimeError as e:
+            max_retries_allowed -= 1
+            if max_retries_allowed > 0:
+                logging.error("xbrl_url(): failed to get [%s]. retrying..." % index_xml_url)
+                time.sleep(random.randint(30, 90))
+            else:
+                content = None
+                logging.error("xbrl_url(): failed to get [%s]. skipping..." % index_xml_url)
+                break
 
-    # --------------------------------------------------------------------------------
-    # "/Archives/edgar/data/{CIK}/{ACCESSION}/" part of the EDGAR filing URL
-    # --------------------------------------------------------------------------------
-    directory = filing_directory_path(index_xml_url)
+    if content is not None:
+        logging.info(f"identifying XBRL URL for [%s]..." % index_xml_url)
+        # --------------------------------------------------------------------------------
+        # "/Archives/edgar/data/{CIK}/{ACCESSION}/" part of the EDGAR filing URL
+        # --------------------------------------------------------------------------------
+        directory = filing_directory_path(index_xml_url)
 
-    # --------------------------------------------------------------------------------
-    # Look for the XBRL XML file in the index.xml.
-    # 1. _htm.xml file
-    # 2. <filename>.xml where "filename" is from <filename>.xsd.
-    # 3. <filename>.xml where "filename" is not RNN.xml e.g. R10.xml.
-    # --------------------------------------------------------------------------------
-    source = BeautifulSoup(content, 'html.parser')
-    url = find_xbrl_url_from_html_xml(source=source, directory=directory)
-    if not url:
+        # --------------------------------------------------------------------------------
+        # Look for the XBRL XML file in the index.xml.
+        # 1. _htm.xml file
+        # 2. <filename>.xml where "filename" is from <filename>.xsd.
+        # 3. <filename>.xml where "filename" is not RNN.xml e.g. R10.xml.
+        # --------------------------------------------------------------------------------
+        source = BeautifulSoup(content, 'html.parser')
+        url = find_xbrl_url_from_html_xml(source=source, directory=directory)
+        if url:
+            logging.info(f"XBRL URL identified [%s]" % url)
+            return url
+
         url = find_xbrl_url_from_xsd(source, directory=directory)
+        if url:
+            logging.info(f"XBRL URL identified [%s]" % url)
+            return url
 
-    if not url:
         url = find_xbrl_url_from_auxiliary_regexp(source=source, directory=directory)
+        if url:
+            logging.info(f"XBRL URL identified [%s]" % url)
+            return url
 
-    if not url:
-        Logger.error("No XBRL identified in the listing [%s]" % index_xml_url)
-        # assert False, "No XBRL found. Check [%s] to identify the XBRL." % index_xml_url
-
-    return url
+        logging.error("No XBRL identified in the listing [%s]" % index_xml_url)
+        return None
+    else:
+        return None
 
 
 def test_xbrl_url():
@@ -512,22 +544,31 @@ def test_xbrl_url():
 
 
 @ray.remote(num_returns=1)
-def worker(df, log_level=logging.INFO):
-    """GET XBRL XML URL
+def worker(df, log_level: int):
+    """GET XBRL XML and save to a file.
     Args:
         df: Pandas dataframe |CIK|Company Name|Form Type|Date Filed|Filename|
             where 'Filename' is the URL to index.xml in the filing directory.
-
+        log_level: Logging level to use in the worker.
     Returns: Pandas dataframe where "Filename" column is updated with XBRL XML URL.
     """
-    assert len(df) > 0
-    Logger.info("worker(): task size is %s" % len(df))
+    assert df is not None and len(df) > 0, "worker(): invalid dataframe"
+    # --------------------------------------------------------------------------------
+    #  Logging setup for Ray as in https://docs.ray.io/en/master/ray-logging.html.
+    #  In Ray, all of the tasks and actors are executed remotely in the worker processes.
+    #  Since Python logger module creates a singleton logger per process, loggers should
+    #  be configured on per task/actor basis.
+    # --------------------------------------------------------------------------------
+    logging.basicConfig(level=log_level)
 
+    assert len(df) > 0
+    logging.info("worker(): task size is %s" % len(df))
     df.loc[:, 'Filename'] = df['Filename'].apply(xbrl_url)
+
     return df
 
 
-def director(df, num_workers: int):
+def director(df, num_workers: int, log_level: int):
     """Director to generate the URL to XBRL XML files in the SEC filing directory.
     Directory listing index.xml provides the list of files in the filing directory.
     Identify the XBRL XML in the directory and generate the URL to the XML.
@@ -548,7 +589,7 @@ def director(df, num_workers: int):
     # --------------------------------------------------------------------------------
     # Asynchronously invoke tasks
     # --------------------------------------------------------------------------------
-    futures = [worker.remote(task) for task in assignment]
+    futures = [worker.remote(task, log_level) for task in assignment]
     assert len(futures) == num_workers, f"Expected {num_workers} tasks but got {len(futures)}."
 
     # --------------------------------------------------------------------------------
@@ -580,32 +621,46 @@ if __name__ == "__main__":
     input_directory, output_directory, year, qtr, num_workers, log_level = args
 
     # --------------------------------------------------------------------------------
+    # Logging
+    # --------------------------------------------------------------------------------
+    logging.basicConfig(level=log_level)
+    # logging.addHandler(logging.StreamHandler())
+    logging.info("main hoge")
+
+    # --------------------------------------------------------------------------------
     # XBRL XML logic
     # --------------------------------------------------------------------------------
     try:
         # --------------------------------------------------------------------------------
         # Setup Ray
         # --------------------------------------------------------------------------------
-        Logger.info("main(): initializing Ray using %s workers..." % num_workers)
+        logging.info("main(): initializing Ray using %s workers..." % num_workers)
         ray.init(num_cpus=num_workers, num_gpus=0, logging_level=log_level)
 
         for filepath in list_files(
             input_directory=input_directory, output_directory=output_directory, year=year, qtr=qtr
         ):
             filename = os.path.basename(filepath)
-            Logger.info("main(): processing the listing [%s]..." % filename)
+            logging.info("main(): processing the listing [%s]..." % filename)
 
             result = director(
                 df=load_edgar_xbrl_index_file(filepath=filepath, types=[FS_TYPE_10Q, FS_TYPE_10K]),
-                num_workers=num_workers
+                num_workers=num_workers,
+                log_level=log_level
             )
-            Logger.info("main(): processed %s records for %s" % (len(result), filename))
+            failure_df = result.loc[result['Filename'].isna()]
+            success_df = result.loc[result['Filename'].inotna()]
+            if len(failure_df) > 0:
+                logging.error("main(): %s records failed." % len(failure_df))
+                logging.error("main(): Failed records:\n%s." % failure_df)
+            else:
+                logging.info("main(): processed %s records for %s" % (len(result), filename))
 
-            save_to_csv(result, directory=output_directory, filename=filename)
+            save_to_csv(success_df, directory=output_directory, filename=filename)
     finally:
         # --------------------------------------------------------------------------------
         # Clean up resource
         # --------------------------------------------------------------------------------
-        Logger.info("main(): shutting down Ray...")
+        logging.info("main(): shutting down Ray...")
         ray.shutdown()
 

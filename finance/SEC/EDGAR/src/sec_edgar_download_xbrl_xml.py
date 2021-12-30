@@ -93,6 +93,7 @@ import glob
 import re
 import json
 import time
+import random
 import requests
 import ray
 import bs4
@@ -118,17 +119,6 @@ from sec_edgar_utility import(
 
 
 pd.set_option('display.max_colwidth', None)
-
-# --------------------------------------------------------------------------------
-# TODO:
-#  Logging setup for Ray as in https://docs.ray.io/en/master/ray-logging.html.
-#  In Ray, all of the tasks and actors are executed remotely in the worker processes.
-#  Since Python logger module creates a singleton logger per process, loggers should
-#  be configured on per task/actor basis.
-# --------------------------------------------------------------------------------
-logging.basicConfig(level=logging.INFO)
-Logger = logging.getLogger(__name__)
-# Logger.addHandler(logging.StreamHandler())
 
 
 # ================================================================================
@@ -158,7 +148,8 @@ def get_command_line_arguments():
     )
     parser.add_argument(
         '-l', '--log-level', type=int, choices=[10, 20, 30, 40], required=False,
-        help='specify the logging level (10 for DEBUG, 20 for INFO)',
+        default=DEFAULT_LOG_LEVEL,
+        help='specify the logging level (10 for INFO)',
     )
     args = vars(parser.parse_args())
 
@@ -209,28 +200,28 @@ def list_files(input_directory, output_directory, year=None, qtr=None):
         If XBRL file has been already created and exists, then skip the filepath.
         """
         if os.path.isfile(filepath) and os.access(filepath, os.R_OK):
-            Logger.info("list_files(): adding [%s] to handle" % filepath)
+            logging.info("list_files(): adding [%s] to handle" % filepath)
             return True
         else:
-            Logger.info("[%s] does not exist, cannot read, or not a file. skipping." % filepath)
+            logging.info("[%s] does not exist, cannot read, or not a file. skipping." % filepath)
             return False
 
     pattern = ""
     pattern += f"{year}" if year else "*"
     pattern += "QTR"
     pattern += f"{qtr}" if qtr else "?"
-    pattern += "_XBRL.gz"
+    pattern += "_LIST.gz"
 
-    Logger.info("Listing the files to process in the directory %s ..." % input_directory)
+    logging.info("Listing the files to process in the directory %s ..." % input_directory)
     files = sorted(filter(is_file_to_process, glob.glob(input_directory + os.sep + pattern)))
-    Logger.info("No files to process in the directory %s" % input_directory)
+    logging.info("No files to process in the directory %s" % input_directory)
     return files
 
 
 def save_to_xml(content, directory, filename):
     """Save the XBRL XML"""
     destination = xbrl_xml_file_path_to_save(directory=directory, filename=filename)
-    Logger.debug("save_to_xml(): saving XML to [%s]..." % destination)
+    logging.debug("save_to_xml(): saving XML to [%s]..." % destination)
     with open(destination, "w") as f:
         f.write(content)
 
@@ -238,7 +229,7 @@ def save_to_xml(content, directory, filename):
 # ================================================================================
 # Logic
 # ================================================================================
-def get_xml(url, logger):
+def get_xml(url):
     """GET XBRL XML from the URL
     Args:
         url: URL to download the XBRL XML
@@ -257,29 +248,29 @@ def get_xml(url, logger):
             #  Synchronization among workers to limit the rate 10/sec from the same IP.
             #  For now, just wait 1 sec at each invocation from the worker.
             # --------------------------------------------------------------------------------
-            # time.sleep(1)
+            time.sleep(1)
 
+            logging.info("get_xml(): getting XBRL XML [%s]..." % url)
             content = http_get_content(url, EDGAR_HTTP_HEADERS)
-            logger.debug("get_xml(): got content from [%s]" % url)
             return content
         except RuntimeError as e:
             max_retries_allowed -= 1
             if max_retries_allowed > 0:
-                logger.error("get_xml(): failed to get [%s]. retrying..." % url)
-                time.sleep(30)
+                logging.error("get_xml(): failed to get [%s]. retrying..." % url)
+                time.sleep(random.randint(30, 90))
             else:
-                logger.error("get_xml(): failed to get [%s]. skipping..." % url)
+                logging.error("get_xml(): failed to get [%s]. skipping..." % url)
                 break
 
     return None
 
 
 @ray.remote(num_returns=1)
-def worker(df, log_level=logging.INFO):
+def worker(df, log_level: int):
     """GET XBRL XML and save to a file.
     Args:
         df: Pandas dataframe |CIK|Company Name|Form Type|Date Filed|Filename|
-            where 'Filename' is the URL to index.xml in the filing directory.
+            where 'Filename' is the URL to XBRL XML in the filing directory.
         log_level: Logging level to use in the worker.
     Returns: List of indices of the dataframe that have failed to get XBRL XML.
     """
@@ -292,8 +283,7 @@ def worker(df, log_level=logging.INFO):
     #  be configured on per task/actor basis.
     # --------------------------------------------------------------------------------
     logging.basicConfig(level=log_level)
-    logger = logging.getLogger(__name__)
-    logger.info("worker(): task size is %s" % len(df))
+    logging.info("worker(): task size is %s" % len(df))
 
     failed_indices = []
     for index, row in df.iterrows():
@@ -301,7 +291,7 @@ def worker(df, log_level=logging.INFO):
         # Download XBRL XML
         # --------------------------------------------------------------------------------
         url = row['Filename']
-        content = get_xml(url, logger)
+        content = get_xml(url)
 
         if content:
             # --------------------------------------------------------------------------------
@@ -317,7 +307,7 @@ def worker(df, log_level=logging.INFO):
                 f"CIK [{row['CIK']})] must match CIK part [{cik}] in url {url}"
 
             directory = f"{DATA_DIR_XBRL}{os.sep}{cik}{os.sep}{accession}"
-            logger.debug(f"worker(): saving XML to [{directory}:{filename}]...")
+            logging.debug(f"worker(): saving XML to [{directory}:{filename}]...")
 
             save_to_xml(content, directory, filename)
         else:
@@ -326,11 +316,12 @@ def worker(df, log_level=logging.INFO):
     return failed_indices
 
 
-def director(df, num_workers: int):
+def director(df, num_workers: int, log_level: int):
     """Director to download XBRL XML files from the SEC filing directories.
     Args:
         df: pandas datafrome of XBRL indices
         num_workers: Number of workers to use
+        log_level: Logging level
     Returns: Pandas dataframe of failed records
     """
     # --------------------------------------------------------------------------------
@@ -341,7 +332,7 @@ def director(df, num_workers: int):
     # --------------------------------------------------------------------------------
     # Asynchronously invoke tasks
     # --------------------------------------------------------------------------------
-    futures = [worker.remote(task) for task in assignment]
+    futures = [worker.remote(task, log_level) for task in assignment]
     assert len(futures) == num_workers, f"Expected {num_workers} tasks but got {len(futures)}."
 
     # --------------------------------------------------------------------------------
@@ -369,7 +360,7 @@ def load_edgar_xbrl_listing_file(filepath, types=[FS_TYPE_10K, FS_TYPE_10K]):
     Returns:
         pandas dataframe
     """
-    Logger.info("load_edgar_xbrl_listing_file(): filepath [%s]" % filepath)
+    logging.info("load_edgar_xbrl_listing_file(): filepath [%s]" % filepath)
     assert os.path.isfile(filepath) and os.access(filepath, os.R_OK), \
         f"{filepath} is not a file, cannot read, or does not exist."
 
@@ -390,7 +381,7 @@ def load_edgar_xbrl_listing_file(filepath, types=[FS_TYPE_10K, FS_TYPE_10K]):
     # --------------------------------------------------------------------------------
     listings = listings.loc[listings['Form Type'].isin(types)] if types else listings
     listings.loc[:, 'Form Type'] = listings['Form Type'].astype('category')
-    Logger.info("load_edgar_xbrl_listing_file(): size of listings [%s]" % len(listings))
+    logging.info("load_edgar_xbrl_listing_file(): size of listings [%s]" % len(listings))
 
     return listings
 
@@ -406,33 +397,40 @@ if __name__ == "__main__":
     input_directory, output_directory, year, qtr, num_workers, log_level = args
 
     # --------------------------------------------------------------------------------
+    # Logging
+    # --------------------------------------------------------------------------------
+    logging.basicConfig(level=log_level)
+    # logging.addHandler(logging.StreamHandler())
+
+    # --------------------------------------------------------------------------------
     # XBRL XML logic
     # --------------------------------------------------------------------------------
     try:
         # --------------------------------------------------------------------------------
         # Setup Ray
         # --------------------------------------------------------------------------------
-        Logger.info("main(): initializing Ray using %s workers..." % num_workers)
+        logging.info("main(): initializing Ray using %s workers..." % num_workers)
         ray.init(num_cpus=num_workers, num_gpus=0, logging_level=log_level)
 
         for filepath in list_files(
             input_directory=input_directory, output_directory=output_directory, year=year, qtr=qtr
         ):
             filename = os.path.basename(filepath)
-            Logger.info("main(): processing the listing [%s]..." % filename)
+            logging.info("main(): processing the listing [%s]..." % filename)
 
             failed_df = director(
                 df=load_edgar_xbrl_listing_file(filepath=filepath, types=[FS_TYPE_10Q, FS_TYPE_10K]),
-                num_workers=num_workers
+                num_workers=num_workers,
+                log_level=log_level
             )
             if len(failed_df):
-                Logger.info("main(): failed records for %s\n%s" % (filename, failed_df))
+                logging.info("main(): failed records for %s\n%s" % (filename, failed_df))
             else:
-                Logger.info("main(): all records processed in %s" % filename)
+                logging.info("main(): all records processed in %s" % filename)
     finally:
         # --------------------------------------------------------------------------------
         # Clean up resource
         # --------------------------------------------------------------------------------
-        Logger.info("main(): shutting down Ray...")
+        logging.info("main(): shutting down Ray...")
         ray.shutdown()
 
