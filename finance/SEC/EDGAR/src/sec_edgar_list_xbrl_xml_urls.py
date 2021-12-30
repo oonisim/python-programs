@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 """
-# Load SEC EDGAR Quarterly (10-Q) XBRL
-
 ## Objective
 Navigate through the EDGAR XBRL listings to generate the URLs to XBRL XML files.
 
@@ -71,10 +69,9 @@ Indexes to all public filings are available from 1994Q3 through the present and 
 Full index files for 2006 QTR 3.
 <img src="../image/edgar_full_index_quarter_2006QTR3.png" align="left" width="800"/>
 """
-
-# --------------------------------------------------------------------------------
+# ================================================================================
 # Setup
-# --------------------------------------------------------------------------------
+# ================================================================================
 from typing import (
     List,
     Dict,
@@ -104,14 +101,24 @@ from sec_edgar_constant import (
     EDGAR_BASE_URL,
     EDGAR_HTTP_HEADERS,
     DEFAULT_LOG_LEVEL,
+    DATA_DIR_INDEX,
+    DATA_DIR_LISTING
 )
-
-DIR = os.path.dirname(os.path.realpath(__file__))
-DATA_DIR_INDEX = f"{DIR}/../data/listing"
-DATA_DIR_XBRL = f"{DIR}/../data/XBRL"
+from sec_edgar_utility import(
+    split,
+    http_get_content,
+)
 
 
 pd.set_option('display.max_colwidth', None)
+
+# --------------------------------------------------------------------------------
+# TODO:
+#  Logging setup for Ray as in https://docs.ray.io/en/master/ray-logging.html.
+#  In Ray, all of the tasks and actors are executed remotely in the worker processes.
+#  Since Python logger module creates a singleton logger per process, loggers should
+#  be configured on per task/actor basis.
+# --------------------------------------------------------------------------------
 logging.basicConfig(level=logging.INFO)
 Logger = logging.getLogger(__name__)
 # Logger.addHandler(logging.StreamHandler())
@@ -124,7 +131,7 @@ def get_command_line_arguments():
     """Get command line arguments"""
     parser = argparse.ArgumentParser(description='argparse test program')
     parser.add_argument('-i', '--input-directory', type=str, required=False, default=DATA_DIR_INDEX, help='specify the input data directory')
-    parser.add_argument('-o', '--output-directory', type=str, required=False, default=DATA_DIR_XBRL, help='specify the output data directory')
+    parser.add_argument('-o', '--output-directory', type=str, required=False, default=DATA_DIR_LISTING, help='specify the output data directory')
     parser.add_argument('-y', '--year', type=int, required=False, help='specify the target year')
     parser.add_argument('-q', '--qtr', type=int, choices=[1, 2, 3, 4], required=False, help='specify the target quarter')
     parser.add_argument('-n', '--num-workers', type=int, required=False, help='specify the number of workers to use')
@@ -147,35 +154,15 @@ def get_command_line_arguments():
     return input_directory, output_directory, year, qtr, num_workers, log_level
 
 
-def http_get_content(url, headers):
-    """HTTP GET URL content
-    Args:
-        url: URL to GET
-    Returns:
-        Content of the HTTP GET response body, or None
-    Raises:
-        ConnectionError if HTTP status is not 200
-    """
-    Logger.debug("http_get_content(): GET url [%s] headers [%s]" % (url, headers))
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        content = response.content.decode("utf-8")
-        return content
-    else:
-        Logger.error(
-            "http_get_content(): HTTP GET [%s] failed. Status [%s]" % (url, response.status_code)
-        )
-        raise ConnectionError(response.status_code)
-
-
-def xbrl_file_path_to_save(directory, filename):
-    if not hasattr(xbrl_file_path_to_save, "mkdired"):
-        pathlib.Path(directory).mkdir(mode=755, parents=True, exist_ok=True)
-        setattr(xbrl_file_path_to_save, "mkdired", True)
+def listing_file_path_to_save(directory, filename):
+    """Get the file path in which to save the directory listing data."""
+    if not hasattr(listing_file_path_to_save, "mkdired"):
+        pathlib.Path(directory).mkdir(mode=0o775, parents=True, exist_ok=True)
+        setattr(listing_file_path_to_save, "mkdired", True)
 
     destination = f"{directory}/{filename}_XBRL.gz"
 
-    Logger.debug("xbrl_file_path_to_save(): Path to save XBML is [%s]" % destination)
+    Logger.debug("listing_file_path_to_save(): Path to save XBML is [%s]" % destination)
     return destination
 
 
@@ -185,9 +172,10 @@ def list_files(input_directory, output_directory, year=None, qtr=None):
     When qtr is specified, only match8ng listing files for the quarter will be selected.
 
     Args:
-        directory: path to the directory from where to get the file
+        input_directory: path to the directory from where to get the file
+        output_directory: path to the directory where the listings will be saved
         year: Year to select
-        qtr: Qauater to select
+        qtr: Quarter to select
     Returns: List of flies
     """
     assert os.path.isdir(input_directory), f"Not a directory or does not exist: {input_directory}"
@@ -199,7 +187,7 @@ def list_files(input_directory, output_directory, year=None, qtr=None):
         If XBRL file has been already created and exists, then skip the filepath.
         """
         source = pathlib.Path(filepath)
-        target = pathlib.Path(xbrl_file_path_to_save(output_directory, os.path.basename(filepath)))
+        target = pathlib.Path(listing_file_path_to_save(output_directory, os.path.basename(filepath)))
 
         if source.is_file():
             if target.exists():
@@ -228,7 +216,7 @@ def list_files(input_directory, output_directory, year=None, qtr=None):
 
 def save_to_csv(df, directory, filename):
     """Save the XBRL"""
-    destination = xbrl_file_path_to_save(directory, filename)
+    destination = listing_file_path_to_save(directory, filename)
     df.to_csv(
         destination,
         sep="|",
@@ -273,23 +261,19 @@ def index_xml_url(filename):
 
 def load_edgar_xbrl_index_file(filepath, types=[FS_TYPE_10K, FS_TYPE_10K]):
     """
-    Generate a pandas dataframe for each XBRL listing file.
+    Generate a pandas dataframe for each XBRL master index file.
     'Filename' column is updated with the URL for the EDGAR directory listing index.xml.
-
     The EDGAR listing file format must be <YYYY>QTR<N> e.g. 2010QTR1.
-    When year is specified, only matching listing files for the year are processed.
-    When qtr is specified, only match8ng listing files for the quarter are processed.
-    
+
     Args:
         filepath: path to a XBRL index file
-        year: Filing year (YYYY)
-        qtr: Filing quarter either 1, 2, 3, 4
         types: Filing types e.g. 10-K
     Returns:
         pandas dataframe
     """
-    assert os.path.isfile(filepath), f"{filepath} is not a file or does not exist."
     Logger.info("load_edgar_xbrl_index_file(): filepath [%s]" % filepath)
+    assert os.path.isfile(filepath) and os.access(filepath, os.R_OK), \
+        f"{filepath} is not a file, cannot read, or does not exist."
 
     # --------------------------------------------------------------------------------
     # Load XBRL index CSV file
@@ -480,7 +464,7 @@ def xbrl_url(index_xml_url: str):
     #  Synchronization among workers to limit the rate 10/sec from the same IP.
     #  For now, just wait 1 sec at each worker.
     # --------------------------------------------------------------------------------
-    time.sleep(1)
+    # time.sleep(1)
     content = http_get_content(index_xml_url, EDGAR_HTTP_HEADERS)
 
     # --------------------------------------------------------------------------------
@@ -525,42 +509,6 @@ def test_xbrl_url():
         SAMPLE_DIRECTORY_LISTING,
         xbrl_url(SAMPLE_DIRECTORY_LISTING)
     ))
-
-
-def split(tasks: pd.DataFrame, num: int):
-    """Split tasks into num assignments and dispense them sequentially
-    Args:
-        tasks: tasks to split into assignments
-        num: number of assignments to create
-    Yields: An assignment, which is a slice of the tasks
-    """
-    assert num > 0
-    assert len(tasks) > 0
-    Logger.debug(f"createing {num} assignments for {len(tasks)} tasks")
-
-    # Total size of the tasks
-    total = len(tasks)
-
-    # Each assignment has 'quota' size which can be zero if total < number of assignments.
-    quota = int(total / num)
-
-    # Left over after each assignment takes its 'quota'
-    redisual = total % num
-
-    start = 0
-    while start < total:
-        # As long as redisual is there, each assginemt has (quota + 1) as its tasks.
-        if redisual > 0:
-            size = quota + 1
-            redisual -= 1
-        else:
-            size = quota
-
-        end = start + size
-        yield tasks[start : min(end, total)]
-
-        start = end
-        end += size
 
 
 @ray.remote(num_returns=1)
@@ -642,7 +590,7 @@ if __name__ == "__main__":
         ray.init(num_cpus=num_workers, num_gpus=0, logging_level=log_level)
 
         for filepath in list_files(
-                input_directory=input_directory, output_directory=output_directory, year=year, qtr=qtr
+            input_directory=input_directory, output_directory=output_directory, year=year, qtr=qtr
         ):
             filename = os.path.basename(filepath)
             Logger.info("main(): processing the listing [%s]..." % filename)
