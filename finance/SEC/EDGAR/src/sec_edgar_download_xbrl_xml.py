@@ -85,28 +85,21 @@ from typing import (
     Iterable
 )
 import argparse
-import sys
 import os
 import pathlib
 import logging
 import glob
 import re
-import json
 import time
 import random
-import requests
+import gzip
+
 import ray
-import bs4
 import pandas as pd
-from bs4 import (
-    BeautifulSoup
-)
-import Levenshtein as levenshtein
 from sec_edgar_constant import (
     NUM_CPUS,
     FS_TYPE_10K,
     FS_TYPE_10Q,
-    EDGAR_BASE_URL,
     EDGAR_HTTP_HEADERS,
     DEFAULT_LOG_LEVEL,
     DATA_DIR_LISTING,
@@ -175,7 +168,7 @@ def xbrl_xml_file_path_to_save(directory, filename):
     pathlib.Path(directory).mkdir(mode=0o775, parents=True, exist_ok=True)
     setattr(xbrl_xml_file_path_to_save, "mkdired", True)
 
-    destination = f"{directory}/{filename}"
+    destination = f"{directory}/{filename}.gz"
     return destination
 
 
@@ -221,10 +214,17 @@ def list_files(input_directory, output_directory, year=None, qtr=None):
 def save_to_xml(content, directory, filename):
     """Save the XBRL XML"""
     destination = xbrl_xml_file_path_to_save(directory=directory, filename=filename)
-    logging.debug("save_to_xml(): saving XML to [%s]..." % destination)
-    with open(destination, "w") as f:
-        f.write(content)
 
+    logging.debug("save_to_xml(): saving XML to [%s]..." % destination)
+    extension = os.path.splitext(destination)[1]
+    if extension == ".gz":
+        with gzip.open(f"{destination}", 'wb') as f:
+            f.write(content.encode())
+    elif extension == "":
+        with open(destination, "w") as f:
+            f.write(content.encode)
+    else:
+        assert False, f"Unknown file type [{extension}]"
 
 # ================================================================================
 # Logic
