@@ -159,17 +159,34 @@ def get_command_line_arguments():
     return input_directory, output_directory, year, qtr, num_workers, log_level
 
 
-def xbrl_xml_file_path_to_save(directory, filename):
-    """Generate the file path to save the XBRL XML. Create directory if required.
+def xbrl_xml_relative_path_to_save(directory, filename):
+    """
+    Generate the relative file path to save the XBRL XML.
+
     Args:
         directory: location to save the file
         flilename: name of the file to create
+    Returns: Absolute file path
     """
-    pathlib.Path(directory).mkdir(mode=0o775, parents=True, exist_ok=True)
-    setattr(xbrl_xml_file_path_to_save, "mkdired", True)
+    assert not directory.startswith("/"), "Must be relative directory path"
+    relative = f"{directory}{os.sep}{filename}.gz"
+    return relative
 
-    destination = f"{directory}/{filename}.gz"
-    return destination
+
+def xbrl_xml_absolute_path_to_save(directory, filename):
+    """
+    Generate the absolute file path to save the XBRL XML. Create directory if required.
+    The "directory/filename" is the relative path from DATA_DIR_XBRL.
+
+    Args:
+        directory: location to save the file
+        flilename: name of the file to create
+    Returns: Absolute file path
+    """
+    relative = xbrl_xml_relative_path_to_save(directory, filename)
+    absolute = os.path.realpath(f"{DATA_DIR_XBRL}{os.sep}{relative}")
+    pathlib.Path(os.path.dirname(absolute)).mkdir(mode=0o775, parents=True, exist_ok=True)
+    return absolute
 
 
 def list_files(input_directory, output_directory, year=None, qtr=None):
@@ -185,8 +202,10 @@ def list_files(input_directory, output_directory, year=None, qtr=None):
     Returns: List of flies
     """
     assert os.path.isdir(input_directory), f"Not a directory or does not exist: {input_directory}"
-    assert (re.match(r"[1-2][0-9][0-9][0-9]", year) if year else True), f"Invalid year {year}"
-    assert (re.match(r"[1-4]", qtr) if qtr else True), f"Invalid quarter {qtr}"
+    assert (isinstance(year, str) and re.match(r"^[1-2][0-9]{3}$", year) if year else True), \
+        f"Invalid year {year} of type {type(year)}"
+    assert (isinstance(qtr, str) and re.match(r"^[1-4]$", qtr) if qtr else True), \
+        f"Invalid quarter {qtr} of type {type(qtr)}"
 
     def is_file_to_process(filepath):
         """Verify if the filepath points to a file that has not been processed yet.
@@ -206,34 +225,18 @@ def list_files(input_directory, output_directory, year=None, qtr=None):
     pattern += "_LIST.gz"
 
     logging.info("Listing the files to process in the directory %s ..." % input_directory)
-    files = sorted(filter(is_file_to_process, glob.glob(input_directory + os.sep + pattern)))
+    files = sorted(
+        filter(is_file_to_process, glob.glob(input_directory + os.sep + pattern)),
+        reverse=True
+    )
     logging.info("No files to process in the directory %s" % input_directory)
     return files
 
 
-def save_to_xml(content, directory, filename):
-    """Save the XBRL XML"""
-    destination = xbrl_xml_file_path_to_save(directory=directory, filename=filename)
-
-    logging.debug("save_to_xml(): saving XML to [%s]..." % destination)
-    extension = os.path.splitext(destination)[1]
-    if extension == ".gz":
-        with gzip.open(f"{destination}", 'wb') as f:
-            f.write(content.encode())
-    elif extension == "":
-        with open(destination, "w") as f:
-            f.write(content.encode)
-    else:
-        assert False, f"Unknown file type [{extension}]"
-
-# ================================================================================
-# Logic
-# ================================================================================
 def get_xml(url):
     """GET XBRL XML from the URL
     Args:
         url: URL to download the XBRL XML
-        logger: Logging instance to use
     Returns: XBRL XML content or None
     """
     max_retries_allowed = 3
@@ -265,16 +268,69 @@ def get_xml(url):
     return None
 
 
+def save_to_xml(msg):
+    """Save the XBRL XML to the path relative to DATA_DIR_XBRL.
+
+    Args:
+        msg: message including the content data, directory to save it as filename
+    Returns: relative path to the XML file if successfully saved, else None
+    """
+    content = msg["data"]
+    directory:str = msg['directory']
+    filename:str = msg['filename']
+    assert not directory.startswith("/"), f"Must not start with '/' but [{directory}]"
+
+    destination = xbrl_xml_absolute_path_to_save(directory=directory, filename=filename)
+    extension = os.path.splitext(destination)[1]
+
+    logging.debug("save_to_xml(): saving XBRL XML to [%s]..." % destination)
+    try:
+        if extension == ".gz":
+            with gzip.open(f"{destination}", 'wb') as f:
+                f.write(content.encode())
+        elif extension == "":
+            with open(destination, "w") as f:
+                f.write(content.encode)
+        else:
+            assert False, f"Unknown file type [{extension}]"
+    except IOError as e:
+        logging.error("save_to_xml(): failed to save [%s] due to [%s]" % (destination, e))
+        return None
+    else:
+        logging.debug("save_to_xml(): saved [%s]" % destination)
+        return xbrl_xml_relative_path_to_save(directory, filename)
+
+# ================================================================================
+# Logic
+# ================================================================================
 @ray.remote(num_returns=1)
-def worker(df, log_level: int):
+def worker(msg:dict):
     """GET XBRL XML and save to a file.
     Args:
-        df: Pandas dataframe |CIK|Company Name|Form Type|Date Filed|Filename|
+        msg: Dictionary to data package of format {
+                "data": <dataframe>,
+                "year": <year of the filing>,
+                "qtr": <quarter of the filing>,
+                "log_level": <logging level>
+             }
+
+         Pandas dataframe |CIK|Company Name|Form Type|Date Filed|Filename|
             where 'Filename' is the URL to XBRL XML in the filing directory.
         log_level: Logging level to use in the worker.
-    Returns: List of indices of the dataframe that have failed to get XBRL XML.
+    Returns: Pa
     """
-    assert df is not None and len(df) > 0, "worker(): invalid dataframe"
+    df = msg["data"]
+    year:str = msg['year']
+    qtr:str = msg['qtr']
+    log_level:int = msg['log_level']
+    assert df is not None and len(df) > 0, f"Invalid dataframe \n{df}"
+
+    # --------------------------------------------------------------------------------
+    # Add year/qtr/filepath columns
+    # --------------------------------------------------------------------------------
+    df.insert(loc=3, column='Year', value=pd.Categorical([year]* len(df)))
+    df.insert(loc=4, column='Quarter', value=pd.Categorical([qtr]* len(df)))
+    df.insert(loc=len(df.columns), column="Filepath", value=[None]*len(df))
 
     # --------------------------------------------------------------------------------
     #  Logging setup for Ray as in https://docs.ray.io/en/master/ray-logging.html.
@@ -295,7 +351,7 @@ def worker(df, log_level: int):
 
         if content:
             # --------------------------------------------------------------------------------
-            # Save XML
+            # Save XBRL XML
             # URL format: https://sec.gov/Archives/edgar/data/{cik}}/{accession}}/{filename}
             # https://sec.gov/Archives/edgar/data/1000697/000095012310017583/wat-20091231.xml
             # --------------------------------------------------------------------------------
@@ -306,17 +362,39 @@ def worker(df, log_level: int):
             assert str(row['CIK']) == cik, \
                 f"CIK [{row['CIK']})] must match CIK part [{cik}] in url {url}"
 
-            directory = f"{DATA_DIR_XBRL}{os.sep}{cik}{os.sep}{accession}"
-            logging.debug(f"worker(): saving XML to [{directory}:{filename}]...")
+            # Note: The directory is relative path, NOT absolute
+            directory = f"{cik}{os.sep}{accession}"
+            package = {
+                "data": content,
+                "directory": directory,
+                "filename": filename
+            }
+            path_to_saved_xml = save_to_xml(package)
 
-            save_to_xml(content, directory, filename)
+            # --------------------------------------------------------------------------------
+            # Update the dataframe with the filepath where the XBRL XML has been saved.
+            # --------------------------------------------------------------------------------
+            if path_to_saved_xml:
+                df.at[index, 'Filepath'] = path_to_saved_xml
+                logging.debug(
+                    "worker(): updated the dataframe[%s, 'Filepath'] with [%s]."
+                    % (index, path_to_saved_xml)
+                )
+            else:
+                logging.debug(
+                    "worker(): not updated the dataframe[%s, 'Filepath'] as saving has failed."
+                    % index
+                )
         else:
-            failed_indices.append(index)
+            logging.debug(
+                "worker(): not updated the dataframe[%s, 'Filepath'] as failed to get XBRL XML"
+                % index
+            )
 
-    return failed_indices
+    return df
 
 
-def director(df, num_workers: int, log_level: int):
+def director(msg):
     """Director to download XBRL XML files from the SEC filing directories.
     Args:
         df: pandas datafrome of XBRL indices
@@ -324,6 +402,18 @@ def director(df, num_workers: int, log_level: int):
         log_level: Logging level
     Returns: Pandas dataframe of failed records
     """
+    df = msg["data"]
+    year = msg['year']
+    qtr = msg['qtr']
+    num_workers = msg['num_workers']
+    log_level = msg['log_level']
+
+    assert df is not None and len(df) > 0, "worker(): invalid dataframe"
+    assert year.isdecimal() and re.match(r"^[12][0-9]{3}$", year)
+    assert qtr.isdecimal() and re.match(r"^[1-4]$", qtr)
+    assert isinstance(num_workers, int) and num_workers > 0
+    assert log_level in [10, 20, 30, 40]
+
     # --------------------------------------------------------------------------------
     # Split dataframe to handle in parallel
     # --------------------------------------------------------------------------------
@@ -332,7 +422,15 @@ def director(df, num_workers: int, log_level: int):
     # --------------------------------------------------------------------------------
     # Asynchronously invoke tasks
     # --------------------------------------------------------------------------------
-    futures = [worker.remote(task, log_level) for task in assignment]
+    futures = [
+        worker.remote({
+            "data": task,
+            "year": year,
+            "qtr": qtr,
+            "log_level": log_level
+        })
+        for task in assignment
+    ]
     assert len(futures) == num_workers, f"Expected {num_workers} tasks but got {len(futures)}."
 
     # --------------------------------------------------------------------------------
@@ -347,9 +445,8 @@ def director(df, num_workers: int, log_level: int):
     # Collect the results
     # --------------------------------------------------------------------------------
     assert len(waits) == num_workers, f"Expected {num_workers} tasks but got {len(waits)}."
-    failed_indices = sum(ray.get(waits), [])
-
-    return df.loc[failed_indices, :]
+    df = pd.concat(ray.get(waits))
+    return df
 
 
 def load_edgar_xbrl_listing_file(filepath, types=[FS_TYPE_10K, FS_TYPE_10K]):
@@ -412,21 +509,49 @@ if __name__ == "__main__":
         logging.info("main(): initializing Ray using %s workers..." % num_workers)
         ray.init(num_cpus=num_workers, num_gpus=0, logging_level=log_level)
 
+        # --------------------------------------------------------------------------------
+        # Process XBRL listing files
+        # --------------------------------------------------------------------------------
         for filepath in list_files(
             input_directory=input_directory, output_directory=output_directory, year=year, qtr=qtr
         ):
             filename = os.path.basename(filepath)
-            logging.info("main(): processing the listing [%s]..." % filename)
+            logging.info("main(): processing the listing csv file [%s]..." % filename)
 
-            failed_df = director(
-                df=load_edgar_xbrl_listing_file(filepath=filepath, types=[FS_TYPE_10Q, FS_TYPE_10K]),
-                num_workers=num_workers,
-                log_level=log_level
-            )
-            if len(failed_df):
-                logging.info("main(): failed records for %s\n%s" % (filename, failed_df))
+            # --------------------------------------------------------------------------------
+            # Load the listing CSV into datafame
+            # --------------------------------------------------------------------------------
+            df = load_edgar_xbrl_listing_file(filepath=filepath, types=[FS_TYPE_10Q, FS_TYPE_10K])
+
+            # --------------------------------------------------------------------------------
+            # Year/Quarter of the listing is filed to SEC
+            # --------------------------------------------------------------------------------
+            match = re.search("^([1-2][0-9]{3})QTR([1-4]).*$", os.path.basename(filepath), re.IGNORECASE)
+            year = match.group(1)
+            qtr = match.group(2)
+
+            # --------------------------------------------------------------------------------
+            # Process the single listing file
+            # --------------------------------------------------------------------------------
+            msg = {
+                "data": df,
+                "year": year,
+                "qtr": qtr,
+                "num_workers": num_workers,
+                "log_level": log_level
+            }
+            result = director(msg)
+
+            # --------------------------------------------------------------------------------
+            # List failed records with 'Filepath' column being None as failed to get XBRL
+            # --------------------------------------------------------------------------------
+            if any(result['Filepath'].isna()):
+                print("*" * 80)
+                print("-" * 80)
+                print(f"[{len(result['Filepath'].isna())}] failed records:\n")
+                print(df)
             else:
-                logging.info("main(): all records processed in %s" % filename)
+                logging.info("main(): all [%s] records processed in %s" % (len(df), filename))
     finally:
         # --------------------------------------------------------------------------------
         # Clean up resource

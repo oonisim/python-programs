@@ -165,7 +165,7 @@ def listing_file_path_to_save(directory, filename):
         pathlib.Path(directory).mkdir(mode=0o775, parents=True, exist_ok=True)
         setattr(listing_file_path_to_save, "mkdired", True)
 
-    destination = f"{directory}/{filename}_LIST.gz"
+    destination = os.path.realpath(f"{directory}{os.sep}{filename}_LIST.gz")
 
     logging.debug("listing_file_path_to_save(): Path to save XBML is [%s]" % destination)
     return destination
@@ -184,8 +184,10 @@ def list_files(input_directory, output_directory, year=None, qtr=None):
     Returns: List of flies
     """
     assert os.path.isdir(input_directory), f"Not a directory or does not exist: {input_directory}"
-    assert (re.match(r"[1-2][0-9][0-9][0-9]", year) if year else True), f"Invalid year {year}"
-    assert (re.match(r"[1-4]", qtr) if qtr else True), f"Invalid quarter {qtr}"
+    assert (isinstance(year, str) and re.match(r"^[1-2][0-9]{3}$", year) if year else True), \
+        f"Invalid year {year} of type {type(year)}"
+    assert (isinstance(qtr, str) and re.match(r"^[1-4]$", qtr) if qtr else True), \
+        f"Invalid quarter {qtr} of type {type(qtr)}"
 
     def is_file_to_process(filepath):
         """Verify if the filepath points to a file that has not been processed yet.
@@ -214,7 +216,10 @@ def list_files(input_directory, output_directory, year=None, qtr=None):
     pattern += f"{qtr}" if qtr else "?"
 
     logging.info("Listing the files to process in the directory %s ..." % input_directory)
-    files = sorted(filter(is_file_to_process, glob.glob(input_directory + os.sep + pattern)))
+    files = sorted(
+        filter(is_file_to_process, glob.glob(input_directory + os.sep + pattern)),
+        reverse=True
+    )
     logging.info("No files to process in the directory %s" % input_directory)
     return files
 
