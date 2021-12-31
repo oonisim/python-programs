@@ -9,7 +9,8 @@ DEFAULT_LOG_LEVEL = 20  # INFO
 
 
 DIR = os.path.dirname(os.path.realpath(__file__))
-DATA_DIR_INDEX = os.path.realpath(f"{DIR}/../data/index")
-DATA_DIR_LISTING = os.path.realpath(f"{DIR}/../data/listing")
-DATA_DIR_XBRL = os.path.realpath(f"{DIR}/../data/XBRL")
+DIR_CSV_INDEX = os.path.realpath(f"{DIR}/../data/csv/index")
+DIR_CSV_LIST = os.path.realpath(f"{DIR}/../data/csv/listing")
+DIR_CSV_XBRL = os.path.realpath(f"{DIR}/../data/csv/xbrl")
+DIR_XML_XBRL = os.path.realpath(f"{DIR}/../data/xml/xbrl")
 
