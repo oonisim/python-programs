@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xbrl
+	xmlns="http://www.xbrl.org/2003/instance"
+	xmlns:country="http://xbrl.sec.gov/country/2020-01-31"
+	xmlns:dei="http://xbrl.sec.gov/dei/2020-01-31"
+	xmlns:iso4217="http://www.xbrl.org/2003/iso4217"
+	xmlns:link="http://www.xbrl.org/2003/linkbase"
+	xmlns:rfmd="http://www.rfmd.com/20210403"
+	xmlns:srt="http://fasb.org/srt/2020-01-31"
+	xmlns:us-gaap="http://fasb.org/us-gaap/2020-01-31"
+	xmlns:xbrldi="http://xbrl.org/2006/xbrldi"
+	xmlns:xlink="http://www.w3.org/1999/xlink"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xml:lang="en-US">
+</xbrl>
