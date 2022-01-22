@@ -2,7 +2,7 @@ import sys
 import os
 import pickle
 import numpy as np
-sys.path.append('../../../python/examples/robot2')
+sys.path.append('../../../nlp')
 try:
     import urllib.request
 except ImportError:
@@ -107,3 +107,7 @@ def load_data(data_type='train'):
 
     np.save(save_path, sequence)
     return sequence, word_to_id, id_to_word
+
+
+if __name__ == "__main__":
+    load_data()
