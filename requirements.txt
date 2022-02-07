@@ -41,6 +41,7 @@ numba
 #--------------------------------------------------------------------------------
 pandas
 scikit-learn
+imblearn
 matplotlib
 seaborn
 jupyter
