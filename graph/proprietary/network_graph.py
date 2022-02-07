@@ -2,10 +2,12 @@ class Graph:
     def __init__(self):
         self.graph_dict = {}
         self.edges = set([])
+        self.min_path_length_to_node = {}
 
     def add_node(self, node):
         if node not in self.graph_dict:
             self.graph_dict[node] = set([])
+            self.min_path_length_to_node[node] = 0
 
     def get_nodes(self):
         return self.graph_dict.keys()
@@ -13,7 +15,7 @@ class Graph:
     def add_edge(self, node, neighbour):
         self.edges.add((node, neighbour))
         if node not in self.graph_dict:
-            self.graph_dict[node] = set([neighbour])
+            self.graph_dict[node] = {neighbour}
         else:
             self.graph_dict[node].add(neighbour)
 
@@ -24,6 +26,24 @@ class Graph:
         for node in self.graph_dict:
             for neighbour in self.graph_dict[node]:
                 print("(", node, ", ", neighbour, ")")
+
+    def set_min_path_length_to_node(self, node, path: list):
+        if node not in self.min_path_length_to_node:
+            self.min_path_length_to_node[node] = len(path)
+
+        else:
+            if self.min_path_length_to_node[node] == 0:
+                # Not yet initialized with the node being part of the path
+                self.min_path_length_to_node[node] = len(path)
+
+            if len(path) < self.min_path_length_to_node[node]:
+                self.min_path_length_to_node[node] = len(path)
+
+    def get_min_path_length_to_node(self, node):
+        if node in self.min_path_length_to_node:
+            return self.min_path_length_to_node[node]
+        else:
+            return -1
 
     def find_path(self, start, end, path=[]):
         path = path + [start]
