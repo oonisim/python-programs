@@ -56,5 +56,7 @@ def evaluate(model, X, y, y_predicted):
 
     if r2 >= 0.4:
         print("****** Success ******")
+        return True
     else:
         print("****** Failed ******")
+        return False
