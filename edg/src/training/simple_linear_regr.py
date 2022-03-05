@@ -1,4 +1,4 @@
-import os
+import sys
 import logging
 import numpy as np
 from simple_linear_regr_utils import generate_data, evaluate
@@ -214,6 +214,9 @@ class SimpleLinearRegression:
 
 
 def main():
+    """Regression model training
+    Returns: 0 if success else -1
+    """
     X_train, y_train, X_test, y_test = generate_data()
     X_test = X_test.astype(TYPE_FLOAT)
     y_test = y_test.astype(TYPE_FLOAT)
@@ -240,9 +243,11 @@ def main():
         # Save the model
         # --------------------------------------------------------------------------------
         model.save("../model/model.npy")
+        return 0
     else:
         logging.error("Evaluation failed")
+        return -1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

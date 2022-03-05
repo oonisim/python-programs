@@ -15,7 +15,7 @@ steps:
     args: [
       'build',
       '-t',
-      'us-central1-docker.pkg.dev/${PROJECT_ID}/diabetes-prediction/diabetes-prediction-api:${SHORT_SHA}',
+      'us-central1-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/myimage:${SHORT_SHA}',
       '-f',
       'src/serving/Dockerfile',
       '.'
@@ -23,7 +23,4 @@ steps:
 
   # Docker push to Google Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: [
-      'push',
-      'us-central1-docker.pkg.dev/${PROJECT_ID}/diabetes-prediction/diabetes-prediction-api:${SHORT_SHA}'
-    ]
+    args: ['push',  'us-central1-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/diabetes:${SHORT_SHA}']

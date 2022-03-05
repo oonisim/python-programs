@@ -1,0 +1,95 @@
+{
+	"info": {
+		"_postman_id": "ca2470d1-09bc-4f01-a4d8-03137fe60ee6",
+		"name": "edg",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "health",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://192.168.13.129:8080/",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"13",
+						"129"
+					],
+					"port": "8080",
+					"path": [
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "batch",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "[\n   [\n      0.077863387626902\n   ],\n   [\n      -0.0396181284261162\n   ],\n   [\n      0.0110390390462862\n   ],\n   [\n      -0.0406959404999971\n   ],\n   [\n      -0.0342290680567117\n   ],\n   [\n      0.00564997867688165\n   ],\n   [\n      0.088641508365711\n   ],\n   [\n      -0.0331512559828308\n   ],\n   [\n      -0.0568631216082106\n   ],\n   [\n      -0.030995631835069\n   ],\n   [\n      0.0552293340754031\n   ],\n   [\n      -0.0600965578298533\n   ],\n   [\n      0.00133873038135806\n   ],\n   [\n      -0.0234509473179027\n   ],\n   [\n      -0.074108114790305\n   ],\n   [\n      0.0196615356373334\n   ],\n   [\n      -0.0159062628007364\n   ],\n   [\n      -0.0159062628007364\n   ],\n   [\n      0.0390621529671896\n   ],\n   [\n      -0.0730303027164241\n   ]\n]"
+				},
+				"url": {
+					"raw": "http://192.168.13.129:8080/stream",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"13",
+						"129"
+					],
+					"port": "8080",
+					"path": [
+						"stream"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "stream",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "0.077863387626902"
+				},
+				"url": {
+					"raw": "http://192.168.13.129:8080/batch",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"13",
+						"129"
+					],
+					"port": "8080",
+					"path": [
+						"batch"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

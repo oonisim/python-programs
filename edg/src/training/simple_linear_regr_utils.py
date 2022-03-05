@@ -51,6 +51,8 @@ def evaluate(model, X, y, y_predicted):
 
     plt.xticks(())
     plt.yticks(())
+    plt.legend()
+    plt.grid()
 
     plt.show()
 
