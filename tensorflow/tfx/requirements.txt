@@ -1,0 +1,3 @@
+tfx
+python-snappy
+apache-beam[interactive]
