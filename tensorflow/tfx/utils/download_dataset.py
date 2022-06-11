@@ -46,7 +46,7 @@ def create_folder():
     Returns:
         None
     """
-    directory = "data/"
+    directory = "downloads/"
     if not os.path.exists(directory):
         os.makedirs(directory)
         logging.info("Data folder created.")

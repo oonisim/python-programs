@@ -1,3 +1,6 @@
 tfx
+tensorflow_text
+tensorflow_decision_forests
 python-snappy
 apache-beam[interactive]
+struct2tensor
