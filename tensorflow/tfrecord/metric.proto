@@ -1,0 +1,6 @@
+syntax = "proto3";
+message Metric {
+  string name = 1;
+  string type = 2;
+  float value = 3;
+}
