@@ -15,7 +15,7 @@
 
 import tensorflow as tf
 from tensorflow import keras
-
+from keras.layers.core import Reshape
 from src.common import features
 
 
@@ -24,11 +24,16 @@ def create_model_inputs():
     for feature_name in features.FEATURE_NAMES:
         name = features.transformed_name(feature_name)
         if feature_name in features.NUMERICAL_FEATURE_NAMES:
-            inputs[name] = keras.layers.Input(name=name, shape=[], dtype=tf.float32)
+            print(f"numerical feature {feature_name}")
+            inputs[name] = keras.layers.Input(name=name, shape=(), dtype=tf.float32)
         elif feature_name in features.categorical_feature_names():
-            inputs[name] = keras.layers.Input(name=name, shape=[], dtype=tf.int64)
+            print(f"categorical feature {feature_name}")
+            inputs[name] = keras.layers.Input(name=name, shape=(), dtype=tf.int64)
+        elif feature_name in features.ONEHOT_CATEGORICAL_FEATURE_NAMES:
+            pass
         else:
             pass
+    print("create_model_inputs(): inputs: [{}]".format(inputs))
     return inputs
 
 
@@ -41,26 +46,40 @@ def _create_binary_classifier(feature_vocab_sizes, hyperparams):
         if feature_name in features.EMBEDDING_CATEGORICAL_FEATURES:
             vocab_size = feature_vocab_sizes[feature_name]
             embedding_size = features.EMBEDDING_CATEGORICAL_FEATURES[feature_name]
+            
             embedding_output = keras.layers.Embedding(
                 input_dim=vocab_size + 1,
                 output_dim=embedding_size,
                 name=f"{key}_embedding",
             )(input_layers[key])
+            # print(f"Shape of embed layer [{key}] has None [{embedding_output.shape}]")
+            
             layers.append(embedding_output)
         elif feature_name in features.ONEHOT_CATEGORICAL_FEATURE_NAMES:
             vocab_size = feature_vocab_sizes[feature_name]
-            onehot_layer = keras.layers.experimental.preprocessing.CategoryEncoding(
-                max_tokens=vocab_size,
-                output_mode="binary",
+            # onehot_layer = keras.layers.experimental.preprocessing.CategoryEncoding(
+            #     max_tokens=vocab_size,
+            #     output_mode="binary",
+            #     name=f"{key}_onehot",
+            # )(input_layers[key])
+            onehot_layer = tf.keras.layers.CategoryEncoding(
+                num_tokens=vocab_size, 
+                output_mode="one_hot",
                 name=f"{key}_onehot",
             )(input_layers[key])
+            
+            # print(f"Shape of one hot layer [{key}] has None [{onehot_layer.shape}]")
+                      
             layers.append(onehot_layer)
         elif feature_name in features.NUMERICAL_FEATURE_NAMES:
             numeric_layer = tf.expand_dims(input_layers[key], -1)
+
+            # print(f"Shape of numeric layer [{key}] has None [{numeric_layer.shape}]")
+                      
             layers.append(numeric_layer)
         else:
             pass
-
+        
     joined = keras.layers.Concatenate(name="combines_inputs")(layers)
     feedforward_output = keras.Sequential(
         [
