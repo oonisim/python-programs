@@ -57,6 +57,10 @@ def _create_binary_classifier(feature_vocab_sizes, hyperparams):
             layers.append(embedding_output)
         elif feature_name in features.ONEHOT_CATEGORICAL_FEATURE_NAMES:
             vocab_size = feature_vocab_sizes[feature_name]
+            
+            # --------------------------------------------------------------------------------
+            # https://github.com/GoogleCloudPlatform/mlops-with-vertex-ai/issues/22
+            # --------------------------------------------------------------------------------
             # onehot_layer = keras.layers.experimental.preprocessing.CategoryEncoding(
             #     max_tokens=vocab_size,
             #     output_mode="binary",
