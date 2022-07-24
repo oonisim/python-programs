@@ -1,4 +1,5 @@
 import os
+import sys
 import string
 from itertools import (
     product
@@ -9,9 +10,24 @@ from typing import (
     Any,
     Optional,
 )
+import contextlib
 
 CSV_FIELD_DELIMITER: str = ","
 OS_EOL_CHARACTER = os.linesep
+
+
+@contextlib.contextmanager
+def smart_open(filename=None):
+    if filename and filename != '-':
+        fh = open(filename, 'w', encoding='utf-8')
+    else:
+        fh = sys.stdout
+
+    try:
+        yield fh
+    finally:
+        if fh is not sys.stdout:
+            fh.close()
 
 
 def generate_alphabet_combinations(length: int = 2) -> List[str]:

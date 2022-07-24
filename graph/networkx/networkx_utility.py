@@ -17,7 +17,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import networkx as nx
 
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+logging.basicConfig(stream=sys.stderr, level=logging.ERROR)
 logger = logging.getLogger(__name__)
 
 

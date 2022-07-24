@@ -23,8 +23,10 @@ Might output something like this:
 40,10,-0.9
 #ERR,#ERR,#ERR
 """
-import logging
+import os.path
 import sys
+import logging
+import argparse
 from itertools import (
     product
 )
@@ -46,7 +48,8 @@ import pandas as pd
 from utility import (
     CSV_FIELD_DELIMITER,
     OS_EOL_CHARACTER,
-    is_number
+    is_number,
+    smart_open
 )
 from networkx_utility import (
     list_reverse_topological_sorted_paths_in_graph,
@@ -64,7 +67,7 @@ OPERATORS = {
 }
 
 
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+logging.basicConfig(stream=sys.stderr, level=logging.ERROR)
 logger = logging.getLogger(__name__)
 
 
@@ -344,7 +347,7 @@ def save_result_table(
     table: nx.DiGraph, 
     column_names: List[str], 
     row_indices: List[str],
-    path_to_file: str
+    path_to_file: str = None
 ):
     """Output the processed table to the output CSV
     Args:
@@ -353,7 +356,8 @@ def save_result_table(
         row_indices: row indicds of the source CSV file
         path_to_file: path to the CSV
     """
-    with open(path_to_file, "w", encoding="utf-8") as output:
+    # with open(path_to_file, "w", encoding="utf-8") as output:
+    with smart_open(path_to_file) as output:
         output.write(CSV_FIELD_DELIMITER.join(column_names) + OS_EOL_CHARACTER)
         for row in row_indices:
             line: List[str] = []
@@ -371,3 +375,28 @@ def save_result_table(
             logger.debug("save_result_table(): line to output %s", line)
             line_in_file = CSV_FIELD_DELIMITER.join(line) + OS_EOL_CHARACTER
             output.write(line_in_file)
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description='spreadsheet')
+    parser.add_argument('-i', '--input', type=str, required=True, help='path to the input CSV file')
+    parser.add_argument('-o', '--output', type=str, required=False, help='path to the output CSV file')
+    args = vars(parser.parse_args())
+
+    input_csv_path = args['input']
+    if not os.path.isfile(input_csv_path):
+        print(f"CSV file {input_csv_path} does not exit")
+        sys.exit(-1)
+
+    df: pd.DataFrame = load_table(input_csv_path)
+    COLUMN_NAMES = list(df.columns)
+    ROW_INDICES = list(df.index)
+    NUM_COLS = len(COLUMN_NAMES)
+    NUM_ROWS = len(df.index)
+
+    sheet = parse_table_into_graph(table=df)
+    process_table(table=sheet)
+    save_result_table(
+        table=sheet, column_names=COLUMN_NAMES, row_indices=ROW_INDICES
+    )
