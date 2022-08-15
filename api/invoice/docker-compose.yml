@@ -1,0 +1,20 @@
+version: '3'
+
+services:
+  revproxy:
+    restart: always
+    build: ./deployment_config/nginx
+    ports:
+      - 80:80
+    links:
+      - api:api
+
+  api:
+    restart: always
+    build: ./
+    expose:
+     - 5000
+    volumes:
+      - './database:/tmp/database'
+    env_file:
+      - var.env
