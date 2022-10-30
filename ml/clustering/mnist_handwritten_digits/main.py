@@ -40,6 +40,7 @@ from utility import (
 # Main class
 # ================================================================================
 class KMeans(Base):
+    # pylint disable=too-many-instance-attributes
     """
     Main class for [TBD]
     """
@@ -54,27 +55,25 @@ class KMeans(Base):
     # --------------------------------------------------------------------------------
     # Instance
     # --------------------------------------------------------------------------------
+    def normalize(self, X: np.ndarray):
+        """(X - X_mean) / STD(X)"""
+        return (X - X.mean(axis=0)) / np.std(X, axis=0)
+
     def __init__(self):
         super().__init__()
         # Digit data
         self.data, self.labels, self.n_labels = load_digit_data()
-        self.N = len(self.data)    # Number of data points
+        self.N = len(self.data)     # Number of data points
+        self.K = self.n_labels      # Number of centroids (K means)
 
         # Number of principal components to use to represent a digit
-        self.D: int = 2         # Dimension=2
+        self.D: int = 2             # Dimension=2
 
-        # PCA reduced data of digits
-        X: np.ndarray = pca_reduce_data(data=self.data, n_components=self.D)
-        X_meaned: np.ndarray = X - X.mean(axis=0)
-        self.X: np.ndarray = X_meaned / X.std(axis=0)
+        # PCA reduced data of digits into 2 dimensional (PCA0, PCA1)
+        self.X: np.ndarray = self.normalize(pca_reduce_data(data=self.data, n_components=self.D))
 
-        # Choose the initial centroids:(n_labels, D) from X at random.
-        self.centroids: np.ndarray = self.X[
-            np.random.choice(a=self.N, size=self.n_labels, replace=False),
-            :
-        ]
-        assert self.centroids.shape == (self.n_labels, self.D), \
-            f"centroid shape expected {(self.n_labels, self.D)} bot {self.centroids.shape}."
+        # Set initial centroids from X at random
+        self.centroids: np.ndarray = self.X[np.random.choice(self.N, self.n_labels)]
 
         # Number of training to run
         self.epoch: int = 1000
@@ -86,43 +85,45 @@ class KMeans(Base):
         # --------------------------------------------------------------------------------
         # Cluster the digits deta in two principal components space with n_labels centroids
         # --------------------------------------------------------------------------------
-        # Get Distances to all points form each centroids.
-        # For each x:(1, D), get distance from 10 centroids:(10,D).
-        # -> distances:(10, D) = ((x:(1, D) - centroids(10, D)) **2).sum(axis=-1)
-        #
-        # Apply the calculation to N number of x:(1, D).
-        # -> Distances:(N, 10) = X:(N, D) and centroids:(10, D)
-        # 1. X:(N, D) -> X:(N, 1, D)
-        # 2. ((X:(N, 1, D) - centroids:(10, D))**2).sum(axis=-1)
-        distances: np.ndarray = ((self.X[:, np.newaxis, :] - self.centroids)**2).sum(axis=-1)
-        assert distances.shape == (self.N, self.n_labels), \
-            f"distances.shape expected {(self.N, self.n_labels)} got {distances.shape}."
 
-        # List of the closest centroid id to each X
-        # closest:(N, 1) = distances.argmin(axis=-1)
-        closest_centroid_id_to_x: np.ndarray = distances.argmin(axis=-1)
-        assert closest_centroid_id_to_x.shape == (self.N,), \
-            f"closest_centroid_id_to_x.shape expected {(self.N,)} got {closest_centroid_id_to_x.shape}."
+        # Calculate the distance from each x to centroids (each (x, c(n)) pair) -> row wise sum (axis=-1)
+        # (X:(N, D) - centroids:(K, D))**2.sum(axis=-1)
+        distances: np.ndarray = np.square(      # Shape (N, D)
+            self.X[                             # Shape (N, 1, D) for broadcast
+                :,
+                np.newaxis,
+                :
+            ] - self.centroids                  # (K, D) -> (1, K, D) broadcast
+        ).sum(axis=-1)                          # (N, K, D) -> (N, K) reduce
+        assert distances.shape == (self.N, self.K), \
+            f"distances.shape expected {(self.N, self.K)} got {distances.shape}"
 
-        # Get 10 x cluster where each cluster is close to a current centroid
-        centroid_clusters: List[np.ndarray] = list()
-        for cluster_id in range(0, self.n_labels):
-            centroid_cluster_selector: np.ndarray = (closest_centroid_id_to_x == cluster_id)
-            cluster: np.ndarray = self.X[centroid_cluster_selector]
+        # Find the nearest centroid for each x -> row-wise argmin
+        nearest_centroid_id_to_x: np.ndarray = distances.argmin(axis=-1)
 
-            num_in_cluster: np.ndarray = centroid_cluster_selector.astype(int).sum()
-            assert cluster.shape == (num_in_cluster, self.D), \
-                f"cluster.shape expected {(num_in_cluster, self.D)} got {cluster.shape}."
-            centroid_clusters.append(cluster)
+        # Get a cluster of x for each centroid
+        clusters: List[np.ndarray] = []
+        for cluster_id in range(0, self.K):
+            # Extract the group of x nearest to the current centroid
+            cluster: np.ndarray = self.X[
+                nearest_centroid_id_to_x == cluster_id
+            ]
+            # Cluster shape is (num_x_in_cluster, D)
+            num_x_in_cluster: np.ndarray = (nearest_centroid_id_to_x == cluster_id).astype(int).sum()
+            assert cluster.shape == (num_x_in_cluster, self.D), \
+                f"cluster.shape expected {(num_x_in_cluster, self.D)} got {cluster.shape}."
 
-        # Update the centroids from the cluster
-        # New coordinate of a centroid:(1,D) = cluster.mean(axis=0)
-        for cluster_id in range(0, self.n_labels):
-            self.centroids[cluster_id] = centroid_clusters[cluster_id].mean(axis=0)
+            clusters.append(cluster)
+
+        # Update the centroid coordinate for each cluster identified
+        for cluster_id in range(len(clusters)):
+            # column-wise mean of the x in the cluster is the new centroid
+            self.centroids[cluster_id] = clusters[cluster_id].mean(axis=0)
+            assert self.centroids.shape == (self.K, self.D)
 
     def fit_transform(self):
         try:
-            for i in range(self.epoch):
+            for _ in range(self.epoch):
                 self.update_centroids()
 
         except (KeyError, IndexError) as e:
@@ -154,11 +155,11 @@ def main():
     sc = plt.scatter(X[:, 0], X[:, 1], c=labels, cmap=plt.cm.Set1, edgecolor="k")
     plt.colorbar(sc)
     plt.xlabel("PCA1")
-    plt.ylabel("PCA1")
+    plt.ylabel("PCA2")
 
     # Plot centroids
     for i in range(len(centroids)):
-        label = TextPath((0,0), str(i))
+        # label = TextPath((0,0), str(i))
         # [marker thickness] https://stackoverflow.com/questions/17285163/
         plt.plot(centroids[i, 0], centroids[i, 1], color="red", marker="x", markersize=20, mew=5)
 
