@@ -7,12 +7,18 @@ import calendar
 from typing import (
     List,
     Dict,
+    Tuple,
 )
 
 import dateutil
 # from dateutil.tz import tzutc
 import datefinder
 import holidays
+import numpy as np
+
+from constant import (
+    TYPE_FLOAT,
+)
 
 
 # --------------------------------------------------------------------------------
@@ -23,8 +29,14 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 def get_datetime_components(date_time: datetime) -> dict:
     """Extract date/time components as dictionary
+    weekday is an integer, where Monday is 0 and Sunday is 6.
+    See https://docs.python.org/3/library/datetime.html#datetime.datetime.weekday
+
+    To have Monday as 1 and Sunday as 7, need to use isoweekday()
+    See https://docs.python.org/3/library/datetime.html#datetime.datetime.isoweekday
+
     Args:
-        date_time: datetime instane to extract components
+        date_time: datetime instance to extract components
     """
     return {
         "year": date_time.year,
@@ -117,7 +129,7 @@ def parse_date_string_as_string(date_str: str, formats=None, year_first=False) -
         except ValueError as e:
             pass
 
-    logger.debug(parsed)
+    logger.debug("$s", parsed)
     if len(parsed) == 0 or len(parsed) > 1:
         raise RuntimeError(f"invalid date_str [{date_str}]")
 
@@ -293,3 +305,82 @@ def get_holidays(
         )
 
     return result
+
+
+def get_cyclic_time_of_day(hours: int, minutes: int, seconds: int) -> Tuple[TYPE_FLOAT, TYPE_FLOAT]:
+    """Encode time in day as cyclic
+    https://datascience.stackexchange.com/a/6335/68313
+    http://blog.davidkaleko.com/feature-engineering-cyclical-features.html
+
+    Args:
+        hours: hours in day
+        minutes: minutes in the hour
+        seconds: seconds in the minute
+    Returns: (time in sin, time in cos)
+    """
+    seconds_in_day = TYPE_FLOAT(24 * 60 * 60)
+    assert 0 <= hours < 24, f"invalid hours [{hours}]"
+    assert 0 <= hours < 60, f"invalid minutes [{minutes}]"
+    assert 0 <= hours < 60, f"invalid seconds [{seconds}]"
+
+    seconds: TYPE_FLOAT = \
+        TYPE_FLOAT(60) * TYPE_FLOAT(60) * TYPE_FLOAT(hours) + \
+        TYPE_FLOAT(60) * TYPE_FLOAT(minutes) + \
+        TYPE_FLOAT(seconds)
+
+    time_in_sin: TYPE_FLOAT
+    time_in_cos: TYPE_FLOAT
+    time_in_sin = x = np.sin(TYPE_FLOAT(2) * TYPE_FLOAT(np.pi) * seconds / seconds_in_day)
+    time_in_cos = y = np.cos(TYPE_FLOAT(2) * TYPE_FLOAT(np.pi) * seconds / seconds_in_day)
+
+    logger.debug("get_cyclic_time_of_day(): x/sin=[%s] y/cos=[%s]", time_in_sin, time_in_cos)
+    return x, y
+
+
+def get_cyclic_day_of_week(day_of_week: int) -> Tuple[TYPE_FLOAT, TYPE_FLOAT]:
+    """Encode day of week as cyclic.
+    day_of_week is an integer, where Monday is 0 and Sunday is 6.
+    See https://docs.python.org/3/library/datetime.html#datetime.datetime.weekday
+
+    https://datascience.stackexchange.com/a/6335/68313
+    http://blog.davidkaleko.com/feature-engineering-cyclical-features.html
+
+    Args:
+        day_of_week: day in week (1-7) where 1 = Sunday
+    Returns: (day_of_week in sin, day_of_week in cos)
+    """
+    days_in_week = TYPE_FLOAT(7)
+    assert 0 <= day_of_week < 7, f"invalid day_of_week [{day_of_week}]. Monday is 0 and Sunday is 6"
+
+    day_of_week_in_sin: TYPE_FLOAT
+    day_of_week_in_cos: TYPE_FLOAT
+
+    day_of_week_in_sin = x = np.sin(TYPE_FLOAT(2) * TYPE_FLOAT(np.pi) * day_of_week / days_in_week)
+    day_of_week_in_cos = y = np.cos(TYPE_FLOAT(2) * TYPE_FLOAT(np.pi) * day_of_week / days_in_week)
+
+    logger.debug("get_cyclic_day_of_week(): x/sin=[%s] y/cos=[%s]", day_of_week_in_sin, day_of_week_in_cos)
+    return x, y
+
+
+def get_cyclic_month_of_year(months: int) -> Tuple[TYPE_FLOAT, TYPE_FLOAT]:
+    """Encode month in year as cyclic and shift the values down by one such that
+    it extends from 0 to 11, for convenience
+
+    https://datascience.stackexchange.com/a/6335/68313
+    http://blog.davidkaleko.com/feature-engineering-cyclical-features.html
+
+    Args:
+        months: month in year (1-12)
+    Returns: (month in sin, month in cos)
+    """
+    months_in_year = TYPE_FLOAT(12)
+    assert 1 <= months <= 12, f"invalid months [{months}]"
+
+    month_in_sin: TYPE_FLOAT
+    month_in_cos: TYPE_FLOAT
+
+    month_in_sin = x = np.sin(TYPE_FLOAT(2) * TYPE_FLOAT(np.pi) * (months - 1) / months_in_year)
+    month_in_cos = y = np.cos(TYPE_FLOAT(2) * TYPE_FLOAT(np.pi) * (months - 1) / months_in_year)
+
+    logger.debug("get_cyclic_month_of_year(): x/sin=[%s] y/cos=[%s]", month_in_sin, month_in_cos)
+    return x, y
