@@ -1,26 +1,23 @@
 """
 Python date/time utility
 """
-import sys
 import logging
 import datetime
 import calendar
 from typing import (
     List,
     Dict,
-    Tuple,
-    Any,
-    Optional,
-    Callable
 )
 
 import dateutil
-from dateutil import relativedelta
-from dateutil.tz import tzutc
-
+# from dateutil.tz import tzutc
 import datefinder
+import holidays
 
 
+# --------------------------------------------------------------------------------
+# module logger
+# --------------------------------------------------------------------------------
 logger: logging.Logger = logging.getLogger(__name__)
 
 
@@ -138,7 +135,7 @@ def get_dates_from_string(
     Returns: datetime
     Raises: RuntimeError is no date
     """
-    dates = list(datefinder.find_dates(text, source=False, index=False, strict=strict, base_date=None))
+    dates = list(datefinder.find_dates(text, source=False, index=False, strict=strict))
     if len(dates) <= 0:
         raise RuntimeError(f"invalid text with no date: [{text}]")
 
@@ -221,6 +218,15 @@ def get_datetime_after_duration(
     Args:
         start_datetime: start point datetime
     Returns: datetime instance
+    :param microseconds:
+    :param seconds:
+    :param minutes:
+    :param hours:
+    :param days:
+    :param weeks:
+    :param start_datetime:
+    :param months:
+    :param years:
     """
     end_datetime = start_datetime + dateutil.relativedelta.relativedelta(
         years=years,
@@ -247,3 +253,43 @@ def get_elapsed_time(func, arg):
     end = datetime.datetime.now()
     elapsed = end - start
     return elapsed
+
+
+def get_holidays(
+        country: str,
+        states: List[str] = None,
+        years: List[int] = None
+) -> Dict[datetime.datetime, str]:
+    """Get holidays of the country and state (optional).
+    If state is not specified, the common holidays for all states will be provided.
+
+    holidays.utils.country_holidays(
+        country, subdiv=None, years=None, expand=True, observed=True
+    )
+    observed:
+        Whether to include the dates of when public holiday are observed
+        (e.g. a holiday falling on a Sunday being observed the following Monday).
+        False may not work for all countries.
+
+    Args:
+        country: ISO 3166-1 alpha-2 code, e.g. AU
+        states: states in the country e.g. ACT (default), NSW, NT, QLD, SA, TAS, VIC, WA in AU
+        years: list of years to get holidays from. If None, empty dict is returned
+    """
+    assert years is not None and len(years) > 0, "years is required"
+
+    result: Dict[datetime.datetime, str] = dict()
+    if states is not None and len(states) > 0:
+        for state in states:
+            result |= holidays.utils.country_holidays(
+                country=country,
+                subdiv=state,
+                years=years
+            )
+    else:   # country common holidays
+        result = holidays.utils.country_holidays(
+            country=country,
+            years=years
+        )
+
+    return result
