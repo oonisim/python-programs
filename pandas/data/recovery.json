@@ -1,0 +1,1979 @@
+[
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/1/22 8:16 AM",
+    "processTime": "4:05",
+    "supplier": "Mary",
+    "suppliedM3": 5.09,
+    "recoveredM3": 4.13
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 1, 2022",
+    "timeStart": "8:29:00 AM",
+    "timeEnd": "9:07:00 AM",
+    "supplierCode": "har",
+    "suppliedM3": 2,
+    "recoveredM3": 1.55
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 1, 2022",
+    "timeStart": "9:27:00 AM",
+    "timeEnd": "11:28:00 AM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.8,
+    "recoveredM3": 4.15
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 1, 2022",
+    "timeStart": "11:38:00 AM",
+    "timeEnd": "12:21:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 1.95,
+    "recoveredM3": 1.55
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/1/22 12:34 PM",
+    "processTime": "1:50",
+    "supplier": "Mary Therese",
+    "suppliedM3": 3.78,
+    "recoveredM3": 2.56
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 1, 2022",
+    "timeStart": "12:40:00 PM",
+    "timeEnd": "2:04:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 3.95,
+    "recoveredM3": 2.55
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 1, 2022",
+    "timeStart": "2:25:00 PM",
+    "timeEnd": "4:29:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 5.3,
+    "recoveredM3": 3.1
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/1/22 2:48 PM",
+    "processTime": "1:20",
+    "supplier": "Mary Therese",
+    "suppliedM3": 3.55,
+    "recoveredM3": 2.59
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 2, 2022",
+    "timeStart": "8:16:00 AM",
+    "timeEnd": "10:55:00 AM",
+    "supplierCode": "tom",
+    "suppliedM3": 4.2,
+    "recoveredM3": 3.65
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/2/22 8:27 AM",
+    "processTime": "1:25",
+    "supplier": "Mary",
+    "suppliedM3": 5.02,
+    "recoveredM3": 4.13
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/2/22 10:17 AM",
+    "processTime": "4:00",
+    "supplier": "Mary",
+    "suppliedM3": 4.95,
+    "recoveredM3": 3.58
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 2, 2022",
+    "timeStart": "11:25:00 AM",
+    "timeEnd": "12:42:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 4.1,
+    "recoveredM3": 3.4
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 2, 2022",
+    "timeStart": "1:12:00 PM",
+    "timeEnd": "3:27:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.25,
+    "recoveredM3": 4.3
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/2/22 2:46 PM",
+    "processTime": "1:10",
+    "supplier": "Mary Jane",
+    "suppliedM3": 5.03,
+    "recoveredM3": 3.67
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 2, 2022",
+    "timeStart": "3:53:00 PM",
+    "timeEnd": "6:59:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 4.05,
+    "recoveredM3": 1.85
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 3, 2022",
+    "timeStart": "8:46:00 AM",
+    "timeEnd": "9:38:00 AM",
+    "supplierCode": "har",
+    "suppliedM3": 2.05,
+    "recoveredM3": 1.45
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/3/22 8:50 AM",
+    "processTime": "2:10",
+    "supplier": "Mary Anne",
+    "suppliedM3": 3.15,
+    "recoveredM3": 2.5
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 3, 2022",
+    "timeStart": "10:22:00 AM",
+    "timeEnd": "1:23:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.35,
+    "recoveredM3": 4.05
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/3/22 11:39 AM",
+    "processTime": "3:25",
+    "supplier": "Mary",
+    "suppliedM3": 4.99,
+    "recoveredM3": 3.45
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 3, 2022",
+    "timeStart": "1:59:00 PM",
+    "timeEnd": "3:44:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 4.15,
+    "recoveredM3": 2
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/3/22 3:44 PM",
+    "processTime": "1:40",
+    "supplier": "Mary",
+    "suppliedM3": 4.99,
+    "recoveredM3": 2.8
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/4/22 9:04 AM",
+    "processTime": "3:25",
+    "supplier": "Mary",
+    "suppliedM3": 5.01,
+    "recoveredM3": 3.46
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 4, 2022",
+    "timeStart": "9:24:00 AM",
+    "timeEnd": "10:02:00 AM",
+    "supplierCode": "har",
+    "suppliedM3": 1.9,
+    "recoveredM3": 1.45
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 4, 2022",
+    "timeStart": "11:04:00 AM",
+    "timeEnd": "12:15:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 3.85,
+    "recoveredM3": 2.15
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 4, 2022",
+    "timeStart": "1:16:00 PM",
+    "timeEnd": "2:55:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 2,
+    "recoveredM3": 1.4
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/4/22 1:48 PM",
+    "processTime": "0:50",
+    "supplier": "Mary Anne",
+    "suppliedM3": 3.14,
+    "recoveredM3": 2.28
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/4/22 3:42 PM",
+    "processTime": "1:25",
+    "supplier": "Mary",
+    "suppliedM3": 4.93,
+    "recoveredM3": 3.06
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 5, 2022",
+    "timeStart": "8:24:00 AM",
+    "timeEnd": "9:19:00 AM",
+    "supplierCode": "har",
+    "suppliedM3": 2,
+    "recoveredM3": 1.6
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/5/22 8:30 AM",
+    "processTime": "1:15",
+    "supplier": "Mary Jane",
+    "suppliedM3": 4.95,
+    "recoveredM3": 4.06
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 5, 2022",
+    "timeStart": "9:32:00 AM",
+    "timeEnd": "11:42:00 AM",
+    "supplierCode": "dic",
+    "suppliedM3": 5.45,
+    "recoveredM3": 4.25
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/5/22 10:00 AM",
+    "processTime": "1:50",
+    "supplier": "Mary Jane",
+    "suppliedM3": 4.72,
+    "recoveredM3": 3.48
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/5/22 12:08 PM",
+    "processTime": "2:20",
+    "supplier": "Mary Jane",
+    "suppliedM3": 4.95,
+    "recoveredM3": 3.46
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 5, 2022",
+    "timeStart": "12:08:00 PM",
+    "timeEnd": "2:08:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 3.7,
+    "recoveredM3": 2.55
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 5, 2022",
+    "timeStart": "2:23:00 PM",
+    "timeEnd": "3:39:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 3.8,
+    "recoveredM3": 2.45
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/5/22 2:59 PM",
+    "processTime": "1:30",
+    "supplier": "Mary Jane",
+    "suppliedM3": 5.07,
+    "recoveredM3": 3.46
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 5, 2022",
+    "timeStart": "4:03:00 PM",
+    "timeEnd": "6:13:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 3.9,
+    "recoveredM3": 2.65
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 6, 2022",
+    "timeStart": "8:11:00 AM",
+    "timeEnd": "10:49:00 AM",
+    "supplierCode": "tom",
+    "suppliedM3": 3.85,
+    "recoveredM3": 2.35
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/6/22 8:19 AM",
+    "processTime": "0:50",
+    "supplier": "Mary Anne",
+    "suppliedM3": 2.99,
+    "recoveredM3": 2.56
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/6/22 9:22 AM",
+    "processTime": "1:15",
+    "supplier": "Mary Jane",
+    "suppliedM3": 4.71,
+    "recoveredM3": 3.14
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 6, 2022",
+    "timeStart": "11:02:00 AM",
+    "timeEnd": "12:27:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 1.95,
+    "recoveredM3": 1.4
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/6/22 11:11 AM",
+    "processTime": "3:50",
+    "supplier": "Mary Therese",
+    "suppliedM3": 4.15,
+    "recoveredM3": 3.26
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 6, 2022",
+    "timeStart": "12:45:00 PM",
+    "timeEnd": "3:06:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 5.6,
+    "recoveredM3": 3.7
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/6/22 3:16 PM",
+    "processTime": "0:45",
+    "supplier": "Mary Anne",
+    "suppliedM3": 2.82,
+    "recoveredM3": 2.12
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 6, 2022",
+    "timeStart": "3:29:00 PM",
+    "timeEnd": "8:04:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.65,
+    "recoveredM3": 4.25
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 7, 2022",
+    "timeStart": "8:21:00 AM",
+    "timeEnd": "11:31:00 AM",
+    "supplierCode": "dic",
+    "suppliedM3": 5.15,
+    "recoveredM3": 3.8
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/7/22 8:22 AM",
+    "processTime": "0:45",
+    "supplier": "Mary Anne",
+    "suppliedM3": 2.81,
+    "recoveredM3": 2.35
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/7/22 9:34 AM",
+    "processTime": "2:40",
+    "supplier": "Mary",
+    "suppliedM3": 5.05,
+    "recoveredM3": 3.93
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 7, 2022",
+    "timeStart": "11:49:00 AM",
+    "timeEnd": "2:17:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.55,
+    "recoveredM3": 4.5
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/7/22 12:31 PM",
+    "processTime": "1:05",
+    "supplier": "Mary Therese",
+    "suppliedM3": 3.75,
+    "recoveredM3": 2.27
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/7/22 1:50 PM",
+    "processTime": "2:45",
+    "supplier": "Mary Jane",
+    "suppliedM3": 4.83,
+    "recoveredM3": 3.59
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 7, 2022",
+    "timeStart": "2:32:00 PM",
+    "timeEnd": "3:04:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 1.95,
+    "recoveredM3": 1.4
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 7, 2022",
+    "timeStart": "3:24:00 PM",
+    "timeEnd": "4:03:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 2.05,
+    "recoveredM3": 1.4
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/8/22 8:19 AM",
+    "processTime": "2:30",
+    "supplier": "Mary Jane",
+    "suppliedM3": 4.75,
+    "recoveredM3": 3.52
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 8, 2022",
+    "timeStart": "8:24:00 AM",
+    "timeEnd": "10:03:00 AM",
+    "supplierCode": "dic",
+    "suppliedM3": 5.95,
+    "recoveredM3": 4
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 8, 2022",
+    "timeStart": "10:31:00 AM",
+    "timeEnd": "1:14:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 4.2,
+    "recoveredM3": 3
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/8/22 11:05 AM",
+    "processTime": "0:55",
+    "supplier": "Mary Therese",
+    "suppliedM3": 3.44,
+    "recoveredM3": 2.38
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/8/22 12:18 PM",
+    "processTime": "1:20",
+    "supplier": "Mary Jane",
+    "suppliedM3": 5.05,
+    "recoveredM3": 3.31
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 8, 2022",
+    "timeStart": "1:35:00 PM",
+    "timeEnd": "6:06:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.4,
+    "recoveredM3": 3.7
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/8/22 2:05 PM",
+    "processTime": "1:00",
+    "supplier": "Mary",
+    "suppliedM3": 4.94,
+    "recoveredM3": 3.3
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/8/22 3:38 PM",
+    "processTime": "0:45",
+    "supplier": "Mary Therese",
+    "suppliedM3": 3.73,
+    "recoveredM3": 2.43
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/9/22 8:21 AM",
+    "processTime": "1:40",
+    "supplier": "Mary Therese",
+    "suppliedM3": 3.31,
+    "recoveredM3": 2.17
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 9, 2022",
+    "timeStart": "8:23:00 AM",
+    "timeEnd": "9:50:00 AM",
+    "supplierCode": "tom",
+    "suppliedM3": 3.85,
+    "recoveredM3": 2.85
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 9, 2022",
+    "timeStart": "10:11:00 AM",
+    "timeEnd": "2:11:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.1,
+    "recoveredM3": 4.2
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/9/22 10:25 AM",
+    "processTime": "3:25",
+    "supplier": "Mary Jane",
+    "suppliedM3": 4.72,
+    "recoveredM3": 3.07
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/9/22 2:00 PM",
+    "processTime": "1:55",
+    "supplier": "Mary Therese",
+    "suppliedM3": 3.59,
+    "recoveredM3": 2.3
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 9, 2022",
+    "timeStart": "2:22:00 PM",
+    "timeEnd": "2:53:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 1.9,
+    "recoveredM3": 1.35
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 9, 2022",
+    "timeStart": "3:13:00 PM",
+    "timeEnd": "4:49:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 4.15,
+    "recoveredM3": 3.2
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 10, 2022",
+    "timeStart": "8:35:00 AM",
+    "timeEnd": "11:20:00 AM",
+    "supplierCode": "tom",
+    "suppliedM3": 4.25,
+    "recoveredM3": 3.05
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/10/22 8:50 AM",
+    "processTime": "4:05",
+    "supplier": "Mary",
+    "suppliedM3": 5.04,
+    "recoveredM3": 3.33
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 10, 2022",
+    "timeStart": "11:50:00 AM",
+    "timeEnd": "1:00:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 3.7,
+    "recoveredM3": 2.55
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/10/22 1:37 PM",
+    "processTime": "3:10",
+    "supplier": "Mary Therese",
+    "suppliedM3": 3.31,
+    "recoveredM3": 2.04
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 10, 2022",
+    "timeStart": "1:38:00 PM",
+    "timeEnd": "2:49:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 4.05,
+    "recoveredM3": 2.65
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 10, 2022",
+    "timeStart": "3:40:00 PM",
+    "timeEnd": "8:17:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.2,
+    "recoveredM3": 3.8
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/11/22 9:03 AM",
+    "processTime": "1:15",
+    "supplier": "Mary Jane",
+    "suppliedM3": 5.18,
+    "recoveredM3": 3.86
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 11, 2022",
+    "timeStart": "9:16:00 AM",
+    "timeEnd": "11:26:00 AM",
+    "supplierCode": "dic",
+    "suppliedM3": 5.55,
+    "recoveredM3": 3.25
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/11/22 11:25 AM",
+    "processTime": "3:40",
+    "supplier": "Mary Therese",
+    "suppliedM3": 3.76,
+    "recoveredM3": 2.83
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 11, 2022",
+    "timeStart": "12:45:00 PM",
+    "timeEnd": "4:06:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 5.85,
+    "recoveredM3": 3.9
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 12, 2022",
+    "timeStart": "8:24:00 AM",
+    "timeEnd": "9:08:00 AM",
+    "supplierCode": "har",
+    "suppliedM3": 2.05,
+    "recoveredM3": 1.7
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/12/22 8:28 AM",
+    "processTime": "1:25",
+    "supplier": "Mary Jane",
+    "suppliedM3": 5.06,
+    "recoveredM3": 3.49
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 12, 2022",
+    "timeStart": "9:31:00 AM",
+    "timeEnd": "1:14:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.05,
+    "recoveredM3": 4.35
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/12/22 10:16 AM",
+    "processTime": "1:30",
+    "supplier": "Mary Anne",
+    "suppliedM3": 3.18,
+    "recoveredM3": 2.63
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/12/22 11:59 AM",
+    "processTime": "2:00",
+    "supplier": "Mary Anne",
+    "suppliedM3": 3.14,
+    "recoveredM3": 2.5
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 12, 2022",
+    "timeStart": "1:36:00 PM",
+    "timeEnd": "3:39:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 5.35,
+    "recoveredM3": 3.55
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/12/22 2:20 PM",
+    "processTime": "1:35",
+    "supplier": "Mary Jane",
+    "suppliedM3": 4.91,
+    "recoveredM3": 3.49
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 12, 2022",
+    "timeStart": "4:03:00 PM",
+    "timeEnd": "4:44:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 1.95,
+    "recoveredM3": 1.25
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/12/22 4:08 PM",
+    "processTime": "0:50",
+    "supplier": "Mary Anne",
+    "suppliedM3": 3.05,
+    "recoveredM3": 2.25
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/13/22 8:22 AM",
+    "processTime": "1:10",
+    "supplier": "Mary Jane",
+    "suppliedM3": 5.29,
+    "recoveredM3": 3.58
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 13, 2022",
+    "timeStart": "8:27:00 AM",
+    "timeEnd": "10:27:00 AM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.95,
+    "recoveredM3": 5.5
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/13/22 9:54 AM",
+    "processTime": "1:40",
+    "supplier": "Mary",
+    "suppliedM3": 4.96,
+    "recoveredM3": 3.59
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 13, 2022",
+    "timeStart": "10:57:00 AM",
+    "timeEnd": "1:02:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 5.95,
+    "recoveredM3": 4.05
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/13/22 12:03 PM",
+    "processTime": "2:35",
+    "supplier": "Mary Therese",
+    "suppliedM3": 3.33,
+    "recoveredM3": 2.6
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 13, 2022",
+    "timeStart": "1:20:00 PM",
+    "timeEnd": "2:06:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 1.95,
+    "recoveredM3": 1.4
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 13, 2022",
+    "timeStart": "2:16:00 PM",
+    "timeEnd": "6:17:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.75,
+    "recoveredM3": 3.95
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/13/22 2:52 PM",
+    "processTime": "1:00",
+    "supplier": "Mary Anne",
+    "suppliedM3": 2.91,
+    "recoveredM3": 2.2
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/13/22 4:09 PM",
+    "processTime": "2:10",
+    "supplier": "Mary",
+    "suppliedM3": 5.09,
+    "recoveredM3": 3.49
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/14/22 8:12 AM",
+    "processTime": "1:00",
+    "supplier": "Mary Anne",
+    "suppliedM3": 3.12,
+    "recoveredM3": 2.6
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 14, 2022",
+    "timeStart": "8:13:00 AM",
+    "timeEnd": "9:41:00 AM",
+    "supplierCode": "dic",
+    "suppliedM3": 5.15,
+    "recoveredM3": 3.4
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/14/22 9:39 AM",
+    "processTime": "2:10",
+    "supplier": "Mary Jane",
+    "suppliedM3": 4.81,
+    "recoveredM3": 3.35
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 14, 2022",
+    "timeStart": "10:03:00 AM",
+    "timeEnd": "12:32:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 5.45,
+    "recoveredM3": 4.2
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/14/22 12:10 PM",
+    "processTime": "3:15",
+    "supplier": "Mary",
+    "suppliedM3": 4.94,
+    "recoveredM3": 3.56
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 14, 2022",
+    "timeStart": "12:54:00 PM",
+    "timeEnd": "3:09:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 5.15,
+    "recoveredM3": 3
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 14, 2022",
+    "timeStart": "3:22:00 PM",
+    "timeEnd": "4:19:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 1.9,
+    "recoveredM3": 1.35
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/14/22 3:42 PM",
+    "processTime": "1:45",
+    "supplier": "Mary",
+    "suppliedM3": 4.92,
+    "recoveredM3": 3
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/15/22 8:13 AM",
+    "processTime": "1:00",
+    "supplier": "Mary Therese",
+    "suppliedM3": 4.11,
+    "recoveredM3": 2.89
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 15, 2022",
+    "timeStart": "8:19:00 AM",
+    "timeEnd": "10:48:00 AM",
+    "supplierCode": "tom",
+    "suppliedM3": 4.1,
+    "recoveredM3": 2.85
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/15/22 9:41 AM",
+    "processTime": "2:50",
+    "supplier": "Mary",
+    "suppliedM3": 5.06,
+    "recoveredM3": 3.96
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 15, 2022",
+    "timeStart": "11:10:00 AM",
+    "timeEnd": "12:35:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 4,
+    "recoveredM3": 3.15
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/15/22 12:43 PM",
+    "processTime": "1:20",
+    "supplier": "Mary",
+    "suppliedM3": 4.96,
+    "recoveredM3": 3.37
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 15, 2022",
+    "timeStart": "12:57:00 PM",
+    "timeEnd": "2:23:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 3.8,
+    "recoveredM3": 2.15
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/15/22 2:30 PM",
+    "processTime": "0:45",
+    "supplier": "Mary Anne",
+    "suppliedM3": 3,
+    "recoveredM3": 2.23
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 15, 2022",
+    "timeStart": "2:38:00 PM",
+    "timeEnd": "3:10:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 1.9,
+    "recoveredM3": 1.4
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 15, 2022",
+    "timeStart": "3:23:00 PM",
+    "timeEnd": "6:04:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 4.15,
+    "recoveredM3": 2
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/15/22 3:34 PM",
+    "processTime": "1:00",
+    "supplier": "Mary Anne",
+    "suppliedM3": 2.97,
+    "recoveredM3": 2.17
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/16/22 8:11 AM",
+    "processTime": "1:10",
+    "supplier": "Mary",
+    "suppliedM3": 4.98,
+    "recoveredM3": 3.78
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 16, 2022",
+    "timeStart": "8:30:00 AM",
+    "timeEnd": "9:17:00 AM",
+    "supplierCode": "har",
+    "suppliedM3": 2.05,
+    "recoveredM3": 1.7
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 16, 2022",
+    "timeStart": "9:28:00 AM",
+    "timeEnd": "10:53:00 AM",
+    "supplierCode": "tom",
+    "suppliedM3": 4.05,
+    "recoveredM3": 3.3
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/16/22 9:48 AM",
+    "processTime": "1:05",
+    "supplier": "Mary Therese",
+    "suppliedM3": 3.55,
+    "recoveredM3": 2.19
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/16/22 11:13 AM",
+    "processTime": "0:50",
+    "supplier": "Mary Anne",
+    "suppliedM3": 3.02,
+    "recoveredM3": 2.38
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 16, 2022",
+    "timeStart": "11:13:00 AM",
+    "timeEnd": "12:58:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.35,
+    "recoveredM3": 3.9
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/16/22 12:14 PM",
+    "processTime": "2:25",
+    "supplier": "Mary Jane",
+    "suppliedM3": 5.19,
+    "recoveredM3": 3.58
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 16, 2022",
+    "timeStart": "1:24:00 PM",
+    "timeEnd": "3:48:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 5.05,
+    "recoveredM3": 3.15
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/16/22 2:56 PM",
+    "processTime": "1:10",
+    "supplier": "Mary Anne",
+    "suppliedM3": 3.04,
+    "recoveredM3": 2.26
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 16, 2022",
+    "timeStart": "4:10:00 PM",
+    "timeEnd": "6:13:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.7,
+    "recoveredM3": 4
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 17, 2022",
+    "timeStart": "8:51:00 AM",
+    "timeEnd": "1:26:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 5.45,
+    "recoveredM3": 3.1
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/17/22 8:53 AM",
+    "processTime": "1:35",
+    "supplier": "Mary",
+    "suppliedM3": 4.96,
+    "recoveredM3": 3.22
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/17/22 11:13 AM",
+    "processTime": "2:00",
+    "supplier": "Mary Jane",
+    "suppliedM3": 4.74,
+    "recoveredM3": 3.09
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/17/22 2:12 PM",
+    "processTime": "3:30",
+    "supplier": "Mary Therese",
+    "suppliedM3": 4.55,
+    "recoveredM3": 2.39
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 17, 2022",
+    "timeStart": "2:14:00 PM",
+    "timeEnd": "3:25:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 4.15,
+    "recoveredM3": 2.8
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 17, 2022",
+    "timeStart": "4:05:00 PM",
+    "timeEnd": "5:35:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 1.95,
+    "recoveredM3": 1.2
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/18/22 9:02 AM",
+    "processTime": "2:20",
+    "supplier": "Mary Anne",
+    "suppliedM3": 2.92,
+    "recoveredM3": 2.32
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 18, 2022",
+    "timeStart": "9:29:00 AM",
+    "timeEnd": "11:15:00 AM",
+    "supplierCode": "tom",
+    "suppliedM3": 4.3,
+    "recoveredM3": 2.75
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 18, 2022",
+    "timeStart": "12:41:00 PM",
+    "timeEnd": "2:17:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 3.85,
+    "recoveredM3": 2.95
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/18/22 12:44 PM",
+    "processTime": "1:25",
+    "supplier": "Mary Anne",
+    "suppliedM3": 3.14,
+    "recoveredM3": 2.34
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/18/22 3:21 PM",
+    "processTime": "1:00",
+    "supplier": "Mary Therese",
+    "suppliedM3": 3.83,
+    "recoveredM3": 2.31
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 18, 2022",
+    "timeStart": "3:41:00 PM",
+    "timeEnd": "5:01:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 4.15,
+    "recoveredM3": 2.05
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/19/22 8:15 AM",
+    "processTime": "1:00",
+    "supplier": "Mary Therese",
+    "suppliedM3": 4.5,
+    "recoveredM3": 3.38
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 19, 2022",
+    "timeStart": "8:18:00 AM",
+    "timeEnd": "9:15:00 AM",
+    "supplierCode": "har",
+    "suppliedM3": 2,
+    "recoveredM3": 1.65
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 19, 2022",
+    "timeStart": "9:42:00 AM",
+    "timeEnd": "10:15:00 AM",
+    "supplierCode": "har",
+    "suppliedM3": 1.9,
+    "recoveredM3": 1.55
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/19/22 9:43 AM",
+    "processTime": "3:15",
+    "supplier": "Mary Anne",
+    "suppliedM3": 2.95,
+    "recoveredM3": 2.5
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 19, 2022",
+    "timeStart": "10:28:00 AM",
+    "timeEnd": "1:02:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 5.1,
+    "recoveredM3": 3.5
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 19, 2022",
+    "timeStart": "1:17:00 PM",
+    "timeEnd": "2:03:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 2,
+    "recoveredM3": 1.45
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/19/22 1:26 PM",
+    "processTime": "3:20",
+    "supplier": "Mary Jane",
+    "suppliedM3": 5.03,
+    "recoveredM3": 3.74
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 19, 2022",
+    "timeStart": "2:33:00 PM",
+    "timeEnd": "4:19:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 5.65,
+    "recoveredM3": 3.15
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/20/22 8:12 AM",
+    "processTime": "2:05",
+    "supplier": "Mary",
+    "suppliedM3": 4.94,
+    "recoveredM3": 4.07
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 20, 2022",
+    "timeStart": "8:18:00 AM",
+    "timeEnd": "11:08:00 AM",
+    "supplierCode": "dic",
+    "suppliedM3": 5.4,
+    "recoveredM3": 3.7
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/20/22 10:37 AM",
+    "processTime": "0:45",
+    "supplier": "Mary Therese",
+    "suppliedM3": 3.57,
+    "recoveredM3": 2.86
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 20, 2022",
+    "timeStart": "11:33:00 AM",
+    "timeEnd": "12:06:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 2,
+    "recoveredM3": 1.55
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/20/22 11:43 AM",
+    "processTime": "1:00",
+    "supplier": "Mary Therese",
+    "suppliedM3": 4.6,
+    "recoveredM3": 3.02
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 20, 2022",
+    "timeStart": "12:16:00 PM",
+    "timeEnd": "1:17:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 3.7,
+    "recoveredM3": 2.15
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/20/22 1:05 PM",
+    "processTime": "1:50",
+    "supplier": "Mary Therese",
+    "suppliedM3": 3.32,
+    "recoveredM3": 2.03
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 20, 2022",
+    "timeStart": "1:41:00 PM",
+    "timeEnd": "2:33:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 1.9,
+    "recoveredM3": 1.3
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 20, 2022",
+    "timeStart": "3:00:00 PM",
+    "timeEnd": "3:48:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 1.95,
+    "recoveredM3": 1.4
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/20/22 3:17 PM",
+    "processTime": "0:55",
+    "supplier": "Mary Therese",
+    "suppliedM3": 3.78,
+    "recoveredM3": 2.25
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 20, 2022",
+    "timeStart": "4:00:00 PM",
+    "timeEnd": "4:32:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 1.95,
+    "recoveredM3": 1.4
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 21, 2022",
+    "timeStart": "8:17:00 AM",
+    "timeEnd": "9:57:00 AM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.15,
+    "recoveredM3": 4.75
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/21/22 8:26 AM",
+    "processTime": "1:05",
+    "supplier": "Mary",
+    "suppliedM3": 5.09,
+    "recoveredM3": 3.6
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/21/22 9:53 AM",
+    "processTime": "0:50",
+    "supplier": "Mary Anne",
+    "suppliedM3": 3.03,
+    "recoveredM3": 2.48
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 21, 2022",
+    "timeStart": "10:19:00 AM",
+    "timeEnd": "11:27:00 AM",
+    "supplierCode": "har",
+    "suppliedM3": 1.9,
+    "recoveredM3": 1.4
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/21/22 11:06 AM",
+    "processTime": "2:20",
+    "supplier": "Mary Therese",
+    "suppliedM3": 3.73,
+    "recoveredM3": 2.48
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 21, 2022",
+    "timeStart": "11:43:00 AM",
+    "timeEnd": "12:58:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 1.95,
+    "recoveredM3": 1.45
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 21, 2022",
+    "timeStart": "1:10:00 PM",
+    "timeEnd": "2:12:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 3.7,
+    "recoveredM3": 1.85
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/21/22 1:57 PM",
+    "processTime": "1:25",
+    "supplier": "Mary",
+    "suppliedM3": 4.96,
+    "recoveredM3": 3.7
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 21, 2022",
+    "timeStart": "2:38:00 PM",
+    "timeEnd": "3:59:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 4.15,
+    "recoveredM3": 2.85
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/21/22 3:47 PM",
+    "processTime": "1:20",
+    "supplier": "Mary",
+    "suppliedM3": 5.1,
+    "recoveredM3": 3.08
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/23/22 8:11 AM",
+    "processTime": "1:25",
+    "supplier": "Mary Jane",
+    "suppliedM3": 4.93,
+    "recoveredM3": 3.65
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 23, 2022",
+    "timeStart": "8:23:00 AM",
+    "timeEnd": "9:55:00 AM",
+    "supplierCode": "tom",
+    "suppliedM3": 3.7,
+    "recoveredM3": 2.1
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/23/22 10:03 AM",
+    "processTime": "0:55",
+    "supplier": "Mary Therese",
+    "suppliedM3": 4.17,
+    "recoveredM3": 2.56
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 23, 2022",
+    "timeStart": "10:20:00 AM",
+    "timeEnd": "11:19:00 AM",
+    "supplierCode": "har",
+    "suppliedM3": 2,
+    "recoveredM3": 1.5
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/23/22 11:22 AM",
+    "processTime": "0:40",
+    "supplier": "Mary Anne",
+    "suppliedM3": 3.04,
+    "recoveredM3": 2.42
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 23, 2022",
+    "timeStart": "11:31:00 AM",
+    "timeEnd": "2:16:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.05,
+    "recoveredM3": 4.35
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/23/22 12:17 PM",
+    "processTime": "3:15",
+    "supplier": "Mary Jane",
+    "suppliedM3": 5.12,
+    "recoveredM3": 3.69
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 23, 2022",
+    "timeStart": "2:34:00 PM",
+    "timeEnd": "3:07:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 2.1,
+    "recoveredM3": 1.5
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 23, 2022",
+    "timeStart": "3:28:00 PM",
+    "timeEnd": "5:07:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 4,
+    "recoveredM3": 2.8
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/23/22 4:02 PM",
+    "processTime": "2:15",
+    "supplier": "Mary Jane",
+    "suppliedM3": 4.75,
+    "recoveredM3": 2.78
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 24, 2022",
+    "timeStart": "8:34:00 AM",
+    "timeEnd": "9:20:00 AM",
+    "supplierCode": "har",
+    "suppliedM3": 2,
+    "recoveredM3": 1.55
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/24/22 8:35 AM",
+    "processTime": "2:20",
+    "supplier": "Mary Jane",
+    "suppliedM3": 4.76,
+    "recoveredM3": 3.52
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 24, 2022",
+    "timeStart": "10:13:00 AM",
+    "timeEnd": "12:37:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 3.95,
+    "recoveredM3": 2.25
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/24/22 11:28 AM",
+    "processTime": "1:20",
+    "supplier": "Mary Jane",
+    "suppliedM3": 4.82,
+    "recoveredM3": 2.98
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 24, 2022",
+    "timeStart": "1:23:00 PM",
+    "timeEnd": "3:02:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 4.05,
+    "recoveredM3": 2.3
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/24/22 1:31 PM",
+    "processTime": "0:50",
+    "supplier": "Mary Anne",
+    "suppliedM3": 2.97,
+    "recoveredM3": 2.11
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/24/22 3:05 PM",
+    "processTime": "0:55",
+    "supplier": "Mary Therese",
+    "suppliedM3": 3.55,
+    "recoveredM3": 2.11
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 24, 2022",
+    "timeStart": "3:55:00 PM",
+    "timeEnd": "6:54:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.45,
+    "recoveredM3": 3.6
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 25, 2022",
+    "timeStart": "9:11:00 AM",
+    "timeEnd": "11:17:00 AM",
+    "supplierCode": "tom",
+    "suppliedM3": 3.8,
+    "recoveredM3": 2.15
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/25/22 9:22 AM",
+    "processTime": "3:10",
+    "supplier": "Mary Therese",
+    "suppliedM3": 4.53,
+    "recoveredM3": 3.55
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 25, 2022",
+    "timeStart": "12:40:00 PM",
+    "timeEnd": "1:57:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 2,
+    "recoveredM3": 1.4
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/25/22 1:38 PM",
+    "processTime": "1:20",
+    "supplier": "Mary Therese",
+    "suppliedM3": 4.39,
+    "recoveredM3": 3.15
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 25, 2022",
+    "timeStart": "3:01:00 PM",
+    "timeEnd": "3:46:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 2.05,
+    "recoveredM3": 1.35
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/25/22 4:10 PM",
+    "processTime": "1:55",
+    "supplier": "Mary Therese",
+    "suppliedM3": 4.2,
+    "recoveredM3": 2.19
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 26, 2022",
+    "timeStart": "8:15:00 AM",
+    "timeEnd": "11:42:00 AM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.85,
+    "recoveredM3": 4.55
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/26/22 8:25 AM",
+    "processTime": "2:50",
+    "supplier": "Mary Therese",
+    "suppliedM3": 4.64,
+    "recoveredM3": 3.55
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/26/22 11:42 AM",
+    "processTime": "0:40",
+    "supplier": "Mary Anne",
+    "suppliedM3": 2.97,
+    "recoveredM3": 2.42
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 26, 2022",
+    "timeStart": "11:55:00 AM",
+    "timeEnd": "12:31:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 2.05,
+    "recoveredM3": 1.5
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/26/22 12:43 PM",
+    "processTime": "1:25",
+    "supplier": "Mary",
+    "suppliedM3": 4.95,
+    "recoveredM3": 3.37
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 26, 2022",
+    "timeStart": "12:56:00 PM",
+    "timeEnd": "1:40:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 1.9,
+    "recoveredM3": 1.4
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 26, 2022",
+    "timeStart": "2:00:00 PM",
+    "timeEnd": "3:42:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 3.8,
+    "recoveredM3": 2.9
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/26/22 2:38 PM",
+    "processTime": "4:30",
+    "supplier": "Mary",
+    "suppliedM3": 5.05,
+    "recoveredM3": 3.35
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 26, 2022",
+    "timeStart": "3:52:00 PM",
+    "timeEnd": "4:30:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 2,
+    "recoveredM3": 1.4
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/27/22 8:13 AM",
+    "processTime": "1:25",
+    "supplier": "Mary Jane",
+    "suppliedM3": 4.78,
+    "recoveredM3": 3.79
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 27, 2022",
+    "timeStart": "8:22:00 AM",
+    "timeEnd": "8:57:00 AM",
+    "supplierCode": "har",
+    "suppliedM3": 2,
+    "recoveredM3": 1.55
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 27, 2022",
+    "timeStart": "9:27:00 AM",
+    "timeEnd": "12:21:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 3.9,
+    "recoveredM3": 2.75
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/27/22 10:10 AM",
+    "processTime": "1:05",
+    "supplier": "Mary Jane",
+    "suppliedM3": 4.9,
+    "recoveredM3": 3.84
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/27/22 11:45 AM",
+    "processTime": "1:10",
+    "supplier": "Mary Therese",
+    "suppliedM3": 4.11,
+    "recoveredM3": 2.87
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 27, 2022",
+    "timeStart": "12:33:00 PM",
+    "timeEnd": "2:04:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 5.15,
+    "recoveredM3": 3.15
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/27/22 1:25 PM",
+    "processTime": "1:35",
+    "supplier": "Mary Jane",
+    "suppliedM3": 5.23,
+    "recoveredM3": 3.24
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 27, 2022",
+    "timeStart": "2:17:00 PM",
+    "timeEnd": "5:09:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.9,
+    "recoveredM3": 4.5
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/27/22 3:28 PM",
+    "processTime": "1:30",
+    "supplier": "Mary Therese",
+    "suppliedM3": 3.96,
+    "recoveredM3": 2.26
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 28, 2022",
+    "timeStart": "8:14:00 AM",
+    "timeEnd": "9:13:00 AM",
+    "supplierCode": "har",
+    "suppliedM3": 2.05,
+    "recoveredM3": 1.6
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/28/22 8:18 AM",
+    "processTime": "0:40",
+    "supplier": "Mary Anne",
+    "suppliedM3": 3.01,
+    "recoveredM3": 2.53
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/28/22 9:23 AM",
+    "processTime": "1:20",
+    "supplier": "Mary",
+    "suppliedM3": 4.9,
+    "recoveredM3": 3.74
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 28, 2022",
+    "timeStart": "9:39:00 AM",
+    "timeEnd": "11:38:00 AM",
+    "supplierCode": "dic",
+    "suppliedM3": 5.35,
+    "recoveredM3": 3.6
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/28/22 11:01 AM",
+    "processTime": "1:40",
+    "supplier": "Mary Anne",
+    "suppliedM3": 3.09,
+    "recoveredM3": 2.46
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 28, 2022",
+    "timeStart": "12:07:00 PM",
+    "timeEnd": "12:52:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 2.05,
+    "recoveredM3": 1.5
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/28/22 1:08 PM",
+    "processTime": "1:55",
+    "supplier": "Mary",
+    "suppliedM3": 5.06,
+    "recoveredM3": 3.76
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 28, 2022",
+    "timeStart": "1:22:00 PM",
+    "timeEnd": "2:35:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 2.1,
+    "recoveredM3": 1.45
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 28, 2022",
+    "timeStart": "3:01:00 PM",
+    "timeEnd": "5:00:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.8,
+    "recoveredM3": 4.65
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/28/22 3:28 PM",
+    "processTime": "1:50",
+    "supplier": "Mary Anne",
+    "suppliedM3": 2.96,
+    "recoveredM3": 2.18
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/29/22 8:13 AM",
+    "processTime": "2:30",
+    "supplier": "Mary Therese",
+    "suppliedM3": 4.5,
+    "recoveredM3": 3.31
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 29, 2022",
+    "timeStart": "8:16:00 AM",
+    "timeEnd": "10:49:00 AM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.5,
+    "recoveredM3": 4.85
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/29/22 10:53 AM",
+    "processTime": "2:00",
+    "supplier": "Mary Anne",
+    "suppliedM3": 2.8,
+    "recoveredM3": 2.31
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 29, 2022",
+    "timeStart": "10:59:00 AM",
+    "timeEnd": "12:08:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 4.3,
+    "recoveredM3": 3.6
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 29, 2022",
+    "timeStart": "12:35:00 PM",
+    "timeEnd": "2:49:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.25,
+    "recoveredM3": 3.85
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/29/22 1:19 PM",
+    "processTime": "3:05",
+    "supplier": "Mary",
+    "suppliedM3": 5,
+    "recoveredM3": 3.31
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 29, 2022",
+    "timeStart": "3:09:00 PM",
+    "timeEnd": "4:47:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 5.5,
+    "recoveredM3": 3.35
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/30/22 8:21 AM",
+    "processTime": "2:25",
+    "supplier": "Mary",
+    "suppliedM3": 4.94,
+    "recoveredM3": 3.77
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 30, 2022",
+    "timeStart": "8:30:00 AM",
+    "timeEnd": "10:19:00 AM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.75,
+    "recoveredM3": 5.1
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 30, 2022",
+    "timeStart": "10:42:00 AM",
+    "timeEnd": "11:30:00 AM",
+    "supplierCode": "har",
+    "suppliedM3": 2.1,
+    "recoveredM3": 1.55
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/30/22 11:07 AM",
+    "processTime": "2:10",
+    "supplier": "Mary",
+    "suppliedM3": 5.03,
+    "recoveredM3": 3.47
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 30, 2022",
+    "timeStart": "11:40:00 AM",
+    "timeEnd": "12:41:00 PM",
+    "supplierCode": "tom",
+    "suppliedM3": 3.7,
+    "recoveredM3": 2.35
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 30, 2022",
+    "timeStart": "12:52:00 PM",
+    "timeEnd": "2:36:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.35,
+    "recoveredM3": 4.55
+  },
+  {
+    "facility": "Bundaberg",
+    "timeStart": "9/30/22 1:48 PM",
+    "processTime": "3:40",
+    "supplier": "Mary Therese",
+    "suppliedM3": 4.53,
+    "recoveredM3": 2.73
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 30, 2022",
+    "timeStart": "3:02:00 PM",
+    "timeEnd": "3:42:00 PM",
+    "supplierCode": "har",
+    "suppliedM3": 2,
+    "recoveredM3": 1.45
+  },
+  {
+    "facility": "Newcastle",
+    "date": "Sep 30, 2022",
+    "timeStart": "4:02:00 PM",
+    "timeEnd": "6:27:00 PM",
+    "supplierCode": "dic",
+    "suppliedM3": 6.3,
+    "recoveredM3": 3.9
+  }
+]
