@@ -51,7 +51,36 @@ def get_datetime_components(date_time: datetime) -> dict:
     }
 
 
-def parse_date_string_as_string(date_str: str, formats=None, year_first=False) -> datetime.datetime:
+def convert_date_into_datetime(date_in_year: datetime.date) -> datetime.datetime:
+    """Convert datetime.date instance into datetime instance
+    Ordinal date is the proleptic Gregorian ordinal, where January 1 of year 1 has ordinal 1.
+
+    Args:
+        date_in_year: datetime.date instance to convert
+    """
+    assert isinstance(date_in_year, datetime.date), \
+        f"expected datetime.date got [{date_in_year}] of type [{type(date_in_year)}"
+
+    return datetime.datetime.fromordinal(date_in_year.toordinal())
+
+
+def convert_time_into_timedelta(time_in_day: datetime.time) -> datetime.timedelta:
+    """Convert datetime.time instance in the day to timedelta from midnight
+    Convert datetime.time() as a point in a day into a duration since midnight.
+
+    datetime.min = datetime(MINYEAR, 1, 1, tzinfo=None)
+    date.min = date(MINYEAR, 1, 1)
+
+    Args:
+        time_in_day: time instance to convert
+    Return: timedelta
+    """
+    assert isinstance(time_in_day, datetime.time), \
+        f"expected datetime.time got [{time_in_day}] of type [{type(time_in_day)}"
+    return datetime.datetime.combine(datetime.date.min, time_in_day) - datetime.datetime.min
+
+
+def parse_date_string(date_str: str, formats=None, year_first=False) -> datetime.datetime:
     day_first_date_formats = (
         # --------------------------------------------------------------------------------
         # 21/01/01 as 21MAY2021
@@ -140,11 +169,11 @@ def get_dates_from_string(
         text: str,
         strict: bool = True,
 ) -> List[datetime.datetime]:
-    """Extract datet from string
+    """Extract dates from string
     Args:
         text: string to find a date
         strict: require complete date. July 2016 of Monday will not return datetimes.
-    Returns: datetime
+    Returns: list of datetime instances
     Raises: RuntimeError is no date
     """
     dates = list(datefinder.find_dates(text, source=False, index=False, strict=strict))
@@ -154,14 +183,26 @@ def get_dates_from_string(
     return dates
 
 
+def has_date_in_string(text: str):
+    """Check if a date is included in the text
+    Args:
+        text: string to find a date
+    """
+    assert isinstance(text, str), f"invalid text [{text}] of type [{type(text)}]."
+    dates: List[datetime] = get_dates_from_string(text=text)
+    return dates is not None and len(dates) > 0
+
+
 def parse_datetime_string(
         date_time_str: str,
+        default: datetime.datetime = None,
         dayfirst: bool = False,
         yearfirst: bool = False,
 ) -> datetime.datetime:
     """
     Args:
         date_time_str: date/time string to parse
+        default: default datetime which elements specified in date_time_str replace.
         dayfirst: regard the first digits as day e.g 01/05/09 as 01/May/2009
         yearfirst: regard the first digits as year e.g. 01/05/09 as 2001/May/09
     Returns: python datetime instance
@@ -170,11 +211,17 @@ def parse_datetime_string(
         dateutil.parser.UnknownTimezoneWarning:  timezone cannot be parsed into a tzinfo.
     """
     try:
-        return dateutil.parser.parse(date_time_str, dayfirst=dayfirst, yearfirst=yearfirst)
+        return dateutil.parser.parse(
+            timestr=date_time_str, default=default, dayfirst=dayfirst, yearfirst=yearfirst
+        )
     except dateutil.parser.ParserError as e:
-        raise RuntimeError(f"parse_datetime_string() invalid date/time string [{date_time_str}]") from e
+        raise RuntimeError(
+            f"parse_datetime_string() invalid date/time string [{date_time_str}]"
+        ) from e
     except dateutil.parser.UnknownTimezoneWarning as e:
-        raise RuntimeError(f"parse_datetime_string() invalid timezone in [{date_time_str}]") from e
+        raise RuntimeError(
+            f"parse_datetime_string() invalid timezone in [{date_time_str}]"
+        ) from e
 
 
 def get_epoch_from_string(literal, format='%d %b %Y %H:%M:%S %Z%z') -> int:
