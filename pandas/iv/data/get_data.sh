@@ -10,7 +10,6 @@ files=(
   "september"
   "october"
   "november"
-  "schedules"
 )
 
 for f in ${files[@]}
@@ -23,3 +22,6 @@ do
 
   rm -f ${f}
 done
+jq -s add *.json > merged.json
+
+wget --quiet --directory-prefix="${DIR}" "${URL}/schedules" -O "schedules.json"
