@@ -248,14 +248,37 @@ def parse_datetime_string(
 
 
 def parse_time_string(text: str) -> datetime.time:
-    """Parse time string e.g. 01:23:53 or 03:00 and return datetime.time instance.
+    """Parse time string e.g. 01:23:53 or 03:00 or 12 and return datetime.time instance.
+
     Args:
         text: time string to parse
     Returns: datetime.time instance
+    Raises: RuntimeError for invalid time expression
     """
     assert isinstance(text, str), f"invalid text [{text}] of type [{type(text)}]."
+    error: Exception = RuntimeError(f"invalid time expression [{text}]. Must be hh:mm:ss or mm:ss or as string")
 
-    _time: datetime.time = datetime.time.fromisoformat("".join(text.split()))
+    numbers: List[str] = "".join(text.split()).split(":")
+    if len(numbers) < 1 or len(numbers) > 3:
+        raise error
+
+    # The expression must be hh:mm:ss with zero padded e.g. 00:01:09
+    # Otherwise 01:10 is interpreted as 01:10:00.
+    expression: str
+    if len(numbers) == 3:
+        expression = f"{numbers[0].zfill(2)}:{numbers[1].zfill(2)}:{numbers[2].zfill(2)}"
+    elif len(numbers) == 2:
+        expression = f"00:{numbers[0].zfill(2)}:{numbers[1].zfill(2)}"
+    elif len(numbers) == 1:
+        expression = f"00:00:{numbers[0].zfill(2)}"
+    else:
+        raise error
+
+    try:
+        _time: datetime.time = datetime.time.fromisoformat(expression)
+    except ValueError as e:
+        raise error from e
+
     assert isinstance(_time, datetime.time), \
         f"invalid text sting [{text}] generating type [{type(_time)}]"
 
