@@ -24,6 +24,7 @@ from constant import (
 # --------------------------------------------------------------------------------
 # module logger
 # --------------------------------------------------------------------------------
+# logging.basicConfig(level=logging.ERROR)
 logger: logging.Logger = logging.getLogger(__name__)
 
 
@@ -49,6 +50,26 @@ def get_datetime_components(date_time: datetime) -> dict:
         "microsecond": date_time.microsecond,
         "tzinfo": date_time.tzinfo,
     }
+
+
+def convert_date_time_into_datetime(
+        date_in_year: datetime.date,
+        time_in_day: datetime.time,
+        tzinfo: datetime.tzinfo = None,
+) -> datetime.datetime:
+    """Convert (datetime.date, datetime.time) into datetime instance
+    Args:
+        date_in_year: datetime.date instance to convert
+        time_in_day: time instance to convert
+        tzinfo: timezone
+    Returns: datetime instance
+    """
+    assert isinstance(date_in_year, datetime.date), \
+        f"expected datetime.date got [{date_in_year}] of type [{type(date_in_year)}"
+    assert isinstance(time_in_day, datetime.time), \
+        f"expected datetime.time got [{time_in_day}] of type [{type(time_in_day)}"
+
+    return datetime.datetime.combine(date=date_in_year, time=time_in_day, tzinfo=tzinfo)
 
 
 def convert_date_into_datetime(date_in_year: datetime.date) -> datetime.datetime:
@@ -169,16 +190,17 @@ def get_dates_from_string(
         text: str,
         strict: bool = True,
 ) -> List[datetime.datetime]:
-    """Extract dates from string
+    """Extract dates from string. Accept text with no date, then return empty list.
+
     Args:
         text: string to find a date
         strict: require complete date. July 2016 of Monday will not return datetimes.
     Returns: list of datetime instances
-    Raises: RuntimeError is no date
     """
     dates = list(datefinder.find_dates(text, source=False, index=False, strict=strict))
     if len(dates) <= 0:
-        raise RuntimeError(f"invalid text with no date: [{text}]")
+        # raise RuntimeError(f"invalid text with no date: [{text}]")
+        logger.warning("get_dates_from_string(): no date in the text [%s]", text)
 
     return dates
 
@@ -189,6 +211,7 @@ def has_date_in_string(text: str):
         text: string to find a date
     """
     assert isinstance(text, str), f"invalid text [{text}] of type [{type(text)}]."
+
     dates: List[datetime] = get_dates_from_string(text=text)
     return dates is not None and len(dates) > 0
 
@@ -222,6 +245,21 @@ def parse_datetime_string(
         raise RuntimeError(
             f"parse_datetime_string() invalid timezone in [{date_time_str}]"
         ) from e
+
+
+def parse_time_string(text: str) -> datetime.time:
+    """Parse time string e.g. 01:23:53 or 03:00 and return datetime.time instance.
+    Args:
+        text: time string to parse
+    Returns: datetime.time instance
+    """
+    assert isinstance(text, str), f"invalid text [{text}] of type [{type(text)}]."
+
+    _time: datetime.time = datetime.time.fromisoformat("".join(text.split()))
+    assert isinstance(_time, datetime.time), \
+        f"invalid text sting [{text}] generating type [{type(_time)}]"
+
+    return _time
 
 
 def get_epoch_from_string(literal, format='%d %b %Y %H:%M:%S %Z%z') -> int:
