@@ -8,6 +8,7 @@ from typing import (
     List,
     Dict,
     Tuple,
+    Union,
 )
 
 import dateutil
@@ -20,6 +21,17 @@ from constant import (
     TYPE_FLOAT,
 )
 
+
+# --------------------------------------------------------------------------------
+# Constants
+# --------------------------------------------------------------------------------
+WEEKDAY_MON: int = 0
+WEEKDAY_TUE: int = 1
+WEEKDAY_WED: int = 2
+WEEKDAY_THU: int = 3
+WEEKDAY_FRI: int = 4
+WEEKDAY_SAT: int = 5
+WEEKDAY_SUN: int = 6
 
 # --------------------------------------------------------------------------------
 # module logger
@@ -411,6 +423,58 @@ def get_holidays(
             country=country,
             years=years
         )
+
+    return result
+
+
+def is_holiday(
+        target: Union[datetime.datetime, datetime.date, str],
+        country: str = None,
+        state: str = None
+) -> bool:
+    """Check if the target is holiday in the country or (country, state)
+    Args:
+        target: datetime, date, or date string to check
+        country: country to check the holidays
+        state: optional state of the country
+    Returns: bool
+    """
+    assert \
+        isinstance(target, str) or \
+        isinstance(target, datetime.datetime) or \
+        isinstance(target, datetime.date)
+
+    year: int
+    if isinstance(target, str):
+        dates: List[datetime.datetime] = get_dates_from_string(target)
+        assert len(dates) == 1, f"invalid date expression [{target}]"
+        year = dates[0].year
+    else:
+        year = target.year
+
+    return target in get_holidays(country=country, states=state, years=[year])
+
+
+def is_weekend(
+        target: Union[datetime.datetime, datetime.date, str],
+) -> bool:
+    """Check if the target is weekend
+    Args:
+        target: datetime, date, or date string to check
+    Returns: bool
+    """
+    result: bool = False
+    assert \
+        isinstance(target, str) or \
+        isinstance(target, datetime.datetime) or \
+        isinstance(target, datetime.date)
+
+    if isinstance(target, str):
+        dates: List[datetime.datetime] = get_dates_from_string(target)
+        assert len(dates) == 1, f"invalid date expression [{target}]"
+        result = dates[0].weekday() in [WEEKDAY_SAT, WEEKDAY_SUN]
+    else:
+        result = target.weekday() in [WEEKDAY_SAT, WEEKDAY_SUN]
 
     return result
 
