@@ -1,6 +1,7 @@
 """
 Main module
 """
+import math
 import sys
 import logging
 import datetime
@@ -192,13 +193,13 @@ def get_process_time(row: pd.Series) -> pd.Series:
     return TYPE_FLOAT(delta.total_seconds())
 
 
-def get_process_date(row: pd.Series):
+def get_process_date(row: pd.Series) -> int:
     _date_time: datetime.datetime = np.nan
 
     if not pd.isnull(row[COLUMN_START_TIME]):
         _date_time = convert_date_into_datetime(row[COLUMN_START_TIME].date())
 
-    return _date_time
+    return _date_time.day
 
 
 def get_code_from_supplier(supplier: str):
@@ -229,7 +230,7 @@ def get_numeric_supplier_code(code: str):
 
 def get_supplier_code(row: pd.Series):
     code: str
-    if row['supplierCode'] not in (np.nan, None):
+    if isinstance(row['supplierCode'], str):
         code = row['supplierCode']
     else:
         code = get_code_from_supplier(row['supplier'])
@@ -247,7 +248,8 @@ def get_numeric_facility_code(code: str):
 
 def get_facility_code(row: pd.Series):
     code: str
-    if row['facility'] not in (np.nan, None):
+    # if row['facility'] not in (np.nan, math.nan, None):
+    if isinstance(row['facility'], str):
         code = row['facility']
     else:
         code = "n/a"
