@@ -310,6 +310,6 @@ def get_start_time_cyclic(row: pd.Series) -> pd.Series:
         minutes=date_time.minute,
         seconds=date_time.second
     )
-    return pd.Series([x, y],index=[COLUMN_WEEKDAY_SINX, COLUMN_WEEKDAY_COSY])
+    return pd.Series([x, y], index=[COLUMN_WEEKDAY_SINX, COLUMN_WEEKDAY_COSY])
 
 
