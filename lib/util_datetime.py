@@ -36,7 +36,7 @@ WEEKDAY_SUN: int = 6
 # --------------------------------------------------------------------------------
 # module logger
 # --------------------------------------------------------------------------------
-# logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.ERROR)
 logger: logging.Logger = logging.getLogger(__name__)
 
 
