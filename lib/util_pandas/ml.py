@@ -19,7 +19,8 @@ from sklearn.metrics import (
 )
 from sklearn.preprocessing import (
     OneHotEncoder,
-    MinMaxScaler
+    MinMaxScaler,
+    StandardScaler,
 )
 from sklearn.model_selection import (
     cross_val_score,
@@ -94,9 +95,15 @@ def stratified_shuffle_split_into_train_test(
 def normalize_numeric_categorical_columns(
         dataframe: pd.DataFrame,
         numeric_columns: List[str] = None,
-        categorical_columns: List[str] = None
+        categorical_columns: List[str] = None,
+        normalize_or_standardize: str = "n"
 ):
-    """Normalize the numeric columns and one-hot-encode categorical columns
+    """Normalize the numeric columns and one-hot-encode categorical columns.
+    Return (transformed dataframe, fitted pipeline) so that the same normalization
+    can be executed with the fitted pipeline.
+
+    Use MinMaxScaler when normalize_or_standardize is N or n, otherwise StandardScaler
+    for numerica columns.
 
     numeric_columns = [
         'age',
@@ -114,9 +121,20 @@ def normalize_numeric_categorical_columns(
         dataframe: dataframe to transform
         numeric_columns: list of numeric column names
         categorical_columns: list of categorical column names
+        normalize_or_standardize: specify normalize or standardize
+
+    Returns: (transformed, pipeline)
     """
+    assert set(categorical_columns).issubset(set(dataframe.columns))
+    assert set(numeric_columns).issubset(set(dataframe.columns))
+
+    if normalize_or_standardize.lower().startswith('n'):
+        scaler = MinMaxScaler()
+    else:
+        scaler = StandardScaler()
+
     numeric_pipeline = Pipeline([
-        ('scaler', MinMaxScaler()),
+        ('scaler', scaler),
     ])
     categorical_pipeline = Pipeline([
         ('one_hot_encoder', OneHotEncoder()),
@@ -128,5 +146,6 @@ def normalize_numeric_categorical_columns(
         ],
         remainder='passthrough'
     )
+
     transformed: pd.DataFrame = pipeline.fit_transform(dataframe)
-    return transformed
+    return transformed, pipeline
