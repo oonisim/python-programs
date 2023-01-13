@@ -3,6 +3,8 @@ ML functions based on pandas
 """
 import logging
 from typing import (
+    List,
+    Dict,
     Tuple,
 )
 
@@ -11,6 +13,27 @@ import pandas as pd
 import sklearn
 from sklearn.model_selection import (
     StratifiedShuffleSplit
+)
+from sklearn.metrics import (
+    mean_squared_error
+)
+from sklearn.preprocessing import (
+    OneHotEncoder,
+    MinMaxScaler
+)
+from sklearn.model_selection import (
+    cross_val_score,
+    RepeatedKFold,
+    GridSearchCV
+)
+from sklearn.linear_model import (
+    Ridge
+)
+from sklearn.compose import (
+    ColumnTransformer
+)
+from sklearn.pipeline import (
+    Pipeline
 )
 
 
@@ -22,7 +45,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 # --------------------------------------------------------------------------------
-# Functions
+# Data processing
 # --------------------------------------------------------------------------------
 def stratified_shuffle_split_into_train_test(
         dataframe: pd.DataFrame,
@@ -63,3 +86,47 @@ def stratified_shuffle_split_into_train_test(
         "strata [\n%s\n]", test_data_set[column_name].value_counts() / len(test_data_set)
     )
     return train_data_set, test_data_set
+
+
+# --------------------------------------------------------------------------------
+# Feature engineering
+# --------------------------------------------------------------------------------
+def normalize_numeric_categorical_columns(
+        dataframe: pd.DataFrame,
+        numeric_columns: List[str] = None,
+        categorical_columns: List[str] = None
+):
+    """Normalize the numeric columns and one-hot-encode categorical columns
+
+    numeric_columns = [
+        'age',
+        'height',
+        'weight',
+    ]
+    categorical_columns = [
+        'nationality',
+        'ethnicity',
+        'gender',
+        'occupation',
+    ]
+
+    Args:
+        dataframe: dataframe to transform
+        numeric_columns: list of numeric column names
+        categorical_columns: list of categorical column names
+    """
+    numeric_pipeline = Pipeline([
+        ('scaler', MinMaxScaler()),
+    ])
+    categorical_pipeline = Pipeline([
+        ('one_hot_encoder', OneHotEncoder()),
+    ])
+    pipeline = ColumnTransformer(
+        transformers=[
+            ("numeric", numeric_pipeline, numeric_columns),
+            ("category", categorical_pipeline, categorical_columns),
+        ],
+        remainder='passthrough'
+    )
+    transformed: pd.DataFrame = pipeline.fit_transform(dataframe)
+    return transformed
