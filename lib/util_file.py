@@ -7,6 +7,10 @@ import os
 import sys
 import tempfile
 import pathlib
+from typing import (
+    List,
+    Dict
+)
 
 # Sadly, Python fails to provide the following magic number for us.
 ERROR_INVALID_NAME = 123
@@ -167,3 +171,20 @@ def is_path_exists_or_creatable_portable(pathname: str) -> bool:
     # other exceptions are unrelated fatal issues and should not be caught here.
     except OSError:
         return False
+
+
+def get_filename(path: str) -> str:
+    return pathlib.Path(path).name
+
+
+def get_file_basename(path: str) -> str:
+    """Get the basename of the file without extension"""
+    return os.path.splitext(os.path.basename(path))[0]
+
+
+def get_file_suffix(path: str) -> str:
+    return pathlib.Path(path).suffix
+
+
+def list_files_in_directory(path: str) -> List[str]:
+    return [f for f in os.listdir(path) if is_file(os.path.join(path, f))]
