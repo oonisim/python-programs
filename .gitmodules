@@ -1,3 +1,0 @@
-[submodule "resources/CNN/cnn-image-retrieval"]
-	path = resources/CNN/cnn-image-retrieval
-	url = https://github.com/frhtas/cnn-imageretrieval.git
