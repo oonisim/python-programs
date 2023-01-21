@@ -9,7 +9,9 @@ import tempfile
 import pathlib
 from typing import (
     List,
-    Dict
+    Dict,
+    Set,
+    Tuple
 )
 
 # Sadly, Python fails to provide the following magic number for us.
@@ -26,6 +28,10 @@ https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-
 
 def is_file(path_to_file) -> bool:
     return pathlib.Path(path_to_file).is_file()
+
+
+def is_dir(path_to_file) -> bool:
+    return pathlib.Path(path_to_file).is_dir()
 
 
 def rm_file(path_to_file):
@@ -174,17 +180,51 @@ def is_path_exists_or_creatable_portable(pathname: str) -> bool:
 
 
 def get_filename(path: str) -> str:
+    """Get the filename of the file at the path including suffix
+    Args:
+        path: path/to/file
+    Returns: filename of the file at the path without parent directories
+    """
+    assert is_file(path), f"[{path}] does not exist or not a file."
     return pathlib.Path(path).name
 
 
 def get_file_basename(path: str) -> str:
-    """Get the basename of the file without extension"""
+    """Get the basename of the file without extension
+    Args:
+        path: path/to/file
+    Returns: basename of the file at the path
+    """
+    assert is_file(path), f"[{path}] does not exist or not a file."
     return os.path.splitext(os.path.basename(path))[0]
 
 
 def get_file_suffix(path: str) -> str:
+    """Get the suffix of the file at the path
+    Args:
+        path: path/to/file
+    """
+    assert is_file(path), f"[{path}] does not exist or not a file."
     return pathlib.Path(path).suffix
 
 
-def list_files_in_directory(path: str) -> List[str]:
-    return [f for f in os.listdir(path) if is_file(os.path.join(path, f))]
+def list_files_in_directory(path: str, patterns: Set[str] = None) -> Set[str]:
+    """List files in the directory
+    Args:
+        path: path/to/dir
+        patterns: glob pattern strings or None
+    Returns: Set of file names found
+    """
+    assert is_dir(path), f"[{path} does not exit or not a directory."
+    if patterns is not None and len(patterns) > 0:
+        return {
+            p.resolve() for p
+            in pathlib.Path(path).glob("**/*")
+            if p.suffix in patterns and is_file(p)
+        }
+    else:
+        return {
+            p.resolve() for p
+            in pathlib.Path(path).glob("**/*")
+            if is_file(p)
+        }
