@@ -1,19 +1,33 @@
 """
 
 """
+import logging
+
 import numpy
 import numpy as np
 from typing import (
     Tuple
 )
-
 from scipy.stats import ortho_group
+
 from util_constant import (
     TYPE_FLOAT,
     TYPE_INT,
 )
+from util_logging import (
+    get_logger
+)
 
 
+# --------------------------------------------------------------------------------
+# Logging
+# --------------------------------------------------------------------------------
+_logger: logging.Logger = get_logger(__name__)
+
+
+# --------------------------------------------------------------------------------
+# Utilities
+# --------------------------------------------------------------------------------
 def is_all_close(
         x: np.ndarray,
         y: np.ndarray,
@@ -80,3 +94,38 @@ def get_orthogonal_vectors(dimension: int) -> np.ndarray:
     # return v.T
 
     return ortho_group.rvs(dim=dimension)
+
+
+def save(array: np.ndarray, path_to_file: str):
+    """Save array to file
+    Args:
+        array: numpy array to save
+        path_to_file: path to file
+    """
+    np.save(file=path_to_file, arr=array)
+    return path_to_file
+
+
+def load(path_to_file: str) -> np.ndarray:
+    """Load saved numpy array from file
+    Args:
+        path_to_file: path to file
+    """
+    name: str = "load()"
+    try:
+        return np.load(file=path_to_file)
+    except OSError as e:
+        _logger.error("%s: file [%s] does not exist or cannot be read.", name, path_to_file)
+        raise e
+    except ValueError as e:
+        _logger.error(
+            "%s: file [%s] contains an object array, but allow_pickle=False given.",
+            name, path_to_file
+        )
+        raise e
+    except np.UnpicklingError as e:
+        _logger.error("%s: file [%s] file cannot be loaded as a pickle.", name, path_to_file)
+        raise e
+
+
+

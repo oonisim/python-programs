@@ -227,7 +227,7 @@ def get_file_suffix(path: str) -> str:
     return pathlib.Path(path).suffix
 
 
-def list_files_in_directory(path: str, pattern: str = None) -> Set[str]:
+def list_files_in_directory(path: str, pattern: str = None) -> List[str]:
     """List files in the directory matching glob pattern
     See
     * https://docs.python.org/3/library/glob.html
@@ -239,18 +239,21 @@ def list_files_in_directory(path: str, pattern: str = None) -> Set[str]:
     Returns: Set of file names (not including path/to/dir) found
     """
     assert is_dir(path), f"[{path} does not exit or not a directory."
+
+    result: Set[str]
     if pattern is not None and len(pattern) > 0:
-        return {
+        result = {
             str(p.resolve().name)
             for p in pathlib.Path(path).glob(pattern)
             if is_file(p)
         }
     else:
-        return {
+        result = {
             str(p.resolve().name) for p
             in pathlib.Path(path).glob("**/*")
             if is_file(p)
         }
+    return sorted(result)
 
 
 def mkdir(path: str, mode=0o777, create_parents: bool = True):

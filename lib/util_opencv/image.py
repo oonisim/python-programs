@@ -5,12 +5,19 @@ Note:
     Other tools e.g. skimage.io.imread loads image as RGB (or RGBA).
     Make sure if the image in file is stored as RGB or BGR.
 
+For RGB:
+    Ensure you convert to RGB from BGR, as OpenCV loads directly into BGR format.
+    You can use image = image[:,:,::-1] or image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB);
+    otherwise you will have the R and B channels reversed resulting in an incorrect comparison.
+
 References:
+    * https://stackoverflow.com/a/64133031/4281353
     * https://stackoverflow.com/a/42406781/4281353
 """
 import os
 import logging
 from typing import (
+    List,
     Set,
     Tuple,
     Union,
@@ -97,11 +104,27 @@ def convert_grey_to_rgb(image: np.ndarray) -> np.ndarray:
         raise RuntimeError(f"image image shape [{image.shape}]")
 
 
-def save_image(path: str, image: np.ndarray, flags: Union[int, None] = None):
-    """Save the image to the path as BGR
-    OpenCV assumes the image to be BGR or BGRA (BGR is the default OpenCV colour format)
+def convert_bgr_to_rgb(image: np.ndarray):
+    """Convert BGR in memory (as loaded by opencv imread) to RGB
+    https://stackoverflow.com/a/64133031/4281353
+
+    Tool e.g. ResNet50 preprocess_input converts
+    Args:
+        image: array in memory in BGR e.g as loaded by OpenCV imread
+    Returns: array in memory in RGB
     """
-    # cv.imwrite(filename=path, img=cv.cvtColor(image, cv.COLOR_RGB2BGR))
+    return cv.cvtColor(image, cv.COLOR_BGR2RGB)
+
+
+def save_image(path: str, image: np.ndarray, flags: Union[int, None] = None):
+    """Save the memory image in BGR to the path as RGB.
+    OpenCV imwrite converts BGR in memory (as bBGR is the default OpenCV colour format in memory)
+    into RGB in the file.
+
+    The image on input (e.g. PNG) is in RGB order but the image in memory is in BGR order.
+    imread() will internally convert from rgb to bgr and imwrite() will do the opposite.
+    """
+    # cv.imwrite(filename=path, img=cv.cvtColor(image, cv.COLOR_BGR2RGB))
     cv.imwrite(filename=path, img=image)
 
 
@@ -192,7 +215,7 @@ def resize_and_save_images(
         width: int,
         path_to_destination: str,
         skip_image_error: bool = True
-):
+) -> Tuple[int, int]:
     """Resize the images in the source directory and save them to the destination.
     Args:
         path_to_source: source directory
@@ -201,7 +224,10 @@ def resize_and_save_images(
         width: width to resize to
         path_to_destination: destination directory
         skip_image_error: continue upon image processing errors
-    Raises: RuntimeError for any filesystem errors
+    Returns: (number of images processed, number of image not processed)
+    Raises:
+         RuntimeError: for any filesystem errors
+         ValueError: for image not able to process
     """
     name = "resize_and_save_images()"
     assert is_dir(path_to_source), f"invalid source [{path_to_source}]."
@@ -209,6 +235,8 @@ def resize_and_save_images(
         f"destination [{path_to_destination}] is an existing file."
     assert height > 0 and width > 0, f"invalid height [{height}] or width [{width}]"
 
+    processed: int = 0
+    skipped: int = 0
     try:
         # --------------------------------------------------------------------------------
         # Setup: Create destination directory if not exist.
@@ -219,7 +247,7 @@ def resize_and_save_images(
         # --------------------------------------------------------------------------------
         # List and process files
         # --------------------------------------------------------------------------------
-        filenames: Set[str] = list_files_in_directory(
+        filenames: List[str] = list_files_in_directory(
             path=path_to_source, pattern=pattern
         )
         if len(filenames) == 0:
@@ -238,11 +266,16 @@ def resize_and_save_images(
                     _h, _w, _d = get_image_dimensions(image=img)
                     if _d is None:  # Grey scale image
                         _logger.info("%s: skipping grey scale image [%s]...", name, _filename)
+                        skipped += 1
                         continue
 
                 except ValueError as e:
                     _logger.info("%s: cannot handle and skip [%s]...", name, source)
-                    continue
+                    if skip_image_error:
+                        skipped += 1
+                        continue
+                    else:
+                        raise e
 
                 if _h == height and _w == width:
                     # no change, do nothing
@@ -260,13 +293,87 @@ def resize_and_save_images(
                     resized = resize_image(
                         image=img, width=width, height=height, interpolation=interpolation
                     )
+
+                processed += 1
                 del img
 
                 _logger.debug("%s: saving image to [%s]", name, destination)
                 save_image(path=destination, image=resized)
+            # End of for loop
 
     except (OSError, RuntimeError) as e:
         _logger.error("%s: failed due to [%s]", name, e)
+        raise e
+
+    return processed, skipped
+
+
+def pack_images_as_rgb_from_directory(
+        path_to_source: str,
+        pattern: Union[str, None],
+        skip_image_error: bool = True
+) -> Tuple[Union[np.ndarray], List[str]]:
+    """Pack multiple color images as RGB into one np array
+    The image data in memory MUST be in RGB. OpenCV imread load the image into memory as BGR.
+
+    Args:
+        path_to_source: source directory
+        pattern: Pathlib glob pattern to filter files to process or None
+        skip_image_error: continue upon image processing errors
+    Returns: (packed images in array of shape (N, height, width, depth), list of packed file names)
+    """
+    name = "pack_images_as_rgb_from_directory()"
+    assert is_dir(path_to_source), f"invalid source [{path_to_source}]."
+    result: Union[np.ndarray, None] = None
+
+    processed: List[str] = list()
+    package: List[np.ndarray] = list()
+    try:
+        # --------------------------------------------------------------------------------
+        # List and process files
+        # --------------------------------------------------------------------------------
+        filenames: List[str] = list_files_in_directory(
+            path=path_to_source, pattern=pattern
+        )
+        if len(filenames) == 0:
+            _logger.warning("%s: no file to pack in the directory [%s]", name, path_to_source)
+        else:
+            for _filename in filenames:
+                source: str = os.sep.join([path_to_source, _filename])
+                resized: np.ndarray
+
+                # --------------------------------------------------------------------------------
+                # Load image to pack
+                # --------------------------------------------------------------------------------
+                try:
+                    # image is loaded into memory as BGR
+                    img: np.ndarray = get_image(path=source)
+                    _h, _w, _d = get_image_dimensions(image=img)
+                    if _d is None:  # Grey scale image
+                        _logger.info("%s: skipping grey scale image [%s]...", name, _filename)
+                        continue
+
+                except ValueError as e:
+                    _logger.info("%s: cannot handle and skip [%s]...", name, source)
+                    if skip_image_error:
+                        continue
+                    else:
+                        raise e
+
+                # Make sure to convert BGR to RGB
+                package.append(convert_bgr_to_rgb(image=img))
+                processed.append(_filename)
+
+            # END for loop
+            result = np.array(package)
+            del package
+            assert result.ndim == 4
+
+    except (OSError, RuntimeError) as e:
+        _logger.error("%s: failed due to [%s]", name, e)
+        raise e
+
+    return result, processed
 
 
 def rotate(img):
