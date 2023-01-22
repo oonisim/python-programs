@@ -18,7 +18,7 @@ import os
 import logging
 from typing import (
     List,
-    Set,
+    Sequence,
     Tuple,
     Union,
     Callable
@@ -208,172 +208,168 @@ def resize_image(
     )
 
 
-def resize_and_save_images(
+def _do_resize(
+        image: np.ndarray, from_height: int, from_width: int, to_height: int, to_width: int
+) -> Union[np.ndarray, None]:
+    """Execute resize image. Do nothing if no size change.
+    Args:
+        image: image to resize
+        from_height: height to resize to
+        from_width: width to resize to
+        to_height: height to resize to
+        to_width: width to resize to
+    Returns: resized image
+    """
+    # --------------------------------------------------------------------------------
+    # Interpolation option depending on if the operation is shrink or enlarge
+    # --------------------------------------------------------------------------------
+    if from_height * from_width > to_height * to_width:
+        interpolation: int = cv.INTER_AREA
+    else:
+        interpolation: int = cv.INTER_LINEAR
+
+    return resize_image(
+        image=image, width=to_width, height=to_height, interpolation=interpolation
+    )
+
+
+def read_and_process_images(
         path_to_source: str,
-        pattern: Union[str, None],
-        height: int,
-        width: int,
-        path_to_destination: str,
+        pattern: Union[str, None] = None,
+        do_resize: bool = False,
+        height: int = -1,
+        width: int = -1,
+        do_save: bool = False,
+        path_to_destination: Union[str, None] = None,
+        bgr_to_rgb: bool = True,
         skip_image_error: bool = True
-) -> Tuple[int, int]:
-    """Resize the images in the source directory and save them to the destination.
+) -> Tuple[Union[Sequence[np.ndarray], None], Sequence[str], Sequence[str]]:
+    """Resize the images in the source directory and save them to the destination if required.
+    NOTE:
+        Saving uses OpenCV imwrite which take BGR data in memory and save it to RGB in file.
+
     Args:
         path_to_source: source directory
         pattern: Pathlib glob pattern to filter files to process or None
+        do_resize: flag if resize using (height, width)
         height: height to resize to
         width: width to resize to
+        do_save: flag to save image
         path_to_destination: destination directory
+        bgr_to_rgb: flag to execute BGR to RGB transformation
         skip_image_error: continue upon image processing errors
-    Returns: (number of images processed, number of image not processed)
+    Returns: (sequence of images, images processed, images not processed)
+             or (None, 0, 0) if there is no image to process.
     Raises:
          RuntimeError: for any filesystem errors
          ValueError: for image not able to process
     """
-    name = "resize_and_save_images()"
-    assert is_dir(path_to_source), f"invalid source [{path_to_source}]."
-    assert not is_file(path_to_destination), \
-        f"destination [{path_to_destination}] is an existing file."
-    assert height > 0 and width > 0, f"invalid height [{height}] or width [{width}]"
+    name = "read_and_process_images()"
+    package: List[np.ndarray] = list()
+    processed: List[str] = list()
+    skipped: List[str] = list()
 
-    processed: int = 0
-    skipped: int = 0
+    # --------------------------------------------------------------------------------
+    # Setups
+    # --------------------------------------------------------------------------------
+    # List and process files
+    assert is_dir(path_to_source), f"invalid source [{path_to_source}]."
+    filenames: List[str] = list_files_in_directory(
+        path=path_to_source, pattern=pattern
+    )
+    if len(filenames) == 0:
+        _logger.warning("%s: no file to process in the directory [%s]", name, path_to_source)
+        return package, processed, skipped
+
+    # Create destination directory if not exist.
     try:
-        # --------------------------------------------------------------------------------
-        # Setup: Create destination directory if not exist.
-        # --------------------------------------------------------------------------------
-        if not is_dir(path_to_destination):
+        if do_save and not is_dir(path_to_destination):
+            assert not is_file(path_to_destination), f"destination [{path_to_destination}] is file."
             mkdir(path=path_to_destination)
 
-        # --------------------------------------------------------------------------------
-        # List and process files
-        # --------------------------------------------------------------------------------
+    except OSError as e:
+        _logger.error("%s: failed in making dir [%s] due to [%s]", name, path_to_destination, e)
+        raise e
+
+    # In case resize
+    if do_resize:
+        assert height > 0 and width > 0, f"invalid height [{height}] or width [{width}]"
+
+    # --------------------------------------------------------------------------------
+    # Process files
+    # --------------------------------------------------------------------------------
+    try:
         filenames: List[str] = list_files_in_directory(
             path=path_to_source, pattern=pattern
         )
         if len(filenames) == 0:
             _logger.warning("%s: no file to resize in the directory [%s]", name, path_to_source)
         else:
+            # --------------------------------------------------------------------------------
+            # Process images
+            # --------------------------------------------------------------------------------
             for _filename in filenames:
                 source: str = os.sep.join([path_to_source, _filename])
                 destination: str = os.sep.join([path_to_destination, _filename])
                 resized: np.ndarray
 
-                # --------------------------------------------------------------------------------
-                # Load image to resize
-                # --------------------------------------------------------------------------------
                 try:
                     img: np.ndarray = get_image(path=source)
                     _h, _w, _d = get_image_dimensions(image=img)
+
+                    # --------------------------------------------------------------------------------
+                    # Skip image with no channel
+                    # --------------------------------------------------------------------------------
                     if _d is None:  # Grey scale image
                         _logger.info("%s: skipping grey scale image [%s]...", name, _filename)
-                        skipped += 1
+                        skipped.append(_filename)
                         continue
 
+                    # --------------------------------------------------------------------------------
+                    # Resize image
+                    # --------------------------------------------------------------------------------
+                    if do_resize:
+                        if _h == height and _w == width:
+                            # Same size, do nothing
+                            pass
+                        else:
+                            img = _do_resize(
+                                image=img, from_height=_h, from_width=_w, to_height=height, to_width=width
+                            )
+
+                    # --------------------------------------------------------------------------------
+                    # Saving must be done BGR data in memory
+                    # --------------------------------------------------------------------------------
+                    if do_save:
+                        _logger.debug("%s: saving image to [%s]", name, destination)
+                        save_image(path=destination, image=img)
+
+                    # --------------------------------------------------------------------------------
+                    # Convert BGR to RGB in memory
+                    # --------------------------------------------------------------------------------
+                    if bgr_to_rgb:
+                        img = convert_bgr_to_rgb(image=img)
+
                 except ValueError as e:
-                    _logger.info("%s: cannot handle and skip [%s]...", name, source)
+                    _logger.info("%s: cannot handle [%s] due to [%s]...", name, source, e)
                     if skip_image_error:
-                        skipped += 1
+                        skipped.append(_filename)
                         continue
                     else:
                         raise e
 
-                if _h == height and _w == width:
-                    # no change, do nothing
-                    resized = img
-                else:
-                    # --------------------------------------------------------------------------------
-                    # Interpolation option depending on if the operation is shrink or enlarge
-                    # --------------------------------------------------------------------------------
-                    if _h * _w > width * height:
-                        interpolation: int = cv.INTER_AREA
-                    else:
-                        interpolation: int = cv.INTER_LINEAR
-
-                    logging.debug("%s: resizing file [%s] to %s ...", name, source, (width, height))
-                    resized = resize_image(
-                        image=img, width=width, height=height, interpolation=interpolation
-                    )
-
-                processed += 1
+                package.append(img)
+                processed.append(_filename)
                 del img
 
-                _logger.debug("%s: saving image to [%s]", name, destination)
-                save_image(path=destination, image=resized)
             # End of for loop
 
     except (OSError, RuntimeError) as e:
         _logger.error("%s: failed due to [%s]", name, e)
         raise e
 
-    return processed, skipped
-
-
-def pack_images_as_rgb_from_directory(
-        path_to_source: str,
-        pattern: Union[str, None],
-        skip_image_error: bool = True
-) -> Tuple[Union[np.ndarray], List[str]]:
-    """Pack multiple color images as RGB into one np array
-    The image data in memory MUST be in RGB. OpenCV imread load the image into memory as BGR.
-
-    Args:
-        path_to_source: source directory
-        pattern: Pathlib glob pattern to filter files to process or None
-        skip_image_error: continue upon image processing errors
-    Returns: (packed images in array of shape (N, height, width, depth), list of packed file names)
-    """
-    name = "pack_images_as_rgb_from_directory()"
-    assert is_dir(path_to_source), f"invalid source [{path_to_source}]."
-    result: Union[np.ndarray, None] = None
-
-    processed: List[str] = list()
-    package: List[np.ndarray] = list()
-    try:
-        # --------------------------------------------------------------------------------
-        # List and process files
-        # --------------------------------------------------------------------------------
-        filenames: List[str] = list_files_in_directory(
-            path=path_to_source, pattern=pattern
-        )
-        if len(filenames) == 0:
-            _logger.warning("%s: no file to pack in the directory [%s]", name, path_to_source)
-        else:
-            for _filename in filenames:
-                source: str = os.sep.join([path_to_source, _filename])
-                resized: np.ndarray
-
-                # --------------------------------------------------------------------------------
-                # Load image to pack
-                # --------------------------------------------------------------------------------
-                try:
-                    # image is loaded into memory as BGR
-                    img: np.ndarray = get_image(path=source)
-                    _h, _w, _d = get_image_dimensions(image=img)
-                    if _d is None:  # Grey scale image
-                        _logger.info("%s: skipping grey scale image [%s]...", name, _filename)
-                        continue
-
-                except ValueError as e:
-                    _logger.info("%s: cannot handle and skip [%s]...", name, source)
-                    if skip_image_error:
-                        continue
-                    else:
-                        raise e
-
-                # Make sure to convert BGR to RGB
-                package.append(convert_bgr_to_rgb(image=img))
-                processed.append(_filename)
-
-            # END for loop
-            result = np.array(package)
-            del package
-            assert result.ndim == 4
-
-    except (OSError, RuntimeError) as e:
-        _logger.error("%s: failed due to [%s]", name, e)
-        raise e
-
-    return result, processed
+    assert len(package) == len(processed)
+    return package, processed, skipped
 
 
 def rotate(img):

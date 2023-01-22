@@ -1,8 +1,19 @@
+"""
+TF/Keras ResNet50 helper class
+
+[Note]
+Input Shape (https://keras.io/api/applications/resnet)
+    input_shape: the input shape has to be (224, 224, 3) (with 'channels_last' data format) or
+    (3, 224, 224) (with 'channels_first' data format). It should have exactly 3 inputs channels,
+    and width and height should be no smaller than 32.
+"""
 import logging
 from typing import (
     List,
     Tuple,
+    Sequence,
     Union,
+    Optional,
     Callable,
 )
 import numpy as np
@@ -21,8 +32,12 @@ from tensorflow.keras.applications.resnet50 import (
 from util_logging import (
     get_logger
 )
+from util_numpy import (
+    get_cosine_similarity,
+)
 from util_opencv.image import (
     validate_image,
+    get_image_dimensions,
     convert_bgr_to_rgb,
 )
 
@@ -34,8 +49,44 @@ _logger: logging.Logger = get_logger(__name__)
 
 
 # --------------------------------------------------------------------------------
+# Constant
+# --------------------------------------------------------------------------------
+RESNET50_IMAGE_VECTOR_SIZE: int = 2048
+
+
+# --------------------------------------------------------------------------------
 # Functions
 # --------------------------------------------------------------------------------
+def validate_resnet_input_image(image: np.ndarray) -> bool:
+    """Check if the image is valid as ResNet input
+    1. Shape is (W, D, 3) where W, D is at minimum 32
+    2. The image height and image should be 32 or larger.
+    """
+    name: str = "validate_resent_input_image()"
+    try:
+        _h, _w, _d = get_image_dimensions(image=image)
+
+        if _d is None:
+            _logger.warning("%s: grey scale image to skip.", name)
+            return False
+
+        if _d != 3:
+            _logger.warning("%s: incorrect channel size [%s].", name, _d)
+            return False
+
+        if _h < 32:
+            _logger.warning("%s: height minimum 32 bot [%s].", name, _h)
+            return False
+
+        if _w < 32:
+            _logger.warning("%s: width minimum 32 bot [%s].", name, _w)
+            return False
+
+    except RuntimeError as e:
+        _logger.error("%s: encountered an error [%s]", name, e)
+        return False
+
+    return True
 
 
 def preprocess_rgb_image_for_resnet(image: np.ndarray):
@@ -137,7 +188,7 @@ class ResNet50Helper:
 
         return converted
 
-    def decode(self, predictions, top=3) -> List[Tuple[str, str, float]]:
+    def decode(self, predictions, top: int = 3) -> List[Tuple[str, str, float]]:
         """Decodes the prediction of an ImageNet model
         https://www.tensorflow.org/api_docs/python/tf/keras/applications/resnet50/decode_predictions
 
@@ -180,7 +231,9 @@ class ResNet50Helper:
         Use the layers in ResNet50 before the classification and generate feature embedding vector
 
         Args:
-            images: images to generate the embedding vectors
+            images:
+                images to generate the embedding vectors. Data is in RGB by default.
+                Set bgr_to_rgb to True of the data is in BGR
             bgr_to_rgb: if BGR to RGB conversion is required
         Returns: vectors of size 2048 (output of the avg_pool layer of ResNet50 model)
         """
@@ -191,3 +244,100 @@ class ResNet50Helper:
             images_to_predict = preprocess_rgb_image_for_resnet(images)
 
         return self.feature_extractor.predict(images_to_predict)
+
+
+class Vectorizer:
+    def __init__(self):
+        self._resnet: Optional[ResNet50Helper] = None
+
+    def fit(self):
+        self._resnet = ResNet50Helper()
+
+    def transform(self, images: Sequence[np.ndarray], bgr_to_rgb: bool = False) -> Optional[np.ndarray]:
+        """Transform list of images into numpy vectors of image features.
+        Images should be preprocessed first (padding, resize, normalize,..)
+
+        Args:
+            images:
+                The sequence of raw images. By default, data in RGB order is expected.
+                if it is BGR, then set bgr_to_rgb to True
+            bgr_to_rgb:
+                execute BGR to RGB transformation e.g. when the image is in BGR (default by OpenCV).
+                ResNet requires RGB format to go into preprocess_input utility which converts RGB to BGR.
+
+        Returns:
+            Vectorized images as numpy array of (N, D) shape where
+            N is the number of images, and D is feature vector
+            size after running it through the vectorizer.
+        """
+        if self._resnet is None:
+            print("run fit() method first.")
+            return None
+
+        name: str = "transform()"
+        result: Union[np.ndarray, None] = None
+
+        package: List[np.ndarray] = list()
+        for img in images:
+            if validate_resnet_input_image(image=img):
+                if bgr_to_rgb:
+                    # Make sure to convert BGR to RGB
+                    package.append(convert_bgr_to_rgb(image=img))
+                else:
+                    package.append(img)
+
+            else:
+                _logger.warning("%s: skip an image...")
+                continue
+        # END for loop
+
+        result = self._resnet.embed(preprocess_rgb_image_for_resnet(np.array(package)))
+        assert result.shape == (len(package), RESNET50_IMAGE_VECTOR_SIZE), \
+            f"expected shape [{(len(package), RESNET50_IMAGE_VECTOR_SIZE)}] got [{result.shape}]."
+        del package
+
+        return result
+
+
+class ImageSearch:
+    @staticmethod
+    def cosine_similarity(query_image_vector: np.ndarray, image_vectors: np.ndarray) -> np.ndarray:
+        """Calculate cosine similarity between image vectors.
+        D is feature vector dimensionality (e.g. 1024)
+        N is the number of images in the batch.
+        Args:
+            query_image_vector: Vectorized image query of (1, D) shape.
+            image_vectors: Vectorized images batch of (N, D) shape.
+
+        Returns:
+            The vector of (1, N) shape with values in range [-1, 1] where
+            1 is max similarity i.e. two vectors are the same.
+        """
+        M: int = query_image_vector.shape[0]
+        D: int = query_image_vector.shape[1]
+        N: int = image_vectors.shape[0]
+        assert M == 1 and D == image_vectors.shape[1], \
+            f"expected query_image_vector shape (1, {image_vectors.shape[1]} got {query_image_vector.shape}"
+
+        similarity: np.ndarray = get_cosine_similarity(x=query_image_vector, y=image_vectors)
+        assert -1 <= similarity <= 1
+        assert similarity.shape == (1, N), f"expected cosine similarity shape {(1, N)} got {similarity.shape}"
+
+        return similarity
+
+    def most_similar(
+            self,
+            query: np.ndarray,
+            n: int = 5
+    ) -> List[Tuple[float, str]]:
+        """
+        Return top n most similar images from corpus.
+        Input image should be cleaned and vectorized with fitted Vectorizer to get query image vector. After that, use
+        the cosine_similarity function to get the top n most similar images from the data set.
+    
+        Args:
+            query: The raw query image input from the user
+            n: The number of similar image names returned from the corpus
+        Returns:
+        """
+        raise NotImplemented()
