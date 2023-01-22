@@ -1,5 +1,12 @@
 """
+OpenCV Image Utilities
+Note:
+    OpenCV assumes the image to be BGR or BGRA (BGR is the default OpenCV colour format).
+    Other tools e.g. skimage.io.imread loads image as RGB (or RGBA).
+    Make sure if the image in file is stored as RGB or BGR.
 
+References:
+    * https://stackoverflow.com/a/42406781/4281353
 """
 import os
 import logging
@@ -28,35 +35,91 @@ from util_file import (
 _logger: logging.Logger = get_logger(name=__name__)
 
 
-def validate_image(image: np.ndarray):
-    """Check if the image is numpy of shape (height, width, depth)"""
+def validate_image(image: np.ndarray) -> np.ndarray:
+    """
+    Check if the image is numpy of shape (height, width, depth)
+    Args:
+        image: image to check
+    Raises: ValueError is image is not valid
+    """
     assert isinstance(image, np.ndarray), f"invalid image data type [{type(image)}]"
-    assert image.ndim == 3, f"unexpected image shape [{image.ndim}]"
+    name: str = "validate_image()"
+
+    if image.ndim == 3:
+        return image
+    else:
+        _logger.error("%s: unexpected image shape [%s]", name, image.ndim)
+        raise ValueError("image has no depth")
+
+
+def can_handle_image(path: str) -> bool:
+    """Check if OpenCV support the image
+    Args:
+        path: path to the imgge
+    Returns: bool
+    """
+    return cv.haveImageReader(path)
 
 
 def get_image(path: str, flags: Union[int, None] = None) -> np.ndarray:
     """Get image from the path
+    Args:
+        path: path to the image
+        flags:
     """
-    img = cv.imread(filename=path, flags=flags)
-    assert img is not None, f"failed to read [{path}]"
+    name: str = "get_image()"
+    if can_handle_image(path=path):
+        img = cv.imread(filename=path, flags=flags)
+        if img is None:
+            _logger.error("%s: failed to load the image [%s].", name, path)
+            raise ValueError(f"OpenCV failed to read [{path}]")
+    else:
+        _logger.error("%s: OpenCV has no image reader for the image [%s].", name, path)
+        raise ValueError(f"OpenCV has no image reader for the image [{path}].")
     return img
 
 
-def save_image(path: str, image: np.ndarray, flags: Union[int, None] = None):
-    """Save the image to the path
+def convert_grey_to_rgb(image: np.ndarray) -> np.ndarray:
+    """Convert Gray to RGB. If it is RGB, do nothing and return the image.
+    Args:
+        image: gray scale  image to convert
+    Returns: RGB image
     """
+    assert isinstance(image, np.ndarray)
+
+    name: str = "convert_grey_to_rgb()"
+    if image.ndim == 3:
+        return image
+    elif image.ndim == 2:
+        return cv.cvtColor(image, cv.COLOR_GRAY2RGB)
+    else:
+        _logger.error("%s: unexpected image shape [%s]", name, image.ndim)
+        raise RuntimeError(f"image image shape [{image.shape}]")
+
+
+def save_image(path: str, image: np.ndarray, flags: Union[int, None] = None):
+    """Save the image to the path as BGR
+    OpenCV assumes the image to be BGR or BGRA (BGR is the default OpenCV colour format)
+    """
+    # cv.imwrite(filename=path, img=cv.cvtColor(image, cv.COLOR_RGB2BGR))
     cv.imwrite(filename=path, img=image)
 
 
-def get_dimensions(image: np.ndarray) -> Tuple[int, int, int]:
+def get_dimensions(image: np.ndarray) -> Tuple[int, int, Union[int, None]]:
     """Get dimension (width, hegith, depth) of the image
     Args:
         image: image data loaded e.g. by cv.imread as type np.ndarray
     Returns:
         (height, width, depth)
     """
-    validate_image(image)
-    height, width, depth = image.shape
+    if image.ndim == 3:         # Color RGB
+        height, width, depth = image.shape
+    elif image.ndim == 2:       # Gray
+        height, width = image.shape
+        depth = None
+    else:
+        raise RuntimeError(f"unexpected image shape [{image.shape}]")
+
     return height, width, depth
 
 
@@ -127,7 +190,8 @@ def resize_and_save_images(
         pattern: Union[str, None],
         height: int,
         width: int,
-        path_to_destination: str
+        path_to_destination: str,
+        skip_image_error: bool = True
 ):
     """Resize the images in the source directory and save them to the destination.
     Args:
@@ -136,6 +200,7 @@ def resize_and_save_images(
         height: height to resize to
         width: width to resize to
         path_to_destination: destination directory
+        skip_image_error: continue upon image processing errors
     Raises: RuntimeError for any filesystem errors
     """
     name = "resize_and_save_images()"
@@ -168,8 +233,16 @@ def resize_and_save_images(
                 # --------------------------------------------------------------------------------
                 # Load image to resize
                 # --------------------------------------------------------------------------------
-                img: np.ndarray = get_image(path=source)
-                _h, _w, _ = get_image_dimensions(image=img)
+                try:
+                    img: np.ndarray = get_image(path=source)
+                    _h, _w, _d = get_image_dimensions(image=img)
+                    if _d is None:  # Grey scale image
+                        _logger.info("%s: skipping grey scale image [%s]...", name, _filename)
+                        continue
+
+                except ValueError as e:
+                    _logger.info("%s: cannot handle and skip [%s]...", name, source)
+                    continue
 
                 if _h == height and _w == width:
                     # no change, do nothing
