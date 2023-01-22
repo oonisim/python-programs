@@ -3,6 +3,7 @@ File utility
 https://stackoverflow.com/a/34102855/4281353
 """
 import errno
+import logging
 import os
 import sys
 import tempfile
@@ -14,7 +15,19 @@ from typing import (
     Tuple
 )
 
-# Sadly, Python fails to provide the following magic number for us.
+from util_logging import (
+    get_logger,
+)
+
+
+# --------------------------------------------------------------------------------
+# Logging
+# --------------------------------------------------------------------------------
+_logger: logging.Logger = get_logger(__name__)
+
+# --------------------------------------------------------------------------------
+# Constants
+# --------------------------------------------------------------------------------
 ERROR_INVALID_NAME = 123
 """
 Windows-specific error code indicating an invalid pathname.
@@ -179,13 +192,21 @@ def is_path_exists_or_creatable_portable(pathname: str) -> bool:
         return False
 
 
+def get_dir_name(path: str) -> str:
+    """Get the directory from the path
+    Args:
+        path: path/to/file
+    Returns: path/to
+    """
+    return str(pathlib.Path(path).parent)
+
+
 def get_filename(path: str) -> str:
     """Get the filename of the file at the path including suffix
     Args:
         path: path/to/file
     Returns: filename of the file at the path without parent directories
     """
-    assert is_file(path), f"[{path}] does not exist or not a file."
     return pathlib.Path(path).name
 
 
@@ -195,7 +216,6 @@ def get_file_basename(path: str) -> str:
         path: path/to/file
     Returns: basename of the file at the path
     """
-    assert is_file(path), f"[{path}] does not exist or not a file."
     return os.path.splitext(os.path.basename(path))[0]
 
 
@@ -204,27 +224,56 @@ def get_file_suffix(path: str) -> str:
     Args:
         path: path/to/file
     """
-    assert is_file(path), f"[{path}] does not exist or not a file."
     return pathlib.Path(path).suffix
 
 
-def list_files_in_directory(path: str, patterns: Set[str] = None) -> Set[str]:
-    """List files in the directory
+def list_files_in_directory(path: str, pattern: str = None) -> Set[str]:
+    """List files in the directory matching glob pattern
+    See
+    * https://docs.python.org/3/library/glob.html
+    * https://docs.python.org/3/library/fnmatch.html#module-fnmatch
+
     Args:
         path: path/to/dir
-        patterns: glob pattern strings or None
-    Returns: Set of file names found
+        pattern: glob pattern string or None
+    Returns: Set of file names (not including path/to/dir) found
     """
     assert is_dir(path), f"[{path} does not exit or not a directory."
-    if patterns is not None and len(patterns) > 0:
+    if pattern is not None and len(pattern) > 0:
         return {
-            p.resolve() for p
-            in pathlib.Path(path).glob("**/*")
-            if p.suffix in patterns and is_file(p)
+            str(p.resolve().name)
+            for p in pathlib.Path(path).glob(pattern)
+            if is_file(p)
         }
     else:
         return {
-            p.resolve() for p
+            str(p.resolve().name) for p
             in pathlib.Path(path).glob("**/*")
             if is_file(p)
         }
+
+
+def mkdir(path: str, mode=0o777, create_parents: bool = True):
+    """make directory if it does not exist and can be created. Do nothing if already exists.
+    Args:
+        path: path to the directory to create
+        mode: permission to set
+        create_parents: flag to create parents
+    """
+    name: str = "mkdir()"
+    if is_file(path):
+        msg: str = f"file [{path} exists.]"
+        _logger.error("%s: %s", name, msg)
+        raise RuntimeError(msg)
+
+    elif not is_path_creatable(path):
+        msg: str = f"cannot create [{path}]"
+        _logger.error("%s: %s", name, msg)
+        raise RuntimeError(msg)
+
+    else:
+        pathlib.Path(path).mkdir(mode=mode, parents=True, exist_ok=True)
+
+
+def get_path_to_this_py_script() -> str:
+    return str(pathlib.Path(__file__).resolve())
