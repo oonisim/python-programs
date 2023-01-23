@@ -9,7 +9,9 @@ DATA_DIR_MODEL="${DIR}/../data/model"
 
 NPY_RESIZED_RGB="resized_rgb.npy"
 NPY_FEATURE_ENGINEERED="feature_engineered.npy"
-NPY_IMG2VEC_MODEL="image2vec.npy"
+NPY_IMAGE_VECTORS="embedded_image_vectors.npy"
+
+NPY_IMG2VEC_MODEL="vectorizer_model"
 
 #--------------------------------------------------------------------------------
 # ETL: Master -> Landing
@@ -37,5 +39,5 @@ python train.py \
   --source-directory=${DATA_DIR_FEATURE} \
   --source-filename=${NPY_FEATURE_ENGINEERED} \
   --target-directory=${DATA_DIR_MODEL} \
-  --target-filename=${NPY_IMG2VEC_MODEL} \
+  --target-filename=${NPY_IMAGE_VECTORS} \
   --log-level=10

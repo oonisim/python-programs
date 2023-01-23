@@ -12,8 +12,12 @@ parser.add_argument(
     help='path to source image directory'
 )
 
-args = vars(parser.parse_args())
+args, unknownargs = parser.parse_known_args()
+args = vars(args)
 print(type(args))
+
+print(unknownargs)
+
 
 print(args.items())
 print(f"--year is {args['year']}")

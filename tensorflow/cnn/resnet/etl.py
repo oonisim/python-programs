@@ -132,6 +132,10 @@ def main():
     _logger.info("ETL is saving the resized RGB into the npy file [%s]...", destination_file)
     save(array=np.array(resized_rgb_images), path_to_file=destination_file)
 
+    name_file: str = os.sep.join([args[ARG_TARGET_DIR], "image_names.npy"])
+    _logger.info("ETL is saving the resized image names into the npy file [%s]...", name_file)
+    save(array=np.array(processed_files), path_to_file=name_file)
+
 
 if __name__ == "__main__":
     main()

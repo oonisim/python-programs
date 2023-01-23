@@ -20,6 +20,10 @@ ARG_SOURCE_DIR = "source_directory"
 ARG_SOURCE_FILE = "source_filename"
 ARG_TARGET_DIR = "target_directory"
 ARG_TARGET_FILE = "target_filename"
+ARG_IMAGE_DATA_DIR = "image_data_dir"
+ARG_IMAGE_DATA_FILE = "image_data_file"
+ARG_IMAGE_NAME_FILE = "image_name_file"
+ARG_IMG2VEC_MODEL_FILE = "img2vec_model"
 
 
 def parse_commandline_arguments() -> Dict[str, Any]:
@@ -44,6 +48,19 @@ def parse_commandline_arguments() -> Dict[str, Any]:
         '-l', '--log-level', type=int, choices=[10, 20, 30, 40], required=False,
         help='specify the logging level (10 for INFO)',
     )
+    parser.add_argument(
+        '-r', '--image-data-dir', type=str, required=False,
+        help='image data directory'
+    )
+    parser.add_argument(
+        '-i', '--image-data-file', type=str, required=False,
+        help='resized RGB data file'
+    )
+    parser.add_argument(
+        '-a', '--image-name-file', type=str, required=False,
+        help='image name file'
+    )
+
     args = vars(parser.parse_args())
     return args
 

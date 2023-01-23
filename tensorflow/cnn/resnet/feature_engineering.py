@@ -23,7 +23,9 @@ import numpy as np
 from util_logging import (
     get_logger
 )
-
+from util_file import (
+    mv_file,
+)
 from util_numpy import (
     load,
     save,
@@ -69,8 +71,8 @@ class FeatureEngineering:
         As TF/ResNet provides the utility instance for feature engineering (preprocess_input),
         nothing to do here.
         """
-        self._is_fitted = True
         self._feature_transformer = preprocess_rgb_image_for_resnet
+        self._is_fitted = True
 
     def transform(
             self,
@@ -94,19 +96,24 @@ class FeatureEngineering:
         for index, img in enumerate(data):
             if validate_resnet_input_image(image=img):
                 if bgr_to_rgb:
-                    # Make sure to convert BGR to RGB
                     package.append(convert_bgr_to_rgb(image=img))
                 else:
                     package.append(img)
 
             else:
-                _logger.warning("%s: skip an invalid image at index [%s]...", name, index)
-                continue
+                _logger.error("%s: invalid image at index [%s]...", name, index)
+                raise RuntimeError(f"invalid image at index [{index}]")
         # END for loop
 
         features: np.ndarray = self._feature_transformer(np.array(package))
         del package
         return features
+
+    def load(self):
+        """Reload the state after fitted
+        """
+        self._feature_transformer = preprocess_rgb_image_for_resnet
+        self._is_fitted = True
 
 
 # ================================================================================

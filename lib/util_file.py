@@ -52,6 +52,10 @@ def rm_file(path_to_file):
     path.unlink()
 
 
+def mv_file(path_from: str, path_to: str):
+    pathlib.Path(path_from).rename(path_to)
+
+
 def is_pathname_valid(pathname: str) -> bool:
     """
     `True` if the passed pathname is a valid pathname for the current OS;

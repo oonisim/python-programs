@@ -17,13 +17,18 @@ import numpy as np
 from keras.models import (
     Model,
 )
+from tensorflow import keras
 
+from util_file import (
+    mv_file,
+)
 from function import (
     ARG_LOG_LEVEL,
     ARG_SOURCE_DIR,
     ARG_SOURCE_FILE,
     ARG_TARGET_DIR,
     ARG_TARGET_FILE,
+    ARG_IMG2VEC_MODEL_FILE,
     parse_commandline_arguments,
     process_commandline_arguments,
 )
@@ -63,10 +68,10 @@ class Vectorizer:
         As TF/ResNet provides the utility instance for feature engineering (preprocess_input),
         nothing to do here.
         """
-        self._resnet = ResNet50Helper()
-        self._image2vec = self._resnet.feature_extractor
+        self._resnet: ResNet50Helper = ResNet50Helper()
+        self._image2vec: Model = self._resnet.feature_extractor
         self._resnet.unload_model()
-        self._is_fitted = True
+        self._is_fitted: bool = True
 
     def transform(self, images: Sequence[np.ndarray]) -> Optional[np.ndarray]:
         """Transform list of images into numpy vectors of image features.
@@ -95,6 +100,13 @@ class Vectorizer:
 
         return embedding
 
+    def save(self, path_to_save: str):
+        self._image2vec.save(path_to_save)
+
+    def load(self, path_to_load):
+        self._image2vec: Model = keras.models.load_model(path_to_load)
+        self._is_fitted: bool = True
+
 
 # ================================================================================
 # Main
@@ -113,6 +125,8 @@ def main():
         raise RuntimeError(f"need [{ARG_TARGET_FILE}] option")
     if args[ARG_SOURCE_FILE] is None:
         raise RuntimeError(f"need [{ARG_SOURCE_FILE}] option")
+    if args[ARG_IMG2VEC_MODEL_FILE] is None:
+        raise RuntimeError(f"need [{ARG_IMG2VEC_MODEL_FILE}] option")
 
     # --------------------------------------------------------------------------------
     # 1. Load features ready for ResNet input layer from saved npy file.
@@ -127,6 +141,7 @@ def main():
     vectorizer: Vectorizer = Vectorizer()
     vectorizer.fit(images=source)
     embeddings: np.ndarray = vectorizer.transform(images=source)
+    vectorizer.save(path_to_save=f"{args[ARG_TARGET_DIR]}{os.sep}{args[ARG_IMG2VEC_MODEL_FILE]}")
 
     # --------------------------------------------------------------------------------
     # 3. Save the features as numpy npy to disk.

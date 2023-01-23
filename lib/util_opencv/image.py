@@ -18,10 +18,13 @@ import os
 import logging
 from typing import (
     List,
+    Dict,
     Sequence,
     Tuple,
+    Any,
     Union,
-    Callable
+    Callable,
+    Optional,
 )
 
 import numpy as np
@@ -114,6 +117,15 @@ def convert_bgr_to_rgb(image: np.ndarray):
     Returns: array in memory in RGB
     """
     return cv.cvtColor(image, cv.COLOR_BGR2RGB)
+
+
+def convert_rgb_to_bgr(image: np.ndarray):
+    """Convert RGB in memory to BGR (as loaded by opencv imread)
+    Args:
+        image: array in memory in RGB
+    Returns: array in memory in BGR
+    """
+    return cv.cvtColor(image, cv.COLOR_RGB2BGR)
 
 
 def save_image(path: str, image: np.ndarray, flags: Union[int, None] = None):
@@ -233,6 +245,61 @@ def _do_resize(
     )
 
 
+def resize(
+        img: np.ndarray, height: int, width: int, bgr_to_rgb: bool = True
+) -> Dict[str, Any]:
+    """resize image. Do nothing if no size change.
+    Args:
+        img: image to resize
+        height: height to resize to
+        width: height to resize to
+        bgr_to_rgb: flag to execute BGR to RGB transformation
+    Returns: dictionary
+    """
+    reason: str
+
+    _h, _w, _d = get_image_dimensions(image=img)
+
+    # --------------------------------------------------------------------------------
+    # Skip image with no channel
+    # --------------------------------------------------------------------------------
+    if _d is None:  # Grey scale image
+        return {
+            "image": None,
+            "reason": "image has no rgb channel"
+        }
+
+    # --------------------------------------------------------------------------------
+    # Resize image
+    # --------------------------------------------------------------------------------
+    if _h == height and _w == width:
+        # Same size, do nothing
+        pass
+    else:
+        # --------------------------------------------------------------------------------
+        # Interpolation option depending on if the operation is shrink or enlarge
+        # --------------------------------------------------------------------------------
+        if _h * _w > height * width:
+            interpolation: int = cv.INTER_AREA
+        else:
+            interpolation: int = cv.INTER_LINEAR
+
+        img = resize_image(
+            image=img, width=width, height=height, interpolation=interpolation
+        )
+
+    # --------------------------------------------------------------------------------
+    # Convert BGR to RGB in memory
+    # --------------------------------------------------------------------------------
+    if bgr_to_rgb:
+        img = convert_bgr_to_rgb(image=img)
+
+    return {
+        "image": img,
+        "reason": "OK"
+    }
+
+
 def read_and_process_images(
         path_to_source: str,
         pattern: Union[str, None] = None,
@@ -315,52 +382,65 @@ def read_and_process_images(
 
                 try:
                     img: np.ndarray = get_image(path=source)
-                    _h, _w, _d = get_image_dimensions(image=img)
-
-                    # --------------------------------------------------------------------------------
-                    # Skip image with no channel
-                    # --------------------------------------------------------------------------------
-                    if _d is None:  # Grey scale image
-                        _logger.info("%s: skipping grey scale image [%s]...", name, _filename)
-                        skipped.append(_filename)
-                        continue
-
-                    # --------------------------------------------------------------------------------
-                    # Resize image
-                    # --------------------------------------------------------------------------------
-                    if do_resize:
-                        if _h == height and _w == width:
-                            # Same size, do nothing
-                            pass
+                    result: dict = resize(img=img, height=height, width=width, bgr_to_rgb=bgr_to_rgb)
+                    if result['image'] is None:
+                        _logger.warning("%s: skip image [%s] due to %s", name, _filename, result['reason'])
+                        if skip_image_error:
+                            skipped.append(_filename)
+                            continue
                         else:
-                            img = _do_resize(
-                                image=img, from_height=_h, from_width=_w, to_height=height, to_width=width
-                            )
+                            raise RuntimeError(result['reason'])
+                    else:
+                        resized = result['image']
 
+#                    _h, _w, _d = get_image_dimensions(image=img)
+#
+#                    # --------------------------------------------------------------------------------
+#                    # Skip image with no channel
+#                    # --------------------------------------------------------------------------------
+#                    if _d is None:  # Grey scale image
+#                        _logger.info("%s: skipping grey scale image [%s]...", name, _filename)
+#                        skipped.append(_filename)
+#                        continue
+#
+#                    # --------------------------------------------------------------------------------
+#                    # Resize image
+#                    # --------------------------------------------------------------------------------
+#                    if do_resize:
+#                        if _h == height and _w == width:
+#                            # Same size, do nothing
+#                            pass
+#                        else:
+#                            img = _do_resize(
+#                                image=img, from_height=_h, from_width=_w, to_height=height, to_width=width
+#                            )
+#
+#                    # --------------------------------------------------------------------------------
+#                    # Convert BGR to RGB in memory
+#                    # --------------------------------------------------------------------------------
+#                    if bgr_to_rgb:
+#                        img = convert_bgr_to_rgb(image=img)
+#
                     # --------------------------------------------------------------------------------
-                    # Saving must be done BGR data in memory
+                    # Saving must be done as BGR data in memory for imwrite to save it as RGB
                     # --------------------------------------------------------------------------------
                     if do_save:
-                        _logger.debug("%s: saving image to [%s]", name, destination)
-                        save_image(path=destination, image=img)
-
-                    # --------------------------------------------------------------------------------
-                    # Convert BGR to RGB in memory
-                    # --------------------------------------------------------------------------------
-                    if bgr_to_rgb:
-                        img = convert_bgr_to_rgb(image=img)
+                        _logger.debug("%s: saving resized image [%s] to [%s]", name, _filename, destination)
+                        if bgr_to_rgb:
+                            save_image(path=destination, image=convert_rgb_to_bgr(image=resized))
+                        else:
+                            save_image(path=destination, image=resized)
 
                 except ValueError as e:
-                    _logger.info("%s: cannot handle [%s] due to [%s]...", name, source, e)
+                    _logger.info("%s: cannot handle [%s] due to [%s]...", name, _filename, e)
                     if skip_image_error:
                         skipped.append(_filename)
                         continue
                     else:
                         raise e
 
-                package.append(img)
+                package.append(resized)
                 processed.append(_filename)
-                del img
 
             # End of for loop
 
