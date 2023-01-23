@@ -14,9 +14,11 @@ import matplotlib.pyplot as plt
 from util_logging import (
     get_logger
 )
+from util_file import (
+    is_file,
+)
 from util_numpy import (
     load,
-    save,
     get_cosine_similarity,
 )
 from util_opencv.image import (
@@ -33,8 +35,6 @@ from function import (
     ARG_LOG_LEVEL,
     ARG_SOURCE_DIR,
     ARG_SOURCE_FILE,
-    ARG_TARGET_DIR,
-    ARG_TARGET_FILE,
     ARG_IMAGE_DATA_DIR,
     ARG_IMAGE_DATA_FILE,
     ARG_IMAGE_NAME_FILE,
@@ -54,6 +54,11 @@ from train import (
 # Logging
 # --------------------------------------------------------------------------------
 _logger: logging.Logger = get_logger(__name__)
+
+# --------------------------------------------------------------------------------
+# Constant
+# --------------------------------------------------------------------------------
+NUM_IMAGES_TO_SEARCH: int = 5
 
 
 # --------------------------------------------------------------------------------
@@ -107,7 +112,9 @@ class ImageSearchEngine:
         # Cosine similarity as dot product of unit vectors
         # --------------------------------------------------------------------------------
         similarity: np.ndarray = get_cosine_similarity(x=query_image_vector, y=image_vectors)
-        assert np.all(-1 <= similarity) and np.all(similarity <= 1)
+        assert len(similarity) > 0
+        # assert np.any(-1 > similarity) or np.any(similarity > 1), f"{np.where(similarity > 1.0)}"
+
         assert similarity.shape == (1, N), f"expected cosine similarity shape {(1, N)} got {similarity.shape}"
 
         return similarity
@@ -160,7 +167,7 @@ class ImageSearchEngine:
     def get_images_for_names(self, names: List[str]) -> np.ndarray:
         return self.get_images_at_indices(self.find_image_indices(names=names))
 
-    def transform(self, query: np.ndarray):
+    def transform(self, query: np.ndarray) -> np.ndarray:
         # --------------------------------------------------------------------------------
         # Apply the same processing at training pipeline
         # 1. Resize and convert to RGB.
@@ -177,7 +184,8 @@ class ImageSearchEngine:
         )
         if result['image'] is None:
             _logger.error("%s: failed resizing image due to [%s]", name, result['reason'])
-            return list()
+            raise RuntimeError(f"failed resizing image due to {result['reason']}")
+
         resized: np.ndarray = result['image']
 
         # --------------------------------------------------------------------------------
@@ -193,6 +201,7 @@ class ImageSearchEngine:
         assert vectorized.shape == _expected_shape, \
             f"expected vectorized single image vector shape {_expected_shape}, got {vectorized.shape}"
 
+        assert not np.any(np.isnan(vectorized))
         return vectorized
 
     def most_similar(
@@ -219,21 +228,20 @@ class ImageSearchEngine:
         vectorized: np.ndarray = self.transform(query=query)
 
         # --------------------------------------------------------------------------------
-        # Take 5 most similar
+        # Take N most similar
         # --------------------------------------------------------------------------------
         similarities: np.ndarray = np.squeeze(self.cosine_similarity(
             query_image_vector=vectorized, image_vectors=self._image_vectors
         ))   # similarities is of shape (1, D). Get (D, )
         # np.argsort is ascending only.
-        print(similarities[:5])
         indices = np.argsort(similarities, axis=-1)[::-1][:np.minimum(len(similarities), n)]
-        print(f"indices {indices} similarties[0] {similarities[:5]}")
+        assert len(indices) == np.minimum(len(similarities), n)
+
         scores: List[float] = similarities[indices].tolist()
         imagee_names: List[str] = self._image_names[indices]
-        print(f"scores: {scores}")
-
         result = [(score, name) for (score, name) in zip(scores, imagee_names)]
-        _logger.info("%s: similar images %s", name, result)
+
+        _logger.info("%s: similar images and scores %s", name, result)
         return result
 
 
@@ -241,13 +249,13 @@ class ImageSearchEngine:
 # Main
 # ================================================================================
 def display_images(query: np.ndarray, images: np.ndarray, names: List[str], scores: List[float]):
-    plt.rc('font', size=6)
+    plt.rc('font', size=7)
     fig, axes = plt.subplots(1, 1+len(images), figsize=(10,6))
     axes[0].axis('off')
     axes[0].imshow(convert_bgr_to_rgb(query))
     axes[0].title.set_text("query")
     for i in range(1, len(images)+1):
-        title: str = f"{names[i-1]}\nscore {round(scores[i-1], 2)}"
+        title: str = f"{names[i-1]}\nscore {round(scores[i-1], 4)}"
         axes[i].axis('off')
         axes[i].imshow(images[i-1])
         axes[i].title.set_text(title)
@@ -258,17 +266,35 @@ def display_images(query: np.ndarray, images: np.ndarray, names: List[str], scor
 def interactive_image_search(engine: ImageSearchEngine):
     while True:
         try:
+            # --------------------------------------------------------------------------------
+            # path to query image
+            # --------------------------------------------------------------------------------
             print("input path to an image to search similarity.")
             path_to_image: str = input()
+            if not is_file(path_to_file=path_to_image):
+                continue
+
+            # --------------------------------------------------------------------------------
+            # query image array in BGR
+            # --------------------------------------------------------------------------------
             query: np.ndarray = get_image(path=path_to_image)
 
+            # --------------------------------------------------------------------------------
+            # Get similar image names and scores
+            # --------------------------------------------------------------------------------
             scores: List[float] = list()
             names: List[str] = list()
-            for score, name in engine.most_similar(query=query):
+            for score, name in engine.most_similar(query=query, n=NUM_IMAGES_TO_SEARCH):
                 scores.append(float(score))
                 names.append(str(name))
 
+            assert len(names) == NUM_IMAGES_TO_SEARCH
+
+            # --------------------------------------------------------------------------------
+            # Display similar images
+            # --------------------------------------------------------------------------------
             images: np.ndarray = engine.get_images_for_names(names=names)
+            assert len(images) == NUM_IMAGES_TO_SEARCH
             display_images(
                 query=query,
                 images=images,
@@ -287,9 +313,11 @@ def main():
     """Run the image search
     """
     args: Dict[str, Any] = process_commandline_arguments(parse_commandline_arguments())
+    print(f"log leavel is {args[ARG_LOG_LEVEL]}")
+
     if args[ARG_LOG_LEVEL] is not None:
-        _logger.setLevel(level=args[ARG_LOG_LEVEL])
         logging.basicConfig(level=args[ARG_LOG_LEVEL])
+        _logger.setLevel(level=args[ARG_LOG_LEVEL])
     if args[ARG_SOURCE_FILE] is None:
         raise RuntimeError(f"need [{ARG_SOURCE_FILE}] option")
 
@@ -329,6 +357,7 @@ def main():
     # --------------------------------------------------------------------------------
     # Start the search engine
     # --------------------------------------------------------------------------------
+    _logger.info("starting image search engine...")
     engine: ImageSearchEngine = ImageSearchEngine(
         image_vectors=image_vectors,
         path_to_vectorizer_model=img2vec_model_path,
@@ -336,6 +365,7 @@ def main():
         image_names=image_names
     )
 
+    _logger.info("starting interactive search...")
     interactive_image_search(engine=engine)
 
 

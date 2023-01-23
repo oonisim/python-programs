@@ -101,9 +101,11 @@ class Vectorizer:
         return embedding
 
     def save(self, path_to_save: str):
+        _logger.info("vectorizer is saving model to  [%s]...", path_to_save)
         self._image2vec.save(path_to_save)
 
     def load(self, path_to_load):
+        _logger.info("vectorizer is loading model from [%s]...", path_to_load)
         self._image2vec: Model = keras.models.load_model(path_to_load)
         self._is_fitted: bool = True
 
