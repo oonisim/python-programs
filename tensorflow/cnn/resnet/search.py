@@ -9,6 +9,7 @@ from typing import (
     Union,
 )
 import numpy as np
+import matplotlib.pyplot as plt
 
 from util_logging import (
     get_logger
@@ -21,6 +22,7 @@ from util_numpy import (
 from util_opencv.image import (
     get_image,
     resize,
+    convert_bgr_to_rgb,
 )
 from util_tf.resnet50 import (
     RESNET50_IMAGE_HEIGHT,
@@ -238,6 +240,21 @@ class ImageSearchEngine:
 # ================================================================================
 # Main
 # ================================================================================
+def display_images(query: np.ndarray, images: np.ndarray, names: List[str], scores: List[float]):
+    plt.rc('font', size=6)
+    fig, axes = plt.subplots(1, 1+len(images), figsize=(10,6))
+    axes[0].axis('off')
+    axes[0].imshow(convert_bgr_to_rgb(query))
+    axes[0].title.set_text("query")
+    for i in range(1, len(images)+1):
+        title: str = f"{names[i-1]}\nscore {round(scores[i-1], 2)}"
+        axes[i].axis('off')
+        axes[i].imshow(images[i-1])
+        axes[i].title.set_text(title)
+    plt.tight_layout()
+    plt.show()
+
+
 def interactive_image_search(engine: ImageSearchEngine):
     while True:
         try:
@@ -248,10 +265,16 @@ def interactive_image_search(engine: ImageSearchEngine):
             scores: List[float] = list()
             names: List[str] = list()
             for score, name in engine.most_similar(query=query):
-                scores.append(score)
-                names.append(name)
+                scores.append(float(score))
+                names.append(str(name))
 
             images: np.ndarray = engine.get_images_for_names(names=names)
+            display_images(
+                query=query,
+                images=images,
+                names=names,
+                scores=scores
+            )
 
         except (ValueError, RuntimeError, OSError) as e:
             print(f"error {e}")
@@ -259,8 +282,6 @@ def interactive_image_search(engine: ImageSearchEngine):
         except (KeyboardInterrupt, EOFError):
             break
 
-        finally:
-            del engine
 
 def main():
     """Run the image search
