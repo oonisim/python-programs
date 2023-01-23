@@ -1,6 +1,37 @@
-import os
-import sys
+"""
+Model serving (image search engine) module
+
+[Objective]
+Find the images based on the embedded image vector cosine similarities.
+
+[Note]
+To prevent training/serving skew (drifts), need to use th same artifacts
+fitted to data for transformations (e.g. scaling, mean-centering, PCA).
+
+[Artifacts]
+1. NPY_IMAGE_VECTORS
+   Embedded image vectors, each of which represents a resized RGB image
+   in the multidimensional latent space. The dimension size depends on
+   the vectorizer model, e.g. ResNet50 avg_pool layer output has 2048.
+   Serialized with numpy.save() method.
+
+2. NPY_RESIZED_RGB
+   Images resized and transformed to have RGB channel order in memory.
+   Serialized with numpy.save() method. Each row in the array matches
+   with the image name in NPY_IMAGE_NAMES.
+
+3. NPY_IMAGE_NAMES
+   Names of the resized RGB images. Each row in the array matches
+   with the image in NPY_RESIZED_RGB. Serialized with numpy.save().
+
+4. TF_VECTORIZER_MODEL
+   Vectorizer Keras Model instance used at modelling to vectorize the images
+   into embedded image vectors. Serialized with the Keras Model.save() method
+   with the default options.
+
+"""
 import logging
+import os
 from typing import (
     List,
     Dict,
@@ -8,14 +39,34 @@ from typing import (
     Any,
     Union,
 )
-import numpy as np
-import matplotlib.pyplot as plt
 
-from util_logging import (
-    get_logger
+import matplotlib.pyplot as plt
+import numpy as np
+# from memory_profiler import (
+#    profile as mprofile
+# )
+from feature_engineering import (
+    FeatureEngineering,
+)
+from function import (
+    ARG_LOG_LEVEL,
+    ARG_SOURCE_DIR,
+    ARG_SOURCE_FILE,
+    ARG_IMAGE_DATA_DIR,
+    ARG_IMAGE_DATA_FILE,
+    ARG_IMAGE_NAME_FILE,
+    ARG_IMG2VEC_MODEL_FILE,
+    parse_commandline_arguments,
+    process_commandline_arguments,
+)
+from model import (
+    Vectorizer
 )
 from util_file import (
     is_file,
+)
+from util_logging import (
+    get_logger
 )
 from util_numpy import (
     load,
@@ -31,24 +82,6 @@ from util_tf.resnet50 import (
     RESNET50_IMAGE_WIDTH,
     RESNET50_IMAGE_VECTOR_SIZE,
 )
-from function import (
-    ARG_LOG_LEVEL,
-    ARG_SOURCE_DIR,
-    ARG_SOURCE_FILE,
-    ARG_IMAGE_DATA_DIR,
-    ARG_IMAGE_DATA_FILE,
-    ARG_IMAGE_NAME_FILE,
-    ARG_IMG2VEC_MODEL_FILE,
-    parse_commandline_arguments,
-    process_commandline_arguments,
-)
-from feature_engineering import (
-    FeatureEngineering,
-)
-from train import (
-    Vectorizer
-)
-
 
 # --------------------------------------------------------------------------------
 # Logging
@@ -58,13 +91,14 @@ _logger: logging.Logger = get_logger(__name__)
 # --------------------------------------------------------------------------------
 # Constant
 # --------------------------------------------------------------------------------
-NUM_IMAGES_TO_SEARCH: int = 5
+NUM_IMAGES_TO_SEARCH: int = 5   # Number of images to search for the query image
 
 
 # --------------------------------------------------------------------------------
 # Search Engine
 # --------------------------------------------------------------------------------
 class ImageSearchEngine:
+    """Image search implementation class"""
     # --------------------------------------------------------------------------------
     # Static
     # --------------------------------------------------------------------------------
@@ -102,9 +136,9 @@ class ImageSearchEngine:
         # --------------------------------------------------------------------------------
         # For matmul/dot operation, the shape match (1, D)-(D, N) is required to get (1, N)
         # --------------------------------------------------------------------------------
-        M: int = query_image_vector.shape[0]
-        D: int = query_image_vector.shape[1]
-        N: int = image_vectors.shape[0]
+        M: int = query_image_vector.shape[0]    # pylint: disable=invalid-name
+        D: int = query_image_vector.shape[1]    # pylint: disable=invalid-name
+        N: int = image_vectors.shape[0]         # pylint: disable=invalid-name
         assert M == 1 and D == image_vectors.shape[1], \
             f"expected query_image_vector shape (1, {image_vectors.shape[1]} got {query_image_vector.shape}"
 
@@ -165,14 +199,23 @@ class ImageSearchEngine:
         return self._images[indices]
 
     def get_images_for_names(self, names: List[str]) -> np.ndarray:
+        """Get images from NPY_RESIZED_RGB for the matching nase
+        Args:
+            names: image names to find the matching image
+        Returns: matched images
+        """
         return self.get_images_at_indices(self.find_image_indices(names=names))
 
     def transform(self, query: np.ndarray) -> np.ndarray:
-        # --------------------------------------------------------------------------------
-        # Apply the same processing at training pipeline
-        # 1. Resize and convert to RGB.
-        # 2. Run Feature engineering.
-        # --------------------------------------------------------------------------------
+        """Apply the same processing at modelling pipeline
+        1. Resize and convert to RGB.
+        2. Run Feature engineering.
+        3. Vectorize the image
+
+        Args:
+            query: single image to transform
+        Returns: Embedded image vector
+        """
         name: str = "transform()"
         assert query.ndim == 3, "image data should be single and of shape (H, W, C)"
 
@@ -204,10 +247,11 @@ class ImageSearchEngine:
         assert not np.any(np.isnan(vectorized))
         return vectorized
 
+    # @mprofile
     def most_similar(
             self,
             query: np.ndarray,
-            n: int = 5
+            n: int = 5              # pylint: disable=invalid-name
     ) -> List[Tuple[float, str]]:
         """
         Return top n most similar images from corpus.
@@ -239,7 +283,7 @@ class ImageSearchEngine:
 
         scores: List[float] = similarities[indices].tolist()
         imagee_names: List[str] = self._image_names[indices]
-        result = [(score, name) for (score, name) in zip(scores, imagee_names)]
+        result = list(zip(scores, imagee_names))
 
         _logger.info("%s: similar images and scores %s", name, result)
         return result
@@ -248,22 +292,47 @@ class ImageSearchEngine:
 # ================================================================================
 # Main
 # ================================================================================
-def display_images(query: np.ndarray, images: np.ndarray, names: List[str], scores: List[float]):
+def display_images(
+        query: np.ndarray,
+        images: np.ndarray,
+        names: List[str],
+        scores: List[float]
+):
+    """Display the matched similar images with name and similarity score
+    Args:
+        query: image for which the similar images are found
+        images: similar images found
+        names: names of the images found
+        scores: similarity scores for the images found
+    """
     plt.rc('font', size=7)
-    fig, axes = plt.subplots(1, 1+len(images), figsize=(10,6))
+    _, axes = plt.subplots(1, 1+len(images), figsize=(10, 6))
+
+    # --------------------------------------------------------------------------------
+    # Query image at the first column
+    # --------------------------------------------------------------------------------
     axes[0].axis('off')
     axes[0].imshow(convert_bgr_to_rgb(query))
     axes[0].title.set_text("query")
-    for i in range(1, len(images)+1):
-        title: str = f"{names[i-1]}\nscore {round(scores[i-1], 4)}"
-        axes[i].axis('off')
-        axes[i].imshow(images[i-1])
-        axes[i].title.set_text(title)
+
+    # --------------------------------------------------------------------------------
+    # Similar images with the name and score (rounded to 4 decimals)
+    # --------------------------------------------------------------------------------
+    for index in range(1, len(images)+1):
+        title: str = f"{names[index-1]}\nscore {round(scores[index-1], 4)}"
+        axes[index].axis('off')
+        axes[index].imshow(images[index-1])
+        axes[index].title.set_text(title)
+
     plt.tight_layout()
     plt.show()
 
 
 def interactive_image_search(engine: ImageSearchEngine):
+    """Command line interactive search UI
+    Args:
+        engine: image search engine to use
+    """
     while True:
         try:
             # --------------------------------------------------------------------------------
@@ -282,8 +351,8 @@ def interactive_image_search(engine: ImageSearchEngine):
             # --------------------------------------------------------------------------------
             # Get similar image names and scores
             # --------------------------------------------------------------------------------
-            scores: List[float] = list()
-            names: List[str] = list()
+            scores: List[float] = []
+            names: List[str] = []
             for score, name in engine.most_similar(query=query, n=NUM_IMAGES_TO_SEARCH):
                 scores.append(float(score))
                 names.append(str(name))
@@ -302,13 +371,14 @@ def interactive_image_search(engine: ImageSearchEngine):
                 scores=scores
             )
 
-        except (ValueError, RuntimeError, OSError) as e:
-            print(f"error {e}")
+        except (ValueError, RuntimeError, OSError, AssertionError) as exception:
+            print(f"error due to {exception}")
             continue
-        except (KeyboardInterrupt, EOFError):
+        except (KeyboardInterrupt, EOFError):   # user CTRL-C or D to stop
             break
 
 
+# @mprofile
 def main():
     """Run the image search
     """
@@ -332,25 +402,31 @@ def main():
         raise RuntimeError(f"need [{ARG_IMG2VEC_MODEL_FILE}] option")
 
     # --------------------------------------------------------------------------------
-    # 1. Load image vectors
+    # 1. Load image vectors (NPY_IMAGE_VECTORS)
     # --------------------------------------------------------------------------------
     source_file_path: str = os.sep.join([args[ARG_SOURCE_DIR], args[ARG_SOURCE_FILE]])
     _logger.info("search engine is loading the image vectors from [%s]...", source_file_path)
     image_vectors: np.ndarray = load(path_to_file=source_file_path)
 
     # --------------------------------------------------------------------------------
-    # 2. Load image names and images (resized/RGB)
+    # 2. Load image names and images (NPY_RESIZED_RGB)
+    # Note the channel order is RGB in memory and saved with the order in disk.
+    # Need RGB to BGR conversion when using with Open CV.
     # --------------------------------------------------------------------------------
-    image_name_file_path: str = os.sep.join([args[ARG_IMAGE_DATA_DIR], args[ARG_IMAGE_NAME_FILE]])
-    _logger.info("search engine is loading the image names from [%s]...", image_name_file_path),
-    image_names: np.ndarray = load(path_to_file=image_name_file_path)
-
     image_data_file_path: str = os.sep.join([args[ARG_IMAGE_DATA_DIR], args[ARG_IMAGE_DATA_FILE]])
-    _logger.info("search engine is loading the image data from [%s]...", image_data_file_path),
+    _logger.info("search engine is loading the image data from [%s]...", image_data_file_path)
     image_data: np.ndarray = load(path_to_file=image_data_file_path)
 
     # --------------------------------------------------------------------------------
-    # 3. Location of the vectorizer model (img2vec) saved at train.
+    # 3. Load image names (NPY_IMAGE_NAMES)
+    # --------------------------------------------------------------------------------
+    image_name_file_path: str = os.sep.join([args[ARG_IMAGE_DATA_DIR], args[ARG_IMAGE_NAME_FILE]])
+    _logger.info("search engine is loading the image names from [%s]...", image_name_file_path)
+    image_names: np.ndarray = load(path_to_file=image_name_file_path)
+
+    # --------------------------------------------------------------------------------
+    # 4. Location of the vectorizer model (TF_VECTORIZER_MODEL)
+    # Vectorizer loads the model with load() method.
     # --------------------------------------------------------------------------------
     img2vec_model_path = os.sep.join([args[ARG_SOURCE_DIR], args[ARG_IMG2VEC_MODEL_FILE]])
 
@@ -371,4 +447,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
