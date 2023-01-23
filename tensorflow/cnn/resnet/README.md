@@ -17,11 +17,13 @@ img2vec: Model = keras.Model(
 
 ## Function
 
-| Input                                           | Output                     |
-|-------------------------------------------------|----------------------------|
-| An image with RGB channels that OpenCV can load | N number of similar images |
+| Input                                                                                                                  | Output                                                                                                  |
+|------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
+| An query image to search similar ones. The image needs to have RGB channels and is in the format that OpenCV can load. | N number of similar images with their names and similarity scores, where the query image is on the left |
 
-<img src="./image/search_engine_output.png" align="left"/>
+**Example**
+
+![](./image/search_engine_output.png "search engine output")
 
 ---
 # Terminologies
@@ -90,7 +92,44 @@ pytest 7.2.0
 2.10.0
 ```
 
-# Setup
+---
+# Directory Structure
+
+Code is organized in the directory:
+
+```
+BASE
+├── README.md
+├── data
+│   ├── master                            <--- Original image data                   
+│   ├── landing                           <--- ETL output
+│   │   ├── image_names.npy               <--- NPY_IMAGE_NAMES
+│   │   └── resized_rgb.npy               <--- NPY_RESIZED_RGB
+│   ├── feature_store                     <--- Feature engineering output
+│   │   └── feature_engineered.npy
+│   └── model                             <--- Modelling output
+│       ├── embedded_image_vectors.npy    <--- NPY_IMAGE_VECTORS
+│       └── vectorizer_model              <--- TF_VECTORIZER_MODEL
+└── src
+    ├── requiments.txt
+    ├── pylintrc
+    ├── etl.py
+    ├── feature_engineering.py
+    ├── model.py
+    ├── serve.py
+    ├── function.py
+    ├── _common.sh
+    ├── run_modelling_pipeline.sh
+    └── run_serving_pipeline.sh
+
+```
+
+---
+
+
+# Execution
+
+## Setup
 
 1. Place original images in ${BASE}/data/master directory.
 2. Create virtual environment.<br>
@@ -99,17 +138,24 @@ pytest 7.2.0
     ```
 3. Install python packages.
     ```
-    pip install -r requirements.txt
+    pip install -r src/requirements.txt
     ```
 4. Set the PYTHONPATH to include the ```lib/``` directory.
 
----
+## Commands
 
-# Execution
-1. To generate the embedding image vectors for image search, run the command:
-```
-run_modelling_pipeline.sh
-```
+1. To generate the embedding image vectors for image search:
+   ```
+   $ cd src/
+   $ ./run_modelling_pipeline.sh
+   ```
+
+2. To run the image search:
+   ```
+   $ cd src/
+   $ ./run_serving_pipeline.sh
+   ```
+
 
 # Standards
 1. Not to use magic words - define constants or enumerations.
