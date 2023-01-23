@@ -1,10 +1,12 @@
 import os
+import sys
 import logging
 from typing import (
     List,
     Dict,
     Tuple,
     Any,
+    Union,
 )
 import numpy as np
 
@@ -52,7 +54,13 @@ from train import (
 _logger: logging.Logger = get_logger(__name__)
 
 
+# --------------------------------------------------------------------------------
+# Search Engine
+# --------------------------------------------------------------------------------
 class ImageSearchEngine:
+    # --------------------------------------------------------------------------------
+    # Static
+    # --------------------------------------------------------------------------------
     @staticmethod
     def cosine_similarity(query_image_vector: np.ndarray, image_vectors: np.ndarray) -> np.ndarray:
         """Calculate cosine similarity between image vectors.
@@ -102,6 +110,9 @@ class ImageSearchEngine:
 
         return similarity
 
+    # --------------------------------------------------------------------------------
+    # Instance
+    # --------------------------------------------------------------------------------
     def __init__(
             self,
             image_vectors: np.ndarray,
@@ -125,6 +136,27 @@ class ImageSearchEngine:
 
         # Embedded image vectors
         self._image_vectors = image_vectors
+
+    def find_image_indices(self, names: List[str]) -> np.ndarray:
+        """Find the indices in the image_names array for the image names
+        e.g. index is 0 for image name 00000.jpg
+        Args:
+            names: name of the images
+        Returns: array of indices
+        """
+        return np.in1d(self._image_names, names).nonzero()[0]
+
+    def get_images_at_indices(self, indices: Union[np.ndarray, List[int]]) -> np.ndarray:
+        """Get images at indices
+        Args:
+            indices: indices to image locations
+        Returns: array of images
+        """
+        assert len(indices) > 0 and np.max(indices) < len(self._images)
+        return self._images[indices]
+
+    def get_images_for_names(self, names: List[str]) -> np.ndarray:
+        return self.get_images_at_indices(self.find_image_indices(names=names))
 
     def transform(self, query: np.ndarray):
         # --------------------------------------------------------------------------------
@@ -169,10 +201,10 @@ class ImageSearchEngine:
         """
         Return top n most similar images from corpus.
         Input image should be cleaned and vectorized with fitted Vectorizer to get query image vector.
-        After that, use the cosine_similarity function to get the top n most similar images from the data set.
+        Then, use the cosine_similarity function to get the top n most similar images from the data set.
 
         Args:
-            query: The raw query image input from the user
+            query: The raw query image input from the user in BGR order in memory as with OpenCV
             n: The number of similar image names returned from the corpus
         Returns:
         """
@@ -206,6 +238,30 @@ class ImageSearchEngine:
 # ================================================================================
 # Main
 # ================================================================================
+def interactive_image_search(engine: ImageSearchEngine):
+    while True:
+        try:
+            print("input path to an image to search similarity.")
+            path_to_image: str = input()
+            query: np.ndarray = get_image(path=path_to_image)
+
+            scores: List[float] = list()
+            names: List[str] = list()
+            for score, name in engine.most_similar(query=query):
+                scores.append(score)
+                names.append(name)
+
+            images: np.ndarray = engine.get_images_for_names(names=names)
+
+        except (ValueError, RuntimeError, OSError) as e:
+            print(f"error {e}")
+            continue
+        except (KeyboardInterrupt, EOFError):
+            break
+
+        finally:
+            del engine
+
 def main():
     """Run the image search
     """
@@ -213,8 +269,6 @@ def main():
     if args[ARG_LOG_LEVEL] is not None:
         _logger.setLevel(level=args[ARG_LOG_LEVEL])
         logging.basicConfig(level=args[ARG_LOG_LEVEL])
-    if args[ARG_TARGET_FILE] is None:
-        raise RuntimeError(f"need [{ARG_TARGET_FILE}] option")
     if args[ARG_SOURCE_FILE] is None:
         raise RuntimeError(f"need [{ARG_SOURCE_FILE}] option")
 
@@ -254,12 +308,14 @@ def main():
     # --------------------------------------------------------------------------------
     # Start the search engine
     # --------------------------------------------------------------------------------
-    search: ImageSearchEngine = ImageSearchEngine(
+    engine: ImageSearchEngine = ImageSearchEngine(
         image_vectors=image_vectors,
         path_to_vectorizer_model=img2vec_model_path,
         images=image_data,
         image_names=image_names
     )
+
+    interactive_image_search(engine=engine)
 
 
 if __name__ == "__main__":

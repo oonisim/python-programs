@@ -32,13 +32,27 @@ VECTORIZER_MODEL="vectorizer_model"  # Keras model saved by Model.save()
 #  --target-filename=${NPY_FEATURE_ENGINEERED} \
 #  --log-level=10
 #
+##--------------------------------------------------------------------------------
+## Training: Feature Store -> Model
+##--------------------------------------------------------------------------------
+#python train.py \
+#  --source-directory=${DATA_DIR_FEATURE} \
+#  --source-filename=${NPY_FEATURE_ENGINEERED} \
+#  --target-directory=${DATA_DIR_MODEL} \
+#  --target-filename=${NPY_IMAGE_VECTORS} \
+#  --vectorizer-model-file=${VECTORIZER_MODEL} \
+#  --log-level=10
+#
 #--------------------------------------------------------------------------------
-# Training: Feature Store -> Model
+# Image Search
 #--------------------------------------------------------------------------------
-python train.py \
-  --source-directory=${DATA_DIR_FEATURE} \
-  --source-filename=${NPY_FEATURE_ENGINEERED} \
+python search.py \
+  --source-directory=${DATA_DIR_MODEL} \
+  --source-filename=${NPY_IMAGE_VECTORS} \
   --target-directory=${DATA_DIR_MODEL} \
-  --target-filename=${NPY_IMAGE_VECTORS} \
   --vectorizer-model-file=${VECTORIZER_MODEL} \
+  --image-data-dir=${DATA_DIR_LANDING} \
+  --image-data-file=${NPY_RESIZED_RGB} \
+  --image-name-file="image_names.npy" \
   --log-level=10
+

@@ -1,5 +1,4 @@
 # Cautions
 
-image in memory passed to a most_similar() as argument MUST be RGB order. If using OpenCV, make sure to convert to RGB
-in memory before passing to an function.
-
+image in memory passed to a most_similar() as argument MUST be BGR order as with OpenCV imread result, 
+because the same transformation (resize, BGR to RGB, Keras/ResNet preprocess) is applied.
