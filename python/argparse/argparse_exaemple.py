@@ -7,9 +7,18 @@ parser.add_argument(
     '-l', '--log_level', type=int, choices=[10, 20, 30, 40], required=False,
     help='specify the logging level (10 for INFO)',
 )
+parser.add_argument(
+    '-s', '--source-directory', type=str, required=True,
+    help='path to source image directory'
+)
 
 args = vars(parser.parse_args())
+print(type(args))
 
+print(args.items())
 print(f"--year is {args['year']}")
 print(f"--qrt is {args['qtr']}")
-print(args.items())
+print(f"--log-level is {args['log_level']}")
+
+print(f"--source-directory is {args['source_directory']}")
+print(f"args.get('log_legvel', None): {args.get('log_legvel', None)}")

@@ -12,12 +12,14 @@ from scipy.stats import ortho_group
 
 from util_constant import (
     TYPE_FLOAT,
-    TYPE_INT,
 )
 from util_logging import (
     get_logger
 )
-
+from util_file import (
+    mkdir,
+    get_dir_name
+)
 
 # --------------------------------------------------------------------------------
 # Logging
@@ -102,30 +104,37 @@ def save(array: np.ndarray, path_to_file: str):
         array: numpy array to save
         path_to_file: path to file
     """
-    np.save(file=path_to_file, arr=array)
-    return path_to_file
+    name: str = "save()"
+    try:
+        mkdir(path=get_dir_name(path_to_file), create_parents=True)
+        np.save(file=path_to_file, arr=array)
+        return path_to_file
+    except OSError as e:
+        _logger.error("%s: file [%s] cannot be saved.", name, path_to_file)
+        raise RuntimeError(f"{name}: os error") from e
 
 
 def load(path_to_file: str) -> np.ndarray:
     """Load saved numpy array from file
     Args:
         path_to_file: path to file
+    Raises: RuntimeError
     """
     name: str = "load()"
     try:
         return np.load(file=path_to_file)
     except OSError as e:
         _logger.error("%s: file [%s] does not exist or cannot be read.", name, path_to_file)
-        raise e
+        raise RuntimeError("load(): os error") from e
     except ValueError as e:
         _logger.error(
             "%s: file [%s] contains an object array, but allow_pickle=False given.",
             name, path_to_file
         )
-        raise e
+        raise RuntimeError(f"{name}: invalid data format") from e
     except np.UnpicklingError as e:
         _logger.error("%s: file [%s] file cannot be loaded as a pickle.", name, path_to_file)
-        raise e
+        raise RuntimeError(f"{name}: invalid data format") from e
 
 
 
