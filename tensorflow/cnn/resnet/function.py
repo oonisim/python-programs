@@ -23,7 +23,7 @@ ARG_TARGET_FILE = "target_filename"
 ARG_IMAGE_DATA_DIR = "image_data_dir"
 ARG_IMAGE_DATA_FILE = "image_data_file"
 ARG_IMAGE_NAME_FILE = "image_name_file"
-ARG_IMG2VEC_MODEL_FILE = "img2vec_model"
+ARG_IMG2VEC_MODEL_FILE = "vectorizer_model_file"
 
 
 def parse_commandline_arguments() -> Dict[str, Any]:
@@ -46,7 +46,7 @@ def parse_commandline_arguments() -> Dict[str, Any]:
     )
     parser.add_argument(
         '-l', '--log-level', type=int, choices=[10, 20, 30, 40], required=False,
-        help='specify the logging level (10 for INFO)',
+        help='logging level (10 for DEBUG)',
     )
     parser.add_argument(
         '-r', '--image-data-dir', type=str, required=False,
@@ -59,6 +59,10 @@ def parse_commandline_arguments() -> Dict[str, Any]:
     parser.add_argument(
         '-a', '--image-name-file', type=str, required=False,
         help='image name file'
+    )
+    parser.add_argument(
+        '-v', '--vectorizer-model-file', type=str, required=False,
+        help='vectorizer model file'
     )
 
     args = vars(parser.parse_args())

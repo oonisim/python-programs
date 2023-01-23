@@ -92,6 +92,12 @@ class FeatureEngineering:
         if not self.is_fitted:
             raise RuntimeError("not yet fitted")
 
+        if isinstance(data, np.ndarray):
+            if data.ndim == 3:
+                data = np.expand_dims(data, axis=0)
+            else:
+                assert data.ndim == 4, "image data should be (244, 244, 3) or (N, 244, 244, 3)"
+
         package: List[np.ndarray] = list()
         for index, img in enumerate(data):
             if validate_resnet_input_image(image=img):
