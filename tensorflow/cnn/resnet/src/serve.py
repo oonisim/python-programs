@@ -249,12 +249,10 @@ class ImageSearchEngine:
 
     # @mprofile
     def most_similar(
-            self,
-            query: np.ndarray,
-            n: int = 5              # pylint: disable=invalid-name
+            self, query: np.ndarray, n: int = 5  # pylint: disable=invalid-name
     ) -> List[Tuple[float, str]]:
         """
-        Return top n most similar images from corpus.
+        Return top n most similar images.
         Input image should be cleaned and vectorized with fitted Vectorizer to get query image vector.
         Then, use the cosine_similarity function to get the top n most similar images from the data set.
 
@@ -263,11 +261,11 @@ class ImageSearchEngine:
             n: The number of similar image names returned from the corpus
         Returns:
         """
-        assert n > 0
+        assert n > 0, f"invalid number of images to search [{n}]."
 
         name: str = "most_similar()"
         # --------------------------------------------------------------------------------
-        # Apply the same processing at training pipeline
+        # Apply the same processing done at modelling pipeline
         # --------------------------------------------------------------------------------
         vectorized: np.ndarray = self.transform(query=query)
 

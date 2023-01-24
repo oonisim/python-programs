@@ -54,6 +54,9 @@ _logger: logging.Logger = get_logger(__name__)
 # Model
 # --------------------------------------------------------------------------------
 class Vectorizer:
+    """Image to vector embedding implementation
+    Use the avg_pool layer of the
+    """
     def __init__(self):
         self._resnet: Optional[ResNet50Helper] = None
         self._image2vec: Optional[Model] = None

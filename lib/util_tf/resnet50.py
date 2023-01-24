@@ -7,22 +7,21 @@ Input Shape (https://keras.io/api/applications/resnet)
     (3, 224, 224) (with 'channels_first' data format). It should have exactly 3 inputs channels,
     and width and height should be no smaller than 32.
 """
+import gc
 import logging
 from typing import (
     List,
     Tuple,
-    Sequence,
     Union,
-    Optional,
     Callable,
 )
+
 import numpy as np
-from keras.models import (
-    Model,
-)
-import tensorflow as tf
 from keras.applications import (
     ResNet50,
+)
+from keras.models import (
+    Model,
 )
 from tensorflow.keras.applications.resnet50 import (
     preprocess_input,
@@ -37,7 +36,6 @@ from util_opencv.image import (
     get_image_dimensions,
     convert_bgr_to_rgb,
 )
-
 
 # --------------------------------------------------------------------------------
 # Logging
@@ -125,6 +123,7 @@ def preprocess_rgb_image_for_resnet(image: np.ndarray):
 # Class
 # --------------------------------------------------------------------------------
 class ResNet50Helper:
+    """TF Keras ResNet50 helper function implementations"""
     # --------------------------------------------------------------------------------
     # Instance
     # --------------------------------------------------------------------------------
@@ -148,14 +147,18 @@ class ResNet50Helper:
             )
 
     def unload_model(self):
+        """Unload the model when not in need"""
         if self._model:
             del self._model
             self._model = None
+            gc.collect()
 
     def unload_feature_extractor(self):
+        """Unload the model when not in need"""
         if self._feature_extractor:
             del self._feature_extractor
             self._feature_extractor = None
+            gc.collect()
 
     # --------------------------------------------------------------------------------
     # Properties

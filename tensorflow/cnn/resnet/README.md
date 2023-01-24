@@ -93,8 +93,9 @@ pytest 7.2.0
 ```
 
 ---
-# Directory Structure
+# Structure
 
+## Directory
 Code is organized in the directory:
 
 ```
@@ -110,19 +111,89 @@ BASE
 │   └── model                             <--- Modelling output
 │       ├── embedded_image_vectors.npy    <--- NPY_IMAGE_VECTORS
 │       └── vectorizer_model              <--- TF_VECTORIZER_MODEL
+├── lib
+│   ├── util_constant.py                  <--- Common constant
+│   ├── util_file.py                      <--- Python file utility
+│   ├── util_numpy.py                     <--- Numpy utility
+│   ├── util_opencv
+│   │   └── image.py                      <--- OpenCV utility
+│   └── util_tf
+│       └── resnet50.py                   <--- TF/Keras Resnet utility
 └── src
     ├── requiments.txt
     ├── pylintrc
-    ├── etl.py
-    ├── feature_engineering.py
-    ├── model.py
-    ├── serve.py
-    ├── function.py
+    ├── etl.py                            <--- Resize image and convert to RGB
+    ├── feature_engineering.py            <--- Feature engineering e.g. ResNet preprocessing
+    ├── model.py                          <--- Vectorizer model and image vector generation
+    ├── serve.py                          <--- Image search
+    ├── function.py                       <--- Utility
     ├── _common.sh
-    ├── run_modelling_pipeline.sh
-    └── run_serving_pipeline.sh
+    ├── run_modelling_pipeline.sh         <--- Run modeling pipeline
+    └── run_serving_pipeline.sh           <--- Run image serach
 
 ```
+
+## Code
+
+Commonly used functions are placed under ```lib``` directory for reusability not to to repeat the same efforts.
+
+### src/serving.py
+
+#### ```ImageSearchEngine.most_similar```
+
+The method in the class implements the image search based on the cosine similarities.
+
+```
+    def most_similar(
+            self, query: np.ndarray, n: int = 5  # pylint: disable=invalid-name
+    ) -> List[Tuple[float, str]]:
+        """
+        Return top n most similar images.
+```
+
+### src/model.py
+
+#### ```Vectorizer.transform()``` 
+
+The method in the class implements the image vectorization using the ResNet50 ```avg_pool``` layer output
+to embed the images into a vector of the latent space of 2048 dimensions.
+
+```
+def transform(self, images: Sequence[np.ndarray]) -> Optional[np.ndarray]:
+        """Transform list of images into numpy vectors of image features.
+        Images should be preprocessed first (padding, resize, normalize,..).
+
+        The results are embedded vectors each of which represents an image
+        in a multidimensional space where proximity represents the similarity
+        of the images.
+```
+
+### lib/util_numpy.py
+
+#### ```get_cosine_similarity()```
+
+The method implements the cosine similarity in the vectorized manner.
+
+```
+def get_cosine_similarity(x: numpy.ndarray, y: np.ndarray) -> np.ndarray:
+    """Calculate cosine similarity
+```
+
+### lib/util_tf/resnet.py
+
+#### ```ResNet50Helper```
+
+The class implements the TF/Keras ResNet50 utility functions.
+
+```
+class ResNet50Helper:
+    """TF Keras ResNet50 helper function implementations"""
+```
+
+### lib/util_opencv/image.py
+
+The file implements the OpenCV utility functions.
+
 
 ---
 
@@ -155,8 +226,3 @@ BASE
    $ cd src/
    $ ./run_serving_pipeline.sh
    ```
-
-
-# Standards
-1. Not to use magic words - define constants or enumerations.
-2. 
