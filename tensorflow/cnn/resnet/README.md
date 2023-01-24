@@ -290,11 +290,9 @@ vector cosine similarity.
 
 * [line_profiler and kernprof](https://github.com/pyutils/line_profiler)
 
-### Execution Time Profiling
 
+## Memory  Profiling
 * [Memory Profiler](https://github.com/pythonprofilers/memory_profiler)
-
-### Memory Usage Profiling
 
 ---
 
