@@ -5,7 +5,6 @@ ETL module.
 1. Load images or omit the invalid images (See read_and_process_images).
 2. Resize the image
 """
-import argparse
 import logging
 import os
 from typing import (
@@ -73,6 +72,8 @@ class ETL:
         self._file_filter_pattern: str = file_filter_pattern
 
     def extract(self):
+        """Extract data from the data sources
+        """
         pass
 
     def transform(self) -> Tuple[List[np.ndarray], List[str], List[str]]:

@@ -40,7 +40,7 @@ python feature_engineering.py \
 #--------------------------------------------------------------------------------
 # Training: Feature Store -> Model
 #--------------------------------------------------------------------------------
-python train.py \
+python model.py \
   --source-directory=${DATA_DIR_FEATURE} \
   --source-filename=${NPY_FEATURE_ENGINEERED} \
   --target-directory=${DATA_DIR_MODEL} \

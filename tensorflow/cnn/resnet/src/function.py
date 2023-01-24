@@ -27,6 +27,7 @@ ARG_IMG2VEC_MODEL_FILE = "vectorizer_model_file"
 
 
 def parse_commandline_arguments() -> Dict[str, Any]:
+    """Parse the command arguments"""
     parser = argparse.ArgumentParser(description='ETL program')
     parser.add_argument(
         '-s', '--source-directory', type=str, required=True,

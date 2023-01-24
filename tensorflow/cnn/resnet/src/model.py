@@ -19,9 +19,6 @@ from keras.models import (
 )
 from tensorflow import keras
 
-from util_file import (
-    mv_file,
-)
 from function import (
     ARG_LOG_LEVEL,
     ARG_SOURCE_DIR,
@@ -64,9 +61,10 @@ class Vectorizer:
 
     @property
     def is_fitted(self) -> bool:
+        """Check if fit() has been executed"""
         return self._is_fitted
 
-    def fit(self, images: Sequence[np.ndarray]):
+    def fit(self, images: Sequence[np.ndarray]):    # pylint: diable=unused-argument
         """Fit the instance to the data to run feature engineering on
         As TF/ResNet provides the utility instance for feature engineering (preprocess_input),
         nothing to do here.
@@ -104,10 +102,15 @@ class Vectorizer:
         return embedding
 
     def save(self, path_to_save: str):
+        """Save the image image vectorizer model
+        Args:
+            path_to_save: path to the location to save the model
+        """
         _logger.info("vectorizer is saving model to  [%s]...", path_to_save)
         self._image2vec.save(path_to_save)
 
     def load(self, path_to_load):
+        """Load the saved image vectorizer model"""
         _logger.info("vectorizer is loading model from [%s]...", path_to_load)
         self._image2vec: Model = keras.models.load_model(path_to_load)
         self._is_fitted: bool = True

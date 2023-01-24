@@ -7,24 +7,29 @@ Feature engineering module
    compatible with the ResNet input format.
 3. Return and/or save the features generated.
 """
-import os
 import logging
+import os
 from typing import (
     List,
     Dict,
-    Sequence,
     Any,
-    Union,
     Optional,
     Callable,
 )
+
 import numpy as np
 
+from function import (
+    ARG_LOG_LEVEL,
+    ARG_SOURCE_DIR,
+    ARG_SOURCE_FILE,
+    ARG_TARGET_DIR,
+    ARG_TARGET_FILE,
+    parse_commandline_arguments,
+    process_commandline_arguments,
+)
 from util_logging import (
     get_logger
-)
-from util_file import (
-    mv_file,
 )
 from util_numpy import (
     load,
@@ -37,16 +42,6 @@ from util_tf.resnet50 import (
     validate_resnet_input_image,
     preprocess_rgb_image_for_resnet
 )
-from function import (
-    ARG_LOG_LEVEL,
-    ARG_SOURCE_DIR,
-    ARG_SOURCE_FILE,
-    ARG_TARGET_DIR,
-    ARG_TARGET_FILE,
-    parse_commandline_arguments,
-    process_commandline_arguments,
-)
-
 
 # --------------------------------------------------------------------------------
 # Logging
@@ -58,15 +53,17 @@ _logger: logging.Logger = get_logger(__name__)
 # FE
 # --------------------------------------------------------------------------------
 class FeatureEngineering:
+    """Feature engineering implementation to prepare the features for modelling"""
     def __init__(self):
         self._is_fitted: bool = False
         self._feature_transformer: Optional[Callable] = None
 
     @property
     def is_fitted(self) -> bool:
+        """Check if the fit() method has been executed"""
         return self._is_fitted
 
-    def fit(self, data: np.ndarray):
+    def fit(self, data: np.ndarray):    # pylint: disable=unused-argument
         """Fit the instance to the data to run feature engineering on
         As TF/ResNet provides the utility instance for feature engineering (preprocess_input),
         nothing to do here.
@@ -98,7 +95,7 @@ class FeatureEngineering:
             else:
                 assert data.ndim == 4, "image data should be (244, 244, 3) or (N, 244, 244, 3)"
 
-        package: List[np.ndarray] = list()
+        package: List[np.ndarray] = []
         for index, img in enumerate(data):
             if validate_resnet_input_image(image=img):
                 if bgr_to_rgb:
@@ -164,4 +161,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

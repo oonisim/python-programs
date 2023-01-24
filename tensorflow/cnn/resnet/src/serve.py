@@ -339,6 +339,7 @@ def interactive_image_search(engine: ImageSearchEngine):
             print("input path to an image to search similarity.")
             path_to_image: str = input()
             if not is_file(path_to_file=path_to_image):
+                print("File does not exist. Skipping...")
                 continue
 
             # --------------------------------------------------------------------------------
@@ -377,6 +378,9 @@ def interactive_image_search(engine: ImageSearchEngine):
 
 
 # @mprofile
+# ================================================================================
+# Main
+# ================================================================================
 def main():
     """Run the image search
     """
