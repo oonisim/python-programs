@@ -1,6 +1,0 @@
-imports:
-- path: qwiklabs.jinja
-
-resources:
-- name: qwiklabs
-  type: qwiklabs.jinja

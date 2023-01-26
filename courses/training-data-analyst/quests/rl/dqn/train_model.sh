@@ -1,1 +1,0 @@
-xvfb-run -s "-screen 0 1400x900x24" -e /dev/stdout python3 -m trainer.trainer "$@"
