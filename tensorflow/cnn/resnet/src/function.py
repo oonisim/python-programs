@@ -55,15 +55,15 @@ def parse_commandline_arguments() -> Dict[str, Any]:
     )
     parser.add_argument(
         '-i', '--image-data-file', type=str, required=False,
-        help='resized RGB data file'
+        help='filename of the serialised resized/RGB data npy in the image data directory'
     )
     parser.add_argument(
         '-a', '--image-name-file', type=str, required=False,
-        help='image name file'
+        help='filename of the serialised image-name data npy in the image data directory'
     )
     parser.add_argument(
         '-v', '--vectorizer-model-file', type=str, required=False,
-        help='vectorizer model file'
+        help='filename of the serialised vectorizer model in the model directory'
     )
 
     args = vars(parser.parse_args())

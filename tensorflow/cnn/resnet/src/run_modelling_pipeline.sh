@@ -46,5 +46,5 @@ python model.py \
   --target-directory=${DATA_DIR_MODEL} \
   --target-filename=${NPY_IMAGE_VECTORS} \
   --vectorizer-model-file=${TF_VECTORIZER_MODEL} \
-  --log-level=40  # INFO
+  --log-level=10
 

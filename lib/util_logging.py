@@ -8,7 +8,7 @@ from typing import (
 # Logging
 # --------------------------------------------------------------------------------
 DEFAULT_LOG_LEVEL_NAME = (
-    logging.getLevelName(logging.INFO)
+    logging.getLevelName(logging.ERROR)
 )
 DEFAULT_LOG_LEVEL = getattr(logging, DEFAULT_LOG_LEVEL_NAME)
 

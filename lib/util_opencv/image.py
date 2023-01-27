@@ -14,8 +14,8 @@ References:
     * https://stackoverflow.com/a/64133031/4281353
     * https://stackoverflow.com/a/42406781/4281353
 """
-import os
 import logging
+import os
 from typing import (
     List,
     Dict,
@@ -24,23 +24,21 @@ from typing import (
     Any,
     Union,
     Callable,
-    Optional,
 )
 
-import numpy as np
-import matplotlib.pyplot as plt
 import cv2 as cv
+import matplotlib.pyplot as plt
+import numpy as np
 
-from util_logging import (
-    get_logger,
-)
 from util_file import (
     is_file,
     is_dir,
     mkdir,
     list_files_in_directory,
 )
-
+from util_logging import (
+    get_logger,
+)
 
 _logger: logging.Logger = get_logger(name=__name__)
 
@@ -281,6 +279,7 @@ def resize(
         # --------------------------------------------------------------------------------
         if _h * _w > height * width:
             interpolation: int = cv.INTER_AREA
+            # interpolation: int = cv.INTER_LINEAR
         else:
             interpolation: int = cv.INTER_LINEAR
 
@@ -456,8 +455,6 @@ def rotate(img):
     # This programs calculates the orientation of an object.
     # The input is an image, and the output is an annotated image
     # with the angle of otientation for each object (0 to 180 degrees)
-
-    from math import atan2, cos, sin, sqrt, pi
 
     # Was the image there?
     if img is None:

@@ -5,20 +5,17 @@ https://stackoverflow.com/a/34102855/4281353
 import errno
 import logging
 import os
+import pathlib
 import sys
 import tempfile
-import pathlib
 from typing import (
     List,
-    Dict,
-    Set,
-    Tuple
+    Set
 )
 
 from util_logging import (
     get_logger,
 )
-
 
 # --------------------------------------------------------------------------------
 # Logging

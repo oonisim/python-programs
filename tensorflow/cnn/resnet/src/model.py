@@ -2,7 +2,8 @@
 Training module
 
 [Objective]
-Generate the model (image embedding vectors) from feature-engineered images
+Generate the model (image embedding vectors) from feature-engineered images.
+Save the image vectorizer Keras Model to use in the serving.
 """
 import os
 import logging
@@ -51,8 +52,8 @@ _logger: logging.Logger = get_logger(__name__)
 # Model
 # --------------------------------------------------------------------------------
 class Vectorizer:
-    """Image to vector embedding implementation
-    Use the avg_pool layer of the
+    """
+    Image to vector embedding implementation using the ResNet50 avg_pool layer output.
     """
     def __init__(self):
         self._resnet: Optional[ResNet50Helper] = None
@@ -64,7 +65,7 @@ class Vectorizer:
         """Check if fit() has been executed"""
         return self._is_fitted
 
-    def fit(self, images: Sequence[np.ndarray]):    # pylint: diable=unused-argument
+    def fit(self, images: Sequence[np.ndarray]):    # pylint: disable=unused-argument
         """Fit the instance to the data to run feature engineering on
         As TF/ResNet provides the utility instance for feature engineering (preprocess_input),
         nothing to do here.
@@ -92,9 +93,11 @@ class Vectorizer:
 
         Raises: RuntimeError when not fitted yet
         """
+        name: str = "transform()"
         if not self.is_fitted:
             raise RuntimeError("not yet fitted")
 
+        _logger.debug("%s: embedding the images into vectors...")
         embedding: np.ndarray = self._image2vec.predict(images)
         assert embedding.shape == (len(images), RESNET50_IMAGE_VECTOR_SIZE), \
             f"expected shape [{(len(images), RESNET50_IMAGE_VECTOR_SIZE)}] got [{embedding.shape}]."
@@ -102,16 +105,17 @@ class Vectorizer:
         return embedding
 
     def save(self, path_to_save: str):
-        """Save the image image vectorizer model
+        """Save the image vectorizer Keras model with keras.Model.save method.
         Args:
             path_to_save: path to the location to save the model
         """
         _logger.info("vectorizer is saving model to  [%s]...", path_to_save)
         self._image2vec.save(path_to_save)
 
-    def load(self, path_to_load):
-        """Load the saved image vectorizer model"""
-        _logger.info("vectorizer is loading model from [%s]...", path_to_load)
+    def load(self, path_to_load: str):
+        """Load the serialized image-vectorizer Keras Model instance from the disk
+        """
+        _logger.info("vectorizer is loading the Keras Model from [%s]...", path_to_load)
         self._image2vec: Model = keras.models.load_model(path_to_load)
         self._is_fitted: bool = True
 
@@ -120,7 +124,7 @@ class Vectorizer:
 # Main
 # ================================================================================
 def main():
-    """Run the Feature Engineering process
+    """Run the modelling to generate the embedded image vectors
     1. Load features ready for ResNet input layer from saved npy file.
     2. Generate image embedding vectors with the ResNet feature extractor.
     3. Save the embedding vectors as npy to use in search.
@@ -144,7 +148,7 @@ def main():
     source: np.ndarray = load(path_to_file=source_file_path)
 
     # --------------------------------------------------------------------------------
-    # 2. Feature engineering for ResNet to generate data for ResNet input layer.
+    # 2. Generate the image vectors and save the saved the vectorizer Keras Model.
     # --------------------------------------------------------------------------------
     vectorizer: Vectorizer = Vectorizer()
     vectorizer.fit(images=source)
@@ -152,10 +156,10 @@ def main():
     vectorizer.save(path_to_save=f"{args[ARG_TARGET_DIR]}{os.sep}{args[ARG_IMG2VEC_MODEL_FILE]}")
 
     # --------------------------------------------------------------------------------
-    # 3. Save the features as numpy npy to disk.
+    # 3. Save the image vectors as numpy npy to disk.
     # --------------------------------------------------------------------------------
     target_file_path: str = os.sep.join([args[ARG_TARGET_DIR], args[ARG_TARGET_FILE]])
-    _logger.info("vectorizer is saving the embedding to [%s]...", target_file_path)
+    _logger.info("vectorizer is saving the image vectors to [%s]...", target_file_path)
     save(array=embeddings, path_to_file=target_file_path)
 
 

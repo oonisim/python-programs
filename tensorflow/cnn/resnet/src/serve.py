@@ -42,9 +42,9 @@ from typing import (
 
 import matplotlib.pyplot as plt
 import numpy as np
-# from memory_profiler import (
-#    profile as mprofile
-# )
+from memory_profiler import (
+   profile as mprofile
+)
 from feature_engineering import (
     FeatureEngineering,
 )
@@ -103,7 +103,10 @@ class ImageSearchEngine:
     # Static
     # --------------------------------------------------------------------------------
     @staticmethod
-    def cosine_similarity(query_image_vector: np.ndarray, image_vectors: np.ndarray) -> np.ndarray:
+    def cosine_similarity(
+            query_image_vector: np.ndarray,
+            image_vectors: np.ndarray
+    ) -> np.ndarray:
         """Calculate cosine similarity between image vectors.
         D is feature vector dimensionality (e.g. 1024)
         N is the number of images in the batch.
@@ -126,7 +129,7 @@ class ImageSearchEngine:
         # image vectors is numpy array of shape (N, RESNET50_IMAGE_VECTOR_SIZE)
         # --------------------------------------------------------------------------------
         assert isinstance(image_vectors, np.ndarray), f"got type [{type(image_vectors)}"
-        assert image_vectors.ndim == 2, f"expected image vector is 2D got [{image_vectors.ndim}]."
+        assert image_vectors.ndim == 2, f"expected image vectors is 2D got [{image_vectors.ndim}]."
 
         # --------------------------------------------------------------------------------
         # Reshape the single query image vector as (1, RESNET50_IMAGE_VECTOR_SIZE)
@@ -168,6 +171,7 @@ class ImageSearchEngine:
         # --------------------------------------------------------------------------------
         self._images: np.ndarray = images
         self._image_names: np.ndarray = image_names
+        self._indices_to_sorted_names = self._image_names.argsort()
 
         # Feature Engineering instance
         self._feature_engineer: FeatureEngineering = FeatureEngineering()
@@ -187,7 +191,11 @@ class ImageSearchEngine:
             names: name of the images
         Returns: array of indices
         """
-        return np.in1d(self._image_names, names).nonzero()[0]
+        # in1d sorts the results and does not preserve the order.
+        # return np.in1d(self._image_names, names).nonzero()[0]
+        return self._indices_to_sorted_names[
+            np.searchsorted(self._image_names, names, sorter=self._indices_to_sorted_names)
+        ]
 
     def get_images_at_indices(self, indices: Union[np.ndarray, List[int]]) -> np.ndarray:
         """Get images at indices
@@ -297,9 +305,11 @@ def display_images(
         scores: List[float]
 ):
     """Display the matched similar images with name and similarity score
+    Note query is in RGB but images are in BGR
+
     Args:
-        query: image for which the similar images are found
-        images: similar images found
+        query: image in for which the similar images are found in BGR
+        images: similar images found in RGB
         names: names of the images found
         scores: similarity scores for the images found
     """
@@ -310,7 +320,7 @@ def display_images(
     # Query image at the first column
     # --------------------------------------------------------------------------------
     axes[0].axis('off')
-    axes[0].imshow(convert_bgr_to_rgb(query))
+    axes[0].imshow(convert_bgr_to_rgb(query))   # BGR to RGB
     axes[0].title.set_text("query")
 
     # --------------------------------------------------------------------------------
@@ -364,8 +374,8 @@ def interactive_image_search(engine: ImageSearchEngine):
             images: np.ndarray = engine.get_images_for_names(names=names)
             assert len(images) == NUM_IMAGES_TO_SEARCH
             display_images(
-                query=query,
-                images=images,
+                query=query,    # query is in BGR
+                images=images,  # images is in RGB
                 names=names,
                 scores=scores
             )
@@ -377,10 +387,10 @@ def interactive_image_search(engine: ImageSearchEngine):
             break
 
 
-# @mprofile
 # ================================================================================
 # Main
 # ================================================================================
+# @mprofile
 def main():
     """Run the image search
     """
@@ -411,7 +421,7 @@ def main():
     image_vectors: np.ndarray = load(path_to_file=source_file_path)
 
     # --------------------------------------------------------------------------------
-    # 2. Load image names and images (NPY_RESIZED_RGB)
+    # 2. Load images (NPY_RESIZED_RGB)
     # Note the channel order is RGB in memory and saved with the order in disk.
     # Need RGB to BGR conversion when using with Open CV.
     # --------------------------------------------------------------------------------
@@ -425,6 +435,10 @@ def main():
     image_name_file_path: str = os.sep.join([args[ARG_IMAGE_DATA_DIR], args[ARG_IMAGE_NAME_FILE]])
     _logger.info("search engine is loading the image names from [%s]...", image_name_file_path)
     image_names: np.ndarray = load(path_to_file=image_name_file_path)
+
+    assert len(image_data) == len(image_names), \
+        f"expected the same number of rows in " \
+        f"images [{len(image_data)}] and names [{len(image_names)}]"
 
     # --------------------------------------------------------------------------------
     # 4. Location of the vectorizer model (TF_VECTORIZER_MODEL)

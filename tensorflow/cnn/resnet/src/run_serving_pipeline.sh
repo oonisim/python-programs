@@ -22,5 +22,7 @@ python serve.py \
   --vectorizer-model-file=${TF_VECTORIZER_MODEL} \
   --image-data-dir=${DATA_DIR_LANDING} \
   --image-data-file=${NPY_RESIZED_RGB} \
-  --image-name-file="image_names.npy" \
+  --image-name-file=${NPY_IMAGE_NAMES} \
   --log-level=10
+
+# mprof plot

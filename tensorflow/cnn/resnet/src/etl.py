@@ -74,7 +74,7 @@ class ETL:
     def extract(self):
         """Extract data from the data sources
         """
-        pass
+        raise NotImplementedError()
 
     def transform(self) -> Tuple[List[np.ndarray], List[str], List[str]]:
         """Load the image, resize, and transform to RGB"""
@@ -106,6 +106,7 @@ def main():
     2. Save the resized RGB data in memory as a numpy npy file, and use it at the
        feature engineering. Make sure feature engineering input is in RGB, not BGR.
     """
+    name: str = "main()"
     args: Dict[str, Any] = process_commandline_arguments(parse_commandline_arguments())
     if args[ARG_LOG_LEVEL] is not None:
         _logger.setLevel(level=args[ARG_LOG_LEVEL])
@@ -125,6 +126,9 @@ def main():
         file_filter_pattern=r"*.jpg"
     )
     resized_rgb_images, processed_files, skipped_files = etl.transform()
+    assert len(resized_rgb_images) == len(processed_files), \
+        f"expected the same number of the images resized [{len(resized_rgb_images)}] " \
+        f"and processed images files [{len(processed_files)}]."
 
     # --------------------------------------------------------------------------------
     # Save the resized RGB in-memory image data to disk to late be used at FE.
@@ -136,6 +140,15 @@ def main():
     name_file: str = os.sep.join([args[ARG_TARGET_DIR], "image_names.npy"])
     _logger.info("ETL is saving the resized image names into the npy file [%s]...", name_file)
     save(array=np.array(processed_files), path_to_file=name_file)
+
+    # --------------------------------------------------------------------------------
+    # Report
+    # --------------------------------------------------------------------------------
+    print(
+        f"{name}: images processed [{len(resized_rgb_images)}], skipped [{len(skipped_files)}]."
+    )
+    if len(skipped_files) > 0:
+        print(f"skipped files: {skipped_files}")
 
 
 if __name__ == "__main__":
