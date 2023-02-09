@@ -193,6 +193,10 @@ def is_path_exists_or_creatable_portable(pathname: str) -> bool:
         return False
 
 
+def change_directory(path_to_dir: str):
+    os.chdir(path_to_dir)
+
+
 def get_dir_name(path: str) -> str:
     """Get the directory from the path
     Args:
@@ -277,6 +281,11 @@ def mkdir(path: str, mode=0o777, create_parents: bool = True):
 
     else:
         pathlib.Path(path).mkdir(mode=mode, parents=True, exist_ok=True)
+
+
+def get_absolute_path(path: str) -> str:
+    """Get the absolute path of the path"""
+    return str(pathlib.Path(path).resolve())
 
 
 def get_path_to_this_py_script() -> str:
