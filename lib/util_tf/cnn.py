@@ -3,7 +3,11 @@ CNN utility module
 """
 from typing import (
     Tuple,
+    Callable,
+    Optional,
 )
+
+import tensorflow as tf
 from keras.layers import (
     Layer,
     Conv2D,
@@ -23,9 +27,34 @@ from keras.models import (
 
 
 # --------------------------------------------------------------------------------
+# Utility
+# --------------------------------------------------------------------------------
+def get_relu_activation_function(
+        alpha: float = 0.0,
+        max_value: Optional[float] = None,
+        threshold: float = 0.0
+) -> Callable:
+    """
+    https://www.tensorflow.org/api_docs/python/tf/keras/activations/relu
+    Args:
+        alpha: the slope for values lower than the threshold.
+        max_value: The largest value the function will return
+        threshold:
+            value of the activation function below which values
+            will be damped or set to zero. Normally 0 (x=0)
+    """
+    def f(x) -> tf.Tensor:
+        return tf.keras.activations.relu(
+            x, alpha=alpha, max_value=max_value, threshold=threshold
+        )
+
+    return f
+
+
+# --------------------------------------------------------------------------------
 # Model
 # --------------------------------------------------------------------------------
-class CNNBlock(Model):
+class Conv2DBlock(Model):
     """Building block of (Convolution -> BN -> Activation)
     """
     def __init__(
