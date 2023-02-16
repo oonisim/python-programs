@@ -72,7 +72,7 @@ python-Levenshtein
 gensim~=4.2.0
 
 
-Werkzeug~=2.1.2
+Werkzeug~=2.2.3
 Pillow~=9.3.0
 six~=1.16.0
 scipy~=1.9.3
