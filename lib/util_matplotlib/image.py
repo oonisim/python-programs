@@ -23,10 +23,11 @@ import matplotlib.pyplot as plt
 # ]
 # --------------------------------------------------------------------------------
 def plot_image(image, width, height, channels, figsize=(6, 6)):
-    reshaped = image.reshape(width, height, channels)
-    plt.figure(figsize=figsize),
-    plt.imshow(reshaped, cmap=plt.cm.binary)
-    plt.axis("off")
+    # reshaped = image.reshape(width, height, channels)
+    # plt.figure(figsize=figsize),
+    # plt.imshow(reshaped, cmap=plt.cm.binary)
+    # plt.axis("off")
+    plot_images(images=image, width=width, height=height, channels=channels, figsize=figsize)
 
 
 def plot_images(
@@ -58,7 +59,7 @@ def plot_images(
     n_empty = n_rows * images_per_row - len(images)
     images.append(np.zeros((width, width * n_empty)))
     for row in range(n_rows):
-        rimages = images[row * images_per_row : (row + 1) * images_per_row]
+        rimages = images[row * images_per_row: (row + 1) * images_per_row]
         row_images.append(np.concatenate(rimages, axis=1))
     image = np.concatenate(row_images, axis=0)
     plt.imshow(image, cmap=mpl.cm.binary, **options)

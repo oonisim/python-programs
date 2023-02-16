@@ -8,6 +8,7 @@ import os
 import pathlib
 import sys
 import tempfile
+import shutil
 from typing import (
     List,
     Set
@@ -204,6 +205,10 @@ def get_dir_name(path: str) -> str:
     Returns: path/to
     """
     return str(pathlib.Path(path).parent)
+
+
+def del_dir(path_to_dir: str, ignore_errors=False):
+    shutil.rmtree(path_to_dir, ignore_errors=ignore_errors)
 
 
 def get_filename(path: str) -> str:
