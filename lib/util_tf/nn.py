@@ -216,9 +216,6 @@ def build_layers(config: Dict[str, dict]) -> List[Layer]:
         "conv02": {
             "kind": LAYER_NAME_CONV2D, "kernel_size":(3,3), "filters":64, "strides":1, "padding": "same"
         },
-        "conf03": {
-            "kind": LAYER_NAME_CONV2D, "kernel_size":(3,3), "filters":64, "strides":1, "padding": "same"
-        },
         "flat": {
             "kind": LAYER_NAME_FLAT, "data_format": LAYER_ARG_CHANNELS_LAST
         },
