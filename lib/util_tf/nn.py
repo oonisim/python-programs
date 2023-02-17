@@ -1,9 +1,21 @@
 """
 CNN utility module
+
+[NOTE]
+Be caseful with TensorFlow import as in https://stackoverflow.com/a/74972559/4281353
+There is a difference between import keras and from tensorflow import keras:
+```
+import keras
+keras.optimizers.Adam.build
+AttributeError: type object 'Adam' has no attribute 'build'
+
+from tensorflow import keras
+keras.optimizers.Adam.build
+<function Adam.build at 0x7f1ff29e7b50>
+```
 """
 import json
 import logging
-import os.path
 from typing import (
     List,
     Dict,
@@ -15,7 +27,11 @@ from typing import (
 
 import numpy as np
 import tensorflow as tf
-import tensorflow_addons as tfa
+from tensorflow import keras
+from keras.callbacks import (
+    Callback,
+    History,
+)
 from keras.layers import (
     Layer,
     Conv2D,
@@ -24,19 +40,12 @@ from keras.layers import (
     Dense,
     Flatten,
     Activation,
+    ReLU,
+    LeakyReLU,
 )
 from keras.models import (
-    Model
-)
-from keras import (
-    regularizers
-)
-from keras.optimizers import (
-    Adam
-)
-from keras.callbacks import (
-    Callback,
-    History,
+    Model,
+    Sequential,
 )
 
 from util_constant import (
@@ -56,12 +65,15 @@ _logger: logging.Logger = get_logger(__name__)
 # --------------------------------------------------------------------------------
 LAYER_NAME_NORM = "Norm"
 LAYER_NAME_CONV2D: str = "Conv2D"
+LAYER_NAME_ACTIVATION: str = "Activation"
 LAYER_NAME_MAXPOOL2D: str = "MaxPool2D"
 LAYER_NAME_DENSE: str = "Dense"
 LAYER_NAME_FLAT: str = "Flatten"
 LAYER_NAME_BN: str = "BatchNorm"
+CUSTOM_LAYER_NAME_CONV2DBLOCK: str = "Conv2DBlock"
 LAYER_ARGV_CHANNELS_LAST: str = "channels_last"
 LAYER_ARGV_PADDING: str = "padding"
+
 
 # --------------------------------------------------------------------------------
 # Information
@@ -147,10 +159,11 @@ class Conv2DBlock(Layer):
         # If Activation layer is not provisioned, instantiate internally.
         # --------------------------------------------------------------------------------
         if activation_layer is None:
-            activation_function: Callable = get_relu_activation_function(
-                alpha=0.1, max_value=None, threshold=0.0
-            )
-            self.activation = Activation(activation=activation_function)
+            # activation_function: Callable = get_relu_activation_function(
+            #    alpha=0.1, max_value=None, threshold=0.0
+            # )
+            # self.activation = Activation(activation=activation_function)
+            self.activation = LeakyReLU(alpha=0.1)
         else:
             self.activation = activation_layer
 
@@ -211,20 +224,40 @@ def build_layers(config: Dict[str, dict]) -> List[Layer]:
     [Example]
     example_config_of_layers = {
         "conv01": {  # Name of the layer. "conv01" is set to name arg of the Layer
-            "kind": LAYER_NAME_CONV2D,     # Layer class Conv2D
-            "kernel_size":(3,3),           # Conv2D argument
+            "kind": LAYER_NAME_CONV2D,
+            "kernel_size":(3,3),
+            "filters":64,
+            "strides":1,
+            "padding": "same",
+
+        },
+        "act01": {
+            "kind": LAYER_NAME_ACTIVATION,
+            "activation": "leaky_relu"
+            "slope": 0.1
+        },
+        "conv02": {  # Name of the layer. "conv01" is set to name arg of the Layer
+            "kind": CUSTOM_LAYER_NAME_CONV2DBLOCK,
+            "kernel_size":(3,3),
+            "filters":64,
+            "strides":1,
+            "padding": "same",
+        },
+        "maxpool01": {
+            "kind": LAYER_NAME_MAXPOOL2D,
+            "pool_size":(2,2), "strides":(2,2),
+            "padding": "valid"
+        },
+        "conv03": {
+            "kind": LAYER_NAME_CONV2D,
+            "kernel_size":(3,3),
             "filters":64,
             "strides":1,
             "padding": "same"
         },
-        "maxpool01": {
-            "kind": LAYER_NAME_MAXPOOL2D, "pool_size":(2,2), "strides":(2,2), "padding": "valid"
-        },
-        "conv02": {
-            "kind": LAYER_NAME_CONV2D, "kernel_size":(3,3), "filters":64, "strides":1, "padding": "same"
-        },
         "flat": {
-            "kind": LAYER_NAME_FLAT, "data_format": LAYER_ARG_CHANNELS_LAST
+            "kind": LAYER_NAME_FLAT,
+            "data_format": LAYER_ARG_CHANNELS_LAST
         },
         "full": {
             "kind": LAYER_NAME_DENSE,
@@ -250,9 +283,9 @@ def build_layers(config: Dict[str, dict]) -> List[Layer]:
         _logger.debug("%s: creating layer[%s] with %s", _name, index, value)
 
         # --------------------------------------------------------------------------------
-        # Convolution
+        # Custom Convolution Block
         # --------------------------------------------------------------------------------
-        if kind == LAYER_NAME_CONV2D:
+        if kind == CUSTOM_LAYER_NAME_CONV2DBLOCK:
             conv: Layer = Conv2DBlock(
                 name=name,
                 filters=value.get("filters", 32),
@@ -263,6 +296,36 @@ def build_layers(config: Dict[str, dict]) -> List[Layer]:
                 # activation="relu"
             )
             layers.append(conv)
+
+        # --------------------------------------------------------------------------------
+        # Convolution
+        # --------------------------------------------------------------------------------
+        elif kind == LAYER_NAME_CONV2D:
+            conv: Layer = Conv2D(
+                name=name,
+                filters=value.get("filters", 32),
+                kernel_size=value.get("kernel_size", 2),
+                strides=value.get("strides", 1),
+                padding=value.get("padding", "same"),
+                data_format=value.get("data_format", "channels_last")
+            )
+            layers.append(conv)
+
+        # --------------------------------------------------------------------------------
+        # Activation
+        # https://keras.io/api/layers/activation_layers/
+        # --------------------------------------------------------------------------------
+        elif kind == LAYER_NAME_ACTIVATION:
+            activation: str = value.get("activation", "relu")
+            if activation == "relu":
+                act: Layer = ReLU()
+
+            elif activation == "leaky_relu":
+                alpha: float = value.get("alpha", 0.1)
+                act: Layer = LeakyReLU(alpha=alpha)
+
+            else:
+                raise NotImplementedError(f"activation {activation} not yet implemented or invalid")
 
         # --------------------------------------------------------------------------------
         # Max Pooling
@@ -306,7 +369,7 @@ def build_layers(config: Dict[str, dict]) -> List[Layer]:
                 # L2 kernel regularizer
                 # https://stats.stackexchange.com/a/383326/105137
                 # https://keras.io/api/layers/regularizers/#l2-class
-                kernel_regularizer=regularizers.l2(l2=value.get("l2", 1e-2)),
+                kernel_regularizer=keras.regularizers.l2(l2=value.get("l2", 1e-2)),
                 activation=value.get("activation", "relu")
             )
             layers.append(full)
@@ -330,15 +393,18 @@ def build_nn_model(
         input_shape,
         layers_config: dict,
         normalization: Optional[Layer] = None,
-        learning_rate: TYPE_FLOAT = TYPE_FLOAT(1e-3),
+        learning_rate: float = 1e-2,
+        metrics: List[str] = ('accuracy')
 ) -> Model:
     """
+    Build a Keras model. Not compile yet here.
     Args:
         model_name: name of the model
         input_shape: shape of the input
         normalization: tf.Keras.layers.Normalization if it has been used for normalizing
-        learning_rate: learning rate
         layers_config: dictionary of layer configurations
+        learning_rate: Optimizer learning rate
+        metrics: Optimizer metrics to monitor
 
     Returns: Model
     """
@@ -375,29 +441,71 @@ def build_nn_model(
     # --------------------------------------------------------------------------------
     model = Model(inputs=inputs, outputs=outputs, name=model_name)
     model.compile(
-        optimizer=Adam(learning_rate=learning_rate),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
         loss=tf.keras.losses.sparse_categorical_crossentropy,
-        metrics=['accuracy']
+        metrics=metrics
     )
-    model.summary()
+    return model
 
+
+def build_nn_model_sequential(
+        model_name: str,
+        input_shape,
+        layers_config: dict,
+        normalization: Optional[Layer] = None,
+        learning_rate: float = 1e-2,
+        metrics: List[str] = ('accuracy')
+) -> Model:
+    """
+    Build a Keras model. Not compile yet here.
+    Args:
+        model_name: name of the model
+        input_shape: shape of the input
+        normalization: tf.Keras.layers.Normalization if it has been used for normalizing
+        layers_config: dictionary of layer configurations
+        learning_rate: Optimizer learning rate
+        metrics: Optimizer metrics to monitor
+
+    Returns: Model
+    """
+    model: Sequential = Sequential(name=model_name)
+
+    # --------------------------------------------------------------------------------
+    # Normalization Layer
+    # --------------------------------------------------------------------------------
+    if normalization is not None:
+        assert isinstance(normalization, Layer)
+        model.add(normalization)
+
+    # --------------------------------------------------------------------------------
+    # CNN Layers
+    # --------------------------------------------------------------------------------
+    layers: List[Layer] = build_layers(layers_config)
+    for layer in layers:
+        model.add(layer)
+
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+        loss=tf.keras.losses.sparse_categorical_crossentropy,
+        metrics=metrics
+    )
     return model
 
 
 def train(
         model: Model,
-        x: Union[np.ndarray, tf.Tensor],
+        x: Union[np.ndarray, tf.Tensor],    # pylint: disable=invalid-name
         y: Union[np.ndarray, tf.Tensor],
         batch_size: int = 32,
         epochs: int = 1,
         validation_split: float = 0.2,
         use_multiprocessing: bool = True,
         workers: int = 4,
-        verbosity: int = 0,
+        verbose: int = 0,
         callbacks: List[Callback] = None
 ) -> History:
     """Model training runner
-    https://www.tensorflow.org/api_docs/python/tf/keras/Model#fit
+    See https://www.tensorflow.org/api_docs/python/tf/keras/Model#fit
 
     Args:
         model: Keras Model to train
@@ -408,7 +516,7 @@ def train(
         validation_split: ratio of x data to allocate for validation during training
         use_multiprocessing: flat for multiprocessing
         workers: number of workers to use for multiprocessing
-        verbosity: verbosity level 'auto', 0, 1, or 2.
+        verbose: verbosity level 'auto', 0, 1, or 2.
         callbacks: List of keras.callbacks.Callback instances.
 
     Returns:
@@ -424,7 +532,7 @@ def train(
         validation_split=validation_split,
         use_multiprocessing=use_multiprocessing,
         workers=workers,
-        verbose=verbosity,
+        verbose=verbose,
         callbacks=callbacks
     )
     return history
@@ -464,19 +572,18 @@ def get_tensorboard_callback(
 
 def get_early_stopping_callback(
         monitor='val_loss',
-        mode: str = "min",
+        mode: str = "auto",
         min_delta: int = 0,
         patience: int = 5,
         verbose: int = 1,
-        start_from_epoch: int = 0,
         restore_best_weights: bool = True
 ) -> Callback:
     """Get Early Stopping callback instance
-    By default, monitor the validation loss to decrease (mode=min) as it quantifies
-    the deviation from the grand truth and indicates over-fitting if it starts to
-    increase.
+    See https://keras.io/api/callbacks/early_stopping/
 
-    https://keras.io/api/callbacks/early_stopping/
+    By default, monitor the validation loss as it quantifies the deviation from
+    the grand truth and indicates over-fitting if it starts to increase.
+
     Args:
         monitor: metrics to monitor e.g. val_loss (stackoverflow.com/questions/75479364/)
         mode: {"auto", "min", "max"}. min: early stop when metric stopped decreasing
@@ -562,6 +669,7 @@ def get_precision(
     _validate_precisions_labels(predictions=predictions, labels=labels)
 
     precision: tf.keras.metrics.Metric = tf.keras.metrics.Precision()
+    # pylint: disable=not-callable
     precision.update_state(y_true=labels, y_pred=tf.math.argmax(predictions, axis=-1))
     return float(precision.result().numpy())
 
@@ -579,6 +687,7 @@ def get_recall(
     _validate_precisions_labels(predictions=predictions, labels=labels)
 
     recall: tf.keras.metrics.Metric = tf.keras.metrics.Recall()
+    # pylint: disable=not-callable
     recall.update_state(y_true=labels, y_pred=tf.math.argmax(predictions, axis=-1))
     return float(recall.result().numpy())
 
@@ -596,6 +705,7 @@ def get_accuracy(
     _validate_precisions_labels(predictions=predictions, labels=labels)
 
     accuracy: tf.keras.metrics.Metric = tf.keras.metrics.Accuracy()
+    # pylint: disable=not-callable
     accuracy.update_state(y_true=labels, y_pred=tf.math.argmax(predictions, axis=-1))
     return float(accuracy.result().numpy())
 
@@ -614,5 +724,6 @@ def get_auc(
     _validate_precisions_labels(predictions=predictions, labels=labels)
 
     auc: tf.keras.metrics.Metric = tf.keras.metrics.Accuracy()
+    # pylint: disable=not-callable
     auc.update_state(y_true=labels, y_pred=tf.math.argmax(predictions, axis=-1))
     return float(auc.result().numpy())
