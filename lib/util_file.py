@@ -1,6 +1,13 @@
 """
 File utility
 https://stackoverflow.com/a/34102855/4281353
+
+Windows-specific error code indicating an invalid pathname.
+
+See Also
+----------
+https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-
+    Official listing of all such codes.
 """
 import errno
 import logging
@@ -18,6 +25,7 @@ from util_logging import (
     get_logger,
 )
 
+
 # --------------------------------------------------------------------------------
 # Logging
 # --------------------------------------------------------------------------------
@@ -27,33 +35,15 @@ _logger: logging.Logger = get_logger(__name__)
 # Constants
 # --------------------------------------------------------------------------------
 ERROR_INVALID_NAME = 123
-"""
-Windows-specific error code indicating an invalid pathname.
-
-See Also
-----------
-https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-
-    Official listing of all such codes.
-"""
 
 
-def is_file(path_to_file) -> bool:
-    return pathlib.Path(path_to_file).is_file()
+def get_path_to_this_py_script() -> str:
+    return str(pathlib.Path(__file__).resolve())
 
 
-def is_dir(path_to_file) -> bool:
-    return pathlib.Path(path_to_file).is_dir()
-
-
-def rm_file(path_to_file):
-    path = pathlib.Path(path_to_file)
-    path.unlink()
-
-
-def mv_file(path_from: str, path_to: str):
-    pathlib.Path(path_from).rename(path_to)
-
-
+# --------------------------------------------------------------------------------
+# Common
+# --------------------------------------------------------------------------------
 def is_pathname_valid(pathname: str) -> bool:
     """
     `True` if the passed pathname is a valid pathname for the current OS;
@@ -194,6 +184,18 @@ def is_path_exists_or_creatable_portable(pathname: str) -> bool:
         return False
 
 
+def get_absolute_path(path: str) -> str:
+    """Get the absolute path of the path"""
+    return str(pathlib.Path(path).resolve())
+
+
+# --------------------------------------------------------------------------------
+# Directory
+# --------------------------------------------------------------------------------
+def is_dir(path_to_file) -> bool:
+    return pathlib.Path(path_to_file).is_dir()
+
+
 def change_directory(path_to_dir: str):
     os.chdir(path_to_dir)
 
@@ -207,8 +209,46 @@ def get_dir_name(path: str) -> str:
     return str(pathlib.Path(path).parent)
 
 
-def del_dir(path_to_dir: str, ignore_errors=False):
+def mkdir(path: str, mode=0o777, create_parents: bool = True):
+    """make directory if it does not exist and can be created. Do nothing if already exists.
+    Args:
+        path: path to the directory to create
+        mode: permission to set
+        create_parents: flag to create parents
+    """
+    name: str = "mkdir()"
+    if is_file(path):
+        msg: str = f"file [{path} exists.]"
+        _logger.error("%s: %s", name, msg)
+        raise RuntimeError(msg)
+
+    elif not is_path_creatable(path):
+        msg: str = f"cannot create [{path}]"
+        _logger.error("%s: %s", name, msg)
+        raise RuntimeError(msg)
+
+    else:
+        pathlib.Path(path).mkdir(mode=mode, parents=True, exist_ok=True)
+
+
+def rmdir(path_to_dir: str, ignore_errors=False):
     shutil.rmtree(path_to_dir, ignore_errors=ignore_errors)
+
+
+# --------------------------------------------------------------------------------
+# File
+# --------------------------------------------------------------------------------
+def is_file(path_to_file) -> bool:
+    return pathlib.Path(path_to_file).is_file()
+
+
+def rm_file(path_to_file):
+    path = pathlib.Path(path_to_file)
+    path.unlink()
+
+
+def mv_file(path_from: str, path_to: str):
+    pathlib.Path(path_from).rename(path_to)
 
 
 def get_filename(path: str) -> str:
@@ -265,33 +305,3 @@ def list_files_in_directory(path: str, pattern: str = None) -> List[str]:
         }
     return sorted(result)
 
-
-def mkdir(path: str, mode=0o777, create_parents: bool = True):
-    """make directory if it does not exist and can be created. Do nothing if already exists.
-    Args:
-        path: path to the directory to create
-        mode: permission to set
-        create_parents: flag to create parents
-    """
-    name: str = "mkdir()"
-    if is_file(path):
-        msg: str = f"file [{path} exists.]"
-        _logger.error("%s: %s", name, msg)
-        raise RuntimeError(msg)
-
-    elif not is_path_creatable(path):
-        msg: str = f"cannot create [{path}]"
-        _logger.error("%s: %s", name, msg)
-        raise RuntimeError(msg)
-
-    else:
-        pathlib.Path(path).mkdir(mode=mode, parents=True, exist_ok=True)
-
-
-def get_absolute_path(path: str) -> str:
-    """Get the absolute path of the path"""
-    return str(pathlib.Path(path).resolve())
-
-
-def get_path_to_this_py_script() -> str:
-    return str(pathlib.Path(__file__).resolve())

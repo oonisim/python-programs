@@ -3,6 +3,7 @@ CNN utility module
 """
 import json
 import logging
+import os.path
 from typing import (
     List,
     Dict,
@@ -14,6 +15,7 @@ from typing import (
 
 import numpy as np
 import tensorflow as tf
+import tensorflow_addons as tfa
 from keras.layers import (
     Layer,
     Conv2D,
@@ -61,15 +63,17 @@ LAYER_NAME_BN: str = "BatchNorm"
 LAYER_ARGV_CHANNELS_LAST: str = "channels_last"
 LAYER_ARGV_PADDING: str = "padding"
 
-
 # --------------------------------------------------------------------------------
-# Utility
+# Information
 # --------------------------------------------------------------------------------
 _logger.info("TensorFlow version: %s", tf.__version__)
 _logger.info("Eager execution is: %s", tf.executing_eagerly())
 _logger.info("Keras version: %s", tf.keras.__version__)
 
 
+# --------------------------------------------------------------------------------
+# Utility
+# --------------------------------------------------------------------------------
 def get_relu_activation_function(
         alpha: float = 0.0,
         max_value: Optional[float] = None,
@@ -92,6 +96,9 @@ def get_relu_activation_function(
     return func
 
 
+# --------------------------------------------------------------------------------
+# Keras Layer
+# --------------------------------------------------------------------------------
 class Conv2DBlock(Layer):
     """Keras custom layer to build a block of (Convolution -> BN -> Activation)
     Using Activation as a layer instead of using activation arg of the Keras Conv2D layer.
@@ -315,6 +322,9 @@ def build_layers(config: Dict[str, dict]) -> List[Layer]:
     return layers
 
 
+# --------------------------------------------------------------------------------
+# Keras Model
+# --------------------------------------------------------------------------------
 def build_nn_model(
         model_name: str,
         input_shape,
@@ -418,3 +428,191 @@ def train(
         callbacks=callbacks
     )
     return history
+
+
+# --------------------------------------------------------------------------------
+# Keras Callbacks
+# --------------------------------------------------------------------------------
+def get_tensorboard_callback(
+    log_dir: str,
+    write_graph: bool = True,
+    write_images: bool = True,
+    histogram_freq: int = 1,
+    embeddings_freq: int = 1,
+) -> Callback:
+    """
+    https://keras.io/api/callbacks/tensorboard/
+
+    Args:
+        log_dir: directory to write logs
+        write_graph: whether to visualize the graph in TensorBoard
+        write_images: whether to write model weights
+        histogram_freq:  frequency in epochs to compute weight histograms for the layers. 0 for not to compute.
+        embeddings_freq: frequency in epochs at which embedding layers will be visualized
+        # update_freq: disabled. Do not use
+    Returns: Callback
+    """
+    callback: Callback = tf.keras.callbacks.TensorBoard(
+        log_dir=log_dir,
+        write_graph=write_graph,
+        write_images=write_images,
+        histogram_freq=histogram_freq,
+        embeddings_freq=embeddings_freq,
+    )
+    return callback
+
+
+def get_early_stopping_callback(
+        monitor='val_loss',
+        mode: str = "min",
+        min_delta: int = 0,
+        patience: int = 5,
+        verbose: int = 1,
+        start_from_epoch: int = 0,
+        restore_best_weights: bool = True
+) -> Callback:
+    """Get Early Stopping callback instance
+    By default, monitor the validation loss to decrease (mode=min) as it quantifies
+    the deviation from the grand truth and indicates over-fitting if it starts to
+    increase.
+
+    https://keras.io/api/callbacks/early_stopping/
+    Args:
+        monitor: metrics to monitor e.g. val_loss (stackoverflow.com/questions/75479364/)
+        mode: {"auto", "min", "max"}. min: early stop when metric stopped decreasing
+        min_delta: Minimum change in metric to qualify as an improvement,
+        patience:  Number of epochs with no improvement after which to early stop
+        verbose: 0 or 1. 0 is silent, 1 displays messages when the callback takes an action.
+        restore_best_weights: restore weights from the epoch with the best metrics value
+    Returns: Callback
+    """
+    return tf.keras.callbacks.EarlyStopping(
+        monitor=monitor,
+        min_delta=min_delta,
+        patience=patience,
+        restore_best_weights=restore_best_weights,
+        mode=mode,
+        verbose=verbose
+    )
+
+
+# --------------------------------------------------------------------------------
+# Model Evaluation
+# --------------------------------------------------------------------------------
+def _validate_precisions_labels(
+        predictions: Union[np.ndarray, tf.Tensor],
+        labels: Union[List, np.ndarray, tf.Tensor],
+):
+    """Validate if predictions and labels.
+
+    model.predict(x) provides the probabilities of each label per prediction.
+    If num_classes=3, model.predict(x) for single x gives e.g [0.112, 0.873, 0.005]
+    for each class. For N number of data in X, model.predict(X) gives (N, num_classes).
+    The argument predictions is expected to have the shape (N, num_classes).
+
+    Args:
+        predictions: predictions from which to generate the confusion matrix.
+        labels: ground truth
+
+    Raises: AssertionError
+    """
+    assert isinstance(predictions, (np.ndarray, tf.Tensor)), \
+        f"expected np.ndarray or tf.Tensor, got {type(type(predictions))}"
+    assert predictions.ndim == 2 and predictions.shape[0] == labels.shape[0], \
+        f"number of elements in prediction[{len(predictions)}] " \
+        f"does not match that in labels[{len(labels)}]."
+
+
+def get_confusion_matrix(
+        predictions: Union[np.ndarray, tf.Tensor],
+        labels: Union[List, np.ndarray, tf.Tensor],
+        num_classes: int
+) -> tf.Tensor:
+    """Generate a confusion matrix from predictions.
+    See https://www.tensorflow.org/api_docs/python/tf/math/confusion_matrix
+    Args:
+        predictions: predictions from which to generate the confusion matrix.
+        labels: ground truth
+        num_classes: number of classes
+
+    Return: Confusion Matrix
+    """
+    _validate_precisions_labels(predictions=predictions, labels=labels)
+    assert predictions.shape[1] == num_classes, \
+        f"expected shape (N, {num_classes}), got {predictions.shape}"
+
+    confusion_matrix: tf.Tensor = tf.math.confusion_matrix(
+        labels=labels,
+        predictions=tf.math.argmax(predictions, axis=-1),
+        num_classes=num_classes
+    )
+    return confusion_matrix
+
+
+def get_precision(
+        predictions: Union[np.ndarray, tf.Tensor],
+        labels: Union[List, np.ndarray, tf.Tensor],
+) -> float:
+    """Calculate precision = TP/(TP+FP)
+    Args:
+        predictions: predictions from which to generate the confusion matrix.
+        labels: ground truth
+    Returns: precision as float
+    """
+    _validate_precisions_labels(predictions=predictions, labels=labels)
+
+    precision: tf.keras.metrics.Metric = tf.keras.metrics.Precision()
+    precision.update_state(y_true=labels, y_pred=tf.math.argmax(predictions, axis=-1))
+    return float(precision.result().numpy())
+
+
+def get_recall(
+        predictions: Union[np.ndarray, tf.Tensor],
+        labels: Union[List, np.ndarray, tf.Tensor],
+) -> float:
+    """Calculate recall = TP/(TP+FN)
+    Args:
+        predictions: predictions from which to generate the confusion matrix.
+        labels: ground truth
+    Returns: recall as float
+    """
+    _validate_precisions_labels(predictions=predictions, labels=labels)
+
+    recall: tf.keras.metrics.Metric = tf.keras.metrics.Recall()
+    recall.update_state(y_true=labels, y_pred=tf.math.argmax(predictions, axis=-1))
+    return float(recall.result().numpy())
+
+
+def get_accuracy(
+        predictions: Union[np.ndarray, tf.Tensor],
+        labels: Union[List, np.ndarray, tf.Tensor],
+) -> float:
+    """Calculate accuracy = (TP+TN)/(TP+FP+TN+FN)
+    Args:
+        predictions: predictions from which to generate the confusion matrix.
+        labels: ground truth
+    Returns: accuracy as float
+    """
+    _validate_precisions_labels(predictions=predictions, labels=labels)
+
+    accuracy: tf.keras.metrics.Metric = tf.keras.metrics.Accuracy()
+    accuracy.update_state(y_true=labels, y_pred=tf.math.argmax(predictions, axis=-1))
+    return float(accuracy.result().numpy())
+
+
+def get_auc(
+        predictions: Union[np.ndarray, tf.Tensor],
+        labels: Union[List, np.ndarray, tf.Tensor],
+) -> float:
+    """Calculate ROC/AUC
+    https://www.tensorflow.org/api_docs/python/tf/keras/metrics/AUC
+    Args:
+        predictions: predictions from which to generate the confusion matrix.
+        labels: ground truth
+    Returns: ROC/AUC as float
+    """
+    _validate_precisions_labels(predictions=predictions, labels=labels)
+
+    auc: tf.keras.metrics.Metric = tf.keras.metrics.Accuracy()
+    auc.update_state(y_true=labels, y_pred=tf.math.argmax(predictions, axis=-1))
+    return float(auc.result().numpy())
