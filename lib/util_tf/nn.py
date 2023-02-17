@@ -233,7 +233,7 @@ def build_layers(config: Dict[str, dict]) -> List[Layer]:
         },
         "act01": {
             "kind": LAYER_NAME_ACTIVATION,
-            "activation": "leaky_relu"
+            "activation": "leaky_relu",
             "slope": 0.1
         },
         "conv02": {  # Name of the layer. "conv01" is set to name arg of the Layer
