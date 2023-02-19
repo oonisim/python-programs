@@ -23,6 +23,7 @@ from typing import (
     Callable,
     Optional,
     Union,
+    Iterable,
 )
 
 import numpy as np
@@ -40,6 +41,7 @@ from keras.layers import (
     Dense,
     Flatten,
     Activation,
+    Reshape,
     ReLU,
     LeakyReLU,
 )
@@ -70,10 +72,10 @@ LAYER_NAME_MAXPOOL2D: str = "MaxPool2D"
 LAYER_NAME_DENSE: str = "Dense"
 LAYER_NAME_FLAT: str = "Flatten"
 LAYER_NAME_BN: str = "BatchNorm"
+LAYER_NAME_RESHAPE: str = "Reshape"
 CUSTOM_LAYER_NAME_CONV2DBLOCK: str = "Conv2DBlock"
 LAYER_ARGV_CHANNELS_LAST: str = "channels_last"
 LAYER_ARGV_PADDING: str = "padding"
-
 
 # --------------------------------------------------------------------------------
 # Information
@@ -370,9 +372,19 @@ def build_layers(config: Dict[str, dict]) -> List[Layer]:
                 # https://stats.stackexchange.com/a/383326/105137
                 # https://keras.io/api/layers/regularizers/#l2-class
                 kernel_regularizer=keras.regularizers.l2(l2=value.get("l2", 1e-2)),
-                activation=value.get("activation", "relu")
+                activation=value.get("activation", None)
             )
             layers.append(full)
+
+        # --------------------------------------------------------------------------------
+        # Reshape
+        # --------------------------------------------------------------------------------
+        elif kind == LAYER_NAME_RESHAPE:
+            assert "target_shape" in "target_shape", \
+                "target_shape parameter is mandatory for Reshape layer."
+            reshape: Layer = Reshape(target_shape=value.get("target_shape"))
+            layers.append(reshape)
+
         # --------------------------------------------------------------------------------
         # Invalid
         # --------------------------------------------------------------------------------
@@ -394,7 +406,7 @@ def build_nn_model(
         layers_config: dict,
         normalization: Optional[Layer] = None,
         learning_rate: float = 1e-2,
-        metrics: List[str] = ('accuracy')
+        metrics: Iterable[str] = ('accuracy')
 ) -> Model:
     """
     Build a Keras model. Not compile yet here.
