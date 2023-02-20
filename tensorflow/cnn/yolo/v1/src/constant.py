@@ -6,7 +6,7 @@ import numpy as np
 # --------------------------------------------------------------------------------
 TYPE_FLOAT = np.float32
 TYPE_INT = np.int32
-EPSILON = TYPE_FLOAT(1e-6)
+EPSILON = TYPE_FLOAT(1e-6)  # small enough value e.g. to avoid div by zero
 
 YOLO_GRID_SIZE: int = 7
 
