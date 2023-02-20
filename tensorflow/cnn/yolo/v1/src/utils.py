@@ -116,10 +116,10 @@ def intersection_over_union(
     height: tf.Tensor = y2 - y1
     assert tf.math.reduce_all(width <= YOLO_V1_IMAGE_WIDTH + 1e-6), \
         "expected (width <= YOLO_V1_IMAGE_WIDTH + 1e-6), " \
-        f"got {width[(width > YOLO_V1_IMAGE_WIDTH + 1e-6)]}"
+        f"got\n{width[(width > YOLO_V1_IMAGE_WIDTH + 1e-6)]}"
     assert tf.math.reduce_all(height <= YOLO_V1_IMAGE_HEIGHT + 1e-6), \
         "expected (height <= YOLO_V1_IMAGE_WIDTH + 1e-6), " \
-        f"got {height[(height > YOLO_V1_IMAGE_HEIGHT + 1e-6)]}"
+        f"got\n{height[(height > YOLO_V1_IMAGE_HEIGHT + 1e-6)]}"
 
     # Clip in case no intersection
     width = tf.clip_by_value(
@@ -146,5 +146,7 @@ def intersection_over_union(
         clip_value_min=TYPE_FLOAT(0.0),
         clip_value_max=TYPE_FLOAT(1.0)
     )
+    assert tf.math.reduce_all(IOU <= TYPE_FLOAT(1.0)), \
+        f"expected IOU <= 1.0, got\n{IOU[(IOU > TYPE_FLOAT(1.0))]}"
     _logger.debug("%s: sample IOU = %s", _name, IOU[0])
     return IOU
