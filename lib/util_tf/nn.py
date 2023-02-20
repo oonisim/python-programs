@@ -187,6 +187,13 @@ class Conv2DBlock(Layer):
         super().build(input_shape=input_shape)
 
     def compute_output_shape(self, input_shape):
+        """Calculate the output shape fo this layer
+        The output shape is that of Conv2D layer.
+
+        Args:
+            input_shape: shape of the layer input
+        Returns: shape of the layer output
+        """
         return self.conv.compute_output_shape(input_shape=input_shape)
 
     def get_config(self) -> dict:

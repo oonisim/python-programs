@@ -2,6 +2,7 @@
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from PIL import Image
 
 
 # --------------------------------------------------------------------------------
@@ -22,6 +23,11 @@ import matplotlib.pyplot as plt
 #   'truck'
 # ]
 # --------------------------------------------------------------------------------
+def display_image_from_file(path_to_image: str):
+    img = np.asarray(Image.open(path_to_image))
+    plt.imshow(img)
+
+
 def plot_image(image, width, height, channels, figsize=(6, 6)):
     # reshaped = image.reshape(width, height, channels)
     # plt.figure(figsize=figsize),
