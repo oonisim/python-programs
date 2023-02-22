@@ -314,6 +314,13 @@ class YOLOLoss(Loss):
         #
         # https://stats.stackexchange.com/q/559122
         # the ground-truth value 𝐶𝑖 is computed during training (the IOU).
+        #
+        # https://github.com/aladdinpersson/Machine-Learning-Collection/pull/44/commits
+        # object_loss = self.mse(
+        #     torch.flatten(exists_box * target[..., 20:21]),
+        #     # To calculate confidenc score in paper, I think it should multiply iou value.
+        #     torch.flatten(exists_box * target[..., 20:21] * iou_maxes),
+        # )
         # --------------------------------------------------------------------------------
         confidence_i_j: tf.Tensor = Iobj_i * (
             # Take the confidence from the responsible & IOU-max-bbox j -> Iobj_i_j
@@ -367,12 +374,12 @@ class YOLOLoss(Loss):
 
         # --------------------------------------------------------------------------------
         # Total loss
+        # tf.add_n be more efficient than reduce_sum because it sums the tensors directly.
         # --------------------------------------------------------------------------------
-        loss: tf.Tensor = tf.math.add(
+        loss: tf.Tensor = tf.math.add_n([
             localization_loss,
             confidence_loss,
             noobj_confidence_loss,
             classification_loss
-        )
-
+        ])
         return loss
