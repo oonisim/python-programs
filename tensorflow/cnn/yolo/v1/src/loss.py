@@ -84,6 +84,7 @@ class YOLOLoss(Loss):
         # --------------------------------------------------------------------------------
         # lambda parameters to prioritise the localization vs classification
         # --------------------------------------------------------------------------------
+        # [YOLO v1 paper]
         # YOLO uses sum-squared error because it is easy to optimize,
         # however it does not perfectly align with our goal of maximizing
         # average precision. It weights localization error equally with
@@ -200,7 +201,7 @@ class YOLOLoss(Loss):
         # Max IOU per grid cell (axis=-1)
         # best_box_j tells which bbox j (0 or 1) is the best box for a cell.
         #
-        # [Original paper]
+        # [YOLO v1 paper]
         # YOLO predicts multiple bounding boxes per grid cell. At training time we only
         # want one bounding box predictor to be responsible for each object.
         # We assign one predictor to be “responsible” for predicting an object based on
@@ -244,7 +245,7 @@ class YOLOLoss(Loss):
         # if best box j == 0, then YOLO_PREDICTION_INDEX_X1:YOLO_PREDICTION_INDEX_H1+1 as
         # the (x, y, w, h) for the predicted localization. If j == 1, the other.
         #
-        # [Original paper]
+        # [YOLO v1 paper]
         # It also only penalizes bounding box coordinate error if that predictor is
         # “responsible” for the ground truth box (i.e. has the highest IOU of any
         # predictor in that grid cell).
@@ -304,7 +305,7 @@ class YOLOLoss(Loss):
 
         # --------------------------------------------------------------------------------
         # Confidence loss with object
-        # [Original paper]
+        # [YOLO v1 paper]
         # These confidence scores reflect how confident the model is that the box contains
         # an object and also how accurate it thinks the box is that it predicts.
         # Formally we define confidence as Pr(Object) IOU(truth,pred) . If no object exists
@@ -339,7 +340,7 @@ class YOLOLoss(Loss):
 
         # --------------------------------------------------------------------------------
         # Confidence loss without object
-        # [Original paper]
+        # [YOLO v1 paper]
         # Also, in every image many grid cells do not contain any object.
         # This pushes the “confidence” scores of those cells towards zero, often
         # overpowering the gradient from cells that do contain objects.
@@ -363,7 +364,7 @@ class YOLOLoss(Loss):
 
         # --------------------------------------------------------------------------------
         # Classification loss
-        # [Original paper]
+        # [YOLO v1 paper]
         # Note that the loss function only penalizes classification error if an object is
         # present in that cell (hence the conditional class probability discussed earlier).
         # --------------------------------------------------------------------------------
