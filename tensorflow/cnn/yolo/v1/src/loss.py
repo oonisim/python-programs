@@ -148,10 +148,28 @@ class YOLOLoss(Loss):
 
         Args:
             T: ground truth
-            Y: prediction of shape (N, S, S, (C+B*P)) where N is batch size
+            Y: prediction of shape (N, S, S, (C+B*P)) where N is batch size.
+
+            [Original Paper]
+            Each grid cell predicts B bounding boxes and confidence scores for
+            those boxes. These confidence scores reflect how confident the model
+            is that the box contains an object and also how accurate it thinks
+            the box is that it predicts.
+
+            Formally we define confidence as Pr(Object) * IOU between truth and pred .
+            If no object exists in that cell, the confidence scores should be zero.
+            Otherwise we want the confidence score to equal the intersection over
+            union (IOU) between the predicted box and the ground truth.
+
+            Each bounding box consists of 5 predictions: x, y, w, h, and confidence.
+            The (x; y) coordinates represent the center of the box relative to the
+            bounds of the grid cell. The width and height are predicted relative to
+            the whole image. Finally the confidence prediction represents the IOU
+            between the predicted box and any ground truth box.
 
         Returns: loss
         """
+        _name: str = "call()"
         # The model output shape for one input image should be
         # (S=7 * S=7 * (C+B*P)=30) or (S, S, (C+B*P)).
         assert isinstance(Y, (np.ndarray, tf.Tensor, tf.Variable))
@@ -173,14 +191,14 @@ class YOLOLoss(Loss):
         # Y into (N, S, S, (C+B*P)) of YOLO v1 model output.
         # T into (N, S, S, (C+P)
         # --------------------------------------------------------------------------------
-        Y: tf.Variable = tf.Variable(Y).reshape((-1, self.S, self.S, self.C + self.B * self.P))
-        T: tf.Tensor = tf.Variable(T).reshape((-1, self.S, self.S, self.C + self.P))
+        Y: tf.Tensor = tf.reshape(tensor=Y, shape=(-1, self.S, self.S, self.C + self.B * self.P))
+        T: tf.Tensor = tf.reshape(tensor=T, shape=(-1, self.S, self.S, self.C + self.P))
         assert Y.shape[0] == T.shape[0]
         self.N: tf.Tensor = Y.shape[0]
         _logger.debug("%s: batch size [%s]", self.N)
 
         # --------------------------------------------------------------------------------
-        # IoU per predicted bounding box and target bbox
+        # IoU between predicted bounding boxes and the target bbox at a cell.
         # --------------------------------------------------------------------------------
         iou_b1 = intersection_over_union(
             Y[..., YOLO_PREDICTION_INDEX_X1:YOLO_PREDICTION_INDEX_H1+1],   # (x,y,w,h) for the first bbox
@@ -193,6 +211,15 @@ class YOLOLoss(Loss):
         # --------------------------------------------------------------------------------
         # Max IOU per grid cell (axis=-1)
         # best_box_j tells which bbox j (0 or 1) is the best box for a cell.
+        #
+        # [Original paper]
+        # YOLO predicts multiple bounding boxes per grid cell. At training time we only
+        # want one bounding box predictor to be responsible for each object.
+        # We assign one predictor to be “responsible” for predicting an object based on
+        # which prediction has the highest current IOU with the ground truth.
+        # This leads to specialization between the bounding box predictors.
+        # Each predictor gets better at predicting certain sizes, aspect ratios, or
+        # classes of object, improving overall recall.
         # --------------------------------------------------------------------------------
         IOU: tf.Tensor = tf.math.reduce_max(input_tensor=[iou_b1, iou_b2], axis=-1, keepdims=True)
         best_box_j: tf.Tensor = tf.reshape(    # argmax drops the last dimension
@@ -228,18 +255,26 @@ class YOLOLoss(Loss):
         # This corresponds to Iobj_i_j as picking up the best box j at each cell.
         # if best box j == 0, then YOLO_PREDICTION_INDEX_X1:YOLO_PREDICTION_INDEX_H1+1 as
         # the (x, y, w, h) for the predicted localization. If j == 1, the other.
+        #
+        # [Original paper]
+        # It also only penalizes bounding box coordinate error if that predictor is
+        # “responsible” for the ground truth box (i.e. has the highest IOU of any
+        # predictor in that grid cell).
         # --------------------------------------------------------------------------------
-        boxes_predicted: tf.Tensor = Iobj_i * (
+        localization_i_j: tf.Variable = tf.Variable(Iobj_i * (
+            # Take the localization from the responsible & IOU-max-bbox j -> Iobj_i_j
             (TYPE_FLOAT(1.0) - best_box_j) * Y[..., YOLO_PREDICTION_INDEX_X1:YOLO_PREDICTION_INDEX_H1+1] +
             best_box_j * Y[..., YOLO_PREDICTION_INDEX_X2:YOLO_PREDICTION_INDEX_H2+1]
-        )
+        ))
 
         # --------------------------------------------------------------------------------
         # True localization (x, y, w, h) per grid cell.
         # --------------------------------------------------------------------------------
-        boxes_truth: tf.Tensor = Iobj_i * T[YOLO_LABEL_INDEX_X:YOLO_LABEL_INDEX_H+1]
-        assert YOLO_PREDICTION_INDEX_H1-YOLO_PREDICTION_INDEX_X1 == 4
-        assert YOLO_LABEL_INDEX_H-YOLO_LABEL_INDEX_X == 4
+        localization_truth_i: tf.Variable = tf.Variable(
+            Iobj_i * T[YOLO_LABEL_INDEX_X:YOLO_LABEL_INDEX_H+1]
+        )
+        assert YOLO_PREDICTION_INDEX_H1 - YOLO_PREDICTION_INDEX_X1 == 4
+        assert YOLO_LABEL_INDEX_H - YOLO_LABEL_INDEX_X == 4
 
         # --------------------------------------------------------------------------------
         # Take square root of w, h.
@@ -253,7 +288,7 @@ class YOLOLoss(Loss):
         # of the bounding box width and height instead of the width and height directly.
         # --------------------------------------------------------------------------------
         # (x/0, y/1, w/2, h/3)
-        w_h_predicted = boxes_predicted[..., 2:4]
+        w_h_predicted: tf.Variable = localization_i_j[..., 2:4]
         w_h_predicted.assign(
             # --------------------------------------------------------------------------------
             # abs(x) as predicted values can be negative. EPSILON to avoid the derivative of
@@ -263,7 +298,7 @@ class YOLOLoss(Loss):
             tf.math.sign(w_h_predicted) * tf.math.sqrt(tf.math.abs(w_h_predicted) + EPSILON)
         )
         # (x/0, y/1, w/2, h/3)
-        w_h_truth = boxes_truth[..., 2:4]
+        w_h_truth: tf.Variable = localization_truth_i[..., 2:4]
         w_h_truth.assign(tf.math.sqrt(w_h_truth))
 
         # --------------------------------------------------------------------------------
@@ -275,11 +310,81 @@ class YOLOLoss(Loss):
         #   (sqrt(h_pred)-sqrt(h_true))^2
         # )
         # --------------------------------------------------------------------------------
-        localization_loss: tf.Tensor = tf.math.reduce_mean(tf.square(
-            boxes_truth - boxes_predicted
+        localization_loss: tf.Tensor = \
+            self.lambda_coord * \
+            tf.math.reduce_mean(tf.square(localization_truth_i - localization_i_j))
+
+        # --------------------------------------------------------------------------------
+        # Confidence loss with object
+        # [Original paper]
+        # These confidence scores reflect how confident the model is that the box contains
+        # an object and also how accurate it thinks the box is that it predicts.
+        # Formally we define confidence as Pr(Object) IOU(truth,pred) . If no object exists
+        # in that cell, the confidence scores should be zero.
+        # Otherwise we want the confidence score to equal the intersection over union (IOU)
+        # between the predicted box and the ground truth.
+        #
+        # https://stats.stackexchange.com/q/559122
+        # the ground-truth value 𝐶𝑖 is computed during training (the IOU).
+        # --------------------------------------------------------------------------------
+        confidence_i_j: tf.Tensor = Iobj_i * (
+            # Take the confidence from the responsible & IOU-max-bbox j -> Iobj_i_j
+            (TYPE_FLOAT(1.0) - best_box_j) * Y[..., YOLO_PREDICTION_INDEX_CP1:YOLO_PREDICTION_INDEX_CP1+1]
+            + best_box_j * Y[..., YOLO_PREDICTION_INDEX_CP2:YOLO_PREDICTION_INDEX_CP2+1]
+        )
+        # NOTE: Iobj_i is cp in label (T[..., YOLO_LABEL_INDEX_CP:YOLO_LABEL_INDEX_CP+1])
+        confidence_truth_i: tf.Tensor = Iobj_i * IOU
+        assert confidence_truth_i.shape == (self. N, self.S, self.S, 1), \
+            f"expected confidence_truth_i.shape=={(self. N, self.S, self.S, 1)}, " \
+            f"got {confidence_truth_i.shape}"
+
+        confidence_loss: tf.Tensor = tf.math.reduce_mean(tf.square(
+            confidence_truth_i - confidence_i_j
         ))
 
         # --------------------------------------------------------------------------------
-        # Classification loss
+        # Confidence loss without object
+        # [Original paper]
+        # Also, in every image many grid cells do not contain any object.
+        # This pushes the “confidence” scores of those cells towards zero, often
+        # overpowering the gradient from cells that do contain objects.
+        # This can lead to model instability, causing training to diverge early on.
+        # To remedy this, we increase the loss from bounding box coordinate predictions
+        # and decrease the loss from confidence predictions for boxes that don’t contain
+        # objects. We use two parameters, coord and noobj to accomplish this.
+        # We set coord = 5 and noobj = :5.
         # --------------------------------------------------------------------------------
+        Inoobj_i: tf.Tensor = TYPE_FLOAT(1.0) - Iobj_i
+        noobj_confidence_i_j: tf.Tensor = Inoobj_i * (
+            Y[..., YOLO_PREDICTION_INDEX_CP1:YOLO_PREDICTION_INDEX_CP1+1] +
+            Y[..., YOLO_PREDICTION_INDEX_CP2:YOLO_PREDICTION_INDEX_CP2+1]
+        )
+        # noobj_confidence_truth = Inoobj_i * cp_i = 0 always, because:
+        # When Inoobj_i = 1 with no object, then cp_i is 0, hence Inoobj_i * cp_i -> 0.
+        # When Inoobj_i = 0 with an object, then again Inoobj_i * cp_i -> 0.
+        noobj_confidence_loss: tf.Tensor = \
+            self.lambda_noobj * \
+            tf.math.reduce_mean(tf.math.square(noobj_confidence_i_j))
 
+        # --------------------------------------------------------------------------------
+        # Classification loss
+        # [Original paper]
+        # Note that the loss function only penalizes classification error if an object is
+        # present in that cell (hence the conditional class probability discussed earlier).
+        # --------------------------------------------------------------------------------
+        classification_loss: tf.Tensor = tf.math.reduce_mean(tf.math.square(
+            Iobj_i * Y[..., :YOLO_PREDICTION_INDEX_CP1],
+            Iobj_i * T[..., :YOLO_LABEL_INDEX_CP]
+        ))
+
+        # --------------------------------------------------------------------------------
+        # Total loss
+        # --------------------------------------------------------------------------------
+        loss: tf.Tensor = tf.math.add(
+            localization_loss,
+            confidence_loss,
+            noobj_confidence_loss,
+            classification_loss
+        )
+
+        return loss
