@@ -1,26 +1,17 @@
-import json
+"""
+YOLO v1 loss function module
+"""
 import logging
 from typing import (
-    List,
-    Dict,
-    Tuple,
-    Callable,
-    Optional,
     Union,
-    Iterable,
 )
 
 import numpy as np
 import tensorflow as tf
-from tensorflow import keras
 from keras.losses import (
     Loss,
-    MeanSquaredError,
 )
 
-from util_logging import (
-    get_logger,
-)
 from constant import (
     TYPE_FLOAT,
     EPSILON,
@@ -30,19 +21,16 @@ from constant import (
     YOLO_PREDICTION_NUM_PRED,
     YOLO_PREDICTION_INDEX_CP1,
     YOLO_PREDICTION_INDEX_X1,
-    YOLO_PREDICTION_INDEX_Y1,
-    YOLO_PREDICTION_INDEX_W1,
     YOLO_PREDICTION_INDEX_H1,
     YOLO_PREDICTION_INDEX_CP2,
     YOLO_PREDICTION_INDEX_X2,
-    YOLO_PREDICTION_INDEX_Y2,
-    YOLO_PREDICTION_INDEX_W2,
     YOLO_PREDICTION_INDEX_H2,
     YOLO_LABEL_INDEX_CP,
     YOLO_LABEL_INDEX_X,
-    YOLO_LABEL_INDEX_Y,
-    YOLO_LABEL_INDEX_W,
     YOLO_LABEL_INDEX_H,
+)
+from util_logging import (
+    get_logger,
 )
 from utils import (
     intersection_over_union,
