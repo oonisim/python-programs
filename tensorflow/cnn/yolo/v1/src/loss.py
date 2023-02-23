@@ -275,6 +275,7 @@ class YOLOLoss(Loss):
             tensor=T[..., self.C:],
             shape=(-1, self.P)
         )
+
         # --------------------------------------------------------------------------------
         # IoU between predicted bounding boxes and the target bbox at a cell.
         # --------------------------------------------------------------------------------
@@ -401,7 +402,7 @@ class YOLOLoss(Loss):
         ))
 
         # --------------------------------------------------------------------------------
-        # Confidence loss without object
+        # Confidence loss with no object
         # [YOLO v1 paper]
         # Also, in every image many grid cells do not contain any object.
         # This pushes the “confidence” scores of those cells towards zero, often
@@ -416,7 +417,7 @@ class YOLOLoss(Loss):
         # When Inoobj_i = 1 with no object, then cp_i is 0, hence Inoobj_i * cp_i -> 0.
         # When Inoobj_i = 0 with an object, then again Inoobj_i * cp_i -> 0.
         # --------------------------------------------------------------------------------
-        Inoobj_i: tf.Tensor = tf.constant(1,0, dtype=TYPE_FLOAT) - self.Iobj_i
+        Inoobj_i: tf.Tensor = tf.constant(1.0, dtype=TYPE_FLOAT) - self.Iobj_i
         noobj_confidences: tf.Tensor = Inoobj_i * localization_predicted[..., 0:1]
         noobj_confidence_loss: tf.Tensor = \
             self.lambda_noobj * \
