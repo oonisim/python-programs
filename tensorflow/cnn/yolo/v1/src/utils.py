@@ -75,18 +75,17 @@ def intersection_over_union(
     towardsdatascience.com/yolo-made-simple-interpreting-the-you-only-look-once-paper-55f72886ab73
 
     Parameters:
-        boxes_preds (tensor): Predictions of Bounding Boxes (BATCH_SIZE, S, S, 4)
-        boxes_labels (tensor): Correct labels of Bounding Boxes (BATCH_SIZE, S, S, 4)
+        boxes_preds (tensor): Predictions of Bounding Boxes (x, y, w, h) in shape:(N, 4)
+        boxes_labels (tensor): Correct labels of Bounding Boxes (x, y, w, h) in shape:(N, 4)
         box_format (str): midpoint/corners, if boxes (x,y,w,h) or (x1,y1,x2,y2)
     Returns:
         IOU(Intersection over union) for all examples
     """
     _name: str = "intersection_over_union()"
-    S: int = YOLO_GRID_SIZE
-    assert boxes_preds.ndim == 4, \
-        f"expected dims=4 with shape (N, {S}, {S}, 4) got {boxes_preds.ndim} dimensions."
-    assert boxes_labels.ndim == 4, \
-        f"expected dims=4 with shape (N, {S}, {S}, 4) got {boxes_labels.ndim} dimensions."
+    assert boxes_preds.ndim == 2, \
+        f"expected dims=4 with shape (N, 4) got {boxes_preds.ndim} dimensions."
+    assert boxes_labels.ndim == 2, \
+        f"expected dims=4 with shape (N, 4) got {boxes_labels.ndim} dimensions."
     assert boxes_preds.shape == boxes_labels.shape, \
         f"expected same shape, got {boxes_preds.shape} and {boxes_labels.shape}."
     assert boxes_preds.shape[1] == boxes_labels.shape[1] == 4   # (x/0, y/1, w/2, h/3)
@@ -111,8 +110,8 @@ def intersection_over_union(
             boxes_preds[..., 0, 3])
     )
 
-    N: TYPE_INT = boxes_preds.shape[0]      # pylint: disable=invalid-name
-    _logger.debug("%s:batch size [%s]", N)
+    N: int = boxes_preds.shape[0]      # pylint: disable=invalid-name
+    _logger.debug("%s:total cells [%s]", N)
 
     # --------------------------------------------------------------------------------
     # Corner coordinates of Bounding Boxes and Ground Truth
@@ -152,7 +151,7 @@ def intersection_over_union(
     y1 = tf.math.maximum(box1_y1, box2_y1)      # pylint: disable=invalid-name
     x2 = tf.math.maximum(box1_x2, box2_x2)      # pylint: disable=invalid-name
     y2 = tf.math.maximum(box1_y2, box2_y2)      # pylint: disable=invalid-name
-    assert x1.shape == (N, S, S, 1)
+    assert x1.shape == (N, 1)
     _logger.debug(
         "%s: sample intersection corner coordinates (x1, y1, x2, y2) = %s",
         _name, (x1[..., 0, 0], y1[..., 0, 0], x2[..., 0, 0], y2[..., 0, 0])
@@ -186,7 +185,7 @@ def intersection_over_union(
         clip_value_max=TYPE_FLOAT(1.0)
     )
     _logger.debug("%s: sample IOU = %s", _name, IOU[0])
-    assert IOU.shape == (N, S, S, 1), f"expected IOU shape {(N, S, S, 1)}, got {IOU.shape}"
+    assert IOU.shape == (N, 1), f"expected IOU shape {(N, 1)}, got {IOU.shape}"
     assert tf.math.reduce_all(IOU <= TYPE_FLOAT(1.0+EPSILON)), \
         f"expected IOU <= 1.0, got\n{IOU[(IOU > TYPE_FLOAT(1.0+EPSILON))]}"
 
