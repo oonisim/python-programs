@@ -7,30 +7,27 @@ import logging
 from typing import (
     Union,
     Optional,
+    Callable,
 )
 
 import numpy as np
+from tensorflow import keras
 import tensorflow as tf
 from keras.losses import (
     Loss,
+    MeanSquaredError,
 )
 
 from constant import (
+    DEBUG_LEVEL,
     TYPE_FLOAT,
+    TYPE_INT,
     EPSILON,
     YOLO_GRID_SIZE,
     YOLO_PREDICTION_NUM_CLASSES,
     YOLO_PREDICTION_NUM_BBOX,
     YOLO_PREDICTION_NUM_PRED,
-    YOLO_PREDICTION_INDEX_CP1,
-    YOLO_PREDICTION_INDEX_X1,
-    YOLO_PREDICTION_INDEX_H1,
-    YOLO_PREDICTION_INDEX_CP2,
-    YOLO_PREDICTION_INDEX_X2,
-    YOLO_PREDICTION_INDEX_H2,
     YOLO_LABEL_INDEX_CP,
-    YOLO_LABEL_INDEX_X,
-    YOLO_LABEL_INDEX_H,
 )
 from util_logging import (
     get_logger,
@@ -42,12 +39,16 @@ from utils import (
 # --------------------------------------------------------------------------------
 # Logging
 # --------------------------------------------------------------------------------
-_logger: logging.Logger = get_logger(__name__)
+_logger: logging.Logger = get_logger(__name__, level=DEBUG_LEVEL)
 
 
 # --------------------------------------------------------------------------------
 # Layer
 # --------------------------------------------------------------------------------
+def loss_fn(y_true: tf.Tensor, y_pred:tf.Tensor) -> tf.Tensor:
+    return tf.math.reduce_sum(tf.square(y_true - y_pred))
+
+
 class YOLOLoss(Loss):
     """YOLO v1 objective (loss) layer
     [References]
@@ -77,13 +78,21 @@ class YOLOLoss(Loss):
             C: number of classes
             P: number of predictions per bounding box (cp, x, y, w, h)
         """
-        super().__init__(reduction=tf.keras.losses.Reduction, **kwargs)
+        super().__init__(**kwargs)
         self.batch_size: int = -1   # batch size
         self.N: int = -1    # Total cells in the batch (S * S * batch_size)
         self.S: int = S     # Number of division per axis (YOLO divides an image into SxS grids)
         self.B: int = B     # Number of bounding boxes per cell
         self.C: int = C     # Number of classes to detect
         self.P: int = P     # Prediction (cp, x, y, w, h) per bounding box
+
+        # --------------------------------------------------------------------------------
+        # Loss function:
+        # [YOLO v1 paper]
+        # We use sum-squared error because it is easy to optimize
+        # --------------------------------------------------------------------------------
+        # self.loss_fn = MeanSquaredError(reduction=tf.keras.losses.Reduction.SUM)
+        self.loss_fn: Callable = loss_fn
 
         # --------------------------------------------------------------------------------
         # lambda parameters to prioritise the localization vs classification
@@ -107,7 +116,7 @@ class YOLOLoss(Loss):
         self.lambda_noobj: TYPE_FLOAT = TYPE_FLOAT(0.5)
 
         # --------------------------------------------------------------------------------
-        # Identity function IObj_i tells if an object exists in a cell.
+        # Identity function Iobj_i tells if an object exists in a cell.
         # [Original Paper]
         # where Iobj_i denotes if object appears in cell i and Iobj_i_j denotes that
         # the jth bounding box predictor in cell i is “responsible” for that prediction.
@@ -132,15 +141,21 @@ class YOLOLoss(Loss):
         })
         return config
 
-    def IObj_i_j(
+    def Iobj_i_j(
             self,
             bounding_boxes: tf.Tensor,
             best_box_indices:tf.Tensor
     ) -> tf.Tensor:
-        """Take the responsible bounding box from each cell where an object exists in the cell.
+        """
+        Identify the responsible bounding boxes and get predictions from them.
+
+        Iobj_i_j is supposed to be a binary function to return 0 or 1. However,
+        the effective result of Iobj_i_j is to get (x, y) or (w, h) or (pc) from
+        the predictions, hence repurpose it to return them.
 
         [YOLO v1 paper]
-        Iobj_i_j denotes that the jth bounding box in cell i is “responsible” for that prediction.
+        Iobj_i_j denotes that the jth bounding box in cell i is “responsible”
+        for that prediction.
 
         Args:
             bounding_boxes:
@@ -151,7 +166,7 @@ class YOLOLoss(Loss):
             best_box_indices:
                 list of index to the best bounding box of a cell in shape (N,)
 
-        Returns: responsible bounding boxes
+        Returns: predictions from the responsible bounding boxes
         """
         # --------------------------------------------------------------------------------
         # From the bounding boxes of each cell, take the box identified by the beset box index.
@@ -167,31 +182,31 @@ class YOLOLoss(Loss):
             )
         )
         # --------------------------------------------------------------------------------
-        # Multiply the best boxes:(N, D) with IObj_i:(N, 1) masks non-responsible boxes.
+        # Multiply the best boxes:(N, D) with Iobj_i:(N, 1) masks non-responsible boxes.
         # --------------------------------------------------------------------------------
         responsible_boxes: tf.Tensor = self.Iobj_i * best_boxes
         return responsible_boxes
 
     def call(
             self,
-            T: Union[np.ndarray, tf.Tensor],
-            Y: Union[np.ndarray, tf.Tensor]
+            y_true: Union[np.ndarray, tf.Tensor],
+            y_pred: Union[np.ndarray, tf.Tensor]
     ) -> tf.Tensor:
         """Loss forward process
         See ../image/yolo_loss_function.png and the original v1 paper.
         [Steps]
         1. Take the max IoU per cell (from between b-boxes and the truth at each cell).
         2. Get Iobj_i_j per each cell i.
-           IObj_i is 1 if the cell i is responsible (pc in truth==1) for an object, or 0.
-           IObj_i_j is 1 if IObj_i is 1 and bbox j has the max IoU at the cell, or 0.
+           Iobj_i is 1 if the cell i is responsible (pc in truth==1) for an object, or 0.
+           Iobj_i_j is 1 if Iobj_i is 1 and bbox j has the max IoU at the cell, or 0.
         3. Take sqrt(w) and sqrt(h) to reduce the impact from the object size.
 
         [References]
         https://www.tensorflow.org/api_docs/python/tf/keras/metrics/mean_squared_error
 
         Args:
-            T: ground truth
-            Y: prediction of shape (N, S, S, (C+B*P)) where N is batch size.
+            y_true: ground truth
+            y_pred: prediction of shape (N, S, S, (C+B*P)) where N is batch size.
 
             [Original Paper]
             Each grid cell predicts B bounding boxes and confidence scores for
@@ -218,16 +233,16 @@ class YOLOLoss(Loss):
         # --------------------------------------------------------------------------------
         # The model output shape for one input image should be
         # (S=7 * S=7 * (C+B*P)=30) or (S, S, (C+B*P)).
-        assert isinstance(Y, (np.ndarray, tf.Tensor, tf.Variable))
-        assert Y.shape[-1] in (
+        assert isinstance(y_pred, (np.ndarray, tf.Tensor, tf.Variable))
+        assert y_pred.shape[-1] in (
             (self.S * self.S * (self.C + self.B * self.P)),
             (self.C + self.B * self.P)
         )
 
         # The label shape for one input image should be
         # (S=7 * S=7 * (C+P)=25) or (S, S, (C+P)).
-        assert isinstance(T, (np.ndarray, tf.Tensor))
-        assert T.shape[-1] in (
+        assert isinstance(y_true, (np.ndarray, tf.Tensor))
+        assert y_true.shape[-1] in (
             (self.S * self.S * (self.C + self.P)),
             (self.C + self.P)
         )
@@ -238,20 +253,21 @@ class YOLOLoss(Loss):
         # All we need are predictions and labels of each cell, hence no need to retain
         # (S x S) geometry of the grids.
         # --------------------------------------------------------------------------------
-        Y: tf.Tensor = tf.reshape(tensor=Y, shape=(-1, self.C + self.B * self.P))
-        T: tf.Tensor = tf.reshape(tensor=T, shape=(-1, self.C + self.P))
+        Y: tf.Tensor = tf.reshape(tensor=y_pred, shape=(-1, self.C + self.B * self.P))
+        T: tf.Tensor = tf.reshape(tensor=y_true, shape=(-1, self.C + self.P))
         assert Y.shape[0] == T.shape[0], \
             f"got different number of predictions:[{Y.shape[0]}] and labels:[{T.shape[0]}]"
 
         self.N: int = int(Y.shape[0])
         self.batch_size = self.N / (self.S * self.S)
         _logger.debug(
-            "%s: batch size:[%s] total cells to process:[%s]", self.batch_size, self.N
+            "%s: batch size:[%s] total cells to process:[%s]", _name, self.batch_size, self.N
         )
 
         self.Iobj_i = T[..., YOLO_LABEL_INDEX_CP:YOLO_LABEL_INDEX_CP+1]
         assert self.Iobj_i.shape == (self.N, 1), \
             f"expected shape {(self.N, 1)} got {self.Iobj_i.shape}."
+        _logger.debug("%s: self.Iobj_i:[%s]", _name, self.Iobj_i)
 
         # --------------------------------------------------------------------------------
         # Classification loss
@@ -259,10 +275,10 @@ class YOLOLoss(Loss):
         # Note that the loss function only penalizes classification error if an object is
         # present in that cell (hence the conditional class probability discussed earlier).
         # --------------------------------------------------------------------------------
-        classification_loss: tf.Tensor = tf.math.reduce_mean(tf.math.square(
-            self.Iobj.i * Y[..., :self.C],   # class predictions
-            self.Iobj.i * T[..., :self.C]    # class truth
-        ))
+        classification_loss: tf.Tensor = self.loss_fn(
+            y_true=self.Iobj_i * T[..., :self.C], y_pred=self.Iobj_i * Y[..., :self.C],
+        )
+        _logger.debug("%s: classification_loss[%s]", _name, classification_loss)
 
         # --------------------------------------------------------------------------------
         # Localization (c, x, y, w, h)
@@ -274,6 +290,10 @@ class YOLOLoss(Loss):
         localization_truth: tf.Tensor = tf.reshape(
             tensor=T[..., self.C:],
             shape=(-1, self.P)
+        )
+        _logger.debug(
+            "%s: localization_predicted shape:%s\n[%s]",
+            _name, localization_predicted.shape, localization_predicted
         )
 
         # --------------------------------------------------------------------------------
@@ -307,21 +327,14 @@ class YOLOLoss(Loss):
         max_IOU: tf.Tensor = tf.math.reduce_max(input_tensor=IOU, axis=-1, keepdims=True)
         assert max_IOU.shape == (self.N, 1), \
             f"expected shape {(self.N, 1)} got {IOU.shape}."
+        _logger.debug("%s: max_IOU[%s]", _name, max_IOU)
 
         best_box_j: tf.Tensor = tf.reshape(    # argmax drops the last dimension
-            tensor=tf.math.argmax(input=IOU, axis=-1, output_type=TYPE_FLOAT),
+            tensor=tf.math.argmax(input=IOU, axis=-1, output_type=TYPE_INT),
             shape=(self.N, 1)
         )
+        _logger.debug("%s: best_box_j:%s", _name, best_box_j)
         del IOU
-        assert (
-                tf.math.reduce_all(best_box_j == tf.constant(value=0, dtype=TYPE_FLOAT)) or
-                tf.math.reduce_all(best_box_j == tf.constant(value=1, dtype=TYPE_FLOAT))
-        ), "expected best_box_j in (0, 1), got {}".format(
-            best_box_j[tf.math.logical_and(
-                best_box_j != tf.constant(value=0, dtype=TYPE_FLOAT),
-                best_box_j != tf.constant(value=1, dtype=TYPE_FLOAT))
-            ]
-        )
 
         # --------------------------------------------------------------------------------
         # Predicted localization (cp, x, y, w, h) from the best bounding box j per grid cell.
@@ -334,18 +347,23 @@ class YOLOLoss(Loss):
         # “responsible” for the ground truth box (i.e. has the highest IOU of any
         # predictor in that grid cell).
         # --------------------------------------------------------------------------------
-        best_boxes: tf.Tensor = self.IObj_i_j(
+        best_boxes: tf.Tensor = self.Iobj_i_j(
             bounding_boxes=localization_predicted,
             best_box_indices=best_box_j
         )
         assert best_boxes.shape == (self.N, self.P), \
             f"expected shape {(self.N, self.P)}, got {best_boxes.shape}"
+        _logger.debug("%s: best_boxes[%s]", _name, best_boxes)
 
         # --------------------------------------------------------------------------------
         # Localization_x_y
         # --------------------------------------------------------------------------------
         localization_x_y: tf.Tensor = best_boxes[..., 1:3]  # (x,y) from (cp,x,y,w,h)
-        localization_x_y_truth: tf.Tensor = localization_truth[..., 1:3]
+        localization_x_y_truth: tf.Tensor = self.Iobj_i * localization_truth[..., 1:3]
+        localization_x_y_loss = \
+            self.lambda_coord * \
+            self.loss_fn(y_true=localization_x_y_truth, y_pred=localization_x_y)
+        _logger.debug("%s: localization_x_y_loss[%s]", _name, localization_x_y_loss)
 
         # --------------------------------------------------------------------------------
         # Localization_w_h as square root of w, h.
@@ -366,13 +384,10 @@ class YOLOLoss(Loss):
         localization_w_h_truth: tf.Tensor = \
             tf.math.sign(_w_h_truth) * tf.math.sqrt(tf.math.abs(_w_h_truth) + EPSILON)
 
-        # --------------------------------------------------------------------------------
-        # Localisation loss
-        # --------------------------------------------------------------------------------
-        localization_loss: tf.Tensor = self.lambda_coord * tf.add_n(
-            tf.math.reduce_mean(tf.square(localization_x_y_truth - localization_x_y)),
-            tf.math.reduce_mean(tf.square(localization_w_h_truth - localization_w_h)),
-        )
+        localization_w_h_loss = \
+            self.lambda_coord * \
+            self.loss_fn(y_true=localization_w_h_truth, y_pred=localization_w_h)
+        _logger.debug("%s: localization_w_h_loss[%s]", _name, localization_w_h_loss)
 
         # --------------------------------------------------------------------------------
         # Confidence loss with object
@@ -394,15 +409,17 @@ class YOLOLoss(Loss):
         #     torch.flatten(exists_box * target[..., 20:21] * iou_maxes),
         # )
         # --------------------------------------------------------------------------------
-        confidence: tf.Tensor = best_boxes[0:1]     # cp from (cp,x,y,w,h)
+        confidence: tf.Tensor = best_boxes[..., 0:1]     # cp from (cp,x,y,w,h)
         confidence_truth: tf.Tensor = self.Iobj_i * max_IOU
-        assert confidence.shape == confidence_truth.shape == (self.N, 1)
-        confidence_loss: tf.Tensor = tf.math.reduce_mean(tf.square(
-            confidence_truth - confidence
-        ))
+        assert confidence.shape == confidence_truth.shape == (self.N, 1), \
+            f"expected shape:{(self.N, 1)}, got confidence.shap:{confidence.shap} " \
+            f"confidence_truth.shape:{confidence_truth.shape}"
+        confidence_loss: tf.Tensor = self.loss_fn(y_true=confidence_truth, y_pred=confidence)
+        _logger.debug("%s: confidence_loss[%s]", _name, confidence_loss)
 
         # --------------------------------------------------------------------------------
         # Confidence loss with no object
+        # --------------------------------------------------------------------------------
         # [YOLO v1 paper]
         # Also, in every image many grid cells do not contain any object.
         # This pushes the “confidence” scores of those cells towards zero, often
@@ -412,25 +429,60 @@ class YOLOLoss(Loss):
         # and decrease the loss from confidence predictions for boxes that don’t contain
         # objects. We use two parameters, coord and noobj to accomplish this.
         # We set coord = 5 and noobj = :5.
-        #
+        # --------------------------------------------------------------------------------
+        Inoobj_i: tf.Tensor = TYPE_FLOAT(1) - self.Iobj_i
+
+        # Each cell has B number of cp in (cp,x,y,w,h).
+        # Calculate C_hat(i) by taking the sum of B number of cp per cell on axis=1
+        # reducing localization_predicted[..., 0] of shape (N, B) into shape (N, 1)
+        # with keepdims=True.
+        no_obj_confidences: tf.Tensor = \
+            Inoobj_i * tf.math.reduce_sum(localization_predicted[..., 0], axis=-1, keepdims=True)
+
+        # no_obj_confidence_truth
+        # = Inoobj_i * localization_truth[..., 0]
+        # = Inoobj_i * Iobj_i
+        # = (1 - Iobj_i) * Iobj_i
+        # = Iobj_i - Iobj_i^2   # Iobj_i^2 == Iobj_i^2 because it is either 1 or 0
+        # = Iobj_i - Iobj_i
+        # = 0
+        # no_obj_confidence_truth: TYPE_FLOAT = TYPE_FLOAT(0)
+        no_obj_confidence_truth = Inoobj_i * self.Iobj_i
+        # No subtraction of no_obj_confidence_truth.
         # no_obj_confidence_truth = Inoobj_i * cp_i = 0 always, because:
         # When Inoobj_i = 1 with no object, then cp_i is 0, hence Inoobj_i * cp_i -> 0.
         # When Inoobj_i = 0 with an object, then again Inoobj_i * cp_i -> 0.
-        # --------------------------------------------------------------------------------
-        Inoobj_i: tf.Tensor = tf.constant(1.0, dtype=TYPE_FLOAT) - self.Iobj_i
-        no_obj_confidences: tf.Tensor = Inoobj_i * localization_predicted[..., 0:1]
         no_obj_confidence_loss: tf.Tensor = \
-            self.lambda_noobj * \
-            tf.math.reduce_mean(tf.math.square(no_obj_confidences))
+            self.lambda_noobj * self.loss_fn(y_true=no_obj_confidence_truth, y_pred=no_obj_confidences)
+        _logger.debug("%s: no_obj_confidence_loss[%s]", _name, no_obj_confidence_loss)
 
         # --------------------------------------------------------------------------------
         # Total loss
         # tf.add_n be more efficient than reduce_sum because it sums the tensors directly.
         # --------------------------------------------------------------------------------
         loss: tf.Tensor = tf.math.add_n([
-            localization_loss,
+            localization_x_y_loss,
+            localization_w_h_loss,
             confidence_loss,
             no_obj_confidence_loss,
             classification_loss
-        ])
+        ]) / TYPE_FLOAT(self.batch_size)
+        _logger.debug("%s: loss[%s]", _name, loss)
         return loss
+
+
+def main():
+    loss: Loss = YOLOLoss()
+
+    S: int = YOLO_GRID_SIZE
+    C: int = YOLO_PREDICTION_NUM_CLASSES
+    B: int = YOLO_PREDICTION_NUM_BBOX
+    P: int = YOLO_PREDICTION_NUM_PRED
+    y_pred: tf.Tensor = tf.constant(np.ones(shape=(1, S, S, C+B*P)), dtype=TYPE_FLOAT)
+    y_true: tf.Tensor = tf.constant(np.zeros(shape=(1, S, S, C+P)), dtype=TYPE_FLOAT)
+    loss: tf.Tensor = loss(y_pred=y_pred, y_true=y_true)
+    print(loss)
+
+
+if __name__ == "__main__":
+    main()

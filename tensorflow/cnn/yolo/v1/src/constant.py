@@ -1,5 +1,13 @@
 # pylint: disable=invalid-name
+import logging
 import numpy as np
+
+
+# --------------------------------------------------------------------------------
+# Logging
+# --------------------------------------------------------------------------------
+DEBUG_LEVEL: int = logging.DEBUG
+logging.basicConfig(level=DEBUG_LEVEL)
 
 # --------------------------------------------------------------------------------
 # TYPES
