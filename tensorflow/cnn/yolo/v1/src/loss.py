@@ -413,15 +413,15 @@ class YOLOLoss(Loss):
         # objects. We use two parameters, coord and noobj to accomplish this.
         # We set coord = 5 and noobj = :5.
         #
-        # noobj_confidence_truth = Inoobj_i * cp_i = 0 always, because:
+        # no_obj_confidence_truth = Inoobj_i * cp_i = 0 always, because:
         # When Inoobj_i = 1 with no object, then cp_i is 0, hence Inoobj_i * cp_i -> 0.
         # When Inoobj_i = 0 with an object, then again Inoobj_i * cp_i -> 0.
         # --------------------------------------------------------------------------------
         Inoobj_i: tf.Tensor = tf.constant(1.0, dtype=TYPE_FLOAT) - self.Iobj_i
-        noobj_confidences: tf.Tensor = Inoobj_i * localization_predicted[..., 0:1]
-        noobj_confidence_loss: tf.Tensor = \
+        no_obj_confidences: tf.Tensor = Inoobj_i * localization_predicted[..., 0:1]
+        no_obj_confidence_loss: tf.Tensor = \
             self.lambda_noobj * \
-            tf.math.reduce_mean(tf.math.square(noobj_confidences))
+            tf.math.reduce_mean(tf.math.square(no_obj_confidences))
 
         # --------------------------------------------------------------------------------
         # Total loss
@@ -430,7 +430,7 @@ class YOLOLoss(Loss):
         loss: tf.Tensor = tf.math.add_n([
             localization_loss,
             confidence_loss,
-            noobj_confidence_loss,
+            no_obj_confidence_loss,
             classification_loss
         ])
         return loss
