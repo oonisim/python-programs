@@ -61,6 +61,7 @@ C_hat(i):
     the predicted box fits the object.
 Iobj_i: 0 or 1 to tell if object appears in cell i
 Iobj_j: if the j-th bounding box predictor in cell i is “responsible” bbox.
+IOU: Intersection Over Union
 
 S: number of divisions per side. S=7 in YOLO v1.
 B: number of bounding boxes to be predicted per cell. B=2 in YOLO v1.
@@ -140,19 +141,19 @@ _VOC_LABELS = (
 )
 ```
 """
+# pylint: disable=too-many-statements
 import logging
 from typing import (
     Union,
     Optional,
-    Callable,
 )
 
 import numpy as np
-from tensorflow import keras
+from tensorflow import keras    # pylint: disable=unused-import
 import tensorflow as tf
 from keras.losses import (
     Loss,
-    MeanSquaredError,
+    # MeanSquaredError,
 )
 
 from constant import (
@@ -209,18 +210,19 @@ class YOLOLoss(Loss):
         """
         Initialization of the Loss instance
         Args:
-            S: size of grid
+            S: Number of division per side (YOLO divides an image into SxS grids)
             B: number of bounding boxes per grid cell
-            C: number of classes
+            C: number of classes to detect
             P: size of predictions len(cp, x, y, w, h) per bounding box
         """
         super().__init__(**kwargs)
         self.batch_size: TYPE_FLOAT = TYPE_FLOAT(-1)
-        self.N: int = -1    # Total cells in the batch (S * S * batch_size)
-        self.S: int = S     # Number of division per axis (YOLO divides an image into SxS grids)
-        self.B: int = B     # Number of bounding boxes per cell
-        self.C: int = C     # Number of classes to detect
-        self.P: int = P     # Prediction (cp, x, y, w, h) per bounding box
+        # pylint: disable=invalid-name
+        self.N: int = -1    # Total cells in the batch (S * S * batch_size) pylint: disable=invalid-name
+        self.S: int = S     # pylint: disable=invalid-name
+        self.B: int = B     # pylint: disable=invalid-name
+        self.C: int = C     # pylint: disable=invalid-name
+        self.P: int = P     # pylint: disable=invalid-name
 
         # --------------------------------------------------------------------------------
         # lambda parameters to prioritise the localization vs classification
@@ -251,8 +253,8 @@ class YOLOLoss(Loss):
         # Note that the loss function only penalizes classification error if an object
         # is present in that grid cell (hence the conditional class probability discussed).
         # --------------------------------------------------------------------------------
-        self.Iobj_i: Optional[tf.Tensor] = None
-        self.Inoobj_i: Optional[tf.Tensor] = None
+        self.Iobj_i: Optional[tf.Tensor] = None     # pylint: disable=invalid-name
+        self.Inoobj_i: Optional[tf.Tensor] = None   # pylint: disable=invalid-name
 
     def get_config(self) -> dict:
         """Returns the config dictionary for a Loss instance.
@@ -287,7 +289,7 @@ class YOLOLoss(Loss):
         """
         return tf.math.reduce_sum(tf.square(y_true - y_pred)) / self.batch_size
 
-    def Iobj_j(
+    def Iobj_j(     # pylint: disable=invalid-name
             self,
             bounding_boxes: tf.Tensor,
             best_box_indices: tf.Tensor
@@ -401,6 +403,7 @@ class YOLOLoss(Loss):
         # All we need are the predictions and label at each cell, hence no need to retain
         # (S x S) geometry of the grids.
         # --------------------------------------------------------------------------------
+        # pylint: disable=invalid-name
         Y: tf.Tensor = tf.reshape(tensor=y_pred, shape=(-1, self.C + self.B * self.P))
         T: tf.Tensor = tf.reshape(tensor=y_true, shape=(-1, self.C + self.P))
         assert Y.shape[0] == T.shape[0], \
@@ -448,15 +451,16 @@ class YOLOLoss(Loss):
         # --------------------------------------------------------------------------------
         # IoU between predicted bounding boxes and the ground truth at a cell.
         # --------------------------------------------------------------------------------
-        IOU: tf.Tensor = tf.concat(
-            [
+        IOU: tf.Tensor = tf.concat(            # pylint: disable=invalid-name
+            values=[
                 intersection_over_union(
                     box_pred[..., j, 1:5],     # shape:(N,4)
                     box_true[..., 1:5]         # shape:(N,4)
                 )
                 for j in range(self.B)
             ],
-            axis=-1
+            axis=-1,
+            name="IOU"
         )
         assert IOU.shape == (self.N, self.B)
 
@@ -473,6 +477,7 @@ class YOLOLoss(Loss):
         # Each predictor gets better at predicting certain sizes, aspect ratios, or
         # classes of object, improving overall recall.
         # --------------------------------------------------------------------------------
+        # pylint: disable=invalid-name
         max_IOU: tf.Tensor = tf.math.reduce_max(input_tensor=IOU, axis=-1, keepdims=True)
         assert max_IOU.shape == (self.N, 1), \
             f"expected max IOU shape {(self.N, 1)}, got {IOU.shape}."
@@ -630,12 +635,13 @@ class YOLOLoss(Loss):
 
 
 def main():
+    """Simple test run"""
     loss: Loss = YOLOLoss()
 
-    S: int = YOLO_GRID_SIZE
-    C: int = YOLO_PREDICTION_NUM_CLASSES
-    B: int = YOLO_PREDICTION_NUM_BBOX
-    P: int = YOLO_PREDICTION_NUM_PRED
+    S: int = YOLO_GRID_SIZE                  # pylint: disable=invalid-name
+    C: int = YOLO_PREDICTION_NUM_CLASSES     # pylint: disable=invalid-name
+    B: int = YOLO_PREDICTION_NUM_BBOX        # pylint: disable=invalid-name
+    P: int = YOLO_PREDICTION_NUM_PRED        # pylint: disable=invalid-name
     y_pred: tf.Tensor = tf.constant(np.ones(shape=(1, S, S, C+B*P)), dtype=TYPE_FLOAT)
     y_true: tf.Tensor = tf.constant(np.zeros(shape=(1, S, S, C+P)), dtype=TYPE_FLOAT)
     loss: tf.Tensor = loss(y_pred=y_pred, y_true=y_true)

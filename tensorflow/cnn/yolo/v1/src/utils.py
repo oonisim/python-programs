@@ -8,31 +8,18 @@ https://datascience.stackexchange.com/q/118656/68313
 TODO:
     clarify if it is OK to clip values without consideration of the back propagation?
 """
-import json
+# pylint: disable=too-many-statements
 import logging
-from typing import (
-    List,
-    Dict,
-    Tuple,
-    Callable,
-    Optional,
-    Union,
-    Iterable,
-)
 
 import tensorflow as tf
+
 from constant import (
     TYPE_FLOAT,
-    TYPE_INT,
     EPSILON,
-    YOLO_GRID_SIZE,
 )
-
-
 from util_logging import (
     get_logger,
 )
-
 
 # --------------------------------------------------------------------------------
 # Constant
@@ -50,7 +37,9 @@ _logger: logging.Logger = get_logger(__name__)
 # Utility
 # --------------------------------------------------------------------------------
 def intersection_over_union(
-        boxes_preds, boxes_labels, box_format="midpoint"
+        boxes_preds: tf.Tensor,
+        boxes_labels: tf.Tensor,
+        box_format: str ="midpoint"
 ) -> tf.Tensor:
     """
     Calculates intersection over union

@@ -1,42 +1,35 @@
+"""
+Pytest for YOLO loss function
+"""
 import sys
-sys.path.append("../../../../../lib")
-sys.path.append("../src")
-
 import logging
+
 import numpy as np
 import torch
 import torch.nn as nn
 import tensorflow as tf
-from tensorflow import keras
-
+from tensorflow import keras  # pylint: disable=unused-import
 
 from constant import (
     DEBUG_LEVEL,
     DUMP,
     TYPE_FLOAT,
-    TYPE_INT,
-    EPSILON,
     YOLO_GRID_SIZE,
     YOLO_PREDICTION_NUM_CLASSES,
     YOLO_PREDICTION_NUM_BBOX,
     YOLO_PREDICTION_NUM_PRED,
-    YOLO_PREDICTION_INDEX_CP1,
-    YOLO_PREDICTION_INDEX_CP2,
-    YOLO_PREDICTION_INDEX_X1,
-    YOLO_PREDICTION_INDEX_X2,
-    YOLO_PREDICTION_INDEX_Y1,
-    YOLO_PREDICTION_INDEX_Y2,
     YOLO_LABEL_INDEX_CP,
-    YOLO_LABEL_INDEX_X,
-    YOLO_LABEL_INDEX_Y
 )
 from loss import (
     YOLOLoss
 )
+
+# sys.path.append("../../../../../lib")
+# sys.path.append("../src")
+
 from util_logging import (
     get_logger
 )
-
 
 # --------------------------------------------------------------------------------
 # Logging
@@ -62,14 +55,14 @@ def intersection_over_union(box1, box2):
     x2 = torch.min(box1x2, box2x2)
     y2 = torch.min(box1y2, box2y2)
 
-    intersection_area = torch.clamp(x2 - x1, min = 0) * torch.clamp(y2 - y1, min = 0)
+    intersection_area = torch.clamp(x2 - x1, min=0) * torch.clamp(y2 - y1, min=0)
 
     iou = intersection_area / (box1area + box2area - intersection_area + 1e-6)
     return iou
 
 
 class TorchYoloLoss(nn.Module):
-    def __init__(self, num_classes=20, num_boxes = 2):
+    def __init__(self, num_classes=20, num_boxes=2):
         super(TorchYoloLoss, self).__init__()
         self.mse = nn.MSELoss(reduction="sum")
         self.num_classes = num_classes
@@ -113,11 +106,11 @@ class TorchYoloLoss(nn.Module):
                 ).unsqueeze(3).unsqueeze(0)
                 for i in range(self.num_boxes)
             ],
-            dim = 0
+            dim=0
         )
         # print(f"iou: shape:{iou.shape}\n{iou}")
 
-        best_iou, best_box = torch.max(iou, dim = 0)
+        best_iou, best_box = torch.max(iou, dim=0)
         # print(f"best_box: shape:{best_box.shape}\n{best_box}")
         DUMP and _logger.debug("%s: best_box[%s]", _name, best_box)
 
@@ -126,7 +119,7 @@ class TorchYoloLoss(nn.Module):
         # print(f"first_box_mask: shape:{first_box_mask.shape}\n{first_box_mask}")
         # print(f"second_box_mask: shape:{second_box_mask.shape}\n{second_box_mask}")
 
-        indicator_ij = (indicator_i * ((1-best_box) * first_box_mask + best_box * second_box_mask))
+        indicator_ij = (indicator_i * ((1 - best_box) * first_box_mask + best_box * second_box_mask))
         # print(f"indicator_ij: shape:{indicator_ij.shape}\n{indicator_ij}")
         indicator_ij = indicator_ij.unsqueeze(4)
         # print(f"indicator_ij: shape:{indicator_ij.shape}\n{indicator_ij}")
@@ -141,8 +134,9 @@ class TorchYoloLoss(nn.Module):
         ) / float(batch_size)
         _logger.debug("%s: localization_xy_loss[%s]", _name, xy_loss)
 
-        wh_loss = self.lambda_coord * self.mse(
-            indicator_ij * torch.sign(box_predictions[..., 3:5]) * torch.sqrt(torch.abs(box_predictions[..., 3:5]) + 1e-6),
+        wh_loss = self.lambda_coord * self.mse(  # pylint: disable=no-member
+            indicator_ij * torch.sign(box_predictions[..., 3:5]) * torch.sqrt(
+                torch.abs(box_predictions[..., 3:5]) + 1e-6),
             indicator_ij * torch.sign(box_target[..., 3:5]) * torch.sqrt(torch.abs(box_target[..., 3:5]) + 1e-6)
         ) / float(batch_size)
         _logger.debug("%s: localization_wh_loss[%s]", _name, wh_loss)
@@ -156,12 +150,12 @@ class TorchYoloLoss(nn.Module):
 
         # no object loss
         no_object_loss = self.lambda_noobj * self.mse(
-            (1-indicator_ij) * box_predictions[..., 0:1],
-            (1-indicator_ij) * box_target[..., 0:1]
+            (1 - indicator_ij) * box_predictions[..., 0:1],
+            (1 - indicator_ij) * box_target[..., 0:1]
         ) / float(batch_size)
         DUMP and _logger.debug(
             "%s: (1-indicator_ij) * box_predictions[..., 0:1] \n%s",
-            _name, (1-indicator_ij) * box_predictions[..., 0:1]
+            _name, (1 - indicator_ij) * box_predictions[..., 0:1]
         )
         _logger.debug("%s: no_obj_confidence_loss[%s]", _name, no_object_loss)
 
@@ -179,38 +173,38 @@ def test_compare_with_torch_rand():
     Expected:
         1. Loss difference is within a limit.
 """
-    N: int = 4                              # Batch size
-    S: int = YOLO_GRID_SIZE
-    B: int = YOLO_PREDICTION_NUM_BBOX
-    C: int = YOLO_PREDICTION_NUM_CLASSES
-    P: int = YOLO_PREDICTION_NUM_PRED
-    MAX_ALLOWANCE: int = 25
+    N: int = 4  # Batch size pylint: disable=invalid-name
+    S: int = YOLO_GRID_SIZE  # pylint: disable=invalid-name
+    B: int = YOLO_PREDICTION_NUM_BBOX  # pylint: disable=invalid-name
+    C: int = YOLO_PREDICTION_NUM_CLASSES  # pylint: disable=invalid-name
+    P: int = YOLO_PREDICTION_NUM_PRED  # pylint: disable=invalid-name
+    MAX_ALLOWANCE: int = 25  # pylint: disable=invalid-name
 
     # --------------------------------------------------------------------------------
     # random value initialization
     # --------------------------------------------------------------------------------
     # Bounding box predictions (cp, x, y, w, h)
-    pred: np.ndarray = np.random.random((N, S, S, C+B*P)).astype(TYPE_FLOAT)
+    pred: np.ndarray = np.random.random((N, S, S, C + B * P)).astype(TYPE_FLOAT)
 
     # --------------------------------------------------------------------------------
     # Bounding box ground truth
     # --------------------------------------------------------------------------------
-    true: np.ndarray = np.random.random((N, S, S, C+P)).astype(TYPE_FLOAT)
+    true: np.ndarray = np.random.random((N, S, S, C + P)).astype(TYPE_FLOAT)
     # Set 0 or 1 to the confidence score of the ground truth.
     # In ground truth, confidence=1 when there is an object in a cell, or 0.
     true[..., YOLO_LABEL_INDEX_CP] = \
-        np.random.randint(low=0, high=2, size=N*S*S).astype(TYPE_FLOAT).reshape((N, S, S))
+        np.random.randint(low=0, high=2, size=N * S * S).astype(TYPE_FLOAT).reshape((N, S, S))
     # Set only one class of the C classes to 1 because the object class in a cell is known
     # to be a specific class e.g. a dog.
-    index_to_true_class = np.random.randint(low=0, high=C+1, size=1)
+    index_to_true_class = np.random.randint(low=0, high=C + 1, size=1)
     true[..., :YOLO_LABEL_INDEX_CP] = TYPE_FLOAT(0)
     true[..., index_to_true_class] = TYPE_FLOAT(1)
 
     # --------------------------------------------------------------------------------
     # Loss from Torch
     # --------------------------------------------------------------------------------
-    y_pred_torch = torch.tensor(pred)
-    y_true_torch = torch.tensor(true)
+    y_pred_torch = torch.Tensor(pred)
+    y_true_torch = torch.Tensor(true)
 
     _logger.debug("-" * 80)
     _logger.debug("Torch")

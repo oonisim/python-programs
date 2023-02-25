@@ -1,3 +1,6 @@
+"""
+Constant definitions
+"""
 # pylint: disable=invalid-name
 import logging
 import numpy as np
