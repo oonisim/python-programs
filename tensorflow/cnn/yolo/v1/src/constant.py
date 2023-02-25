@@ -1,12 +1,13 @@
 # pylint: disable=invalid-name
 import logging
 import numpy as np
-
+import tensorflow as tf
 
 # --------------------------------------------------------------------------------
 # Logging
 # --------------------------------------------------------------------------------
-DEBUG_LEVEL: int = logging.DEBUG
+DEBUG_LEVEL: int = logging.INFO
+DUMP: bool = False
 logging.basicConfig(level=DEBUG_LEVEL)
 
 # --------------------------------------------------------------------------------
@@ -14,6 +15,8 @@ logging.basicConfig(level=DEBUG_LEVEL)
 # --------------------------------------------------------------------------------
 TYPE_FLOAT = np.float32
 TYPE_INT = np.int32
+ZERO: tf.Tensor = tf.constant(0, dtype=TYPE_FLOAT)
+ONE: tf.Tensor = tf.constant(1, dtype=TYPE_FLOAT)
 EPSILON = TYPE_FLOAT(1e-6)  # small enough value e.g. to avoid div by zero
 
 YOLO_GRID_SIZE: int = 7
