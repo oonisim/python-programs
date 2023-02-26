@@ -112,11 +112,35 @@ non-max-suppression:
 
 [References]
 * PASCAL VOC (Visual Object Classes) - http://host.robots.ox.ac.uk/pascal/VOC/
+* PASCAL VOC 2007 - http://host.robots.ox.ac.uk/pascal/VOC/voc2007/ (information and link to data)
+* PASCAL VOC 2007 examples - http://host.robots.ox.ac.uk/pascal/VOC/voc2007/examples/index.html
+* PASCAL VOC 2007 Development Kit - http://host.robots.ox.ac.uk/pascal/VOC/voc2007/htmldoc/index.html
+  (Details about the dataset)
+---
+Objects of the twenty classes listed above are annotated in the ground truth.
+    class:
+        the object class e.g. `car' or `bicycle'
+    bounding box:
+        an axis-aligned rectangle specifying the extent of the object visible in the image.
+    view:
+        `frontal', `rear', `left' or `right'.
+        The views are subjectively marked to indicate the view of the `bulk' of the object.
+        Some objects have no view specified.
+    `truncated':
+        an object marked as `truncated' indicates that the bounding box specified for
+        the object does not correspond to the full extent of the object e.g. an image
+        of a person from the waist up, or a view of a car extending outside the image.
+    `difficult':
+        an object marked as `difficult' indicates that the object is considered difficult
+        to recognize, for example an object which is clearly visible but unidentifiable
+        without substantial use of context. Objects marked as difficult are currently
+        ignored in the evaluation of the challenge.
+---
 * TensorFlow Data Set - https://www.tensorflow.org/datasets/catalog/voc
 > This dataset contains the data from the PASCAL Visual Object Classes Challenge,
 > corresponding to the Classification and Detection competitions.
 > https://github.com/tensorflow/datasets/blob/master/tensorflow_datasets/object_detection/voc.py
-```
+---
 _VOC_LABELS = (
     "aeroplane",
     "bicycle",
@@ -139,7 +163,7 @@ _VOC_LABELS = (
     "train",
     "tvmonitor",
 )
-```
+---
 """
 # pylint: disable=too-many-statements
 import logging

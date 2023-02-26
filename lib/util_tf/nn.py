@@ -40,8 +40,9 @@ from keras.layers import (
     BatchNormalization,
     Dense,
     Flatten,
-    Activation,
+    Dropout,
     Reshape,
+    Activation,
     ReLU,
     LeakyReLU,
 )
@@ -70,6 +71,7 @@ LAYER_NAME_CONV2D: str = "Conv2D"
 LAYER_NAME_ACTIVATION: str = "Activation"
 LAYER_NAME_MAXPOOL2D: str = "MaxPool2D"
 LAYER_NAME_DENSE: str = "Dense"
+LAYER_NAME_DROP: str = "Dropout"
 LAYER_NAME_FLAT: str = "Flatten"
 LAYER_NAME_BN: str = "BatchNorm"
 LAYER_NAME_RESHAPE: str = "Reshape"
@@ -327,11 +329,16 @@ def build_layers(config: Dict[str, dict]) -> List[Layer]:
         elif kind == LAYER_NAME_ACTIVATION:
             activation: str = value.get("activation", "relu")
             if activation == "relu":
-                act: Layer = ReLU()
+                act: Layer = ReLU(
+                    name=name,
+                )
 
             elif activation == "leaky_relu":
                 alpha: float = value.get("alpha", 0.1)
-                act: Layer = LeakyReLU(alpha=alpha)
+                act: Layer = LeakyReLU(
+                    name=name,
+                    alpha=alpha
+                )
 
             else:
                 raise NotImplementedError(f"activation {activation} not yet implemented or invalid")
@@ -384,12 +391,27 @@ def build_layers(config: Dict[str, dict]) -> List[Layer]:
             layers.append(full)
 
         # --------------------------------------------------------------------------------
+        # Dropout
+        # --------------------------------------------------------------------------------
+        elif kind == LAYER_NAME_DROP:
+            assert "rate" in value, \
+                "rate parameter is mandatory for Dropout layer."
+            drop: Layer = Dropout(
+                name=name,
+                rate=value.get("rate")
+            )
+            layers.append(drop)
+
+        # --------------------------------------------------------------------------------
         # Reshape
         # --------------------------------------------------------------------------------
         elif kind == LAYER_NAME_RESHAPE:
-            assert "target_shape" in "target_shape", \
+            assert "target_shape" in value, \
                 "target_shape parameter is mandatory for Reshape layer."
-            reshape: Layer = Reshape(target_shape=value.get("target_shape"))
+            reshape: Layer = Reshape(
+                name=name,
+                target_shape=value.get("target_shape")
+            )
             layers.append(reshape)
 
         # --------------------------------------------------------------------------------
