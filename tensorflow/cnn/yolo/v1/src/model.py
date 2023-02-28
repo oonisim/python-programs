@@ -8,6 +8,17 @@ from typing import (
     Tuple,
 )
 
+from tensorflow import keras
+from keras import (
+    Model
+)
+from keras.optimizers import (
+    SGD
+)
+from keras.losses import (
+    SparseCategoricalCrossentropy
+)
+
 from constant import (
     DEBUG_LEVEL,
     TYPE_FLOAT,
@@ -19,19 +30,32 @@ from constant import (
     YOLO_PREDICTION_NUM_BBOX,
     YOLO_PREDICTION_NUM_PRED,
     YOLO_LEAKY_RELU_SLOPE,
+    YOLO_V1_MOMENTUM,
+    YOLO_V1_DECAY,
+    YOLO_V1_LR,
 )
 from util_logging import (
     get_logger,
 )
 from util_tf.nn import (
+    LAYER_NAME_NORM,
     LAYER_NAME_CONV2D,
     LAYER_NAME_ACTIVATION,
     LAYER_NAME_MAXPOOL2D,
     LAYER_NAME_DENSE,
     LAYER_NAME_FLAT,
+    LAYER_NAME_BN,
     LAYER_NAME_DROP,
     LAYER_NAME_RESHAPE,
+    build_nn_model,
+    train,
+    get_early_stopping_callback,
+    get_tensorboard_callback,
 )
+from loss import (
+    YOLOLoss
+)
+
 
 # --------------------------------------------------------------------------------
 # Logging
@@ -269,3 +293,28 @@ layers_config = {
         "kind": LAYER_NAME_RESHAPE, "target_shape": (S, S, (C + B * P))
     }
 }
+
+
+# --------------------------------------------------------------------------------
+# Model
+# TODO: Normalization layer (standardization)
+# --------------------------------------------------------------------------------
+class YOLOModel(Model):
+    def __init__(self, *args, **kwargs):
+        super(YOLOModel, self).__init__(*args, **kwargs)
+        self.model: Model = build_nn_model(model_name="yolo_v1", input_shape=input_shape, layers_config=layers_config)
+        self.optimizer: keras.optimizers.Optimizer = SGD(
+            learning_rate=YOLO_V1_LR,
+            momentum=YOLO_V1_MOMENTUM,
+            decay=YOLO_V1_DECAY
+        )
+        self.model.compile(
+            optimizer=self.optimizer,
+            loss=YOLOLoss(),
+            metrics=[SparseCategoricalCrossentropy()]
+        )
+        self.model.summary()
+
+    def call(self, inputs, training=None, mask=None):
+        return self.model(inputs)
+

@@ -36,6 +36,9 @@ YOLO_V1_IMAGE_CHANNELS: int = 3
 # --------------------------------------------------------------------------------
 YOLO_LEAKY_RELU_SLOPE: TYPE_FLOAT = TYPE_FLOAT(0.1)
 YOLO_V1_BATCH_SIZE: int = 64
+YOLO_V1_MOMENTUM: TYPE_FLOAT = TYPE_FLOAT(0.9)
+YOLO_V1_DECAY: TYPE_FLOAT = TYPE_FLOAT(0.0005)
+YOLO_V1_LR: TYPE_FLOAT = TYPE_FLOAT(1e-3)
 
 # --------------------------------------------------------------------------------
 # YOLO v1 Predictions
