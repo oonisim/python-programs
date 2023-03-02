@@ -58,6 +58,7 @@ graphviz
 #--------------------------------------------------------------------------------
 tensorflow
 tensorflow-datasets
+tensorflow_transform
 tensorflow_decision_forests
 wurlitzer
 pydeequ
