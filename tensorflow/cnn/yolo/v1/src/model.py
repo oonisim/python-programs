@@ -6,11 +6,15 @@ https://github.com/aladdinpersson/Machine-Learning-Collection/blob/master/ML/Pyt
 import logging
 from typing import (
     Tuple,
+    List,
 )
 
 from tensorflow import keras
 from keras import (
-    Model
+    Model,
+)
+from keras.layers import (
+    Layer,
 )
 from keras.optimizers import (
     SGD
@@ -91,6 +95,9 @@ layers_config = {
     # --------------------------------------------------------------------------------
     # 1st
     # --------------------------------------------------------------------------------
+    "norm": {
+        "kind": LAYER_NAME_NORM, "input_shape": input_shape, "axis": -1
+    },
     "conv01": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (7, 7), "filters": 64, "strides": (2, 2), "padding": "same"
     },
@@ -314,6 +321,23 @@ class YOLOModel(Model):
             metrics=[SparseCategoricalCrossentropy()]
         )
         self.model.summary()
+
+    @property
+    def layers(self) -> List[Layer]:
+        """Provide model layers as a list"""
+        return self.model.layers
+
+    @property
+    def input(self):
+        return self.model.input
+
+    def get_layer(self, name=None, index=None):
+        """Provide Keras Model get_layer I/F"""
+        return self.model.get_layer(name=name, index=index)
+
+    def get_model(self) -> Model:
+        """Provide the Model instance"""
+        return self.model
 
     def call(self, inputs, training=None, mask=None):
         return self.model(inputs)

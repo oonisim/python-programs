@@ -3,19 +3,24 @@
 from typing import (
     Tuple,
 )
+
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import tensorflow as tf
 import tensorflow_datasets as tfds
 from tensorflow.debugging import (
-    Assert
+    Assert,
+    assert_non_negative,
+)
+
+from util_constant import (
+    TYPE_FLOAT
 )
 
 
-def tfds_convert_pascal_voc_bndbox_to_yolo_bbox(
-        box: tf.Tensor
-) -> tf.Tensor:
+def convert_pascal_voc_bndbox_to_yolo_bbox(
+        bndbox: tf.Tensor
+) -> tf.data.Dataset:
     """
     Convert TFDS PASCAL VOC XML bndbox annotation to YOLO Darknet Bounding box annotation
     (x,y,w,h) where (x,y) is the center of bbox and (w,h) is relative to image size.
@@ -62,15 +67,36 @@ def tfds_convert_pascal_voc_bndbox_to_yolo_bbox(
     Args:
         bndbox: coordinate of box as (ymin, xmin, ymax, xmax)
     Returns:
-        YOLO Darknet bbox annotation (x,y,w,h) as Tensor
+        YOLO Darknet bbox annotation (x,y,w,h) as Dataset
     """
-    box = tf.reshape(tensor=bndbox, shape=(-1,len("xywh")))
+    x = (bndbox[1] + bndbox[3]) / TYPE_FLOAT(2.0)   # (xmin+xmax)/2
+    y = (bndbox[0] + bndbox[2]) / TYPE_FLOAT(2.0)   # (ymin+ymax)/2
+    w = bndbox[3] - bndbox[1]                       # xmax-xmin
+    h = bndbox[2] - bndbox[0]                       # ymax-ymin
 
-    x = (box[:, 1] + box[:, 3]) / 2.0  # (xmin+xmax)/2
-    y = (box[:, 0] + box[:, 2]) / 2.0  # (ymin+ymax)/2
-    w = box[:, 3] - box[:, 1]          # xmax-xmin
-    h = box[:, 2] - box[:, 0]          # ymax-ymin
-    bbox = tf.concat(values=[x, y, w, h], axis=-1)
+    box: tf.Tensor = tf.stack(values=[x, y, w, h], axis=-1)
+    assert_non_negative(x=box, message="expected all non negative")
 
-    # Assert(condition=tf.reduce_all(bbox >= 0.0), data=bndbox)
-    return bbox
+    return tf.data.Dataset.from_tensors(box)
+
+
+def test_convert_pascal_voc_bndbox_to_yolo_bbox():
+    xmin: TYPE_FLOAT = TYPE_FLOAT(0)
+    xmax: TYPE_FLOAT = TYPE_FLOAT(6)
+    ymin: TYPE_FLOAT = TYPE_FLOAT(0)
+    ymax: TYPE_FLOAT = TYPE_FLOAT(8)
+    bndbox: tfds.features.BBox = tfds.features.BBox(
+        ymin=ymin, xmin=xmin, ymax=ymax, xmax=xmax
+    )
+
+    yolo_bbox_dataset = convert_pascal_voc_bndbox_to_yolo_bbox(bndbox=bndbox)
+    yolo_bbox_tensor = yolo_bbox_dataset.take(1).get_single_element()
+    x_centre = TYPE_FLOAT(yolo_bbox_tensor[0])
+    y_centre = TYPE_FLOAT(yolo_bbox_tensor[1])
+    w = TYPE_FLOAT(yolo_bbox_tensor[2])
+    h = TYPE_FLOAT(yolo_bbox_tensor[3])
+
+    assert x_centre == TYPE_FLOAT(3)
+    assert y_centre == TYPE_FLOAT(4)
+    assert w == TYPE_FLOAT(6)
+    assert h == TYPE_FLOAT(8)

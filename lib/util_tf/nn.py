@@ -35,6 +35,7 @@ from keras.callbacks import (
 )
 from keras.layers import (
     Layer,
+    Normalization,
     Conv2D,
     MaxPooling2D,
     BatchNormalization,
@@ -66,7 +67,7 @@ _logger: logging.Logger = get_logger(__name__)
 # --------------------------------------------------------------------------------
 # Constant
 # --------------------------------------------------------------------------------
-LAYER_NAME_NORM = "Norm"
+LAYER_NAME_NORM = "Normalization"
 LAYER_NAME_CONV2D: str = "Conv2D"
 LAYER_NAME_ACTIVATION: str = "Activation"
 LAYER_NAME_MAXPOOL2D: str = "MaxPool2D"
@@ -234,6 +235,11 @@ def build_layers(config: Dict[str, dict]) -> List[Layer]:
 
     [Example]
     example_config_of_layers = {
+        "norm": {
+            "kind": LAYER_NAME_NORM,
+            "input_shape": input_shape,
+            "axis": -1
+        },
         "conv01": {  # Name of the layer. "conv01" is set to name arg of the Layer
             "kind": LAYER_NAME_CONV2D,
             "kernel_size":(3,3),
@@ -294,9 +300,27 @@ def build_layers(config: Dict[str, dict]) -> List[Layer]:
         _logger.debug("%s: creating layer[%s] with %s", _name, index, value)
 
         # --------------------------------------------------------------------------------
+        # Normalization
+        # --------------------------------------------------------------------------------
+        if kind == LAYER_NAME_NORM:
+            # [Assumption]:
+            # Normalization is used as the first layer.
+            # The layer is extracted from the model to call its adapt() method, which
+            # will require input_shape to adapt to the input datga.
+            assert "input_shape" in value, \
+                "input_shape parameter is required for Normalization layer."
+
+            norm: Layer = Normalization(
+                name=name,
+                input_shape=value.get("input_shape", None),
+                axis=value.get("axis", -1)
+            )
+            layers.append(norm)
+
+        # --------------------------------------------------------------------------------
         # Custom Convolution Block
         # --------------------------------------------------------------------------------
-        if kind == CUSTOM_LAYER_NAME_CONV2DBLOCK:
+        elif kind == CUSTOM_LAYER_NAME_CONV2DBLOCK:
             conv: Layer = Conv2DBlock(
                 name=name,
                 filters=value.get("filters", 32),
