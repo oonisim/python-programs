@@ -9,7 +9,6 @@ Currently only supports layers in Darknet19 config.
 For YOLO v1, see Darknet loader.py
 
 """
-
 import argparse
 import configparser
 import io

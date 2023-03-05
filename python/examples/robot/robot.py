@@ -62,7 +62,7 @@ LEFT/RIGHT is a rotation of the current Move. New Move is set as rotation.dot(Mo
 # --------------------------------------------------------------------------------
 # Global constants to be set in initialize().
 # --------------------------------------------------------------------------------
-(N, M) = -1, -1           # Board geometry. N is horizontal/x, M is vertical/y
+(N, M) = -1, -1           # Board util_tf.geometry. N is horizontal/x, M is vertical/y
 BASE = None               # Base coordinate (0, 0)
 TIP = None                # Top right coordinate (n-1, m-1)
 

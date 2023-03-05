@@ -189,10 +189,10 @@ from constant import (
     ONE,        # 1.0 of type TYPE_FLOAT
     EPSILON,
     YOLO_GRID_SIZE,
-    YOLO_PREDICTION_NUM_CLASSES,
-    YOLO_PREDICTION_NUM_BBOX,
-    YOLO_PREDICTION_NUM_PRED,
-    YOLO_LABEL_INDEX_CP,
+    YOLO_V1_PREDICTION_NUM_CLASSES,
+    YOLO_V1_PREDICTION_NUM_BBOX,
+    YOLO_V1_PREDICTION_NUM_PRED,
+    YOLO_V1_LABEL_INDEX_CP,
 )
 from util_logging import (
     get_logger,
@@ -226,9 +226,9 @@ class YOLOLoss(Loss):
     def __init__(
             self,
             S: int = YOLO_GRID_SIZE,                # pylint: disable=invalid-name
-            B: int = YOLO_PREDICTION_NUM_BBOX,      # pylint: disable=invalid-name
-            C: int = YOLO_PREDICTION_NUM_CLASSES,   # pylint: disable=invalid-name
-            P: int = YOLO_PREDICTION_NUM_PRED,      # pylint: disable=invalid-name
+            B: int = YOLO_V1_PREDICTION_NUM_BBOX,      # pylint: disable=invalid-name
+            C: int = YOLO_V1_PREDICTION_NUM_CLASSES,   # pylint: disable=invalid-name
+            P: int = YOLO_V1_PREDICTION_NUM_PRED,      # pylint: disable=invalid-name
             **kwargs
     ):
         """
@@ -425,7 +425,7 @@ class YOLOLoss(Loss):
         # Reshape y_pred into N consecutive predictions in shape (N, (C+B*P)).
         # Reshape y_true into N consecutive labels in shape (N, (C+P)).
         # All we need are the predictions and label at each cell, hence no need to retain
-        # (S x S) geometry of the grids.
+        # (S x S) util_tf.geometry of the grids.
         # --------------------------------------------------------------------------------
         # pylint: disable=invalid-name
         Y: tf.Tensor = tf.reshape(tensor=y_pred, shape=(-1, self.C + self.B * self.P))
@@ -439,7 +439,7 @@ class YOLOLoss(Loss):
             "%s: batch size:[%s] total cells:[%s]", _name, self.batch_size, self.N
         )
 
-        self.Iobj_i = T[..., YOLO_LABEL_INDEX_CP:YOLO_LABEL_INDEX_CP+1]
+        self.Iobj_i = T[..., YOLO_V1_LABEL_INDEX_CP:YOLO_V1_LABEL_INDEX_CP+1]
         self.Inoobj_i = ONE - self.Iobj_i
         assert self.Iobj_i.shape == (self.N, 1), \
             f"expected shape {(self.N, 1)} got {self.Iobj_i.shape}."
@@ -517,7 +517,7 @@ class YOLOLoss(Loss):
         # --------------------------------------------------------------------------------
         # Bbox prediction (cp, x, y, w, h) from the responsible bounding box j per cell.
         # This corresponds to Iobj_j as picking up the best box j at each cell.
-        # if best box j == 0, then YOLO_PREDICTION_INDEX_X1:YOLO_PREDICTION_INDEX_H1+1 as
+        # if best box j == 0, then YOLO_V1_PREDICTION_INDEX_X1:YOLO_V1_PREDICTION_INDEX_H1+1 as
         # the (x, y, w, h) for the predicted localization. If j == 1, the other.
         #
         # [YOLO v1 paper]
@@ -663,9 +663,9 @@ def main():
     loss: Loss = YOLOLoss()
 
     S: int = YOLO_GRID_SIZE                  # pylint: disable=invalid-name
-    C: int = YOLO_PREDICTION_NUM_CLASSES     # pylint: disable=invalid-name
-    B: int = YOLO_PREDICTION_NUM_BBOX        # pylint: disable=invalid-name
-    P: int = YOLO_PREDICTION_NUM_PRED        # pylint: disable=invalid-name
+    C: int = YOLO_V1_PREDICTION_NUM_CLASSES     # pylint: disable=invalid-name
+    B: int = YOLO_V1_PREDICTION_NUM_BBOX        # pylint: disable=invalid-name
+    P: int = YOLO_V1_PREDICTION_NUM_PRED        # pylint: disable=invalid-name
     y_pred: tf.Tensor = tf.constant(np.ones(shape=(1, S, S, C+B*P)), dtype=TYPE_FLOAT)
     y_true: tf.Tensor = tf.constant(np.zeros(shape=(1, S, S, C+P)), dtype=TYPE_FLOAT)
     loss: tf.Tensor = loss(y_pred=y_pred, y_true=y_true)

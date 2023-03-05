@@ -30,10 +30,10 @@ from constant import (
     YOLO_V1_IMAGE_HEIGHT,
     YOLO_V1_IMAGE_CHANNELS,
     YOLO_GRID_SIZE,
-    YOLO_PREDICTION_NUM_CLASSES,
-    YOLO_PREDICTION_NUM_BBOX,
-    YOLO_PREDICTION_NUM_PRED,
-    YOLO_LEAKY_RELU_SLOPE,
+    YOLO_V1_PREDICTION_NUM_CLASSES,
+    YOLO_V1_PREDICTION_NUM_BBOX,
+    YOLO_V1_PREDICTION_NUM_PRED,
+    YOLO_V1_LEAKY_RELU_SLOPE,
     YOLO_V1_MOMENTUM,
     YOLO_V1_DECAY,
     YOLO_V1_LR,
@@ -84,9 +84,9 @@ _logger: logging.Logger = get_logger(__name__, level=DEBUG_LEVEL)
 # with rate = .5 after the first connected layer prevents co-adaptation between layers.
 # --------------------------------------------------------------------------------
 S: int = YOLO_GRID_SIZE                 # pylint: disable=invalid-name
-B: int = YOLO_PREDICTION_NUM_BBOX       # pylint: disable=invalid-name
-C: int = YOLO_PREDICTION_NUM_CLASSES    # pylint: disable=invalid-name
-P: int = YOLO_PREDICTION_NUM_PRED       # pylint: disable=invalid-name
+B: int = YOLO_V1_PREDICTION_NUM_BBOX       # pylint: disable=invalid-name
+C: int = YOLO_V1_PREDICTION_NUM_CLASSES    # pylint: disable=invalid-name
+P: int = YOLO_V1_PREDICTION_NUM_PRED       # pylint: disable=invalid-name
 
 input_shape: Tuple[int, int, int] = (
     YOLO_V1_IMAGE_WIDTH, YOLO_V1_IMAGE_HEIGHT, YOLO_V1_IMAGE_CHANNELS
@@ -102,7 +102,7 @@ layers_config = {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (7, 7), "filters": 64, "strides": (2, 2), "padding": "same"
     },
     "act01": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     "maxpool01": {
         "kind": LAYER_NAME_MAXPOOL2D, "pool_size": (2, 2), "strides": (2, 2), "padding": "valid"
@@ -114,7 +114,7 @@ layers_config = {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 192, "strides": (1, 1), "padding": "same"
     },
     "act02": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     "maxpool02": {
         "kind": LAYER_NAME_MAXPOOL2D, "pool_size": (2, 2), "strides": (2, 2), "padding": "valid"
@@ -126,25 +126,25 @@ layers_config = {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters": 192, "strides": (1, 1), "padding": "same"
     },
     "act03_1": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     "conv03_2": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 256, "strides": (1, 1), "padding": "same"
     },
     "act03_2": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     "conv03_3": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters": 256, "strides": (1, 1), "padding": "same"
     },
     "act03_3": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     "conv03_4": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters":512, "strides": (1, 1), "padding": "same"
     },
     "act03_4": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     "maxpool03": {
         "kind": LAYER_NAME_MAXPOOL2D, "pool_size": (2, 2), "strides": (2, 2), "padding": "valid"
@@ -157,65 +157,65 @@ layers_config = {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters": 256, "strides": (1, 1), "padding": "same"
     },
     "act04_1_1": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     "conv04_1_2": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 512, "strides": (1, 1), "padding": "same"
     },
     "act04_1_2": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     # Repeat 2
     "conv04_2_1": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters": 256, "strides": (1, 1), "padding": "same"
     },
     "act04_2_1": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     "conv04_2_2": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters":512, "strides": (1, 1), "padding": "same"
     },
     "act04_2_2": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     # Repeat 3
     "conv04_3_1": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters": 256, "strides": (1, 1), "padding": "same"
     },
     "act04_3_1": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     "conv04_3_2": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters":512, "strides": (1, 1), "padding": "same"
     },
     "act04_3_2": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     # Repeat 4
     "conv04_4_1": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters": 256, "strides": (1, 1), "padding": "same"
     },
     "act04_4_1": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     "conv04_4_2": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 512, "strides": (1, 1), "padding": "same"
     },
     "act04_4_2": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     # rest
     "conv04_5": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters": 512, "strides": (1, 1), "padding": "same"
     },
     "act04_5": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     "conv04_6": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 1024, "strides": (1, 1), "padding": "same"
     },
     "act04_6": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     "maxpool04": {
         "kind": LAYER_NAME_MAXPOOL2D, "pool_size": (2, 2), "strides": (2, 2), "padding": "valid"
@@ -228,39 +228,39 @@ layers_config = {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters":512, "strides": (1, 1), "padding": "same"
     },
     "act05_1_1": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     "conv05_1_2": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters":1025, "strides": (1, 1), "padding": "same"
     },
     "act05_1_2": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     # Repeat 2
     "conv05_2_1": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters":512, "strides": (1, 1), "padding": "same"
     },
     "act05_2_1": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     "conv05_2_2": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters":1024, "strides": (1, 1), "padding": "same"
     },
     "act05_2_2": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     # rest
     "conv05_3": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters":1024, "strides": (1, 1), "padding": "same"
     },
     "act05_3": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     "conv05_4": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters":1024, "strides": (2, 2), "padding": "same"
     },
     "act05_4": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     # --------------------------------------------------------------------------------
     # 6th
@@ -269,13 +269,13 @@ layers_config = {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters":1024, "strides": (1, 1), "padding": "same"
     },
     "act06_1": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     "conv06_2": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters":1024, "strides": (1, 1), "padding": "same"
     },
     "act06_2": {
-        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_LEAKY_RELU_SLOPE
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     # --------------------------------------------------------------------------------
     # Fully Connected
