@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+DIR=$(realpath .)
+cd $DIR
+
 # --------------------------------------------------------------------------------
 # [Objective]
 # Setup Python virtual environment for Mac Apple Silicon
@@ -36,6 +39,12 @@ pip install --no-cache-dir \
   numpy \
   tensorflow-transform
 
+pip install -r requirements.txt
+
+# --------------------------------------------------------------------------------
+# as a note
+# --------------------------------------------------------------------------------
+exit 0
 pip install --no-cache-dir \
   tensorflow-macos \
   tensorflow-metal \
