@@ -53,11 +53,14 @@ def validate_image(image: np.ndarray) -> np.ndarray:
     assert isinstance(image, np.ndarray), f"invalid image data type [{type(image)}]"
     name: str = "validate_image()"
 
-    if image.ndim == 3:
-        return image
-    else:
+    if image.ndim != 3:
         _logger.error("%s: unexpected image shape [%s]", name, image.ndim)
         raise ValueError("image has no depth")
+
+    if np.issubdtype(image.dtype, np.floating):
+        raise ValueError("image has float type. Use unsigned int as pixel value")
+
+    return image
 
 
 def can_handle_image(path: str) -> bool:
@@ -85,6 +88,9 @@ def get_image(path: str, flags: Union[int, None] = None) -> np.ndarray:
         _logger.error("%s: OpenCV has no image reader for the image [%s].", name, path)
         raise ValueError(f"OpenCV has no image reader for the image [{path}].")
     return img
+
+
+read_image: Callable = get_image
 
 
 def convert_grey_to_rgb(image: np.ndarray) -> np.ndarray:
@@ -126,7 +132,12 @@ def convert_rgb_to_bgr(image: np.ndarray):
     return cv.cvtColor(image, cv.COLOR_RGB2BGR)
 
 
-def save_image(path: str, image: np.ndarray, flags: Union[int, None] = None):
+def save_image(
+        path: str,
+        image: np.ndarray,
+        bgr_to_rgb: bool = False,
+        flags: Union[int, None] = None
+):
     """Save the memory image in BGR to the path as RGB.
     OpenCV imwrite converts BGR in memory (as bBGR is the default OpenCV colour format in memory)
     into RGB in the file.
@@ -134,8 +145,9 @@ def save_image(path: str, image: np.ndarray, flags: Union[int, None] = None):
     The image on input (e.g. PNG) is in RGB order but the image in memory is in BGR order.
     imread() will internally convert from rgb to bgr and imwrite() will do the opposite.
     """
-    # cv.imwrite(filename=path, img=cv.cvtColor(image, cv.COLOR_BGR2RGB))
-    cv.imwrite(filename=path, img=image)
+    cv.imwrite(
+        filename=path, img=cv.cvtColor(image, cv.COLOR_BGR2RGB) if bgr_to_rgb else image
+    )
 
 
 def get_dimensions(image: np.ndarray) -> Tuple[int, int, Union[int, None]]:
@@ -159,13 +171,27 @@ def get_dimensions(image: np.ndarray) -> Tuple[int, int, Union[int, None]]:
 get_image_dimensions: Callable = get_dimensions
 
 
-def show_image(image: np.ndarray, name: str = "", fontsize: int = None, show_axes=False) -> None:
+def show_image(
+        image: np.ndarray,
+        name: str = "",
+        fontsize: int = None,
+        show_axes=False,
+        bgr_to_rgb: bool = True
+) -> None:
     """Show image using matplotlib
     Convert to RGB for pyplot as OpenCV reads images with BGR format.
     See https://stackoverflow.com/a/70019644/4281353
+
+    Args:
+        image: image data
+        name: title name
+        fontsize: title font size
+        show_axes: switch to show axes
+        bgr_to_rgb: switch to run BGR to RGB conversion
     """
     validate_image(image)
-    image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
+    if bgr_to_rgb:
+        image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
     plt.title(name, fontsize=fontsize)
     if not show_axes:
         plt.axis('off')
