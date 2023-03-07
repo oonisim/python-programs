@@ -107,7 +107,6 @@ def test_generate_yolo_v1_data_from_pascal_voc():
     # be multiple objects identified in an image.
     # --------------------------------------------------------------------------------
     for voc_record in voc_record_generator:
-        print(voc_record['objects'])
         # --------------------------------------------------------------------------------
         # PASCAL VOC Labels. Note that the label value is from 1 to 20.
         # --------------------------------------------------------------------------------
