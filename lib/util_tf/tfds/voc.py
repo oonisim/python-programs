@@ -1,4 +1,5 @@
-"""TensorFlow Datasets utility module
+"""TensorFlow Datasets Pascal VOC utility module
+https://www.tensorflow.org/datasets/catalog/voc
 """
 from typing import (
     Tuple,
@@ -36,11 +37,38 @@ from util_tf.geometry.euclidean import (
 
 
 # --------------------------------------------------------------------------------
+# Constant
+# --------------------------------------------------------------------------------
+PASCAL_VOC_CLASSES: List[str] = [
+    "aeroplane",
+    "bicycle",
+    "bird",
+    "boat",
+    "bottle",
+    "bus",
+    "car",
+    "cat",
+    "chair",
+    "cow",
+    "dog",
+    "horse",
+    "motorbike",
+    "person",
+    "sheep",
+    "sofa",
+    "diningtable",
+    "pottedplant",
+    "train",
+    "tvmonitor"
+]
+
+
+# --------------------------------------------------------------------------------
 # Utility
 # --------------------------------------------------------------------------------
-def convert_pascal_voc_bndbox_to_yolo_bbox(
+def _convert_pascal_voc_bndbox_to_yolo_bbox(
         bndbox: tf.Tensor
-) -> tf.data.Dataset:
+) -> tf.Tensor:
     """
     Convert TFDS PASCAL VOC XML bndbox annotation to YOLO Darknet Bounding box annotation
     (x,y,w,h) where (x,y) is the center of bbox and (w,h) is relative to image size.
@@ -87,7 +115,7 @@ def convert_pascal_voc_bndbox_to_yolo_bbox(
     Args:
         bndbox: coordinate of box as (ymin, xmin, ymax, xmax)
     Returns:
-        YOLO Darknet bbox annotation (x,y,w,h) as Dataset
+        YOLO Darknet bbox annotation (x,y,w,h) as Tensor
     """
     bndbox = tf.reshape(tensor=bndbox, shape=(-1, 4))
     xmin: tf.Tensor = bndbox[..., 1]
@@ -97,7 +125,15 @@ def convert_pascal_voc_bndbox_to_yolo_bbox(
     box: tf.Tensor = convert_box_corner_coordinates_to_centre_w_h(
         ymin=ymin, xmin=xmin, ymax=ymax, xmax=xmax
     )
-    return tf.data.Dataset.from_tensors(box)
+    return box
+
+
+def convert_pascal_voc_bndbox_to_yolo_bbox(
+        bndbox: tf.Tensor
+) -> tf.data.Dataset:
+    return tf.data.Dataset.from_tensors(
+        _convert_pascal_voc_bndbox_to_yolo_bbox(bndbox=bndbox)
+    )
 
 
 def generate_yolo_v1_class_predictions(labels: tf.Tensor, dtype=tf.dtypes.float32):
@@ -192,13 +228,13 @@ def _generate_yolo_v1_label_from_pascal_voc(dataset) -> tf.Tensor:
     # The shape can be () or (n) based on the objects identified in the image.
     # --------------------------------------------------------------------------------
     indices = tf.reshape(
-        tensor=dataset['objects']['label'],
+        tensor=dataset['objects']['label'] - 1,     # VOC label is from 1...20
         shape=(-1, 1)
     )
     tf.debugging.assert_equal(
         x=num_objects,
         y=tf.shape(indices)[0],
-        message="expected same numbef of objects."
+        message="expected bbox and labels have the same number of objects."
     )
     # tf.print("index shape", tf.shape(index), index)
 
@@ -291,3 +327,5 @@ def test_convert_pascal_voc_bndbox_to_yolo_bbox():
         x=h,
         y=tf.ones_like(input=w) * tf.constant(8.0), message="expected 8"
     )
+
+

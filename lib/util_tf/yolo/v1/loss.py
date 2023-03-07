@@ -180,11 +180,13 @@ from keras.losses import (
     # MeanSquaredError,
 )
 
+from util_constant import (
+    TYPE_FLOAT,
+    TYPE_INT,
+)
 from constant import (
     DEBUG_LEVEL,
     DUMP,
-    TYPE_FLOAT,
-    TYPE_INT,
     ZERO,       # 0.0 of type TYPE_FLOAT
     ONE,        # 1.0 of type TYPE_FLOAT
     EPSILON,
