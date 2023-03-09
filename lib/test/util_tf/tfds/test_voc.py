@@ -37,6 +37,15 @@ from util_tf.tfds.voc import (
 )
 
 
+# --------------------------------------------------------------------------------
+# Constants
+# --------------------------------------------------------------------------------
+PASCAL_VOC_SAMPLE_DATASET_DIR: str = "./pascal_voc_samples"
+
+
+# --------------------------------------------------------------------------------
+# Test
+# --------------------------------------------------------------------------------
 def test_convert_pascal_voc_bndbox_to_yolo_bbox():
     xmin: TYPE_FLOAT = tf.constant(0, dtype=TYPE_FLOAT)
     xmax: TYPE_FLOAT = tf.constant(6, dtype=TYPE_FLOAT)
@@ -89,9 +98,11 @@ def test_generate_yolo_v1_data_from_pascal_voc():
     """
     # --------------------------------------------------------------------------------
     # Test Pascal VOC dataset saved in the disk
+    # Dataset from TFDS PASCAL VOC have been saved to PASCAL_VOC_SAMPLE_DATASET_DIR
+    # using tf.data.Dataset.save() method.
     # --------------------------------------------------------------------------------
     voc_dataset: tf.data.Dataset = \
-        tf.data.Dataset.load(path="./pascal_voc_sample", compression="GZIP")
+        tf.data.Dataset.load(path=PASCAL_VOC_SAMPLE_DATASET_DIR, compression="GZIP")
     voc_record_generator = voc_dataset.as_numpy_iterator()
 
     # --------------------------------------------------------------------------------
