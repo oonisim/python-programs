@@ -1,6 +1,9 @@
 """TensorFlow Datasets Pascal VOC utility module
 https://www.tensorflow.org/datasets/catalog/voc
 """
+import sys
+sys.path.append("/Users/oonisim/home/repository/git/oonisim/python-programs/lib")
+
 from typing import (
     Tuple,
     List,
@@ -43,26 +46,26 @@ from util_tf.geometry.euclidean import (
 # Constant
 # --------------------------------------------------------------------------------
 PASCAL_VOC_CLASSES: List[str] = [
-    "aeroplane",
-    "bicycle",
-    "bird",
-    "boat",
-    "bottle",
-    "bus",
-    "car",
-    "cat",
-    "chair",
-    "cow",
-    "dog",
-    "horse",
-    "motorbike",
-    "person",
-    "sheep",
-    "sofa",
-    "diningtable",
-    "pottedplant",
-    "train",
-    "tvmonitor"
+    "aeroplane",        # 0
+    "bicycle",          # 1
+    "bird",             # 2
+    "boat",             # 3
+    "bottle",           # 4
+    "bus",              # 5
+    "car",              # 6
+    "cat",              # 7
+    "chair",            # 8
+    "cow",              # 9
+    "diningtable",      # 10
+    "dog",              # 11
+    "horse",            # 12
+    "motorbike",        # 13
+    "person",           # 14
+    "pottedplant",      # 15
+    "sheep",            # 16
+    "sofa",             # 17
+    "train",            # 18
+    "tvmonitor"         # 19
 ]
 S = YOLO_GRID_SIZE
 C = YOLO_V1_PREDICTION_NUM_CLASSES
@@ -142,7 +145,7 @@ def convert_pascal_voc_bndbox_to_yolo_bbox(
     )
 
 
-def generate_yolo_v1_class_predictions(labels: tf.Tensor, dtype=tf.dtypes.float32):
+def generate_yolo_v1_class_predictions(labels: tf.Tensor):
     """
     Generate class prediction C in the YOLO v1 label of format (C,P) where C is 20 classes.
     It is one hot encoding to identify the object class id.
@@ -157,7 +160,7 @@ def generate_yolo_v1_class_predictions(labels: tf.Tensor, dtype=tf.dtypes.float3
     """
     # --------------------------------------------------------------------------------
     # Sparce label index of int64 (as in voc) to the class of truth (0, ..., 19).
-    # The shape can be () or (n) based on the objects identified in the image.
+    # The shape should be (n, 1) as there can be multiple objects identified in image.
     # --------------------------------------------------------------------------------
     labels: tf.Tensor = tf.reshape(
         tensor=labels,
@@ -176,7 +179,8 @@ def generate_yolo_v1_class_predictions(labels: tf.Tensor, dtype=tf.dtypes.float3
     # Hence, the column j=labels[i] at the row is set to 1.
     # --------------------------------------------------------------------------------
     # (row=i, col=labels[i]) positions set to 1.0
-    positions: tf.Tensor = tf.stack(
+    # DO NOT use tf.stack here which generate (n, 1, 2) instead of (n, 2)
+    positions: tf.Tensor = tf.concat(
         values=[
             tf.reshape(tf.range(num_objects, dtype=labels.dtype), (-1, 1)),  # row i
             labels                                                           # column j=labels[i]
@@ -184,110 +188,55 @@ def generate_yolo_v1_class_predictions(labels: tf.Tensor, dtype=tf.dtypes.float3
         axis=-1
     )
     classes = tf.tensor_scatter_nd_update(
-        tensor=tf.zeros(shape=(num_objects, C), dtype=dtype),
+        tensor=tf.zeros(shape=(num_objects, C), dtype=TYPE_FLOAT),
         indices=positions,
-        updates=tf.ones(shape=(num_objects, 1))
+        updates=tf.ones(shape=(num_objects,))
     )
     return classes
 
 
-def _incorrect_generate_yolo_v1_label_from_pascal_voc(dataset) -> tf.Tensor:
-    """
-    Generate YOLO v1 label in format (C,P) where C is 20 classes and P is (cp,x,y,w,h)
-    where (x,y) is the centre coordinate of a bounding box that locates an object and
-    (w,h) is the (width,height) of the box. cp is confidence which is 1.0 for label.
-
-    Args:
-        dataset: VOC dataset (either train, validation, or test)
-    Returns: tf.Tensor of shape (25,) that holds (C,P)
-    """
-    # --------------------------------------------------------------------------------
-    # (x,y,w,h) in YOLO v1 label
-    # From Pascal VOC bounding box to YOLO v1 bounding box
-    # bndbox shape can be (4,) or (n, 4) based on the objects identified in the image.
-    # --------------------------------------------------------------------------------
-    bndbox = tf.reshape(tensor=dataset['objects']['bbox'], shape=(-1, 4))
-    num_objects = tf.shape(bndbox)[0]
-    # tf.print("number of objects in the image: ", num_objects)
-
-    box: tf.Tensor = convert_box_corner_coordinates_to_centre_w_h(
-        ymin=bndbox[..., 0],
-        xmin=bndbox[..., 1],
-        ymax=bndbox[..., 2],
-        xmax=bndbox[..., 3]
-    )
-    x = box[..., 0:1]
-    dtype = x.dtype
-    # tf.print("box shape", tf.shape(box), box)
-
-    # --------------------------------------------------------------------------------
-    # Confidence score cp that has the same shape and type of x=box[..., 0:1].
-    # cp of the ground truth bounding box is always 1.0
-    # --------------------------------------------------------------------------------
-    cp: tf.Tensor = tf.ones_like(
-        input=x,
-        dtype=dtype
-    )
-
-    # --------------------------------------------------------------------------------
-    # Sparce label index of int64 (as in voc) to the class of truth (0, ..., 19).
-    # The shape can be () or (n) based on the objects identified in the image.
-    # --------------------------------------------------------------------------------
-    indices = tf.reshape(
-        tensor=dataset['objects']['label'] - 1,     # VOC label is from 1...20
-        shape=(-1, 1)
-    )
-    tf.debugging.assert_equal(
-        x=num_objects,
-        y=tf.shape(indices)[0],
-        message="expected bbox and labels have the same number of objects."
-    )
-    # tf.print("index shape", tf.shape(index), index)
-
-    # --------------------------------------------------------------------------------
-    # C=20 class predictions in YOLO v1 label
-    # --------------------------------------------------------------------------------
-    classes = generate_yolo_v1_class_predictions(labels=indices, dtype=dtype)
-
-    # --------------------------------------------------------------------------------
-    # YOLO v1 label
-    # --------------------------------------------------------------------------------
-    label = tf.concat([classes, cp, box], axis=-1)
-    return label
-
-
-def _generate_yolo_v1_labels_from_pascal_voc(
-    bbox: tf.Tensor,
-    label: tf.Tensor
-) -> tf.Tensor:
+def generate_yolo_v1_labels_from_pascal_voc(record: Dict) -> tf.Tensor:
     """
     Generate YOLO v1 labels in shape (S,S,(C+P)) per image where C is 20 classes and
     P is (cp,x,y,w,h) where (x,y) is the centre coordinate of a bounding box that
     locates an object and (w,h) is the (width,height) of the box.
     cp is confidence which is 1.0 for label.
 
+    Note:
+        Run as tf.py_function which only take a list as 'imp' argument and cannot
+        take dictionary.
+
+        PASCAL VOC image shape is not that of YOLO v1 which is (448,448,3). Hence,
+        need to resize. However, no need to change (x,y) in bounding boxes as they
+        are normalized by the image size so that they are between 0. and 1.
+
     Args:
-        bbox: bounding boxes
+        bndbox: bounding boxes
         label: index to the class
     Returns: tf.Tensor of shape (S,S,C+P)
     """
+    bndbox: tf.Tensor = record['objects']['bbox']
+    label: tf.Tensor = record['objects']['label']
+    tf.debugging.assert_non_negative(
+        x=YOLO_V1_PREDICTION_NUM_CLASSES-label, message="label < 20"
+    )
+
     # --------------------------------------------------------------------------------
-    # (x,y,w,h) in YOLO v1 label
-    # From Pascal VOC bounding box to YOLO v1 bounding box
-    # bndbox shape can be (4,) or (n, 4) based on the objects identified in the image.
+    # PASCAL VOC bndbox shape should be (n, 4) as multiple objects can exist in an image
     # --------------------------------------------------------------------------------
-    bndbox = tf.reshape(tensor=bbox, shape=(-1, 4))
+    bndbox = tf.reshape(tensor=bndbox, shape=(-1, 4))
     num_objects = tf.shape(bndbox)[0]
     # tf.print("number of objects in the image: ", num_objects)
 
+    # --------------------------------------------------------------------------------
+    # From Pascal VOC bounding box to YOLO v1 bounding box (x,y,w,h)
+    # --------------------------------------------------------------------------------
     box: tf.Tensor = convert_box_corner_coordinates_to_centre_w_h(
         ymin=bndbox[..., 0],
         xmin=bndbox[..., 1],
         ymax=bndbox[..., 2],
         xmax=bndbox[..., 3]
     )
-    x = box[..., 0:1]
-    dtype = x.dtype
     # tf.print("box shape", tf.shape(box), box)
 
     # --------------------------------------------------------------------------------
@@ -295,18 +244,19 @@ def _generate_yolo_v1_labels_from_pascal_voc(
     # cp of the ground truth bounding box is always 1.0
     # --------------------------------------------------------------------------------
     cp: tf.Tensor = tf.ones_like(
-        input=x,
-        dtype=TYPE_FLOAT
+        input=box[..., 0:1],
+        dtype=box.dtype
     )
 
     # --------------------------------------------------------------------------------
-    # Sparce label index of int64 (as in voc) to the class of truth (0, ..., 19).
-    # The shape can be () or (n) based on the objects identified in the image.
+    # Sparce label index to the class of truth (0, ..., 19). int64 as in voc.
+    # The shape should (n,1) as there can be multiple objects identified.
     # --------------------------------------------------------------------------------
     indices = tf.reshape(
-        tensor=(label - 1),     # VOC label is from 1...20
+        tensor=label,
         shape=(-1, 1)
     )
+
     tf.debugging.assert_equal(
         x=num_objects,
         y=tf.shape(indices)[0],
@@ -317,7 +267,7 @@ def _generate_yolo_v1_labels_from_pascal_voc(
     # --------------------------------------------------------------------------------
     # C=20 class predictions in YOLO v1 label
     # --------------------------------------------------------------------------------
-    classes = generate_yolo_v1_class_predictions(labels=indices, dtype=dtype)
+    classes = generate_yolo_v1_class_predictions(labels=indices)
 
     # --------------------------------------------------------------------------------
     # YOLO v1 labels for all the identified bounding boxes
@@ -325,111 +275,81 @@ def _generate_yolo_v1_labels_from_pascal_voc(
     labels = tf.concat([classes, cp, box], axis=-1)
 
     # --------------------------------------------------------------------------------
-    # YOLO v1 labels for an image with S x S grid cells.
+    # YOLO v1 labels for an image of S x S grid where each cell in the  has a label.
+    # NOTE:
+    #   The centres of multiple bounding boxes can fall into single cell. Then, which
+    #   bounding box take precedence is non-deterministic.
+    #
+    #   See https://www.tensorflow.org/api_docs/python/tf/tensor_scatter_nd_update.
+    # > The order in which updates are applied is nondeterministic, so the output
+    # > will be nondeterministic if indices contains duplicates.
     # --------------------------------------------------------------------------------
-    result = tf.zeros(shape=(S, S, C+P), dtype=dtype)
+    grid = tf.zeros(shape=(S, S, C+P), dtype=TYPE_FLOAT)
 
-    def fn(xy):
-        grid_row = tf.cast(tf.math.floor(S * xy[1]), dtype=tf.int32)   # y
-        grid_col = tf.cast(tf.math.floor(S * xy[0]), dtype=tf.int32)   # x
+    # Coordinate (row, col) of the grid that includes the centre of a bounding box (x,y).
+    # row = (0,...,S-1), col = (0,...,S-1)
+    def fn_xy_to_grid_coordinate(x_y):
+        grid_row = tf.cast(tf.math.floor(S * x_y[1]), dtype=tf.int32)   # y
+        grid_col = tf.cast(tf.math.floor(S * x_y[0]), dtype=tf.int32)   # x
+        assert_non_negative(x=grid_row, message="grid_row >= 0")
+        assert_non_negative(x=grid_col, message="grid_col >= 0")
+
         return tf.stack([grid_row, grid_col], axis=-1)
 
-    update_indices = tf.map_fn(
-        fn=fn,
-        elems=tf.stack([box[..., 0], box[..., 1]], axis=-1),
+    xy: tf.Tensor = tf.stack([box[..., 0], box[..., 1]], axis=-1)
+    coordinates = tf.map_fn(
+        fn=fn_xy_to_grid_coordinate,
+        elems=xy,                               # shape:(n,2)
         fn_output_signature=tf.TensorSpec(
-            shape=(2,),
+            shape=(2,),                         # Output shape of fn
             dtype=tf.dtypes.int32,
             name=None
         )
     )
+    # Update cells in the S x S grid that have the centre of the bounding boxes.
     return tf.tensor_scatter_nd_update(
-        tensor=result,
-        indices=update_indices,
+        tensor=grid,
+        indices=coordinates,
         updates=labels
     )
 
 
-def generate_yolo_v1_label_from_pascal_voc(dataset) -> tf.data.Dataset:
-    # label = _generate_yolo_v1_labels_from_pascal_voc(dataset=dataset)
-    label = _generate_yolo_v1_labels_from_pascal_voc(
-        bbox=dataset['objects']['bbox'],
-        label=dataset['objects']['label']
-    )
-    return tf.data.Dataset.from_tensors(label)
-
-
-def _incorrect_generate_yolo_v1_data_from_pascal_voc(dataset) -> tf.Tensor:
-    """Generate dataset of (image, label) for YOLO v1 training or validation.
-    TFDS Pascal VOC has the structure where there can be multiple objects identified
-    in single image. To have one-to-one relation between image and label, repeats
-    the image n times where n is the number of identified objects (labels).
+def generate_yolo_v1_data_from_pascal_voc(record: Dict) -> Tuple[tf.Tensor, tf.Tensor]:
+    """
+    Generate (image, labels) for YOLO v1 where label has (S,S,C+P) shape to tell the
+    binding box and class for each grid, hence there are S*S labels.
 
     Args:
-        dataset: VOC dataset (either train, validation, or test)
-    Returns: Tensor of tuple(image, label)
+        record: Single row/record from the PASCAL VOC Dataset
+    Returns: Tensor of tuple(image, labels)
     """
-    labels = _incorrect_generate_yolo_v1_label_from_pascal_voc(dataset=dataset)
-    num_objects = tf.shape(labels)[0]
-    # tf.print("labels shape ", tf.shape(labels))
-    # tf.print("num_objects ", num_objects)
+    image: tf.Tensor = record['image']
+    bndbox: tf.Tensor = record['objects']['bbox']
+    label: tf.Tensor = record['objects']['label']
 
+    # --------------------------------------------------------------------------------
+    # Resize to YOLO v1 image
+    # --------------------------------------------------------------------------------
     resized = tf.image.resize(
-        images=dataset['image'],
+        images=image,
         size=(YOLO_V1_IMAGE_WIDTH, YOLO_V1_IMAGE_HEIGHT)
     )
-    images = tf.repeat(
-        input=(resized[tf.newaxis, ...]),
-        repeats=num_objects,
-        axis=0
-    )
-
-    # return images
-    return tf.nest.map_structure(
-        lambda left, right: (left, right), images, labels
-    )
-
-
-def _generate_yolo_v1_data_from_pascal_voc(dataset: Dict) -> tf.Tensor:
-    """Generate dataset of (image, label) for YOLO v1 training or validation.
-    TFDS Pascal VOC has the structure where there can be multiple objects identified
-    in single image. To have one-to-one relation between image and label, repeats
-    the image n times where n is the number of identified objects (labels).
-
-
-    Args:
-        dataset: VOC dataset (either train, validation, or test)
-    Returns: Tensor of tuple(image, label)
-    """
-    labels = tf.py_function(
-        # tf.py_function inp argument only support List. Cannot pass a dictionary.
-        # https://github.com/tensorflow/tensorflow/issues/27679
-        # > This is a limitation of py_function which only supports a list of Tensor
-        # inputs  and I don't need see a straightforward way to extend its implementation
-        # to support dictionaries. FWIW, you could deconstruct the dictionary structure
-        # ahead of invoking the py_function:
-        func=_generate_yolo_v1_labels_from_pascal_voc,
-        inp=[dataset['objects']['bbox'], dataset['objects']['label']],
-        Tout=TYPE_FLOAT
-    )
-    # num_objects = tf.shape(labels)[0]
-    # tf.print("labels shape ", tf.shape(labels))
-    # tf.print("num_objects ", num_objects)
-
-    resized = tf.image.resize(
-        images=dataset['image'],
-        size=(YOLO_V1_IMAGE_WIDTH, YOLO_V1_IMAGE_HEIGHT)
-    )
-    return labels
-    return tf.nest.map_structure(
-        lambda left, right: (left, right), resized, labels
-    )
-
-
-def generate_yolo_v1_data_from_pascal_voc(dataset: Dict) -> tf.data.Dataset:
-    """Dataset version of _generate_yolo_v1_data_from_pascal_voc for flat_map"""
-    data = _generate_yolo_v1_data_from_pascal_voc(dataset)
-    return tf.data.Dataset.from_tensor_slices(data)
+    labels = generate_yolo_v1_labels_from_pascal_voc(record)
+    # labels = tf.py_function(
+    #     # tf.py_function inp argument only support List. Cannot pass a dictionary.
+    #     # https://github.com/tensorflow/tensorflow/issues/27679
+    #     # > This is a limitation of py_function which only supports a list of Tensor
+    #     # inputs  and I don't need see a straightforward way to extend its implementation
+    #     # to support dictionaries. FWIW, you could deconstruct the dictionary structure
+    #     # ahead of invoking the py_function:
+    #     func=generate_yolo_v1_labels_from_pascal_voc,
+    #     inp=[
+    #         bndbox,
+    #         label
+    #     ],
+    #     Tout=TYPE_FLOAT
+    # )
+    return resized, labels
 
 
 # --------------------------------------------------------------------------------
@@ -469,3 +389,21 @@ def test_convert_pascal_voc_bndbox_to_yolo_bbox():
     )
 
 
+def main():
+    voc, info = tfds.load(
+        name='voc',
+        data_dir="/Volumes/SSD/data/tfds/",
+        with_info=True,
+    )
+    labels = voc['train'].take(21).map(
+        generate_yolo_v1_labels_from_pascal_voc,
+        num_parallel_calls=1,
+        deterministic=True
+    )
+    for index, label in enumerate(labels):
+        print(index, label.shape)
+        print('-' * 80)
+
+
+if __name__ == "__main__":
+    main()

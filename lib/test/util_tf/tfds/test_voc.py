@@ -1,9 +1,6 @@
 """
 TFDS voc test module
 """
-from typing import (
-    Union
-)
 import numpy as np
 import tensorflow as tf
 from tensorflow.debugging import (
@@ -119,7 +116,7 @@ def test_generate_yolo_v1_data_from_pascal_voc():
     # --------------------------------------------------------------------------------
     for voc_record in voc_record_generator:
         # --------------------------------------------------------------------------------
-        # PASCAL VOC Labels. Note that the label value is from 1 to 20.
+        # PASCAL VOC Labels. Note that the label value is from 0 to 19.
         # --------------------------------------------------------------------------------
         labels: np.ndarray = voc_record['objects']['label']
 
@@ -156,8 +153,7 @@ def test_generate_yolo_v1_data_from_pascal_voc():
             assert_equal(x=actual_cp, y=1.0, message="expected cp==1.0")
 
             # Test condition #4
-            # PASCAL VOC label = index to class (-1 as VOC label is from 1 to 20)
-            index_to_class: int = labels[position] - 1
+            index_to_class: int = labels[position]
             assert_equal(
                 x=actual_yolo_label[index_to_class],
                 y=1.0,
