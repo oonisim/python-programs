@@ -45,6 +45,7 @@ from util_tf.geometry.euclidean import (
 # --------------------------------------------------------------------------------
 # Constant
 # --------------------------------------------------------------------------------
+# Class labels of TFDS VOC Dataset. Other origins may use different.
 PASCAL_VOC_CLASSES: List[str] = [
     "aeroplane",        # 0
     "bicycle",          # 1
