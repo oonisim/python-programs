@@ -3,6 +3,8 @@ Pytest for YOLO loss function
 """
 import sys
 import logging
+sys.path.append("../../../../util_tf/yolo/v1")
+
 
 import numpy as np
 import torch
@@ -10,22 +12,19 @@ import torch.nn as nn
 import tensorflow as tf
 from tensorflow import keras  # pylint: disable=unused-import
 
-from constant import (
+from util_tf.yolo.v1.constant import (
     DEBUG_LEVEL,
     DUMP,
     TYPE_FLOAT,
     YOLO_GRID_SIZE,
-    YOLO_PREDICTION_NUM_CLASSES,
-    YOLO_PREDICTION_NUM_BBOX,
-    YOLO_PREDICTION_NUM_PRED,
-    YOLO_LABEL_INDEX_CP,
+    YOLO_V1_PREDICTION_NUM_CLASSES,
+    YOLO_V1_PREDICTION_NUM_BBOX,
+    YOLO_V1_PREDICTION_NUM_PRED,
+    YOLO_V1_LABEL_INDEX_CP,
 )
-from loss import (
+from util_tf.yolo.v1.loss import (
     YOLOLoss
 )
-
-# sys.path.append("../../../../../lib")
-# sys.path.append("../src")
 
 from util_logging import (
     get_logger
@@ -175,9 +174,9 @@ def test_compare_with_torch_rand():
 """
     N: int = 4  # Batch size pylint: disable=invalid-name
     S: int = YOLO_GRID_SIZE  # pylint: disable=invalid-name
-    B: int = YOLO_PREDICTION_NUM_BBOX  # pylint: disable=invalid-name
-    C: int = YOLO_PREDICTION_NUM_CLASSES  # pylint: disable=invalid-name
-    P: int = YOLO_PREDICTION_NUM_PRED  # pylint: disable=invalid-name
+    B: int = YOLO_V1_PREDICTION_NUM_BBOX  # pylint: disable=invalid-name
+    C: int = YOLO_V1_PREDICTION_NUM_CLASSES  # pylint: disable=invalid-name
+    P: int = YOLO_V1_PREDICTION_NUM_PRED  # pylint: disable=invalid-name
     MAX_ALLOWANCE: int = 25  # pylint: disable=invalid-name
 
     # --------------------------------------------------------------------------------
@@ -192,12 +191,12 @@ def test_compare_with_torch_rand():
     true: np.ndarray = np.random.random((N, S, S, C + P)).astype(TYPE_FLOAT)
     # Set 0 or 1 to the confidence score of the ground truth.
     # In ground truth, confidence=1 when there is an object in a cell, or 0.
-    true[..., YOLO_LABEL_INDEX_CP] = \
+    true[..., YOLO_V1_LABEL_INDEX_CP] = \
         np.random.randint(low=0, high=2, size=N * S * S).astype(TYPE_FLOAT).reshape((N, S, S))
     # Set only one class of the C classes to 1 because the object class in a cell is known
     # to be a specific class e.g. a dog.
     index_to_true_class = np.random.randint(low=0, high=C + 1, size=1)
-    true[..., :YOLO_LABEL_INDEX_CP] = TYPE_FLOAT(0)
+    true[..., :YOLO_V1_LABEL_INDEX_CP] = TYPE_FLOAT(0)
     true[..., index_to_true_class] = TYPE_FLOAT(1)
 
     # --------------------------------------------------------------------------------

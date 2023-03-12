@@ -19,8 +19,8 @@ from keras.layers import (
 from keras.optimizers import (
     SGD
 )
-from keras.losses import (
-    SparseCategoricalCrossentropy
+from keras.optimizers import (
+    Optimizer
 )
 
 from constant import (
@@ -36,7 +36,7 @@ from constant import (
     YOLO_V1_LEAKY_RELU_SLOPE,
     YOLO_V1_MOMENTUM,
     YOLO_V1_DECAY,
-    YOLO_V1_LR,
+    YOLO_V1_LR_1ST,
 )
 from util_logging import (
     get_logger,
@@ -306,21 +306,28 @@ layers_config = {
 # Model
 # TODO: Normalization layer (standardization)
 # --------------------------------------------------------------------------------
-class YOLOModel(Model):
+# class YOLOModel(Model):
+class YOLOModel:
     def __init__(self, *args, **kwargs):
-        super(YOLOModel, self).__init__(*args, **kwargs)
-        self.model: Model = build_nn_model(model_name="yolo_v1", input_shape=input_shape, layers_config=layers_config)
-        self.optimizer: keras.optimizers.Optimizer = SGD(
-            learning_rate=YOLO_V1_LR,
+        # super(YOLOModel, self).__init__(*args, **kwargs)
+        self._model: Model = build_nn_model(model_name="yolo_v1", input_shape=input_shape, layers_config=layers_config)
+        self._learning_rate: float = YOLO_V1_LR_1ST
+        self._optimizer: Optimizer = SGD(
+            learning_rate=YOLO_V1_LR_1ST,
             momentum=YOLO_V1_MOMENTUM,
             decay=YOLO_V1_DECAY
         )
-        self.model.compile(
-            optimizer=self.optimizer,
+        self._model.compile(
+            optimizer=self._optimizer,
             loss=YOLOLoss(),
-            metrics=[SparseCategoricalCrossentropy()]
+            metrics=['accuracy']
         )
-        self.model.summary()
+        self._model.summary()
+
+    @property
+    def model(self) -> Model:
+        """Provide the Model instance"""
+        return self._model
 
     @property
     def layers(self) -> List[Layer]:
@@ -329,16 +336,29 @@ class YOLOModel(Model):
 
     @property
     def input(self):
+        """Model input"""
         return self.model.input
+
+    @property
+    def optimizer(self) -> Optimizer:
+        """Provide model training optimizer"""
+        return self._optimizer
+
+    @property
+    def learning_rate(self):
+        return self.model.optimizer.learning_rate.numpy()
+
+    @learning_rate.setter
+    def learning_rate(self, learning_rate):
+        self._learning_rate = learning_rate
+        self.model.optimizer.learning_rate.assign(learning_rate)
 
     def get_layer(self, name=None, index=None):
         """Provide Keras Model get_layer I/F"""
         return self.model.get_layer(name=name, index=index)
 
-    def get_model(self) -> Model:
-        """Provide the Model instance"""
-        return self.model
-
     def call(self, inputs, training=None, mask=None):
         return self.model(inputs)
 
+    def fit(self, *args, **kwargs):
+        return self.model.fit(*args, **kwargs)

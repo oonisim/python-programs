@@ -164,6 +164,9 @@ PASCAL_VOC_CLASSES: List[str] = [
     "tvmonitor"         # 19
 ]
 ---
+
+[NOTE]
+assert, logger are for eager mode only for unit testing purpose (pytest) only.
 """
 # pylint: disable=too-many-statements
 import logging
@@ -187,8 +190,6 @@ from util_constant import (
 from constant import (
     DEBUG_LEVEL,
     DUMP,
-    ZERO,       # 0.0 of type TYPE_FLOAT
-    ONE,        # 1.0 of type TYPE_FLOAT
     EPSILON,
     YOLO_GRID_SIZE,
     YOLO_V1_PREDICTION_NUM_CLASSES,
@@ -227,10 +228,10 @@ class YOLOLoss(Loss):
     """
     def __init__(
             self,
-            S: int = YOLO_GRID_SIZE,                # pylint: disable=invalid-name
-            B: int = YOLO_V1_PREDICTION_NUM_BBOX,      # pylint: disable=invalid-name
-            C: int = YOLO_V1_PREDICTION_NUM_CLASSES,   # pylint: disable=invalid-name
-            P: int = YOLO_V1_PREDICTION_NUM_PRED,      # pylint: disable=invalid-name
+            S = YOLO_GRID_SIZE,                   # pylint: disable=invalid-name
+            B = YOLO_V1_PREDICTION_NUM_BBOX,      # pylint: disable=invalid-name
+            C = YOLO_V1_PREDICTION_NUM_CLASSES,   # pylint: disable=invalid-name
+            P = YOLO_V1_PREDICTION_NUM_PRED,      # pylint: disable=invalid-name
             **kwargs
     ):
         """
@@ -242,13 +243,13 @@ class YOLOLoss(Loss):
             P: size of predictions len(cp, x, y, w, h) per bounding box
         """
         super().__init__(**kwargs)
-        self.batch_size: TYPE_FLOAT = TYPE_FLOAT(-1)
+        self.batch_size = TYPE_FLOAT(0)
         # pylint: disable=invalid-name
-        self.N: int = -1    # Total cells in the batch (S * S * batch_size) pylint: disable=invalid-name
-        self.S: int = S     # pylint: disable=invalid-name
-        self.B: int = B     # pylint: disable=invalid-name
-        self.C: int = C     # pylint: disable=invalid-name
-        self.P: int = P     # pylint: disable=invalid-name
+        self.N = -1    # Total cells in the batch (S * S * batch_size) pylint: disable=invalid-name
+        self.S = S     # pylint: disable=invalid-name
+        self.B = B     # pylint: disable=invalid-name
+        self.C = C     # pylint: disable=invalid-name
+        self.P = P     # pylint: disable=invalid-name
 
         # --------------------------------------------------------------------------------
         # lambda parameters to prioritise the localization vs classification
@@ -423,6 +424,11 @@ class YOLOLoss(Loss):
             (self.C + self.P)
         )
 
+        self.batch_size = tf.cast(tf.shape(y_pred)[0], dtype=TYPE_FLOAT)
+        _logger.debug(
+            "%s: batch size:[%s] total cells:[%s]", _name, self.batch_size, self.N
+        )
+
         # --------------------------------------------------------------------------------
         # Reshape y_pred into N consecutive predictions in shape (N, (C+B*P)).
         # Reshape y_true into N consecutive labels in shape (N, (C+P)).
@@ -432,19 +438,17 @@ class YOLOLoss(Loss):
         # pylint: disable=invalid-name
         Y: tf.Tensor = tf.reshape(tensor=y_pred, shape=(-1, self.C + self.B * self.P))
         T: tf.Tensor = tf.reshape(tensor=y_true, shape=(-1, self.C + self.P))
-        assert Y.shape[0] == T.shape[0], \
-            f"got different number of predictions:[{Y.shape[0]}] and labels:[{T.shape[0]}]"
+        # You can't use Python bool in graph mode. You should instead use tf.cond.
+        # assert tf.shape(Y)[0] == tf.shape(T)[0], \
+        #     f"got different number of predictions:[{tf.shape(Y)[0]}] and labels:[{tf.shape(T)[0]}]"
+        # tf.assert_equal(x=tf.shape(Y)[0], y=tf.shape(T)[0], message="expected same number")
 
-        self.N: int = int(Y.shape[0])
-        self.batch_size = TYPE_FLOAT(self.N / (self.S * self.S))
-        _logger.debug(
-            "%s: batch size:[%s] total cells:[%s]", _name, self.batch_size, self.N
-        )
-
+        self.N = tf.shape(Y)[0]
         self.Iobj_i = T[..., YOLO_V1_LABEL_INDEX_CP:YOLO_V1_LABEL_INDEX_CP+1]
-        self.Inoobj_i = ONE - self.Iobj_i
-        assert self.Iobj_i.shape == (self.N, 1), \
-            f"expected shape {(self.N, 1)} got {self.Iobj_i.shape}."
+        self.Inoobj_i = 1.0 - self.Iobj_i
+        # assert self.Iobj_i.shape == (self.N, 1), \
+        #     f"expected shape {(self.N, 1)} got {self.Iobj_i.shape}."
+        # tf.assert_equal(x=self.Iobj_i.shape, y=(self.N, 1), message="expected same shape")
         DUMP and _logger.debug("%s: self.Iobj_i:[%s]", _name, self.Iobj_i)
 
         # --------------------------------------------------------------------------------
@@ -471,7 +475,7 @@ class YOLOLoss(Loss):
             shape=(-1, self.P)
         )
         DUMP and _logger.debug(
-            "%s: box_pred shape:%s\n[%s]", _name, box_pred.shape, box_pred
+            "%s: box_pred shape:%s\n[%s]", _name, tf.shape(box_pred), box_pred
         )
 
         # --------------------------------------------------------------------------------
@@ -488,7 +492,7 @@ class YOLOLoss(Loss):
             axis=-1,
             name="IOU"
         )
-        assert IOU.shape == (self.N, self.B)
+        # assert tf.reduce_all(tf.shape(IOU) == (self.N, self.B))
 
         # --------------------------------------------------------------------------------
         # Max IOU per grid cell (axis=-1)
@@ -505,8 +509,8 @@ class YOLOLoss(Loss):
         # --------------------------------------------------------------------------------
         # pylint: disable=invalid-name
         max_IOU: tf.Tensor = tf.math.reduce_max(input_tensor=IOU, axis=-1, keepdims=True)
-        assert max_IOU.shape == (self.N, 1), \
-            f"expected max IOU shape {(self.N, 1)}, got {IOU.shape}."
+        # assert tf.reduce_all(tf.shape(max_IOU) == (self.N, 1)), \
+        #     f"expected max IOU shape {(self.N, 1)}, got {tf.shape(max_IOU)}."
         DUMP and _logger.debug("%s: max_IOU[%s]", _name, max_IOU)
 
         best_box_j: tf.Tensor = tf.reshape(    # argmax drops the last dimension
@@ -531,8 +535,8 @@ class YOLOLoss(Loss):
             bounding_boxes=box_pred,
             best_box_indices=best_box_j
         )
-        assert best_boxes.shape == (self.N, self.P), \
-            f"expected shape {(self.N, self.P)}, got {best_boxes.shape}"
+        # assert tf.shape(best_boxes) == (self.N, self.P), \
+        #    f"expected shape {(self.N, self.P)}, got {tf.shape(best_boxes)}"
         DUMP and _logger.debug("%s: best_boxes[%s]", _name, best_boxes)
 
         # --------------------------------------------------------------------------------
@@ -595,9 +599,9 @@ class YOLOLoss(Loss):
         # --------------------------------------------------------------------------------
         confidence_pred: tf.Tensor = best_boxes[..., 0:1]     # cp from (cp,x,y,w,h)
         confidence_true: tf.Tensor = max_IOU
-        assert confidence_pred.shape == confidence_true.shape == (self.N, 1), \
-            f"expected confidence shape:{(self.N, 1)}, got " \
-            f"confidence_pred:{confidence_pred} confidence_truth:{confidence_true.shape}"
+        # assert tf.reduce_all(tf.shape(confidence_pred) == (self.N, 1)), \
+        #     f"expected confidence shape:{(self.N, 1)}, got " \
+        #     f"confidence_pred:{confidence_pred} confidence_truth:{tf.shape(confidence_true)}"
         confidence_loss: tf.Tensor = self.loss_fn(
             y_true=self.Iobj_i * confidence_true,
             y_pred=self.Iobj_i * confidence_pred
@@ -623,7 +627,7 @@ class YOLOLoss(Loss):
         # box_pred[..., 0] of shape (N, B) into shape (N, 1) with keepdims=True.
         no_obj_confidences_pred: tf.Tensor = \
             self.Inoobj_i * tf.math.reduce_sum(box_pred[..., 0], axis=-1, keepdims=True)
-        assert no_obj_confidences_pred.shape == (self.N, 1)
+        # assert tf.reduce_all(tf.shape(no_obj_confidences_pred) == (self.N, 1))
 
         # No subtraction of no_obj_confidence_true.
         # no_obj_confidence_true
@@ -638,7 +642,7 @@ class YOLOLoss(Loss):
         # When Inoobj_i = 1 with no object, then cp_i is 0, hence Inoobj_i * cp_i -> 0.
         # When Inoobj_i = 0 with an object, then again Inoobj_i * cp_i -> 0.
         # no_obj_confidence_true = self.Inoobj_i * self.Iobj_i
-        no_obj_confidence_true: tf.Tensor = ZERO
+        no_obj_confidence_true: tf.Tensor = 0.0
         no_obj_confidence_loss: tf.Tensor = self.lambda_noobj * self.loss_fn(
             y_true=no_obj_confidence_true,
             y_pred=self.Inoobj_i * no_obj_confidences_pred

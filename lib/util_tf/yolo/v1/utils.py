@@ -71,23 +71,26 @@ def intersection_over_union(
         IOU(Intersection over union) for all examples
     """
     _name: str = "intersection_over_union()"
-    assert boxes_preds.ndim == 2, \
-        f"expected dims=4 with shape (N, 4) got {boxes_preds.ndim} dimensions."
-    assert boxes_labels.ndim == 2, \
-        f"expected dims=4 with shape (N, 4) got {boxes_labels.ndim} dimensions."
-    assert boxes_preds.shape == boxes_labels.shape, \
-        f"expected same shape, got {boxes_preds.shape} and {boxes_labels.shape}."
-    assert boxes_preds.shape[1] == boxes_labels.shape[1] == 4   # (x/0, y/1, w/2, h/3)
+    # Cannot use python bool in TF Graph mode
+    # assert tf.rank(boxes_preds) == 2, \
+    #     f"expected dims=4 with shape (N, 4) got {tf.rank(boxes_preds)} dimensions."
+    # assert tf.rank(boxes_labels) == 2, \
+    #     f"expected dims=4 with shape (N, 4) got {tf.rank(boxes_labels)} dimensions."
+    # assert tf.shape(boxes_preds) == tf.shape(boxes_labels), \
+    #     f"expected same shape, got {tf.shape(boxes_preds)} and {tf.shape(boxes_labels)}."
+    # assert boxes_preds.shape[1] == boxes_labels.shape[1] == 4   # (x/0, y/1, w/2, h/3)
 
     # Check if w, h within MAX_EXPECTED_W_PREDICTION and MAX_EXPECTED_H_PREDICTION
     w_predicted: tf.Tensor = boxes_preds[..., 2]
     h_predicted: tf.Tensor = boxes_preds[..., 3]
-    assert tf.math.reduce_all(w_predicted <= MAX_EXPECTED_W_PREDICTION + EPSILON), \
-        "expected w_predicted <= MAX_EXPECTED_W_PREDICTION, " \
-        f"got\n{w_predicted[(w_predicted > MAX_EXPECTED_W_PREDICTION + EPSILON)]}"
-    assert tf.math.reduce_all(h_predicted <= MAX_EXPECTED_H_PREDICTION + EPSILON), \
-        "expected height <= MAX_EXPECTED_H_PREDICTION, " \
-        f"got\n{h_predicted[(h_predicted > MAX_EXPECTED_H_PREDICTION + EPSILON)]}"
+
+    # Cannot use python bool in TF Graph mode
+    # assert tf.math.reduce_all(w_predicted <= MAX_EXPECTED_W_PREDICTION + EPSILON), \
+    #     "expected w_predicted <= MAX_EXPECTED_W_PREDICTION, " \
+    #     f"got\n{w_predicted[(w_predicted > MAX_EXPECTED_W_PREDICTION + EPSILON)]}"
+    # assert tf.math.reduce_all(h_predicted <= MAX_EXPECTED_H_PREDICTION + EPSILON), \
+    #     "expected height <= MAX_EXPECTED_H_PREDICTION, " \
+    #     f"got\n{h_predicted[(h_predicted > MAX_EXPECTED_H_PREDICTION + EPSILON)]}"
 
     _logger.debug(
         "%s: sample prediction (x, y, w, h) = %s",
@@ -105,32 +108,19 @@ def intersection_over_union(
     # --------------------------------------------------------------------------------
     # Corner coordinates of Bounding Boxes and Ground Truth
     # --------------------------------------------------------------------------------
-    if box_format == "midpoint":
-        # predicted box left x coordinate
-        box1_x1 = boxes_preds[..., 0:1] - boxes_preds[..., 2:3] / 2
-        # predicted box right x coordinate
-        box1_x2 = boxes_preds[..., 0:1] + boxes_preds[..., 2:3] / 2
-        # predicted box bottom y coordinate
-        box1_y1 = boxes_preds[..., 1:2] - boxes_preds[..., 3:4] / 2
-        # predicted box top y coordinate
-        box1_y2 = boxes_preds[..., 1:2] + boxes_preds[..., 3:4] / 2
+    # predicted box left x coordinate
+    box1_x1 = boxes_preds[..., 0:1] - boxes_preds[..., 2:3] / 2.
+    # predicted box right x coordinate
+    box1_x2 = boxes_preds[..., 0:1] + boxes_preds[..., 2:3] / 2.
+    # predicted box bottom y coordinate
+    box1_y1 = boxes_preds[..., 1:2] - boxes_preds[..., 3:4] / 2.
+    # predicted box top y coordinate
+    box1_y2 = boxes_preds[..., 1:2] + boxes_preds[..., 3:4] / 2.
 
-        box2_x1 = boxes_labels[..., 0:1] - boxes_labels[..., 2:3] / 2
-        box2_y1 = boxes_labels[..., 1:2] - boxes_labels[..., 3:4] / 2
-        box2_x2 = boxes_labels[..., 0:1] + boxes_labels[..., 2:3] / 2
-        box2_y2 = boxes_labels[..., 1:2] + boxes_labels[..., 3:4] / 2
-
-    elif box_format == "corners":
-        box1_x1 = boxes_preds[..., 0:1]
-        box1_y1 = boxes_preds[..., 1:2]
-        box1_x2 = boxes_preds[..., 2:3]
-        box1_y2 = boxes_preds[..., 3:4]  # (N, 1)
-        box2_x1 = boxes_labels[..., 0:1]
-        box2_y1 = boxes_labels[..., 1:2]
-        box2_x2 = boxes_labels[..., 2:3]
-        box2_y2 = boxes_labels[..., 3:4]
-    else:
-        raise RuntimeError(f"invalid box_format {box_format}")
+    box2_x1 = boxes_labels[..., 0:1] - boxes_labels[..., 2:3] / 2.
+    box2_y1 = boxes_labels[..., 1:2] - boxes_labels[..., 3:4] / 2.
+    box2_x2 = boxes_labels[..., 0:1] + boxes_labels[..., 2:3] / 2.
+    box2_y2 = boxes_labels[..., 1:2] + boxes_labels[..., 3:4] / 2.
 
     # --------------------------------------------------------------------------------
     # Intersection
@@ -140,7 +130,7 @@ def intersection_over_union(
     y1 = tf.math.maximum(box1_y1, box2_y1)      # pylint: disable=invalid-name
     x2 = tf.math.maximum(box1_x2, box2_x2)      # pylint: disable=invalid-name
     y2 = tf.math.maximum(box1_y2, box2_y2)      # pylint: disable=invalid-name
-    assert x1.shape == (N, 1)
+    # assert tf.shape(x1) == (N, 1)
     _logger.debug(
         "%s: sample intersection corner coordinates (x1, y1, x2, y2) = %s",
         _name, (x1[..., 0, 0], y1[..., 0, 0], x2[..., 0, 0], y2[..., 0, 0])
@@ -174,8 +164,8 @@ def intersection_over_union(
         clip_value_max=TYPE_FLOAT(1.0)
     )
     _logger.debug("%s: sample IOU = %s", _name, IOU[0])
-    assert IOU.shape == (N, 1), f"expected IOU shape {(N, 1)}, got {IOU.shape}"
-    assert tf.math.reduce_all(IOU <= TYPE_FLOAT(1.0+EPSILON)), \
-        f"expected IOU <= 1.0, got\n{IOU[(IOU > TYPE_FLOAT(1.0+EPSILON))]}"
+    # assert tf.shape(IOU) == (N, 1), f"expected IOU shape {(N, 1)}, got {IOU.shape}"
+    # assert tf.math.reduce_all(IOU <= TYPE_FLOAT(1.0+EPSILON)), \
+    #     f"expected IOU <= 1.0, got\n{IOU[(IOU > TYPE_FLOAT(1.0+EPSILON))]}"
 
     return IOU

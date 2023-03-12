@@ -222,13 +222,13 @@ def mkdir(path: str, mode=0o777, create_parents: bool = True):
         _logger.error("%s: %s", name, msg)
         raise RuntimeError(msg)
 
-    elif not is_path_creatable(path):
-        msg: str = f"cannot create [{path}]"
-        _logger.error("%s: %s", name, msg)
-        raise RuntimeError(msg)
+#    elif not is_path_creatable(path):
+#        msg: str = f"cannot create [{path}]"
+#        _logger.error("%s: %s", name, msg)
+#        raise RuntimeError(msg)
 
     else:
-        pathlib.Path(path).mkdir(mode=mode, parents=True, exist_ok=True)
+        pathlib.Path(path).mkdir(mode=mode, parents=create_parents, exist_ok=True)
 
 
 def rmdir(path_to_dir: str, ignore_errors=False):

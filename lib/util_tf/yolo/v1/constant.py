@@ -40,7 +40,28 @@ YOLO_V1_LEAKY_RELU_SLOPE: TYPE_FLOAT = TYPE_FLOAT(0.1)
 YOLO_V1_BATCH_SIZE: int = 64
 YOLO_V1_MOMENTUM: TYPE_FLOAT = TYPE_FLOAT(0.9)
 YOLO_V1_DECAY: TYPE_FLOAT = TYPE_FLOAT(0.0005)
-YOLO_V1_LR: TYPE_FLOAT = TYPE_FLOAT(1e-3)
+
+# Learning Rate
+# [YOLO v1 paper]
+# We train the network for about 135 epochs on the training
+# and validation data sets from PASCAL VOC 2007 and
+# 2012. When testing on 2012 we also include the VOC 2007
+# test data for training. Throughout training we use a batch
+# size of 64, a momentum of 0:9 and a decay of 0:0005.
+# Our learning rate schedule is as follows: For the first
+# epochs we slowly raise the learning rate from 10􀀀3 to 10􀀀2.
+# If we start at a high learning rate our model often diverges
+# due to unstable gradients. We continue training with 10􀀀2
+# for 75 epochs, then 10􀀀3 for 30 epochs, and finally 10􀀀4
+# for 30 epochs.
+YOLO_V1_LR_1ST: TYPE_FLOAT = TYPE_FLOAT(1e-3)
+YOLO_V1_EPOCHS_1ST = 10
+YOLO_V1_LR_2ND: TYPE_FLOAT = TYPE_FLOAT(1e-2)
+YOLO_V1_EPOCHS_2ND = 75
+YOLO_V1_LR_3RD: TYPE_FLOAT = TYPE_FLOAT(1e-3)
+YOLO_V1_EPOCHS_3RD = 30
+YOLO_V1_LR_4TH: TYPE_FLOAT = TYPE_FLOAT(1e-4)
+YOLO_V1_EPOCHS_4TH = 30
 
 # --------------------------------------------------------------------------------
 # YOLO v1 Predictions
