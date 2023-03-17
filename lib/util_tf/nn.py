@@ -356,16 +356,16 @@ def build_layers(config: Dict[str, dict]) -> List[Layer]:
                 act: Layer = ReLU(
                     name=name,
                 )
-
             elif activation == "leaky_relu":
                 alpha: float = value.get("alpha", 0.1)
                 act: Layer = LeakyReLU(
                     name=name,
                     alpha=alpha
                 )
-
             else:
                 raise NotImplementedError(f"activation {activation} not yet implemented or invalid")
+
+            layers.append(act)
 
         # --------------------------------------------------------------------------------
         # Max Pooling

@@ -211,7 +211,7 @@ _logger: logging.Logger = get_logger(__name__, level=DEBUG_LEVEL)
 
 
 # --------------------------------------------------------------------------------
-# Layer
+# Loss function
 # --------------------------------------------------------------------------------
 class YOLOLoss(Loss):
     """YOLO v1 objective (loss) layer
@@ -314,6 +314,8 @@ class YOLOLoss(Loss):
 
         Returns: batch size normalized loss
         """
+        tf.debugging.assert_all_finite(x=y_true, message="expected y_true is finite")
+        tf.debugging.assert_all_finite(x=y_pred, message="expected y_pred is finite")
         return tf.math.reduce_sum(tf.square(y_true - y_pred)) / self.batch_size
 
     def Iobj_j(     # pylint: disable=invalid-name
@@ -349,9 +351,13 @@ class YOLOLoss(Loss):
         # --------------------------------------------------------------------------------
         responsible_boxes: tf.Tensor = tf.einsum(
             "nbd,nb->nd",
-            tf.reshape(tensor=bounding_boxes, shape=(self.N, self.B, -1)),
+            # Reshape using -1 cause an error ValueError: Shape must be rank 1 but is rank 0
+            # https://github.com/tensorflow/tensorflow/issues/46776
+            # tf.reshape(tensor=bounding_boxes, shape=(self.N, self.B, -1)),
+            tf.reshape(tensor=bounding_boxes, shape=(self.N, self.B, self.P)),
             tf.one_hot(
-                indices=tf.reshape(tensor=best_box_indices, shape=(-1)),
+                # indices=tf.reshape(tensor=best_box_indices, shape=(-1)),
+                indices=tf.reshape(tensor=best_box_indices, shape=(self.N,)),
                 depth=self.B,
                 dtype=bounding_boxes.dtype
             )
@@ -428,6 +434,9 @@ class YOLOLoss(Loss):
         _logger.debug(
             "%s: batch size:[%s] total cells:[%s]", _name, self.batch_size, self.N
         )
+        tf.debugging.assert_all_finite(x=y_true, message="expected y_true is finite")
+        tf.debugging.assert_all_finite(x=y_pred, message="expected y_pred is finite")
+        tf.debugging.assert_non_negative(x=self.batch_size, message="expected batch size non negative")
 
         # --------------------------------------------------------------------------------
         # Reshape y_pred into N consecutive predictions in shape (N, (C+B*P)).
@@ -444,6 +453,8 @@ class YOLOLoss(Loss):
         # tf.assert_equal(x=tf.shape(Y)[0], y=tf.shape(T)[0], message="expected same number")
 
         self.N = tf.shape(Y)[0]
+        # tf.print(_name, "number of cells to process (N)=", self.N)
+
         self.Iobj_i = T[..., YOLO_V1_LABEL_INDEX_CP:YOLO_V1_LABEL_INDEX_CP+1]
         self.Inoobj_i = 1.0 - self.Iobj_i
         # assert self.Iobj_i.shape == (self.N, 1), \
@@ -653,14 +664,26 @@ class YOLOLoss(Loss):
         # Total loss
         # tf.add_n be more efficient than reduce_sum because it sums the tensors directly.
         # --------------------------------------------------------------------------------
-        loss: tf.Tensor = tf.math.add_n([
-            x_y_loss,
-            w_h_loss,
-            confidence_loss,
-            no_obj_confidence_loss,
+        tf.print("x_y_loss", x_y_loss)
+        tf.print("w_h_loss", w_h_loss)
+        tf.print("confidence_loss", confidence_loss)
+        tf.print("no_obj_confidence_loss", no_obj_confidence_loss)
+        tf.print("classification_loss", classification_loss)
+        # loss: tf.Tensor = tf.math.add_n([
+        #     x_y_loss,
+        #     w_h_loss,
+        #     confidence_loss,
+        #     no_obj_confidence_loss,
+        #     classification_loss
+        # ])
+        loss: tf.Tensor = \
+            x_y_loss + \
+            w_h_loss + \
+            confidence_loss + \
+            no_obj_confidence_loss + \
             classification_loss
-        ])
-        _logger.debug("%s: loss[%s]", _name, loss)
+
+        tf.print("loss", loss)
         return loss
 
 
