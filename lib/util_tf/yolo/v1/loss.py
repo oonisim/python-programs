@@ -187,7 +187,7 @@ from util_constant import (
     TYPE_FLOAT,
     TYPE_INT,
 )
-from constant import (
+from util_tf.yolo.v1.constant import (
     DEBUG_LEVEL,
     DUMP,
     EPSILON,
@@ -200,7 +200,7 @@ from constant import (
 from util_logging import (
     get_logger,
 )
-from utils import (
+from util_tf.yolo.v1.utils import (
     intersection_over_union,
 )
 

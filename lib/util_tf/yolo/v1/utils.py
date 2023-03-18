@@ -13,7 +13,7 @@ import logging
 
 import tensorflow as tf
 
-from constant import (
+from util_tf.yolo.v1.constant import (
     TYPE_FLOAT,
     EPSILON,
 )

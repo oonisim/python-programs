@@ -382,10 +382,12 @@ def build_layers(config: Dict[str, dict]) -> List[Layer]:
 
         # --------------------------------------------------------------------------------
         # Batch Norm
+        # axis=1 when channel first image for CNN.
         # --------------------------------------------------------------------------------
         elif kind == LAYER_NAME_BN:
             norm: Layer = BatchNormalization(
                 name=name,
+                axis=value.get("axis", -1)
             )
             layers.append(norm)
 
@@ -410,7 +412,7 @@ def build_layers(config: Dict[str, dict]) -> List[Layer]:
                 # https://stats.stackexchange.com/a/383326/105137
                 # https://keras.io/api/layers/regularizers/#l2-class
                 kernel_regularizer=keras.regularizers.l2(l2=value.get("l2", 1e-2)),
-                activation=value.get("activation", None)
+                activation=value.get("activation", None)    # None -> Linear activation
             )
             layers.append(full)
 
