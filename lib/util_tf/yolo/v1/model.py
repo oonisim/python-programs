@@ -1,6 +1,10 @@
 """
 Implementation of Yolo (v1) architecture with slight modification with added BatchNorm.
 https://github.com/aladdinpersson/Machine-Learning-Collection/blob/master/ML/Pytorch/object_detection/YOLO/model.py
+
+NOTE:
+    axis=-1 for the BN layer after convolution, but axis=1 after fully connected layer.
+
 """
 # pylint: disable=too-many-statements
 import logging
@@ -180,11 +184,17 @@ layers_config = {
     "act04_1_1": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
+    "bn004_1_1": {
+        "kind": LAYER_NAME_BN, "axis": -1
+    },
     "conv04_1_2": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 512, "strides": (1, 1), "padding": "same"
     },
     "act04_1_2": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "bn004_1_2": {
+        "kind": LAYER_NAME_BN, "axis": -1
     },
     # Repeat 2
     "conv04_2_1": {
@@ -193,11 +203,17 @@ layers_config = {
     "act04_2_1": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
+    "bn004_2_1": {
+        "kind": LAYER_NAME_BN, "axis": -1
+    },
     "conv04_2_2": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters":512, "strides": (1, 1), "padding": "same"
     },
     "act04_2_2": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "bn004_2_2": {
+        "kind": LAYER_NAME_BN, "axis": -1
     },
     # Repeat 3
     "conv04_3_1": {
@@ -206,11 +222,17 @@ layers_config = {
     "act04_3_1": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
+    "bn004_3_1": {
+        "kind": LAYER_NAME_BN, "axis": -1
+    },
     "conv04_3_2": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 512, "strides": (1, 1), "padding": "same"
     },
     "act04_3_2": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "bn004_3_2": {
+        "kind": LAYER_NAME_BN, "axis": -1
     },
     # Repeat 4
     "conv04_4_1": {
@@ -219,11 +241,17 @@ layers_config = {
     "act04_4_1": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
+    "bn004_4_1": {
+        "kind": LAYER_NAME_BN, "axis": -1
+    },
     "conv04_4_2": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 512, "strides": (1, 1), "padding": "same"
     },
     "act04_4_2": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "bn004_4_2": {
+        "kind": LAYER_NAME_BN, "axis": -1
     },
     # rest
     "conv04_5": {
@@ -232,11 +260,17 @@ layers_config = {
     "act04_5": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
+    "bn004_5": {
+        "kind": LAYER_NAME_BN, "axis": -1
+    },
     "conv04_6": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 1024, "strides": (1, 1), "padding": "same"
     },
     "act04_6": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "bn004_6": {
+        "kind": LAYER_NAME_BN, "axis": -1
     },
     "maxpool04": {
         "kind": LAYER_NAME_MAXPOOL2D, "pool_size": (2, 2), "strides": (2, 2), "padding": "valid"
@@ -251,11 +285,17 @@ layers_config = {
     "act05_1_1": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
+    "bn005_1_1": {
+        "kind": LAYER_NAME_BN, "axis": -1
+    },
     "conv05_1_2": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 1024, "strides": (1, 1), "padding": "same"
     },
     "act05_1_2": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "bn005_1_2": {
+        "kind": LAYER_NAME_BN, "axis": -1
     },
     # Repeat 2
     "conv05_2_1": {
@@ -264,11 +304,17 @@ layers_config = {
     "act05_2_1": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
+    "bn005_2_1": {
+        "kind": LAYER_NAME_BN, "axis": -1
+    },
     "conv05_2_2": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 1024, "strides": (1, 1), "padding": "same"
     },
     "act05_2_2": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "bn005_2_2": {
+        "kind": LAYER_NAME_BN, "axis": -1
     },
     # rest
     "conv05_3": {
@@ -277,11 +323,17 @@ layers_config = {
     "act05_3": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
+    "bn005_3": {
+        "kind": LAYER_NAME_BN, "axis": -1
+    },
     "conv05_4": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 1024, "strides": (2, 2), "padding": "same"
     },
     "act05_4": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "bn005_4": {
+        "kind": LAYER_NAME_BN, "axis": -1
     },
     # --------------------------------------------------------------------------------
     # 6th
@@ -291,6 +343,9 @@ layers_config = {
     },
     "act06_1": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "bn006_1": {
+        "kind": LAYER_NAME_BN, "axis": -1
     },
     "conv06_2": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 1024, "strides": (1, 1), "padding": "same"
@@ -311,7 +366,7 @@ layers_config = {
         "kind": LAYER_NAME_DENSE, "units": 4096, "activation": "relu", "l2": 1e-2
     },
     "bn_full01": {
-        "kind": LAYER_NAME_BN, "axis": 1
+        "kind": LAYER_NAME_BN, "axis": 1    # NOTE axis=1
     },
     "drop01": {
         "kind": LAYER_NAME_DROP, "rate": TYPE_FLOAT(0.5),

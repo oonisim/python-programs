@@ -54,13 +54,17 @@ YOLO_V1_DECAY: TYPE_FLOAT = TYPE_FLOAT(0.0005)
 # due to unstable gradients. We continue training with 10􀀀2
 # for 75 epochs, then 10􀀀3 for 30 epochs, and finally 10􀀀4
 # for 30 epochs.
-YOLO_V1_LR_1ST: TYPE_FLOAT = TYPE_FLOAT(1e-3)
+#
+# NOTE:
+# 1e-3 is too high and causes overfitting + model output explodes to inf
+# with BN layer being used. Hence, reduce.
+YOLO_V1_LR_1ST: TYPE_FLOAT = TYPE_FLOAT(1e-7)
 YOLO_V1_EPOCHS_1ST = 10
-YOLO_V1_LR_2ND: TYPE_FLOAT = TYPE_FLOAT(1e-2)
+YOLO_V1_LR_2ND: TYPE_FLOAT = TYPE_FLOAT(1e-6)
 YOLO_V1_EPOCHS_2ND = 75
-YOLO_V1_LR_3RD: TYPE_FLOAT = TYPE_FLOAT(1e-3)
+YOLO_V1_LR_3RD: TYPE_FLOAT = TYPE_FLOAT(1e-7)
 YOLO_V1_EPOCHS_3RD = 30
-YOLO_V1_LR_4TH: TYPE_FLOAT = TYPE_FLOAT(1e-4)
+YOLO_V1_LR_4TH: TYPE_FLOAT = TYPE_FLOAT(1e-8)
 YOLO_V1_EPOCHS_4TH = 30
 
 # --------------------------------------------------------------------------------
