@@ -9,7 +9,7 @@ from typing import (
     List,
 )
 
-from tensorflow import keras
+from tensorflow import keras    # DO not forget this
 from keras import (
     Model,
 )
@@ -82,6 +82,9 @@ _logger: logging.Logger = get_logger(__name__, level=DEBUG_LEVEL)
 #
 # To avoid overfitting we use dropout and extensive data augmentation. A dropout layer
 # with rate = .5 after the first connected layer prevents co-adaptation between layers.
+#
+# We use a linear activation function for the final layer and
+# all other layers use the following leaky rectified linear activation:
 # --------------------------------------------------------------------------------
 S: int = YOLO_GRID_SIZE                 # pylint: disable=invalid-name
 B: int = YOLO_V1_PREDICTION_NUM_BBOX       # pylint: disable=invalid-name
@@ -210,7 +213,7 @@ layers_config = {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     "conv04_3_2": {
-        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters":512, "strides": (1, 1), "padding": "same"
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 512, "strides": (1, 1), "padding": "same"
     },
     "act04_3_2": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
@@ -261,13 +264,13 @@ layers_config = {
     # --------------------------------------------------------------------------------
     # Repeat 1
     "conv05_1_1": {
-        "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters":512, "strides": (1, 1), "padding": "same"
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters": 512, "strides": (1, 1), "padding": "same"
     },
     "act05_1_1": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     "conv05_1_2": {
-        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters":1025, "strides": (1, 1), "padding": "same"
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 1024, "strides": (1, 1), "padding": "same"
     },
     "act05_1_2": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
@@ -277,13 +280,13 @@ layers_config = {
     },
     # Repeat 2
     "conv05_2_1": {
-        "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters":512, "strides": (1, 1), "padding": "same"
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters": 512, "strides": (1, 1), "padding": "same"
     },
     "act05_2_1": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
     "conv05_2_2": {
-        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters":1024, "strides": (1, 1), "padding": "same"
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 1024, "strides": (1, 1), "padding": "same"
     },
     "act05_2_2": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
@@ -293,7 +296,7 @@ layers_config = {
     },
     # rest
     "conv05_3": {
-        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters":1024, "strides": (1, 1), "padding": "same"
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 1024, "strides": (1, 1), "padding": "same"
     },
     "act05_3": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
@@ -302,7 +305,7 @@ layers_config = {
         "kind": LAYER_NAME_BN,
     },
     "conv05_4": {
-        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters":1024, "strides": (2, 2), "padding": "same"
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 1024, "strides": (2, 2), "padding": "same"
     },
     "act05_4": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
@@ -314,7 +317,7 @@ layers_config = {
     # 6th
     # --------------------------------------------------------------------------------
     "conv06_1": {
-        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters":1024, "strides": (1, 1), "padding": "same"
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 1024, "strides": (1, 1), "padding": "same"
     },
     "act06_1": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
@@ -323,7 +326,7 @@ layers_config = {
         "kind": LAYER_NAME_BN,
     },
     "conv06_2": {
-        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters":1024, "strides": (1, 1), "padding": "same"
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 1024, "strides": (1, 1), "padding": "same"
     },
     "act06_2": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
@@ -346,12 +349,11 @@ layers_config = {
     "drop01": {
         "kind": LAYER_NAME_DROP, "rate": TYPE_FLOAT(0.5),
     },
-    # To be able to reshape into (S, S, (C + B * P))
+    # To be able to reshape into (S, S, (C + B * P)).
+    # [YOLO v1 paper]
+    # We use a linear activation function for the final layer
     "full02": {
-        "kind": LAYER_NAME_DENSE, "units": (S * S * (C + B * P)), "activation": "relu", "l2": 1e-2
-    },
-    "bn_full02": {
-        "kind": LAYER_NAME_BN,
+        "kind": LAYER_NAME_DENSE, "units": (S * S * (C + B * P)), "activation": "linear", "l2": 1e-2
     },
     # --------------------------------------------------------------------------------
     # Rehape into (S, S, (C + B * P))
