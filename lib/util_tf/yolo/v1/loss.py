@@ -457,6 +457,7 @@ class YOLOLoss(Loss):
 
         self.Iobj_i = T[..., YOLO_V1_LABEL_INDEX_CP:YOLO_V1_LABEL_INDEX_CP+1]
         self.Inoobj_i = 1.0 - self.Iobj_i
+        tf.debugging.assert_equal(x=tf.shape(self.Iobj_i), y=(self.N, 1), message="expected Iobj_i shape (N,1")
         # assert self.Iobj_i.shape == (self.N, 1), \
         #     f"expected shape {(self.N, 1)} got {self.Iobj_i.shape}."
         # tf.assert_equal(x=self.Iobj_i.shape, y=(self.N, 1), message="expected same shape")
@@ -491,19 +492,20 @@ class YOLOLoss(Loss):
 
         # --------------------------------------------------------------------------------
         # IoU between predicted bounding boxes and the ground truth at a cell.
+        # IOU shape (N, B)
         # --------------------------------------------------------------------------------
         IOU: tf.Tensor = tf.concat(            # pylint: disable=invalid-name
             values=[
                 intersection_over_union(
-                    box_pred[..., j, 1:5],     # shape:(N,4)
-                    box_true[..., 1:5]         # shape:(N,4)
+                    box_pred[..., j, 1:5],     # (x,y,w,h) shape:(N,4) from one of B boxes
+                    box_true[..., 1:5]         # (x,y,w,h) shape:(N,4) from ground truth
                 )
-                for j in range(self.B)
+                for j in range(self.B)         # IOU for each bounding box from B predicted boxes
             ],
             axis=-1,
             name="IOU"
         )
-        # assert tf.reduce_all(tf.shape(IOU) == (self.N, self.B))
+        tf.debugging.assert_equal(x=tf.shape(IOU), y=(self.N, self.B), message="expected shape (N,B)")
 
         # --------------------------------------------------------------------------------
         # Max IOU per grid cell (axis=-1)
@@ -520,8 +522,7 @@ class YOLOLoss(Loss):
         # --------------------------------------------------------------------------------
         # pylint: disable=invalid-name
         max_IOU: tf.Tensor = tf.math.reduce_max(input_tensor=IOU, axis=-1, keepdims=True)
-        # assert tf.reduce_all(tf.shape(max_IOU) == (self.N, 1)), \
-        #     f"expected max IOU shape {(self.N, 1)}, got {tf.shape(max_IOU)}."
+        tf.debugging.assert_equal(x=tf.shape(max_IOU), y=(self.N, 1), message="expected MAX IOU shape (N,1)")
         DUMP and _logger.debug("%s: max_IOU[%s]", _name, max_IOU)
 
         best_box_j: tf.Tensor = tf.reshape(    # argmax drops the last dimension
@@ -546,16 +547,17 @@ class YOLOLoss(Loss):
             bounding_boxes=box_pred,
             best_box_indices=best_box_j
         )
-        # assert tf.shape(best_boxes) == (self.N, self.P), \
-        #    f"expected shape {(self.N, self.P)}, got {tf.shape(best_boxes)}"
+        tf.debugging.assert_equal(
+            x=tf.shape(best_boxes), y=(self.N, self.P), message="expected bestbox shape (N,P)"
+        )
         DUMP and _logger.debug("%s: best_boxes[%s]", _name, best_boxes)
 
         # --------------------------------------------------------------------------------
         # Localization loss (x, y)
         # --------------------------------------------------------------------------------
         x_y_loss = self.lambda_coord * self.loss_fn(
-            y_true=self.Iobj_i * best_boxes[..., 1:3],  # (x,y) from (cp,x,y,w,h)
-            y_pred=self.Iobj_i * box_true[..., 1:3]
+            y_true=self.Iobj_i * box_true[..., 1:3],    # shape (N, 2)
+            y_pred=self.Iobj_i * best_boxes[..., 1:3]   # shape (N, 2) as (x,y) from (cp,x,y,w,h)
         )
         _logger.debug("%s: x_y_loss[%s]", _name, x_y_loss)
 
@@ -564,7 +566,7 @@ class YOLOLoss(Loss):
         # https://datascience.stackexchange.com/questions/118674
         # https://youtu.be/n9_XyCGr-MI?list=PLhhyoLH6Ijfw0TpCTVTNk42NN08H6UvNq&t=2804
         # --------------------------------------------------------------------------------
-        # Prevent 1/sqrt(x=0) in the gradient during the back propagation.
+        # Prevent infinite gradient f'(x=0) = 1/sqrt(x=0) -> inf during the back propagation.
         # Gradient sqrt(x) is 0.5*sqrt(x). sqrt(abs(x)+eps) to avoid infinity by sqrt(x=0).
         # sign(x) to restore the original sign which is lost via abs(x).
         # --------------------------------------------------------------------------------
@@ -574,16 +576,16 @@ class YOLOLoss(Loss):
         # less than in small boxes. To partially address this we predict the square root
         # of the bounding box width and height instead of the width and height directly.
         # --------------------------------------------------------------------------------
-        _w_h_pred: tf.Tensor = best_boxes[..., 3:5]  # (x,y) from (cp,x,y,w,h)
+        _w_h_pred: tf.Tensor = best_boxes[..., 3:5]  # Shape (N,2) as (w,h) from (cp,x,y,w,h)
         sqrt_w_h_pred: tf.Tensor = \
             tf.math.sign(_w_h_pred) * tf.math.sqrt(tf.math.abs(_w_h_pred) + EPSILON)
 
-        _w_h_true: tf.Tensor = box_true[..., 3:5]
-        sqrt__w_h_true: tf.Tensor = \
+        _w_h_true: tf.Tensor = box_true[..., 3:5]   # Shape (N,2) as (w,h) from (cp,x,y,w,h)
+        sqrt_w_h_true: tf.Tensor = \
             tf.math.sign(_w_h_true) * tf.math.sqrt(tf.math.abs(_w_h_true) + EPSILON)
 
         w_h_loss = self.lambda_coord * self.loss_fn(
-            y_true=self.Iobj_i * sqrt__w_h_true,
+            y_true=self.Iobj_i * sqrt_w_h_true,
             y_pred=self.Iobj_i * sqrt_w_h_pred
         )
         _logger.debug("%s: w_h_loss[%s]", _name, w_h_loss)
@@ -638,7 +640,11 @@ class YOLOLoss(Loss):
         # box_pred[..., 0] of shape (N, B) into shape (N, 1) with keepdims=True.
         no_obj_confidences_pred: tf.Tensor = \
             self.Inoobj_i * tf.math.reduce_sum(box_pred[..., 0], axis=-1, keepdims=True)
-        # assert tf.reduce_all(tf.shape(no_obj_confidences_pred) == (self.N, 1))
+        tf.debugging.assert_equal(
+            x=tf.shape(no_obj_confidences_pred),
+            y=(self.N, 1),
+            message="expected no_obj_confidences_pred shape:(N,1)"
+        )
 
         # No subtraction of no_obj_confidence_true.
         # no_obj_confidence_true
@@ -664,11 +670,12 @@ class YOLOLoss(Loss):
         # Total loss
         # tf.add_n be more efficient than reduce_sum because it sums the tensors directly.
         # --------------------------------------------------------------------------------
-        tf.print("x_y_loss", x_y_loss)
-        tf.print("w_h_loss", w_h_loss)
-        tf.print("confidence_loss", confidence_loss)
-        tf.print("no_obj_confidence_loss", no_obj_confidence_loss)
-        tf.print("classification_loss", classification_loss)
+        # tf.print("x_y_loss", x_y_loss)
+        # tf.print("w_h_loss", w_h_loss)
+        # tf.print("confidence_loss", confidence_loss)
+        # tf.print("no_obj_confidence_loss", no_obj_confidence_loss)
+        # tf.print("classification_loss", classification_loss)
+
         # loss: tf.Tensor = tf.math.add_n([
         #     x_y_loss,
         #     w_h_loss,
@@ -683,7 +690,6 @@ class YOLOLoss(Loss):
             no_obj_confidence_loss + \
             classification_loss
 
-        tf.print("loss", loss)
         return loss
 
 
@@ -691,7 +697,7 @@ def main():
     """Simple test run"""
     loss: Loss = YOLOLoss()
 
-    S: int = YOLO_GRID_SIZE                  # pylint: disable=invalid-name
+    S: int = YOLO_GRID_SIZE                     # pylint: disable=invalid-name
     C: int = YOLO_V1_PREDICTION_NUM_CLASSES     # pylint: disable=invalid-name
     B: int = YOLO_V1_PREDICTION_NUM_BBOX        # pylint: disable=invalid-name
     P: int = YOLO_V1_PREDICTION_NUM_PRED        # pylint: disable=invalid-name

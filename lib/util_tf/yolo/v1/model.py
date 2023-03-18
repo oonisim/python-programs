@@ -104,6 +104,9 @@ layers_config = {
     "act01": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
+    "bn01": {
+        "kind": LAYER_NAME_BN,
+    },
     "maxpool01": {
         "kind": LAYER_NAME_MAXPOOL2D, "pool_size": (2, 2), "strides": (2, 2), "padding": "valid"
     },
@@ -115,6 +118,9 @@ layers_config = {
     },
     "act02": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "bn02": {
+        "kind": LAYER_NAME_BN,
     },
     "maxpool02": {
         "kind": LAYER_NAME_MAXPOOL2D, "pool_size": (2, 2), "strides": (2, 2), "padding": "valid"
@@ -128,11 +134,17 @@ layers_config = {
     "act03_1": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
+    "bn03_1": {
+        "kind": LAYER_NAME_BN,
+    },
     "conv03_2": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 256, "strides": (1, 1), "padding": "same"
     },
     "act03_2": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "bn03_2": {
+        "kind": LAYER_NAME_BN,
     },
     "conv03_3": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters": 256, "strides": (1, 1), "padding": "same"
@@ -140,11 +152,17 @@ layers_config = {
     "act03_3": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
+    "bn03_3": {
+        "kind": LAYER_NAME_BN,
+    },
     "conv03_4": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters":512, "strides": (1, 1), "padding": "same"
     },
     "act03_4": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "bn03_4": {
+        "kind": LAYER_NAME_BN,
     },
     "maxpool03": {
         "kind": LAYER_NAME_MAXPOOL2D, "pool_size": (2, 2), "strides": (2, 2), "padding": "valid"
@@ -165,6 +183,9 @@ layers_config = {
     "act04_1_2": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
+    "bn04_1": {
+        "kind": LAYER_NAME_BN,
+    },
     # Repeat 2
     "conv04_2_1": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters": 256, "strides": (1, 1), "padding": "same"
@@ -177,6 +198,9 @@ layers_config = {
     },
     "act04_2_2": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "bn04_2": {
+        "kind": LAYER_NAME_BN,
     },
     # Repeat 3
     "conv04_3_1": {
@@ -191,6 +215,9 @@ layers_config = {
     "act04_3_2": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
+    "bn04_3": {
+        "kind": LAYER_NAME_BN,
+    },
     # Repeat 4
     "conv04_4_1": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters": 256, "strides": (1, 1), "padding": "same"
@@ -204,6 +231,9 @@ layers_config = {
     "act04_4_2": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
+    "bn04_4": {
+        "kind": LAYER_NAME_BN,
+    },
     # rest
     "conv04_5": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters": 512, "strides": (1, 1), "padding": "same"
@@ -211,11 +241,17 @@ layers_config = {
     "act04_5": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
+    "bn04_5": {
+        "kind": LAYER_NAME_BN,
+    },
     "conv04_6": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 1024, "strides": (1, 1), "padding": "same"
     },
     "act04_6": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "bn04_6": {
+        "kind": LAYER_NAME_BN,
     },
     "maxpool04": {
         "kind": LAYER_NAME_MAXPOOL2D, "pool_size": (2, 2), "strides": (2, 2), "padding": "valid"
@@ -236,6 +272,9 @@ layers_config = {
     "act05_1_2": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
+    "bn05_1": {
+        "kind": LAYER_NAME_BN,
+    },
     # Repeat 2
     "conv05_2_1": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters":512, "strides": (1, 1), "padding": "same"
@@ -249,6 +288,9 @@ layers_config = {
     "act05_2_2": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
+    "bn05_2": {
+        "kind": LAYER_NAME_BN,
+    },
     # rest
     "conv05_3": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters":1024, "strides": (1, 1), "padding": "same"
@@ -256,11 +298,17 @@ layers_config = {
     "act05_3": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
+    "bn05_3": {
+        "kind": LAYER_NAME_BN,
+    },
     "conv05_4": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters":1024, "strides": (2, 2), "padding": "same"
     },
     "act05_4": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "bn05_4": {
+        "kind": LAYER_NAME_BN,
     },
     # --------------------------------------------------------------------------------
     # 6th
@@ -271,11 +319,17 @@ layers_config = {
     "act06_1": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
     },
+    "bn06_1": {
+        "kind": LAYER_NAME_BN,
+    },
     "conv06_2": {
         "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters":1024, "strides": (1, 1), "padding": "same"
     },
     "act06_2": {
         "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "bn06_2": {
+        "kind": LAYER_NAME_BN,
     },
     # --------------------------------------------------------------------------------
     # Fully Connected
@@ -286,12 +340,18 @@ layers_config = {
     "full01": {
         "kind": LAYER_NAME_DENSE, "units": 4096, "activation": "relu", "l2": 1e-2
     },
+    "bn_full01": {
+        "kind": LAYER_NAME_BN,
+    },
     "drop01": {
         "kind": LAYER_NAME_DROP, "rate": TYPE_FLOAT(0.5),
     },
     # To be able to reshape into (S, S, (C + B * P))
     "full02": {
         "kind": LAYER_NAME_DENSE, "units": (S * S * (C + B * P)), "activation": "relu", "l2": 1e-2
+    },
+    "bn_full02": {
+        "kind": LAYER_NAME_BN,
     },
     # --------------------------------------------------------------------------------
     # Rehape into (S, S, (C + B * P))
@@ -320,7 +380,7 @@ class YOLOModel:
         self._model.compile(
             optimizer=self._optimizer,
             loss=YOLOLoss(),
-            metrics=['accuracy']
+            # metrics=['accuracy']
         )
         self._model.summary()
 

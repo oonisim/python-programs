@@ -39,7 +39,6 @@ _logger: logging.Logger = get_logger(__name__)
 def intersection_over_union(
         boxes_preds: tf.Tensor,
         boxes_labels: tf.Tensor,
-        box_format: str ="midpoint"
 ) -> tf.Tensor:
     """
     Calculates intersection over union
@@ -66,9 +65,8 @@ def intersection_over_union(
     Parameters:
         boxes_preds (tensor): Predictions of Bounding Boxes (x, y, w, h) in shape:(N, 4)
         boxes_labels (tensor): Correct labels of Bounding Boxes (x, y, w, h) in shape:(N, 4)
-        box_format (str): midpoint/corners, if boxes (x,y,w,h) or (x1,y1,x2,y2)
     Returns:
-        IOU(Intersection over union) for all examples
+        IOU(Intersection over union) for all examples in shape (N, 1)
     """
     _name: str = "intersection_over_union()"
     # Cannot use python bool in TF Graph mode

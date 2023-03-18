@@ -535,3 +535,80 @@ def rotate(img):
             # Save the output image to the current directory
             # cv.imwrite(f"{i}.jpg", result)
 
+
+def draw_box_on_image(
+        img: np.ndarray, 
+        bbox, 
+        title: str,
+        color=(255, 0, 0),
+        thickness=2
+):
+    """Draw a single bounding box on the image
+    Args:
+        img: image
+        bbox:
+            bounding box (x,y,w,h) where values are normalized to the image size with
+            value range [0.0,1.0]. (x,y) is the centre of the bounding box.
+        title: title of the box
+        color: color of the box
+        thickness: line thickness
+    """
+    img = img.astype(np.uint8).copy()
+    validate_image(img)
+
+    width = img.shape[1]
+    height = img.shape[0]
+    x, y, w, h = bbox
+    x *= width
+    y *= height
+    w *= width
+    h *= height
+    x_min, x_max, y_min, y_max = int(x - w/2), int(x + w/2), int(y - h/2), int(y + h/2)
+
+    img = cv.rectangle(img, (x_min, y_min), (x_max, y_max), color=color, thickness=thickness)
+
+    ((text_width, text_height), _) = cv.getTextSize(title, cv.FONT_HERSHEY_SIMPLEX, 0.35, 1)
+    img = cv.rectangle(img, (x_min, y_min - int(1.3 * text_height)), (x_min + text_width, y_min), color, -1)
+    img = cv.putText(
+        img,
+        text=title,
+        org=(x_min, y_min - int(0.3 * text_height)),
+        fontFace=cv.FONT_HERSHEY_SIMPLEX,
+        fontScale=0.35,
+        color=(255, 255, 255),
+        lineType=cv.LINE_AA,
+    )
+    return img
+
+
+def draw_grid(
+        img: np.ndarray, 
+        shape=(2, 2), 
+        color=(0, 255, 0), 
+        thickness=1
+):
+    """Draw grid on an image
+    Args:
+        img: image
+        shape: shape of the grid
+        color: color of the grid
+        thickness: line thickness
+    """
+    img = img.astype(np.uint8).copy()
+    validate_image(img)
+
+    height, width, _ = img.shape
+    rows, cols = shape
+    dy, dx = height / rows, width / cols
+
+    # draw vertical lines
+    for x in np.linspace(start=dx, stop=width-dx, num=cols-1):
+        x = int(round(x))
+        cv.line(img, (x, 0), (x, height), color=color, thickness=thickness)
+
+    # draw horizontal lines
+    for y in np.linspace(start=dy, stop=height-dy, num=rows-1):
+        y = int(round(y))
+        cv.line(img, (0, y), (width, y), color=color, thickness=thickness)
+
+    return img
