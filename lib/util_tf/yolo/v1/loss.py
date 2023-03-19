@@ -228,10 +228,12 @@ class YOLOLoss(Loss):
     """
     def __init__(
             self,
-            S = YOLO_GRID_SIZE,                   # pylint: disable=invalid-name
-            B = YOLO_V1_PREDICTION_NUM_BBOX,      # pylint: disable=invalid-name
-            C = YOLO_V1_PREDICTION_NUM_CLASSES,   # pylint: disable=invalid-name
-            P = YOLO_V1_PREDICTION_NUM_PRED,      # pylint: disable=invalid-name
+            S=YOLO_GRID_SIZE,                   # pylint: disable=invalid-name
+            B=YOLO_V1_PREDICTION_NUM_BBOX,      # pylint: disable=invalid-name
+            C=YOLO_V1_PREDICTION_NUM_CLASSES,   # pylint: disable=invalid-name
+            P=YOLO_V1_PREDICTION_NUM_PRED,      # pylint: disable=invalid-name
+            lambda_coord=TYPE_FLOAT(5.0),
+            lambda_noobj=TYPE_FLOAT(0.5),
             **kwargs
     ):
         """
@@ -269,8 +271,8 @@ class YOLOLoss(Loss):
         # predictions for boxes that don’t contain objects. We
         # use two parameters, lambda_coord=5 and lambda_noobj=0.5
         # --------------------------------------------------------------------------------
-        self.lambda_coord: TYPE_FLOAT = TYPE_FLOAT(5.0)
-        self.lambda_noobj: TYPE_FLOAT = TYPE_FLOAT(0.5)
+        self.lambda_coord: TYPE_FLOAT = lambda_coord
+        self.lambda_noobj: TYPE_FLOAT = lambda_noobj
 
         # --------------------------------------------------------------------------------
         # Identity function Iobj_i tells if an object exists in a cell.
@@ -289,6 +291,8 @@ class YOLOLoss(Loss):
         Return serializable layer configuration from which the instance can be reinstantiated.
         """
         config = super().get_config().copy()
+        # Those parameters need to be in the __init__ arguments to restore at the load model.
+        # Otherwise TypeError: __init__() got an unexpected keyword argument 'lambda_coord'
         config.update({
             'S': self.S,
             'B': self.B,

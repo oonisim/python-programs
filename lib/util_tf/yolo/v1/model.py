@@ -12,7 +12,7 @@ from typing import (
     Tuple,
     List,
 )
-
+import tensorflow as tf
 from tensorflow import keras    # DO not forget this
 from keras import (
     Model,
@@ -21,7 +21,8 @@ from keras.layers import (
     Layer,
 )
 from keras.optimizers import (
-    SGD
+    SGD,
+    Adam
 )
 from keras.optimizers import (
     Optimizer
@@ -99,6 +100,218 @@ input_shape: Tuple[int, int, int] = (
     YOLO_V1_IMAGE_WIDTH, YOLO_V1_IMAGE_HEIGHT, YOLO_V1_IMAGE_CHANNELS
 )
 layers_config = {
+    # --------------------------------------------------------------------------------
+    # 1st
+    # --------------------------------------------------------------------------------
+    "norm": {
+        "kind": LAYER_NAME_NORM, "input_shape": input_shape, "axis": -1
+    },
+    "conv01": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (7, 7), "filters": 64, "strides": (2, 2), "padding": "same"
+    },
+    "act01": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "maxpool01": {
+        "kind": LAYER_NAME_MAXPOOL2D, "pool_size": (2, 2), "strides": (2, 2), "padding": "valid"
+    },
+    # --------------------------------------------------------------------------------
+    # 2nd
+    # --------------------------------------------------------------------------------
+    "conv02": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 192, "strides": (1, 1), "padding": "same"
+    },
+    "act02": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "maxpool02": {
+        "kind": LAYER_NAME_MAXPOOL2D, "pool_size": (2, 2), "strides": (2, 2), "padding": "valid"
+    },
+    # --------------------------------------------------------------------------------
+    # 3rd
+    # --------------------------------------------------------------------------------
+    "conv03_1": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters": 192, "strides": (1, 1), "padding": "same"
+    },
+    "act03_1": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "conv03_2": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 256, "strides": (1, 1), "padding": "same"
+    },
+    "act03_2": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "conv03_3": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters": 256, "strides": (1, 1), "padding": "same"
+    },
+    "act03_3": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "conv03_4": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters":512, "strides": (1, 1), "padding": "same"
+    },
+    "act03_4": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "maxpool03": {
+        "kind": LAYER_NAME_MAXPOOL2D, "pool_size": (2, 2), "strides": (2, 2), "padding": "valid"
+    },
+    # --------------------------------------------------------------------------------
+    # 4th
+    # --------------------------------------------------------------------------------
+    # Repeat 1
+    "conv04_1_1": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters": 256, "strides": (1, 1), "padding": "same"
+    },
+    "act04_1_1": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "conv04_1_2": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 512, "strides": (1, 1), "padding": "same"
+    },
+    "act04_1_2": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    # Repeat 2
+    "conv04_2_1": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters": 256, "strides": (1, 1), "padding": "same"
+    },
+    "act04_2_1": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "conv04_2_2": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters":512, "strides": (1, 1), "padding": "same"
+    },
+    "act04_2_2": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    # Repeat 3
+    "conv04_3_1": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters": 256, "strides": (1, 1), "padding": "same"
+    },
+    "act04_3_1": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "conv04_3_2": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 512, "strides": (1, 1), "padding": "same"
+    },
+    "act04_3_2": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    # Repeat 4
+    "conv04_4_1": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters": 256, "strides": (1, 1), "padding": "same"
+    },
+    "act04_4_1": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "conv04_4_2": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 512, "strides": (1, 1), "padding": "same"
+    },
+    "act04_4_2": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    # rest
+    "conv04_5": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters": 512, "strides": (1, 1), "padding": "same"
+    },
+    "act04_5": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "conv04_6": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 1024, "strides": (1, 1), "padding": "same"
+    },
+    "act04_6": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "maxpool04": {
+        "kind": LAYER_NAME_MAXPOOL2D, "pool_size": (2, 2), "strides": (2, 2), "padding": "valid"
+    },
+    # --------------------------------------------------------------------------------
+    # 5th
+    # --------------------------------------------------------------------------------
+    # Repeat 1
+    "conv05_1_1": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters": 512, "strides": (1, 1), "padding": "same"
+    },
+    "act05_1_1": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "conv05_1_2": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 1024, "strides": (1, 1), "padding": "same"
+    },
+    "act05_1_2": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    # Repeat 2
+    "conv05_2_1": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (1, 1), "filters": 512, "strides": (1, 1), "padding": "same"
+    },
+    "act05_2_1": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "conv05_2_2": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 1024, "strides": (1, 1), "padding": "same"
+    },
+    "act05_2_2": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    # rest
+    "conv05_3": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 1024, "strides": (1, 1), "padding": "same"
+    },
+    "act05_3": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "conv05_4": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 1024, "strides": (2, 2), "padding": "same"
+    },
+    "act05_4": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    # --------------------------------------------------------------------------------
+    # 6th
+    # --------------------------------------------------------------------------------
+    "conv06_1": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 1024, "strides": (1, 1), "padding": "same"
+    },
+    "act06_1": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    "conv06_2": {
+        "kind": LAYER_NAME_CONV2D, "kernel_size": (3, 3), "filters": 1024, "strides": (1, 1), "padding": "same"
+    },
+    "act06_2": {
+        "kind": LAYER_NAME_ACTIVATION, "activation": "leaky_relu", "slope": YOLO_V1_LEAKY_RELU_SLOPE
+    },
+    # --------------------------------------------------------------------------------
+    # Fully Connected
+    # --------------------------------------------------------------------------------
+    "flat": {
+        "kind": LAYER_NAME_FLAT, "data_format": "channels_last"
+    },
+    "full01": {
+        "kind": LAYER_NAME_DENSE, "units": 4096, "activation": "relu", "l2": 1e-2
+    },
+    "drop01": {
+        "kind": LAYER_NAME_DROP, "rate": TYPE_FLOAT(0.5),
+    },
+    # To be able to reshape into (S, S, (C + B * P)).
+    # [YOLO v1 paper]
+    # We use a linear activation function for the final layer
+    "full02": {
+        "kind": LAYER_NAME_DENSE, "units": (S * S * (C + B * P)), "activation": "linear", "l2": 1e-2
+    },
+    # --------------------------------------------------------------------------------
+    # Reshape into (S, S, (C + B * P))
+    # --------------------------------------------------------------------------------
+    "reshape": {
+        "kind": LAYER_NAME_RESHAPE, "target_shape": (S, S, (C + B * P))
+    }
+}
+
+layers_config_bn = {
     # --------------------------------------------------------------------------------
     # 1st
     # --------------------------------------------------------------------------------
@@ -378,7 +591,7 @@ layers_config = {
         "kind": LAYER_NAME_DENSE, "units": (S * S * (C + B * P)), "activation": "linear", "l2": 1e-2
     },
     # --------------------------------------------------------------------------------
-    # Rehape into (S, S, (C + B * P))
+    # Reshape into (S, S, (C + B * P))
     # --------------------------------------------------------------------------------
     "reshape": {
         "kind": LAYER_NAME_RESHAPE, "target_shape": (S, S, (C + B * P))
@@ -388,7 +601,6 @@ layers_config = {
 
 # --------------------------------------------------------------------------------
 # Model
-# TODO: Normalization layer (standardization)
 # --------------------------------------------------------------------------------
 # class YOLOModel(Model):
 class YOLOModel:
@@ -396,14 +608,18 @@ class YOLOModel:
         # super(YOLOModel, self).__init__(*args, **kwargs)
         self._model: Model = build_nn_model(model_name="yolo_v1", input_shape=input_shape, layers_config=layers_config)
         self._learning_rate: float = YOLO_V1_LR_1ST
-        self._optimizer: Optimizer = SGD(
-            learning_rate=YOLO_V1_LR_1ST,
-            momentum=YOLO_V1_MOMENTUM,
-            decay=YOLO_V1_DECAY
+        # self._optimizer: Optimizer = SGD(
+        #     learning_rate=YOLO_V1_LR_1ST,
+        #     momentum=YOLO_V1_MOMENTUM,
+        #     decay=YOLO_V1_DECAY
+        # )
+        self._optimizer: Optimizer = Adam(
+            learning_rate=YOLO_V1_LR_1ST
         )
         self._model.compile(
             optimizer=self._optimizer,
             loss=YOLOLoss(),
+            # YOLO model output is (C,B*P) with B number of predictions which need non-max suppression.
             # metrics=['accuracy']
         )
         self._model.summary()
@@ -446,3 +662,24 @@ class YOLOModel:
 
     def fit(self, *args, **kwargs):
         return self.model.fit(*args, **kwargs)
+
+    def predict(self, inputs):
+        self.model.predict(
+            x=inputs,
+            batch_size=None,
+            verbose='auto',
+            steps=None,
+            callbacks=None,
+            max_queue_size=10,
+            workers=4,
+            use_multiprocessing=False
+        )
+
+    def save(self, path_to_dir):
+        """Save model"""
+        self.model.save(filepath=path_to_dir)
+
+    def load(self, path_to_dir):
+        """Load the saved model
+        """
+        self._model = keras.models.load_model(path_to_dir)

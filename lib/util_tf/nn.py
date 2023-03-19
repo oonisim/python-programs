@@ -687,6 +687,29 @@ def get_model_checkpoint_callback(
     )
 
 
+def get_reduce_lr_callback(
+        monitor='val_loss',
+        factor=0.1,
+        patience=3,
+        verbose=1,
+        mode='auto',
+        min_delta=0.0001,
+        cooldown=0,
+        min_lr=0,
+        **kwargs
+):
+    return tf.keras.callbacks.ReduceLROnPlateau(
+        monitor=monitor,
+        factor=factor,
+        patience=patience,
+        verbose=verbose,
+        mode=mode,
+        min_delta=min_delta,
+        cooldown=cooldown,
+        min_lr=min_lr,
+        **kwargs
+    )
+
 # --------------------------------------------------------------------------------
 # Model Evaluation
 # --------------------------------------------------------------------------------
