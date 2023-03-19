@@ -664,7 +664,8 @@ class YOLOModel:
         return self.model.fit(*args, **kwargs)
 
     def predict(self, inputs):
-        self.model.predict(
+        """Predict"""
+        return self.model.predict(
             x=inputs,
             batch_size=None,
             verbose='auto',
@@ -675,11 +676,18 @@ class YOLOModel:
             use_multiprocessing=False
         )
 
-    def save(self, path_to_dir):
+    def save(self, filepath):
         """Save model"""
-        self.model.save(filepath=path_to_dir)
+        self.model.save(filepath=filepath)
 
-    def load(self, path_to_dir):
-        """Load the saved model
+    def load(self, filepath, custom_objects=None, compile=True, options=None):
+        """Load the saved model or checkpoint
+        https://www.tensorflow.org/api_docs/python/tf/keras/models/load_model
         """
-        self._model = keras.models.load_model(path_to_dir)
+        self._model = keras.models.load_model(
+            filepath=filepath,
+            custom_objects=custom_objects,
+            compile=compile,
+            options=options
+        )
+        return self._model

@@ -671,7 +671,7 @@ def get_early_stopping_callback(
 
 
 def get_model_checkpoint_callback(
-        filepath: str = 'model.hdf5',
+        filepath: str = 'model_checkpoint.hdf5',
         monitor: str = "val_loss",
         mode: str = "min",
         save_freq: str = 'epoch',
@@ -680,6 +680,7 @@ def get_model_checkpoint_callback(
     return tf.keras.callbacks.ModelCheckpoint(
         filepath=filepath,
         save_best_only=True,
+        save_weights_only=False,
         monitor=monitor,
         mode=mode,
         save_freq=save_freq,

@@ -167,3 +167,9 @@ def intersection_over_union(
     #     f"expected IOU <= 1.0, got\n{IOU[(IOU > TYPE_FLOAT(1.0+EPSILON))]}"
 
     return IOU
+
+
+def yolo_v1_metric(y_true, y_pred):
+    """Calculate YOLO v1 prediction metrics
+    """
+    pass
