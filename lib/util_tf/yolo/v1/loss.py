@@ -435,12 +435,8 @@ class YOLOLoss(Loss):
         )
 
         self.batch_size = tf.cast(tf.shape(y_pred)[0], dtype=TYPE_FLOAT)
-        _logger.debug(
-            "%s: batch size:[%s] total cells:[%s]", _name, self.batch_size, self.N
-        )
         tf.debugging.assert_all_finite(x=y_true, message="expected y_true is finite")
         tf.debugging.assert_all_finite(x=y_pred, message="expected y_pred is finite")
-        tf.debugging.assert_non_negative(x=self.batch_size, message="expected batch size non negative")
 
         # --------------------------------------------------------------------------------
         # Reshape y_pred into N consecutive predictions in shape (N, (C+B*P)).
@@ -451,21 +447,13 @@ class YOLOLoss(Loss):
         # pylint: disable=invalid-name
         Y: tf.Tensor = tf.reshape(tensor=y_pred, shape=(-1, self.C + self.B * self.P))
         T: tf.Tensor = tf.reshape(tensor=y_true, shape=(-1, self.C + self.P))
-        # You can't use Python bool in graph mode. You should instead use tf.cond.
-        # assert tf.shape(Y)[0] == tf.shape(T)[0], \
-        #     f"got different number of predictions:[{tf.shape(Y)[0]}] and labels:[{tf.shape(T)[0]}]"
-        # tf.assert_equal(x=tf.shape(Y)[0], y=tf.shape(T)[0], message="expected same number")
 
         self.N = tf.shape(Y)[0]
-        # tf.print(_name, "number of cells to process (N)=", self.N)
-
         self.Iobj_i = T[..., YOLO_V1_LABEL_INDEX_CP:YOLO_V1_LABEL_INDEX_CP+1]
         self.Inoobj_i = 1.0 - self.Iobj_i
-        tf.debugging.assert_equal(x=tf.shape(self.Iobj_i), y=(self.N, 1), message="expected Iobj_i shape (N,1")
-        # assert self.Iobj_i.shape == (self.N, 1), \
-        #     f"expected shape {(self.N, 1)} got {self.Iobj_i.shape}."
-        # tf.assert_equal(x=self.Iobj_i.shape, y=(self.N, 1), message="expected same shape")
-        DUMP and _logger.debug("%s: self.Iobj_i:[%s]", _name, self.Iobj_i)
+        tf.debugging.assert_equal(
+            x=tf.shape(self.Iobj_i), y=(self.N, 1), message="expected Iobj_i shape (N,1"
+        )
 
         # --------------------------------------------------------------------------------
         # Classification loss
@@ -477,7 +465,7 @@ class YOLOLoss(Loss):
             y_true=self.Iobj_i * T[..., :self.C],
             y_pred=self.Iobj_i * Y[..., :self.C],
         )
-        _logger.debug("%s: classification_loss[%s]", _name, classification_loss)
+        # tf.print("classification_loss:", classification_loss)
 
         # --------------------------------------------------------------------------------
         # Bounding box predictions (c, x, y, w, h)
@@ -489,9 +477,6 @@ class YOLOLoss(Loss):
         box_true: tf.Tensor = tf.reshape(
             tensor=T[..., self.C:],
             shape=(-1, self.P)
-        )
-        DUMP and _logger.debug(
-            "%s: box_pred shape:%s\n[%s]", _name, tf.shape(box_pred), box_pred
         )
 
         # --------------------------------------------------------------------------------
@@ -533,7 +518,6 @@ class YOLOLoss(Loss):
             tensor=tf.math.argmax(input=IOU, axis=-1, output_type=TYPE_INT),
             shape=(self.N, 1)
         )
-        DUMP and _logger.debug("%s: best_box_j:%s", _name, best_box_j)
         del IOU
 
         # --------------------------------------------------------------------------------
@@ -563,7 +547,7 @@ class YOLOLoss(Loss):
             y_true=self.Iobj_i * box_true[..., 1:3],    # shape (N, 2)
             y_pred=self.Iobj_i * best_boxes[..., 1:3]   # shape (N, 2) as (x,y) from (cp,x,y,w,h)
         )
-        _logger.debug("%s: x_y_loss[%s]", _name, x_y_loss)
+        # tf.print("x_y_loss:", x_y_loss)
 
         # --------------------------------------------------------------------------------
         # Localization loss (sqrt(w), sqrt(h))
@@ -592,7 +576,7 @@ class YOLOLoss(Loss):
             y_true=self.Iobj_i * sqrt_w_h_true,
             y_pred=self.Iobj_i * sqrt_w_h_pred
         )
-        _logger.debug("%s: w_h_loss[%s]", _name, w_h_loss)
+        # tf.print("w_h_loss:", w_h_loss)
 
         # --------------------------------------------------------------------------------
         # Confidence loss with an object in a cell
@@ -616,14 +600,15 @@ class YOLOLoss(Loss):
         # --------------------------------------------------------------------------------
         confidence_pred: tf.Tensor = best_boxes[..., 0:1]     # cp from (cp,x,y,w,h)
         confidence_true: tf.Tensor = max_IOU
-        # assert tf.reduce_all(tf.shape(confidence_pred) == (self.N, 1)), \
-        #     f"expected confidence shape:{(self.N, 1)}, got " \
-        #     f"confidence_pred:{confidence_pred} confidence_truth:{tf.shape(confidence_true)}"
+        tf.debugging.assert_equal(
+            x=tf.shape(confidence_pred), y=(self.N, 1),
+            message="expected shape of confidence_pred is (N,1)"
+        )
         confidence_loss: tf.Tensor = self.loss_fn(
             y_true=self.Iobj_i * confidence_true,
             y_pred=self.Iobj_i * confidence_pred
         )
-        _logger.debug("%s: confidence_loss[%s]", _name, confidence_loss)
+        # tf.print("confidence_loss:", confidence_loss)
 
         # --------------------------------------------------------------------------------
         # Confidence loss with no object
@@ -668,32 +653,18 @@ class YOLOLoss(Loss):
             y_true=no_obj_confidence_true,
             y_pred=self.Inoobj_i * no_obj_confidences_pred
         )
-        _logger.debug("%s: no_obj_confidence_loss[%s]", _name, no_obj_confidence_loss)
+        tf.print("no_obj_confidence_loss:", no_obj_confidence_loss)
 
         # --------------------------------------------------------------------------------
-        # Total loss
-        # tf.add_n be more efficient than reduce_sum because it sums the tensors directly.
+        # Total loss (tf.add_n is efficient than reduce_sum as summing tensors directly)
         # --------------------------------------------------------------------------------
-        # tf.print("x_y_loss", x_y_loss)
-        # tf.print("w_h_loss", w_h_loss)
-        # tf.print("confidence_loss", confidence_loss)
-        # tf.print("no_obj_confidence_loss", no_obj_confidence_loss)
-        # tf.print("classification_loss", classification_loss)
-
-        # loss: tf.Tensor = tf.math.add_n([
-        #     x_y_loss,
-        #     w_h_loss,
-        #     confidence_loss,
-        #     no_obj_confidence_loss,
-        #     classification_loss
-        # ])
-        loss: tf.Tensor = \
-            x_y_loss + \
-            w_h_loss + \
-            confidence_loss + \
-            no_obj_confidence_loss + \
+        loss: tf.Tensor = tf.math.add_n([
+            x_y_loss,
+            w_h_loss,
+            confidence_loss,
+            no_obj_confidence_loss,
             classification_loss
-
+        ])
         return loss
 
 
