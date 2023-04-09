@@ -198,4 +198,13 @@ class PromptTemplate:
             example: input to apply the prompt template
         Returns: prompt generated via the template
         """
-        return self.prompt_template.apply(example=input)
+        return self.prompt_template.apply(example=example, *args, **kwargs)
+
+    def apply(self, example: Dict) -> str:
+        """Apply prompt template on the example
+        Args:
+            example: input to apply the prompt template
+        Returns: single prompt string generated via the template
+        """
+        return self.prompt_template.apply(example=example)[0]
+
