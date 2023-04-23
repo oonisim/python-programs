@@ -6,34 +6,41 @@ See https://docs.python.org/3/library/http.html for HTTP status codes.
 import os
 import shutil
 import logging
-import requests
 from http import (
     HTTPStatus
-)
-from requests.models import (
-    Response
-)
-from requests.exceptions import (
-    HTTPError,
-    ConnectionError,
-    Timeout,
-    RequestException
 )
 from functools import (
     wraps
 )
 from typing import (
-    List,
     Dict,
     Generator,
     Optional
 )
 
+import requests
+from requests.models import (
+    Response
+)
+from requests.exceptions import (
+    HTTPError,
+    Timeout,
+    # Causes "Redefining built-in 'ConnectionError' (redefined-builtin)" which cannot be disabled
+    # See https://github.com/pylint-dev/pylint/issues/3677
+    # ConnectionError,
+    RequestException
+)
 
 from util_logging import (
     get_logger,
 )
 _logger: logging.Logger = get_logger(name=__name__)
+
+
+# --------------------------------------------------------------------------------
+# Constant
+# --------------------------------------------------------------------------------
+TIMEOUT_DEFAULT: float = 30.0
 
 
 # --------------------------------------------------------------------------------
@@ -49,7 +56,9 @@ def handle_requests_exception(function):
 
         try:
             return function(*args, **kwds)
-        except (HTTPError, ConnectionError, Timeout, RequestException) as error:
+        except (
+                HTTPError, requests.exceptions.ConnectionError, Timeout, RequestException
+        ) as error:
             _logger.error("%s: failed due to timeout error [%s]", name, error)
             raise RuntimeError(f"{name} failed.") from error
 
@@ -60,6 +69,7 @@ def handle_requests_exception(function):
 def exists_url(
         url: str,
         headers: Optional[Dict[str, str]] = None,
+        timeout: float = TIMEOUT_DEFAULT
 ) -> bool:
     """Check if URL exists
     Args:
@@ -68,11 +78,12 @@ def exists_url(
             HTTP headers to set to the request, e.g {
                 "User-Agent": "Company Name myname@company.com"
             }
+        timeout: (optional) How many seconds to wait for the server to send data
     Returns: True if exists or False
     Raises:
         RuntimeError if HTTP status is not 200 and not in status_codes_to_ignore
     """
-    response: Response = requests.head(url=url, headers=headers)
+    response: Response = requests.head(url=url, headers=headers, timeout=timeout)
     if response.status_code not in [HTTPStatus.OK, HTTPStatus.NOT_FOUND]:
         response.raise_for_status()
 
@@ -83,8 +94,8 @@ def exists_url(
 def get_content_from_url(
         url: str,
         headers: Optional[Dict[str, str]] = None,
-        status_codes_to_ignore: Optional[List[int]] = None
-) -> Optional[str]:
+        timeout: float = TIMEOUT_DEFAULT
+) -> str:
     """Get content from url.
     See https://requests.readthedocs.io/en/latest/
     
@@ -94,7 +105,7 @@ def get_content_from_url(
             HTTP headers to set to the request, e.g {
                 "User-Agent": "Company Name myname@company.com"
             }
-        status_codes_to_ignore: list of status codes to ignore
+        timeout: (optional) How many seconds to wait for the server to send data
     Returns:
         Content of the HTTP GET response body or None if status code is in status_codes_to_ignore
     Raises:
@@ -103,22 +114,16 @@ def get_content_from_url(
     name: str = "get_content_from_url()"
     _logger.debug("%s: url [%s] headers [%s]", name, url, headers)
 
-    response: Response = requests.get(url=url, headers=headers)
-    status_code: int = response.status_code
-    if status_code == HTTPStatus.OK:
-        content = response.content.decode("utf-8")
-        return content
-    elif status_codes_to_ignore is not None and status_code in status_codes_to_ignore:
-        _logger.debug("%s: pass the status code [%s] and returns None", name, status_code)
-        return None
-    else:
-        response.raise_for_status()
+    response: Response = requests.get(url=url, headers=headers, timeout=timeout)
+    response.raise_for_status()
+    return response.content.decode("utf-8")
 
 
 @handle_requests_exception
 def download_from_url(
         url: str,
         headers: Optional[Dict[str, str]] = None,
+        timeout: float = TIMEOUT_DEFAULT,
         path_to_file: Optional[str] = None
 ) -> str:
     """Download content from URL to the path_to_file.
@@ -128,6 +133,7 @@ def download_from_url(
             HTTP headers to set to the request, e.g {
                 "User-Agent": "Company Name myname@company.com"
             }
+        timeout: (optional) How many seconds to wait for the server to send data
         path_to_file:
             path to the file to save the content.
             If None, the filename from url is created at the current directory.
@@ -143,7 +149,7 @@ def download_from_url(
     )
 
     filename: str = url.strip().split(os.sep)[-1] if path_to_file is None else path_to_file
-    with requests.get(url=url, headers=headers, stream=True) as response:
+    with requests.get(url=url, headers=headers, timeout=timeout, stream=True) as response:
         response.raise_for_status()
         with open(path_to_file, 'wb') as _file:
             shutil.copyfileobj(response.raw, _file)
@@ -155,6 +161,7 @@ def download_from_url(
 def stream_from_url(
         url: str,
         headers: Optional[Dict[str, str]] = None,
+        timeout: float = TIMEOUT_DEFAULT,
         chunk_size: int = 512,
         decode_unicode: bool = False,
         delimiter: str = None
@@ -170,6 +177,7 @@ def stream_from_url(
             HTTP headers to set to the request, e.g {
                 "User-Agent": "Company Name myname@company.com"
             }
+        timeout: (optional) How many seconds to wait for the server to send data
         chunk_size: the number of bytes to read into memory.
         decode_unicode: if True, content will be decoded using the best available encoding based on the response.
         delimiter: character to split the content into lines
@@ -184,7 +192,7 @@ def stream_from_url(
         "%s: streaming from url [%s] headers [%s]", name, url, headers
     )
 
-    with requests.get(url=url, headers=headers, stream=True) as response:
+    with requests.get(url=url, headers=headers, timeout=timeout, stream=True) as response:
         response.raise_for_status()
         for line in response.iter_lines(
                 chunk_size=chunk_size, decode_unicode=decode_unicode, delimiter=delimiter
