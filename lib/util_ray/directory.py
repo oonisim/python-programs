@@ -170,10 +170,11 @@ def test():
             def aggregate(self, results: List[Any]) -> int:
                 return int(np.sum(results))
 
-        calclator: Director = CalcDirector()
-        result: int = calclator.run([1, 2, 3, 4, 5])
+        calculator: Director = CalcDirector()
+        result: int = calculator.run([1, 2, 3, 4, 5])
         assert result == np.sum(np.power([1, 2, 3, 4, 5], 2)), f"expected 55 but {result}"
-        calclator.close()
+
+        calculator.close()
 
     finally:
         ray.shutdown()
