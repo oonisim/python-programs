@@ -1,3 +1,4 @@
+import os
 import logging
 from typing import (
     Optional,
@@ -7,9 +8,7 @@ from typing import (
 # --------------------------------------------------------------------------------
 # Logging
 # --------------------------------------------------------------------------------
-DEFAULT_LOG_LEVEL_NAME = (
-    logging.getLevelName(logging.ERROR)
-)
+DEFAULT_LOG_LEVEL_NAME = logging.getLevelName(logging.ERROR)
 DEFAULT_LOG_LEVEL = getattr(logging, DEFAULT_LOG_LEVEL_NAME)
 
 
@@ -36,6 +35,20 @@ def get_log_level(name: str) -> int:
     """
     assert is_valid_log_level_name(name), f"Invalid log level name {name}."
     return getattr(logging, name)
+
+
+def get_log_level_from_environment_variable(
+        log_level_variable_name: str = "LOG_LEVEL_NAME"
+) -> int:
+    """Get log level for the log level name specified in the environment variable
+    Returns: log level int or DEFAULT_LOG_LEVEL
+    """
+    log_level_name: str = DEFAULT_LOG_LEVEL_NAME
+    if log_level_variable_name in os.environ:
+        if is_valid_log_level_name(log_level_variable_name):
+            log_level_name = os.environ[log_level_variable_name].upper()
+
+    return getattr(logging, log_level_name)
 
 
 def get_logger(name: str, level: Optional[int] = None) -> logging.Logger:

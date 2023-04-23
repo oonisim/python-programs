@@ -521,6 +521,15 @@ def is_weekend(
     return result
 
 
+def is_date_string(x):
+    """Check if x has date/time format"""
+    try:
+        dateutil.parser.parse(x)
+        return True
+    except ValueError:
+        return False
+
+
 def get_cyclic_time_of_day(hours: int, minutes: int, seconds: int) -> Tuple[TYPE_FLOAT, TYPE_FLOAT]:
     """Encode time in day as cyclic
     https://datascience.stackexchange.com/a/6335/68313
