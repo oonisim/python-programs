@@ -1,3 +1,6 @@
+"""
+Python generator utility module
+"""
 import logging
 from typing import (
     List,
@@ -8,15 +11,18 @@ from typing import (
 )
 
 
+# --------------------------------------------------------------------------------
+# Functions
+# --------------------------------------------------------------------------------
 def split(sliceable, num: int) -> Generator:
-    """Split sliceable into num batches to stream
+    """Split slice-able collection into batches to stream
     Args:
         sliceable: a slice-able object e.g. list, numpy array
         num: number of batches to split
     Yields: A batch
     """
     assert num > 0
-    assert (
+    assert (    # To be able to slice, __getitem__ method is required
         "__getitem__" in dir(sliceable)
         and (not isinstance(sliceable, Dict))
         and len(sliceable) > 0
