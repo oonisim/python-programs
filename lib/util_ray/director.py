@@ -1,46 +1,43 @@
 """
 Director pattern of assigning tasks to workers
 """
-import os
-import re
 import time
 import logging
 import multiprocessing
 from typing import (
     List,
-    Dict,
-    Callable,
-    Generator,
     Sequence,
     Any,
 )
 
-import ray
-
-from util_logging import (
+from util_logging import (              # pylint disable=wrong-import-order
     get_logger,
     DEFAULT_LOG_LEVEL
 )
-from util_python.generator import (
+from util_python.generator import (     # pylint disable=wrong-import-order
     split
 )
+import ray
 
 
 # --------------------------------------------------------------------------------
 # Constant
 # --------------------------------------------------------------------------------
 NUM_CPUS: int = multiprocessing.cpu_count()
+MAX_WORKERS: int = NUM_CPUS
 
 
 # --------------------------------------------------------------------------------
 # Class
 # --------------------------------------------------------------------------------
 class Director:
+    """Director pattern implementation class to assign tasks to workers"""
     # --------------------------------------------------------------------------------
     # Properties
     # --------------------------------------------------------------------------------
     @property
     def logger(self) -> logging.Logger:
+        """Provides the logger instance"""
         return self._logger
 
     # --------------------------------------------------------------------------------
@@ -58,6 +55,9 @@ class Director:
             log_level: logging level according to the python logging module
             initialize_ray: flag if initialize ray
         """
+        assert 0 < num_workers <= MAX_WORKERS, \
+            f"expected 0 < num_workers < {MAX_WORKERS+1}, got {num_workers}"
+
         # --------------------------------------------------------------------------------
         # Logging
         # --------------------------------------------------------------------------------
@@ -70,7 +70,7 @@ class Director:
         self._num_workers: int = num_workers
         self._ray_initialized: bool = False
         if initialize_ray:
-            logging.info("main(): initializing Ray using %s workers..." % self._num_workers)
+            self._logger.info("main(): initializing Ray using %s workers...", self._num_workers)
             try:
                 ray.init(num_cpus=self._num_workers, num_gpus=0, logging_level=log_level)
                 self._ray_initialized = True
@@ -88,6 +88,16 @@ class Director:
     def worker(self, task: Any) -> Any:
         """Worker task to execute based on the instruction message
         To be implemented in the child class.
+
+        NOTE:
+            Like the best practice in Spark, make sure to reduce the shuffle or
+            network traffic. If the end goal in aggregate is to sum all up, then
+            do the subtotal in worker.
+
+            For instance, if the task is [1,2,3] and calculate their power,
+            instead of returning [1,4,9], return the subtotal 14 if the end
+            result at aggregate is total sum.
+
         Args:
             task: task
         """
@@ -100,7 +110,11 @@ class Director:
         Args:
             tasks: a slice-able collection of records
         Returns: List of task results executed by the workers.
+        Raises: RuntimeError if there is no task
         """
+        if not tasks or len(tasks) == 0:
+            raise RuntimeError(f"invalid tasks:{tasks}")
+
         num_workers: int = min(len(tasks), self._num_workers)
         assert num_workers > 0
 
@@ -115,7 +129,7 @@ class Director:
         # instance/class members.
         # --------------------------------------------------------------------------------
         futures = [
-            self.worker.remote(self, task)
+            self.worker.remote(self, task)  # pylint: disable=no-member
             for task in split(sliceable=tasks, num=num_workers)
         ]
         assert len(futures) == num_workers, \
@@ -140,11 +154,20 @@ class Director:
         return results
 
     def aggregate(self, results: List[Any]) -> Any:
-        """Aggregate the result results from the workers"""
+        """Aggregate the result results from the workers.
+        NOTE:
+            Beware the size of the result that each worker returns can be different.
+            If the size of tasks is 7 e.g. [1,2,3,4,5,6,7] assigned to 3 workers,
+            the sizes are not the same as split to [1,2,3], [4,5], [6,7].
+
+            Then np.sum([[1,2,3], [4,5], [6,7]]) will result in unexpected
+            [1,2,3,4,5,6,7] as numpy cannot handle non-equal length causing
+            unexpected result.
+        """
         raise NotImplementedError("TBD")
 
     def run(self, tasks: Sequence):
-        """Run the process of the directory
+        """Run the process of the director
         """
         return self.aggregate(self.assign(tasks=tasks))
 
@@ -153,28 +176,3 @@ class Director:
         if self._ray_initialized:
             ray.shutdown()
             time.sleep(3)
-
-
-# ================================================================================
-# Test
-# ================================================================================
-def test():
-    import numpy as np
-
-    try:
-        class CalcDirector(Director):
-            @ray.remote
-            def worker(self, task: List[int]) -> int:
-                return task[0] ** 2
-
-            def aggregate(self, results: List[Any]) -> int:
-                return int(np.sum(results))
-
-        calculator: Director = CalcDirector()
-        result: int = calculator.run([1, 2, 3, 4, 5])
-        assert result == np.sum(np.power([1, 2, 3, 4, 5], 2)), f"expected 55 but {result}"
-
-        calculator.close()
-
-    finally:
-        ray.shutdown()

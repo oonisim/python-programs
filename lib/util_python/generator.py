@@ -1,20 +1,61 @@
 """
 Python generator utility module
 """
+import functools
 import logging
+import threading
 from typing import (
-    List,
     Dict,
-    Any,
-    Callable,
-    Generator,
+    Iterator,
 )
+
+from util_logging import (
+    get_logger
+)
+
+_logger: logging.Logger = get_logger(name=__name__)
 
 
 # --------------------------------------------------------------------------------
 # Functions
 # --------------------------------------------------------------------------------
-def split(sliceable, num: int) -> Generator:
+class ThreadSafeIterator:
+    """Wrapper class to make an iterable thread-safe
+    Generator and iterator are not thread safe. Generate cannot be thread-safe
+    because if two threads call next method on a generator at the same time,
+    it will raise an exception ValueError: generator already executing.
+
+    The only way to fix it is by wrapping it in an iterator and have a lock
+    that allows only one thread to call next method of the generator.
+
+    See
+        * https://anandology.com/blog/using-iterators-and-generators/
+        * https://docs.python.org/3/library/functions.html#iter
+        * https://anandology.com/blog/using-iterators-and-generators/
+    """
+    def __init__(self, iterable):
+        self.lock = threading.Lock()
+        self.iterable = iter(iterable)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        with self.lock:
+            return self.iterable.__next__()
+
+
+def threadsafe_iterator(func):
+    """A decorator that makes an iterable thread-safe.
+    """
+    @functools.wraps(func)
+    def _iterator(*args, **kwargs):
+        return ThreadSafeIterator(func(*args, **kwargs))
+    return _iterator
+
+
+@threadsafe_iterator
+def split(sliceable, num: int) -> Iterator:
     """Split slice-able collection into batches to stream
     Args:
         sliceable: a slice-able object e.g. list, numpy array
@@ -28,7 +69,7 @@ def split(sliceable, num: int) -> Generator:
         and len(sliceable) > 0
     ), f"{type(sliceable)} not slice-able"
 
-    logging.debug(f"split(): splitting {len(sliceable)} sliceable into {num} batches.")
+    _logger.debug("split(): splitting %s sliceable into %s batches.", len(sliceable), num)
 
     # Total rows
     total = len(sliceable)
