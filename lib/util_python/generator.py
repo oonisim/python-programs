@@ -1,12 +1,17 @@
 """
 Python generator utility module
 """
+import sys
 import functools
 import logging
+import math
 import threading
 from typing import (
+    List,
     Dict,
-    Iterator,
+    Generator,
+    Callable,
+    Any
 )
 
 from util_logging import (
@@ -45,40 +50,38 @@ class ThreadSafeIterator:
             return self.iterable.__next__()
 
 
-def threadsafe_iterator(func):
+def threadsafe_iterator(func) -> Callable[[List[Any], Dict[str, Any]], ThreadSafeIterator]:
     """A decorator that makes an iterable thread-safe.
     """
     @functools.wraps(func)
     def _iterator(*args, **kwargs):
         return ThreadSafeIterator(func(*args, **kwargs))
+
     return _iterator
 
 
 @threadsafe_iterator
-def split(sliceable, num: int) -> Iterator:
+def split(sliceable, num_batches: int) -> Generator:
     """Split slice-able collection into batches to stream
     Args:
         sliceable: a slice-able object e.g. list, numpy array
-        num: number of batches to split
+        num_batches: number of batches to split
     Yields: A batch
     """
-    assert num > 0
-    assert (    # To be able to slice, __getitem__ method is required
-        "__getitem__" in dir(sliceable)
-        and (not isinstance(sliceable, Dict))
-        and len(sliceable) > 0
-    ), f"{type(sliceable)} not slice-able"
+    assert len(sliceable) > 0 and num_batches > 0, \
+        f"invalid data size [{len(sliceable)}] or num_batches [{num_batches}]."
+    assert "__getitem__" in dir(sliceable) and (not isinstance(sliceable, Dict)), \
+        f"{type(sliceable)} not slice-able."
 
-    _logger.debug("split(): splitting %s sliceable into %s batches.", len(sliceable), num)
-
-    # Total rows
+    name: str = "split()"
     total = len(sliceable)
+    _logger.info("%s: splitting [%s] records into %s batches.", name, total, num_batches)
 
     # Each assignment has 'quota' size which can be zero if total < number of assignments.
-    quota = int(total / num)
+    quota = int(total / num_batches)
 
     # Left over after each assignment takes its 'quota'
-    residual = total % num
+    residual = total % num_batches
 
     start: int = 0
     while start < total:
@@ -94,3 +97,45 @@ def split(sliceable, num: int) -> Iterator:
 
         start = end
         end += size
+
+    _logger.info("%s: done", name)
+
+
+def stream(
+        sliceable,
+        batch_size: int,
+        num_batches_to_show_progress: int = sys.maxsize
+) -> Generator:
+    """Stream a batch at a time from a slice-able collection.
+    Args:
+        sliceable: a slice-able object e.g. list, numpy array, pandas dataframe
+        batch_size: number of records to package into a batch to stream
+        num_batches_to_show_progress: number of batches, at every consumption of which to show the progress
+    Yields: A batch
+    """
+    assert len(sliceable) > 0 and batch_size > 0, \
+        f"invalid data size [{len(sliceable)}] or batch size [{batch_size}]."
+    assert "__getitem__" in dir(sliceable) and (not isinstance(sliceable, Dict)), \
+        f"{type(sliceable)} not slice-able."
+
+    name: str = "stream()"
+    total_records: int = len(sliceable)
+    num_batches: int = math.ceil(total_records / batch_size)
+    _logger.info(
+        "%s: streaming [%s] records in [%s] batches with batch size [%s].",
+        name, total_records, num_batches, batch_size
+    )
+
+    position: int = 0
+    while position < total_records:
+        next_position: int = position + min(batch_size, total_records - position)
+        yield sliceable[position:next_position]
+        position = next_position
+
+        if (position / batch_size) % num_batches_to_show_progress == 0:
+            print(f"{name}: [{position}] records consumed in [{position / batch_size}] batches.")
+
+    assert position == total_records, \
+        f"expected position:[{position}] == total_records:[{total_records}]."
+
+    _logger.info("%s: done", name)
