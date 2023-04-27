@@ -65,7 +65,7 @@ def split(sliceable, num_batches: int) -> Generator:
     """Split slice-able collection into batches to stream
     Args:
         sliceable: a slice-able object e.g. list, numpy array
-        num_batches: number of batches to split
+        num_batches: number of batches to split. if num_batches > len(sliceable), adjust to len(sliceable)
     Yields: A batch
     """
     assert len(sliceable) > 0 and num_batches > 0, \
@@ -76,6 +76,13 @@ def split(sliceable, num_batches: int) -> Generator:
     name: str = "split()"
     total = len(sliceable)
     _logger.info("%s: splitting [%s] records into %s batches.", name, total, num_batches)
+
+    if num_batches > total:
+        logging.debug(
+            "%s: num_batches:[%s] > total records:[%s. adjust num_batches to [%s]",
+            name, num_batches, total, total
+        )
+        num_batches = total
 
     # Each assignment has 'quota' size which can be zero if total < number of assignments.
     quota = int(total / num_batches)
@@ -101,7 +108,7 @@ def split(sliceable, num_batches: int) -> Generator:
     _logger.info("%s: done", name)
 
 
-def stream(
+def batch(
         sliceable,
         batch_size: int,
         num_batches_to_show_progress: int = sys.maxsize
@@ -118,7 +125,7 @@ def stream(
     assert "__getitem__" in dir(sliceable) and (not isinstance(sliceable, Dict)), \
         f"{type(sliceable)} not slice-able."
 
-    name: str = "stream()"
+    name: str = "batch()"
     total_records: int = len(sliceable)
     num_batches: int = math.ceil(total_records / batch_size)
     _logger.info(
