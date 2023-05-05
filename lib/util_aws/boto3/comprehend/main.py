@@ -1,5 +1,6 @@
 """Module for AWS Comprehend operation with Boto3
 """
+import re
 import logging
 from typing import (
     List,
@@ -52,6 +53,28 @@ class ComprehendDetect:
         """
         return language_code in SUPPORTED_LANGUAGES_CODES
 
+    @staticmethod
+    def validate_text(text: str):
+        """Validate if the text is string with length
+        Args:
+            text: text to validate
+        Raises:
+            ValueError: text is invalid
+        """
+        name: str = "validate_text()"
+        if not text or not isinstance(text, str):
+            msg: str = f"expected the text as a valid string, got [{text}]."
+            _logger.error("%s: %s", name, msg)
+            raise ValueError(msg)
+
+        text = re.sub(r'[\s\'\"\n\t\\]+', ' ', text, flags=re.MULTILINE).strip()
+        if len(text) == 0:
+            msg: str = f"expected the text as a valid string with length, got [{text}]."
+            _logger.error("%s: %s", name, msg)
+            raise ValueError(msg)
+
+        return text
+
     # --------------------------------------------------------------------------------
     # Instance
     # --------------------------------------------------------------------------------
@@ -75,8 +98,20 @@ class ComprehendDetect:
                 'Score': float
             }
 
-        Raises: RuntimeError when API call fails
+        Raises:
+            ValueError: argument values are invalid
+            RuntimeError: AWS API call failed
         """
+        name: str = "detect_dominant_language()"
+
+        # --------------------------------------------------------------------------------
+        # Validate and clean text
+        # --------------------------------------------------------------------------------
+        text = self.validate_text(text=text)
+
+        # --------------------------------------------------------------------------------
+        # Detect language(s)
+        # --------------------------------------------------------------------------------
         try:
             response = self.comprehend_client.detect_dominant_language(
                 Text=text
@@ -85,7 +120,7 @@ class ComprehendDetect:
                 response['Languages'],
                 key=lambda detection: detection['Score']
             )
-            _logger.debug("detected languages %s", detections)
+            _logger.debug("%s: detected languages %s", name, detections)
 
             if return_language_code_only:
                 detections = [
@@ -114,7 +149,7 @@ class ComprehendDetect:
         Args:
             text: text to extract entities from.
             language_code: language code of the text. It can be omitted if  auto_detect_language is True
-            auto_detect_language: use language auto detection
+            auto_detect_language: use language auto-detection
 
         Returns:
             The list of entities along with their confidence scores.
@@ -137,7 +172,9 @@ class ComprehendDetect:
                 ...
             ]
 
-        Raises: RuntimeError when Boto3 failed e.g. language_code is not supported.
+        Raises:
+            ValueError: argument values are invalid
+            RuntimeError: AWS API call failed
         """
         name: str = "detect_entities()"
         assert (
@@ -146,6 +183,11 @@ class ComprehendDetect:
         ), \
             f"invalid combination of auto_detect_language:[{auto_detect_language}] " \
             f"and language_code:[{language_code}]"
+
+        # --------------------------------------------------------------------------------
+        # Validate and clean text
+        # --------------------------------------------------------------------------------
+        text = self.validate_text(text=text)
 
         # --------------------------------------------------------------------------------
         # Auto language detection if specified
@@ -185,6 +227,7 @@ class ComprehendDetect:
         Args:
             text: text to extract entities from.
             language_code: language code of the text
+            auto_detect_language: flat to use language code auto-detection
             entity_types:
                 types of entities that AWS Comprehend identifies.
                 See https://docs.aws.amazon.com/comprehend/latest/dg/how-entities.html
@@ -210,16 +253,36 @@ class ComprehendDetect:
                     },
                     ...
                 ]
-
+        Returns:
+            list of values of the entity_type if return_entity_value_only is True.
+            Otherwise, list of entities
         """
-        result = None
+        name: str = "detect_entities_by_type()"
+        result: Optional[List[Any]] = None
+
+        # --------------------------------------------------------------------------------
+        # Validate and clean text
+        # --------------------------------------------------------------------------------
+        text = self.validate_text(text=text)
+
+        # --------------------------------------------------------------------------------
+        # Detect entities
+        # --------------------------------------------------------------------------------
         detected_entities: List[Any] = self.detect_entities(
             text=text, language_code=language_code, auto_detect_language=auto_detect_language
         )
 
+        # --------------------------------------------------------------------------------
+        # If no entity types, return the detected entities as is.
+        # --------------------------------------------------------------------------------
         if not entity_types:
-            return detected_entities
+            return sorted(
+                detected_entities, reverse=True, key=lambda _entity: _entity['Score']
+            ) if sort_by_score else detected_entities
 
+        # --------------------------------------------------------------------------------
+        # Extract entity of the specified entity_types
+        # --------------------------------------------------------------------------------
         assert len(entity_types) > 0 and isinstance(entity_types[0], str), \
             f"invalid entity_types:[{entity_types}]."
 
@@ -236,7 +299,7 @@ class ComprehendDetect:
             entities = {}
             for entity in detected_entities:
                 if entity['Type'].lower() in entity_type_set:
-                    text: str = entity['Text'].lower()
+                    text: str = entity['Text']
                     if text not in entities or entities[text] < entity['Score']:
                         # Create {text: score} pair and sort by score later in sorted().
                         entities[text] = entity['Score']

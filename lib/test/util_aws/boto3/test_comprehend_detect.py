@@ -270,3 +270,315 @@ def test_comprehend_detect_entities__auto_detect_language_ja():
     # Test condition #3
     assert date_certainty > threshold, \
         f"expected detecting {date} as DATE with {date_certainty} > {threshold} in\n{listing}"
+
+
+# --------------------------------------------------------------------------------
+# Entity detections by entity type
+# --------------------------------------------------------------------------------
+def test_detect_entities_by_type():
+    """Test entity detections of a certain entity type e.g. PERSON, LOCATION, DATE
+    in English text
+
+    Test conditions:
+        From the text including PERSON, LOCATION, DATE,
+        1. Extract PERSON entities only with descending order by score.
+        2. Extract LOCATION entities only with descending order by score
+        3. Extract DATE entities only with descending order by score
+    """
+    person1: str = "Abraham Lincoln"
+    person2: str = "Ulysses S. Grant"
+    person3: str = "Robert E. Lee"
+    location: str = "Gettysburg"
+    date1: str = "12 Apr 1861"
+    date2: str = "9 Apr 1865"
+
+    text: str = f"""During the civil war from {date1} – {date2},
+                {person1} was the president and leading The Union. 
+                {person2} was some of his generals. 
+                {person3} fought the last fight at {location}."""
+
+    # --------------------------------------------------------------------------------
+    # All entities
+    # --------------------------------------------------------------------------------
+    entities: List[Dict[str, Any]] = comprehend.detect_entities_by_type(
+        text=text,
+        language_code="en",
+        entity_types=None
+    )
+    listing = json.dumps(entities, indent=4, default=str, ensure_ascii=False)
+    # print(f"total entities: {listing}")
+
+    # --------------------------------------------------------------------------------
+    # entity_type=PERSON
+    # [
+    #     {
+    #         "Score": 0.9997009038925171,
+    #         "Type": "PERSON",
+    #         "Text": "Abraham Lincoln",
+    #         "BeginOffset": 52,
+    #         "EndOffset": 67
+    #     },
+    #     {
+    #         "Score": 0.9993404746055603,
+    #         "Type": "PERSON",
+    #         "Text": "Robert E. Lee",
+    #         "BeginOffset": 152,
+    #         "EndOffset": 165
+    #     },
+    #     {
+    #         "Score": 0.9573029279708862,
+    #         "Type": "PERSON",
+    #         "Text": "Ulysses S. Grant",
+    #         "BeginOffset": 109,
+    #         "EndOffset": 125
+    #     }
+    # ]
+    # --------------------------------------------------------------------------------
+    people: List[Dict[str, Any]] = comprehend.detect_entities_by_type(
+        text=text,
+        language_code="en",
+        entity_types=["PERSON"],
+        sort_by_score=True
+    )
+    people_listing = json.dumps(people, indent=4, default=str, ensure_ascii=False)
+    # print(f"people_listing: {people_listing}")
+    assert len(people) == 3, f"expected 3 people entities, got [{len(people)}]."
+    assert people[0]['Score'] >= people[1]['Score'] >= people[2]['Score'], \
+        f"expected descending sorted by score, got {people_listing}"
+    assert {people[0]['Text'], people[1]['Text'], people[2]['Text']} == {person1, person2, person3}, \
+        f"expected people {{person1, person2, person3}} in {people_listing}"
+
+    # --------------------------------------------------------------------------------
+    # entity_type=LOCATION
+    # [
+    #     {
+    #         "Score": 0.9948418736457825,
+    #         "Type": "LOCATION",
+    #         "Text": "Gettysburg",
+    #         "BeginOffset": 191,
+    #         "EndOffset": 201
+    #     }
+    # ]
+    # --------------------------------------------------------------------------------
+    locations: List[Dict[str, Any]] = comprehend.detect_entities_by_type(
+        text=text,
+        language_code="en",
+        entity_types=["LOCATION"],
+        sort_by_score=True
+    )
+    location_listing = json.dumps(locations, indent=4, default=str, ensure_ascii=False)
+    # print(f"location_listing: {location_listing}")
+    assert len(locations) == 1, f"expected 1 locations entity, got [{len(locations)}]."
+    assert locations[0]['Text'] == location, \
+        f"expected locations {location}, got {locations[0]['Text']}.\n" \
+        f"Entities found:{location_listing}"
+
+    # --------------------------------------------------------------------------------
+    # entity_type=DATE
+    # [
+    #     {
+    #         "Score": 0.9979767799377441,
+    #         "Type": "DATE",
+    #         "Text": "9 Apr 1865",
+    #         "BeginOffset": 40,
+    #         "EndOffset": 50
+    #     },
+    #     {
+    #         "Score": 0.9972290396690369,
+    #         "Type": "DATE",
+    #         "Text": "12 Apr 1861",
+    #         "BeginOffset": 26,
+    #         "EndOffset": 37
+    #     }
+    # ]
+    # --------------------------------------------------------------------------------
+    dates: List[Dict[str, Any]] = comprehend.detect_entities_by_type(
+        text=text,
+        language_code="en",
+        entity_types=["DATE"],
+        sort_by_score=True
+    )
+    dates_listing = json.dumps(dates, indent=4, default=str, ensure_ascii=False)
+    # print(f"dates_listing: {dates_listing}")
+    assert len(dates) == 2, f"expected 2 dates entities, got [{len(dates)}]."
+    assert dates[0]['Score'] >= dates[1]['Score'], \
+        f"expected descending sorted by score, got {dates_listing}"
+    assert {dates[0]['Text'], dates[1]['Text']} == {date1, date2}, \
+        f"expected dates {{date1, date2}} in {dates_listing}"
+
+
+def test_detect_entities_by_type__return_entity_value_only():
+    """Test entity detections of a certain entity type e.g. PERSON, LOCATION, DATE
+    in English text with only values returned e.g. ["Abraham Lincoln", "Robert E. Lee"]
+    instead of list of dictionaries.
+
+    Test conditions:
+        From the text including PERSON, LOCATION, DATE,
+        1. Extract PERSON values only with descending order by score.
+        2. Extract LOCATION values only with descending order by score
+        3. Extract DATE values only with descending order by score
+    """
+    person1: str = "Abraham Lincoln"
+    person2: str = "Ulysses S. Grant"
+    person3: str = "Robert E. Lee"
+    location: str = "Gettysburg"
+    date1: str = "12 Apr 1861"
+    date2: str = "9 Apr 1865"
+
+    text: str = f"""During the civil war from {date1} – {date2},
+                {person1} was the president and leading The Union. 
+                {person2} was some of his generals. 
+                {person3} fought the last fight at {location}."""
+
+    # --------------------------------------------------------------------------------
+    # entity_type=PERSON
+    # [
+    #     {
+    #         "Score": 0.9997009038925171,
+    #         "Type": "PERSON",
+    #         "Text": "Abraham Lincoln",
+    #         "BeginOffset": 52,
+    #         "EndOffset": 67
+    #     },
+    #     {
+    #         "Score": 0.9993404746055603,
+    #         "Type": "PERSON",
+    #         "Text": "Robert E. Lee",
+    #         "BeginOffset": 152,
+    #         "EndOffset": 165
+    #     },
+    #     {
+    #         "Score": 0.9573029279708862,
+    #         "Type": "PERSON",
+    #         "Text": "Ulysses S. Grant",
+    #         "BeginOffset": 109,
+    #         "EndOffset": 125
+    #     }
+    # ]
+    # --------------------------------------------------------------------------------
+    # First, get the list of dictionaries
+    people: List[Dict[str, Any]] = comprehend.detect_entities_by_type(
+        text=text,
+        language_code="en",
+        entity_types=["PERSON"],
+        sort_by_score=True,
+        return_entity_value_only=False
+    )
+    people_listing = json.dumps(people, indent=4, default=str, ensure_ascii=False)
+    # print(f"people_listing: {people_listing}")
+    assert len(people) == 3, f"expected 3 people entities, got [{len(people)}]."
+
+    people_values_expected: List[str] = [
+        people[0]['Text'], people[1]['Text'], people[2]['Text']
+    ]
+
+    # Then, get the values only.
+    people_values_actual: List[str] = comprehend.detect_entities_by_type(
+        text=text,
+        language_code="en",
+        entity_types=["PERSON"],
+        sort_by_score=True,
+        return_entity_value_only=True
+    )
+    # print(f"people_values_actual: {people_values_actual}")
+    assert len(people_values_expected) == len(people_values_actual), \
+        f"expected {len(people_values_expected)} people, got {len(people_values_actual)}\n " \
+        f"as people_values_actual={people_values_actual} collected from {people_listing}"
+
+    assert all([
+        people_values_actual[index] == expected
+        for index, expected in enumerate(people_values_expected)
+    ]), f"expected {people_values_expected}, got {people_values_actual}\n" \
+        f"collected from {people_listing}"
+
+    # --------------------------------------------------------------------------------
+    # entity_type=LOCATION
+    # [
+    #     {
+    #         "Score": 0.9948418736457825,
+    #         "Type": "LOCATION",
+    #         "Text": "Gettysburg",
+    #         "BeginOffset": 191,
+    #         "EndOffset": 201
+    #     }
+    # ]
+    # --------------------------------------------------------------------------------
+    locations: List[Dict[str, Any]] = comprehend.detect_entities_by_type(
+        text=text,
+        language_code="en",
+        entity_types=["LOCATION"],
+        sort_by_score=True,
+        return_entity_value_only=False
+    )
+    location_listing = json.dumps(locations, indent=4, default=str, ensure_ascii=False)
+    # print(f"location_listing: {location_listing}")
+    assert len(locations) == 1, f"expected 1 locations entity, got [{len(locations)}]."
+    assert locations[0]['Text'] == location, \
+        f"expected locations {location}, got {locations[0]['Text']}.\n" \
+        f"Entities found:{location_listing}"
+
+    location_values_expected: List[str] = [location]
+    location_values_actual: List[str] = comprehend.detect_entities_by_type(
+        text=text,
+        language_code="en",
+        entity_types=["LOCATION"],
+        sort_by_score=True,
+        return_entity_value_only=True
+    )
+    # print(f"location_values_actual: {location_values_actual}")
+    assert location_values_expected == location_values_actual, \
+        f"expected {location_values_expected} entities, got {location_values_actual}\n" \
+        f"collected from {location_listing}"
+
+    # --------------------------------------------------------------------------------
+    # entity_type=DATE
+    # [
+    #     {
+    #         "Score": 0.9979767799377441,
+    #         "Type": "DATE",
+    #         "Text": "9 Apr 1865",
+    #         "BeginOffset": 40,
+    #         "EndOffset": 50
+    #     },
+    #     {
+    #         "Score": 0.9972290396690369,
+    #         "Type": "DATE",
+    #         "Text": "12 Apr 1861",
+    #         "BeginOffset": 26,
+    #         "EndOffset": 37
+    #     }
+    # ]
+    # --------------------------------------------------------------------------------
+    dates: List[Dict[str, Any]] = comprehend.detect_entities_by_type(
+        text=text,
+        language_code="en",
+        entity_types=["DATE"],
+        sort_by_score=True,
+        return_entity_value_only=False
+    )
+    dates_listing = json.dumps(dates, indent=4, default=str, ensure_ascii=False)
+    # print(f"dates_listing: {dates_listing}")
+    assert len(dates) == 2, f"expected 2 dates entities, got [{len(dates)}]."
+    assert dates[0]['Score'] >= dates[1]['Score'], \
+        f"expected descending sorted by score, got {dates_listing}"
+
+    date_values_expected: List[str] = [dates[0]['Text'], dates[1]['Text']]
+    date_values_actual: List[str] = comprehend.detect_entities_by_type(
+        text=text,
+        language_code="en",
+        entity_types=["DATE"],
+        sort_by_score=True,
+        return_entity_value_only=True
+    )
+    # print(f"date_values_actual: {date_values_actual}")
+    assert len(date_values_expected) == len(date_values_actual), \
+        f"expected {len(date_values_expected)} date, got {len(date_values_actual)}\n " \
+        f"as date_values_actual={date_values_actual} collected from {dates_listing}"
+
+    # Verify the values are descending order by score as in
+    assert all([
+        date_values_actual[index] == expected
+        for index, expected in enumerate(date_values_expected)
+    ]), f"expected {date_values_expected}, got {date_values_actual}\n" \
+        f"collected from {dates_listing}"
+
