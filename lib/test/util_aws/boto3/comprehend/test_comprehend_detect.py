@@ -150,11 +150,11 @@ def test_comprehend_detect_entities__en():
 
     # Test condition #1
     assert person_certainty > threshold, \
-        f"expected detecting {person} as DATE with {person_certainty} > {threshold} in\n{listing}"
+        f"expected detecting {person} as PERSON with {person_certainty} > {threshold} in\n{listing}"
 
     # Test condition #2
     assert location_certainty > threshold, \
-        f"expected detecting {location} as DATE with {location_certainty} > {threshold} in\n{listing}"
+        f"expected detecting {location} as LOCATION with {location_certainty} > {threshold} in\n{listing}"
 
     # Test condition #3
     assert date_certainty > threshold, \
@@ -169,7 +169,7 @@ def test_comprehend_detect_entities__ja():
         2. Detect LOCATION, e.g. "ケンタッキー州"
         3. Detect DATE, e.g. "1865年4月９日"
     """
-    person: str = "エイブラハム　リンカーン"
+    person: str = "エイブラハム リンカーン"    # space is ASCII not multi-byote JP space
     location: str = "ケンタッキー州"
     date: str = "1865年4月９日"
 
@@ -188,6 +188,7 @@ def test_comprehend_detect_entities__ja():
     )
     listing = json.dumps(entities, indent=4, default=str, ensure_ascii=False)
     # print(listing)
+
     assert len(entities) > 0, f"expected detections, got [{entities}]"
     for entity in entities:
         # Test condition #1
@@ -204,11 +205,11 @@ def test_comprehend_detect_entities__ja():
 
     # Test condition #1
     assert person_certainty > threshold, \
-        f"expected detecting {person} as DATE with {person_certainty} > {threshold} in\n{listing}"
+        f"expected detecting {person} as PERSON with {person_certainty} > {threshold} in\n{listing}"
 
     # Test condition #2
     assert location_certainty > threshold, \
-        f"expected detecting {location} as DATE with {location_certainty} > {threshold} in\n{listing}"
+        f"expected detecting {location} as LOCATION with {location_certainty} > {threshold} in\n{listing}"
 
     # Test condition #3
     assert date_certainty > threshold, \
@@ -222,11 +223,11 @@ def test_comprehend_detect_entities__auto_detect_language_ja():
     """Test entity detections with auto-detect language
     Test conditions:
         From the text including PERSON, LOCATION, DATE more than threshold certainty.
-        1. Detect PERSON, e.g. "エイブラハム　リンカーン"
+        1. Detect PERSON, e.g. "エイブラハム リンカーン"
         2. Detect LOCATION, e.g. "ケンタッキー州"
         3. Detect DATE, e.g. "1865年4月９日"
     """
-    person: str = "エイブラハム　リンカーン"
+    person: str = "エイブラハム リンカーン"    # space is ASCII not multi-byote JP space
     location: str = "ケンタッキー州"
     date: str = "1865年4月９日"
 
@@ -246,6 +247,7 @@ def test_comprehend_detect_entities__auto_detect_language_ja():
     )
     listing = json.dumps(entities, indent=4, default=str, ensure_ascii=False)
     assert len(entities) > 0, f"expected detections, got [{entities}]"
+    
     for entity in entities:
         # Test condition #1
         if entity['Text'] == person and entity['Type'] == "PERSON":

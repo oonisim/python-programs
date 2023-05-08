@@ -12,6 +12,10 @@ from typing import (
 
 import botocore
 
+from util_aws.boto3.common import (
+    Base
+)
+
 # --------------------------------------------------------------------------------
 # Logging
 # --------------------------------------------------------------------------------
@@ -41,7 +45,7 @@ SUPPORTED_LANGUAGES_CODES: List[str] = [  # As of 04MAY2023
 # --------------------------------------------------------------------------------
 # AWS service class
 # --------------------------------------------------------------------------------
-class ComprehendDetect:
+class ComprehendDetect(Base):
     """Class to provide the AWS Comprehend detection functions.
     """
     # --------------------------------------------------------------------------------
@@ -52,28 +56,6 @@ class ComprehendDetect:
         """Check if the language code is supported by Comprehend
         """
         return language_code in SUPPORTED_LANGUAGES_CODES
-
-    @staticmethod
-    def validate_text(text: str):
-        """Validate if the text is string with length
-        Args:
-            text: text to validate
-        Raises:
-            ValueError: text is invalid
-        """
-        name: str = "validate_text()"
-        if not text or not isinstance(text, str):
-            msg: str = f"expected the text as a valid string, got [{text}]."
-            _logger.error("%s: %s", name, msg)
-            raise ValueError(msg)
-
-        text = re.sub(r'[\s\'\"\n\t\\]+', ' ', text, flags=re.MULTILINE).strip()
-        if len(text) == 0:
-            msg: str = f"expected the text as a valid string with length, got [{text}]."
-            _logger.error("%s: %s", name, msg)
-            raise ValueError(msg)
-
-        return text
 
     # --------------------------------------------------------------------------------
     # Instance

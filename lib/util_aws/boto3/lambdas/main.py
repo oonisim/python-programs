@@ -1,5 +1,92 @@
 """Module for AWS Lambda operations using Boto3
 Note: a.b.lambda package causes syntax error as 'lambda' cannot be used as the package name.
+
+Lambda event argument example when invoked from API Gateway
+"event": {
+    "resource": "/comprehend/entity",
+    "path": "/comprehend/entity/",
+    "httpMethod": "POST",
+    "headers": {
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br",
+        "content-type": "application/json",
+        "Host": "t1nniz2jrj.execute-api.ap-southeast-2.amazonaws.com",
+        "Postman-Token": "75288d5c-0173-4fc4-8dc9-dffa4b123a2c",
+        "User-Agent": "PostmanRuntime/7.32.2",
+        "X-Amzn-Trace-Id": "Root=1-64571694-6b300666676d600b1dab1218",
+        "X-Forwarded-For": "103.158.55.2",
+        "X-Forwarded-Port": "443",
+        "X-Forwarded-Proto": "https"
+    },
+    "multiValueHeaders": {
+        "Accept": [
+            "*/*"
+        ],
+        "Accept-Encoding": [
+            "gzip, deflate, br"
+        ],
+        "content-type": [
+            "application/json"
+        ],
+        "Host": [
+            "t1nniz2jrj.execute-api.ap-southeast-2.amazonaws.com"
+        ],
+        "Postman-Token": [
+            "75288f5c-0173-4fc4-8dc9-dffa4b123a2c"
+        ],
+        "User-Agent": [
+            "PostmanRuntime/7.32.2"
+        ],
+        "X-Amzn-Trace-Id": [
+            "Root=1-64171694-6b300666676d600b1dab1218"
+        ],
+        "X-Forwarded-For": [
+            "103.158.55.2"
+        ],
+        "X-Forwarded-Port": [
+            "443"
+        ],
+        "X-Forwarded-Proto": [
+            "https"
+        ]
+    },
+    "queryStringParameters": null,
+    "multiValueQueryStringParameters": null,
+    "pathParameters": null,
+    "stageVariables": null,
+    "requestContext": {
+        "resourceId": "v00x2v",
+        "resourcePath": "/comprehend/entity",
+        "httpMethod": "POST",
+        "extendedRequestId": "EiB3MEErSwMFjBg=",
+        "requestTime": "07/May/2023:03:10:12 +0000",
+        "path": "/dev/comprehend/entity/",
+        "accountId": "755863699032",
+        "protocol": "HTTP/1.1",
+        "stage": "dev",
+        "domainPrefix": "t1nniz2jrj",
+        "requestTimeEpoch": 1683429012116,
+        "requestId": "0104e494-7dc3-4f90-94d3-7ee6a147f9db",
+        "identity": {
+            "cognitoIdentityPoolId": null,
+            "accountId": null,
+            "cognitoIdentityId": null,
+            "caller": null,
+            "sourceIp": "103.158.55.2",
+            "principalOrgId": null,
+            "accessKey": null,
+            "cognitoAuthenticationType": null,
+            "cognitoAuthenticationProvider": null,
+            "userArn": null,
+            "userAgent": "PostmanRuntime/7.32.2",
+            "user": null
+        },
+        "domainName": "t1nniz2jrj.execute-api.ap-southeast-2.amazonaws.com",
+        "apiId": "t1nniz2jrj"
+    },
+    "body": null,
+    "isBase64Encoded": false
+}
 """
 import json
 import logging
@@ -58,12 +145,22 @@ class LambdaFunction:
     # Static
     # --------------------------------------------------------------------------------
     @staticmethod
-    def get_json_payload_from_event(
+    def get_request_id_from_apigw_event(event: dict) -> str:
+        """Get API Gateway event request ID"""
+        name: str = "get_request_id_from_event()"
+        try:
+            return event['requestContext']['requestId']
+        except KeyError as error:
+            _logger.error("%s, event['requestContext']['requestId'] does not exist.", name)
+            raise RuntimeError("failed to get request id.")
+
+    @staticmethod
+    def get_json_payload_from_apigw_event(
             event: dict,
             expect_payload_as_dictionary: bool = True,
             expected_dictionary_element_names: Iterable = None
     ) -> Union[List, Dict]:
-        """Get JSON payload from event['body'].
+        """Get JSON payload from API Gateway event['body'].
         Prerequisite:
             Event is a dictionary with the structure:
             {

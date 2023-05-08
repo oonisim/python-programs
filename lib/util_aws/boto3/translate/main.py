@@ -2,7 +2,12 @@
 import json
 import logging
 
+from util_aws.boto3.common import (
+    Base
+)
+
 import botocore
+
 
 # --------------------------------------------------------------------------------
 # Logging
@@ -13,7 +18,7 @@ _logger: logging.Logger = logging.getLogger(__name__)
 # --------------------------------------------------------------------------------
 # AWS Translate
 # --------------------------------------------------------------------------------
-class Translate:
+class Translate(Base):
     """Class to provide AWS Translate functions."""
     # --------------------------------------------------------------------------------
     # Static
@@ -29,7 +34,7 @@ class Translate:
         """
         self._client = translate_client
 
-    def translate_text(self, text, source_language_code, target_language_code):
+    def translate_text(self, text, source_language_code: str, target_language_code: str):
         """
         Translate text in source language to the target language
         Args:
@@ -37,11 +42,26 @@ class Translate:
             source_language_code: language code of the text to translate
             target_language_code: target language code to translate to.
         Returns: translated text
-        Raises: RuntimeError when Boto3 caused an error.
+        Raises:
+            RuntimeError: AWS API call failure
+            ValueError: Invalid values identified
         """
+        name: str = "translate_text()"
+
+        # --------------------------------------------------------------------------------
+        # Validate and clean text strings
+        # --------------------------------------------------------------------------------
+        text = self.validate_text(text=text)
+        source_language_code = self.validate_text(source_language_code)
+        target_language_code = self.validate_text(target_language_code)
+
+        # --------------------------------------------------------------------------------
+        # Translation
+        # --------------------------------------------------------------------------------
         try:
             _logger.debug(
-                "source language:[%s] target language:[%s] text:\n[%s]",
+                "%s: source language:[%s] target language:[%s] text:\n[%s]",
+                name,
                 source_language_code,
                 target_language_code,
                 text
@@ -61,9 +81,9 @@ class Translate:
             _logger.debug("translated:%s", json.dumps(response, indent=4, default=str))
 
         except botocore.exceptions.ClientError as error:
-            msg: str = f"translate_text() from source_language_code:[{source_language_code}] to " \
-                       f"target_language_code:[{target_language_code}] failed due to [{error}]."
-            _logger.error("%s", msg)
+            msg: str = f"translation from source_language_code:[{source_language_code}] to " \
+                       f"target_language_code:[{target_language_code}].\ncause:[{error}]."
+            _logger.error("%s: %s", name, msg)
             raise RuntimeError(msg) from error
 
         return response['TranslatedText']
