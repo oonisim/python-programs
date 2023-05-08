@@ -1,17 +1,8 @@
 """Module for common AWS handling class
 """
+# pylint: disable=too-few-public-methods
 import re
 import logging
-from typing import (
-    List,
-    Dict,
-    Set,
-    Any,
-    Optional,
-)
-
-import botocore
-import boto3
 
 
 # --------------------------------------------------------------------------------

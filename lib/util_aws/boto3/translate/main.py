@@ -2,6 +2,7 @@
 import json
 import logging
 
+# pylint: disable=import-error
 from util_aws.boto3.common import (
     Base
 )
@@ -20,6 +21,7 @@ _logger: logging.Logger = logging.getLogger(__name__)
 # --------------------------------------------------------------------------------
 class Translate(Base):
     """Class to provide AWS Translate functions."""
+    # pylint: disable=too-few-public-methods
     # --------------------------------------------------------------------------------
     # Static
     # --------------------------------------------------------------------------------
@@ -34,7 +36,7 @@ class Translate(Base):
         """
         self._client = translate_client
 
-    def translate_text(self, text, source_language_code: str, target_language_code: str):
+    def translate_text(self, text: str, source_language_code: str, target_language_code: str):
         """
         Translate text in source language to the target language
         Args:
