@@ -23,7 +23,7 @@ def test_translate_text__fail_with_invalid_language_code():
     """
     try:
         translate.translate_text(
-            text="i love sushi", source_language_code="invalid", target_language_code="es"
+            text="i love sushi", source_language_code="hoge", target_language_code="es"
         )
         # Test condition #1
         assert False, "expected RuntimeError for the invalid source_language_code."
@@ -32,7 +32,7 @@ def test_translate_text__fail_with_invalid_language_code():
 
     try:
         translate.translate_text(
-            text="i love sushi", source_language_code="en", target_language_code="invalid"
+            text="i love sushi", source_language_code="en", target_language_code="hoge"
         )
         # Test condition #2
         assert False, "expected RuntimeError for the invalid target_language_code."
@@ -48,7 +48,7 @@ def test_translate_text__fail_with_invalid_text():
             text=None, source_language_code="en", target_language_code="es"
         )
         assert False, "expected RuntimeError for the invalid text."
-    except RuntimeError as error:
+    except ValueError as error:
         logging.debug(error)
 
     try:
@@ -56,7 +56,7 @@ def test_translate_text__fail_with_invalid_text():
             text="   ", source_language_code="en", target_language_code="es"
         )
         assert False, "expected RuntimeError for the invalid text."
-    except RuntimeError as error:
+    except ValueError as error:
         logging.debug(error)
 
 
