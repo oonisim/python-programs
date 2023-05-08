@@ -1,6 +1,5 @@
 """Module for AWS Comprehend operation with Boto3
 """
-import re
 import logging
 from typing import (
     List,
@@ -12,7 +11,7 @@ from typing import (
 
 import botocore
 
-from util_aws.boto3.common import (
+from util_aws.boto3.common import (     # pylint: disable=import-error
     Base
 )
 
@@ -187,6 +186,17 @@ class ComprehendDetect(Base):
             )
             entities: List[Any] = response['Entities']
             _logger.debug("%s: number of entities detected is [%s].", name, len(entities))
+
+        except self.comprehend_client.exceptions.TextSizeLimitExceededException as error:
+            msg: str = f"length of the text [{len(text)}] exceeded the max size.\ncause:[{error}]"
+            _logger.error("%s: %s error: %s", name, msg, error)
+            raise ValueError(msg) from error
+
+        except botocore.exceptions.ParamValidationError as error:
+            msg: str = f"invalid parameter. check if language_code:[{language_code}] is correct." \
+                       f"\ncause:[{error}]"
+            _logger.error("%s: %s", name, msg)
+            raise ValueError(msg) from error
 
         except botocore.exceptions.ClientError as error:
             msg: str = f"Comprehend.detect_entities() failed due to {error}\n" \

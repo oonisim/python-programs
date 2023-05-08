@@ -1,5 +1,9 @@
 """Module to test ComprehendDetect class"""
 import logging
+from typing import (
+    List,
+    Any
+)
 
 # pylint: disable=import-error
 from util_aws.boto3.translate import (
@@ -72,6 +76,8 @@ def test_translate_text__same_source_and_target_language_codes():
 
 def test_traslate_text__en_es():
     """Test translate EN to ES.
+    Test conditions:
+    1. Translate "English" to "Inglés"
     """
     text: str = "English"
     expected: str = "Inglés".lower()
@@ -80,3 +86,14 @@ def test_traslate_text__en_es():
         text=text, source_language_code="en", target_language_code="es"
     )
     assert translation.lower() == expected, f"expected [{expected} got [{translation}]."
+
+
+def test_list_languages():
+    """Test listing the language codes that AWS translate supports
+    https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/translate/client/list_languages.html
+    """
+    languages: List[str] = translate.list_languages(return_language_code_only=True)
+    assert len(languages) > 0 and "en" in languages, f"expected languages, got {languages}"
+
+    languages: List[Any] = translate.list_languages(return_language_code_only=False)
+    assert len(languages) > 0, f"expected languages, got {languages}"

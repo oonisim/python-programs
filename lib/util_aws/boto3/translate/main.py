@@ -1,6 +1,10 @@
 """Module for AWS Translate operations using Boto3"""
 import json
 import logging
+from typing import (
+    List,
+    Any,
+)
 
 # pylint: disable=import-error
 from util_aws.boto3.common import (
@@ -35,6 +39,31 @@ class Translate(Base):
             translate_client: A Boto3 Translate client.
         """
         self._client = translate_client
+
+    def list_languages(
+            self,
+            return_language_code_only: bool = True
+    ) -> List[str]:
+        """Provides a list of languages (RFC-5646 codes and names) that Amazon Translate supports.
+        https://docs.aws.amazon.com/translate/latest/APIReference/API_ListLanguages.html
+        https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/translate/client/list_languages.html
+        """
+        response = self._client.list_languages(
+            DisplayLanguageCode='en',
+            MaxResults=200,
+        )
+
+        results: List[Any] = response['Languages']
+        while "NextToken" in response:
+            response = self._client.list_languages(
+                DisplayLanguageCode='en',
+                NextToken=response["NextToken"]
+            )
+            results.extend(response["Languages"])
+
+        return [
+            language['LanguageCode'] for language in results
+        ] if return_language_code_only else results
 
     def translate_text(self, text: str, source_language_code: str, target_language_code: str):
         """
@@ -81,6 +110,17 @@ class Translate(Base):
                 TargetLanguageCode=target_language_code
             )
             _logger.debug("translated:%s", json.dumps(response, indent=4, default=str))
+
+        except self._client.exceptions.TextSizeLimitExceededException as error:
+            msg: str = f"length of the text [{len(text)}] exceeded the max size.\ncause:[{error}]"
+            _logger.error("%s: %s error: %s", name, msg, error)
+            raise ValueError(msg)
+
+        except botocore.exceptions.ParamValidationError as error:
+            msg: str = f"invalid parameter. check if source_language_code:[{source_language_code}] " \
+                       f"and target_language_code:[{target_language_code}] are correct.\ncause:[{error}]"
+            _logger.error("%s: %s", name, msg)
+            raise ValueError(msg) from error
 
         except botocore.exceptions.ClientError as error:
             msg: str = f"translation from source_language_code:[{source_language_code}] to " \
