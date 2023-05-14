@@ -1,0 +1,418 @@
+"""Module for SpaCy operations
+References:
+    https://www.nltk.org/data.html
+"""
+import logging
+from typing import (
+    List,
+    Dict,
+    Set,
+    Tuple,
+    Any,
+    Optional,
+    Union
+)
+
+from util_logging import (
+    get_logger
+)
+from util_python.string import (
+    string_similarity_score,
+    remove_special_characters_from_text,
+)
+
+import nltk
+import textacy
+import spacy
+from spacy.tokens import Doc
+from spacy.language import Language
+
+
+# --------------------------------------------------------------------------------
+# Logging
+# --------------------------------------------------------------------------------
+_logger: logging.Logger = get_logger(__name__)
+_logger.setLevel(logging.INFO)
+
+
+# --------------------------------------------------------------------------------
+# Constant
+# --------------------------------------------------------------------------------
+LANGUAGES: Dict[str, str] = {
+    "en": "english",
+    "es": "spanish"
+}
+
+
+# --------------------------------------------------------------------------------
+# Utility
+# --------------------------------------------------------------------------------
+def get_language_from_code(language_code: str):
+    """Get full language name from its code e.g. 'english' from 'en'
+    TODO: move to a common library
+    Args:
+        language_code: language code
+    Return: language
+    Raises: KeyError for unknown language codes
+    """
+    name: str = "get_language_from_code()"
+    try:
+        return LANGUAGES[language_code.strip().lower()]
+    except KeyError:
+        _logger.error("%s: unknown language code [%s].", name, language_code)
+        raise
+
+
+# --------------------------------------------------------------------------------
+# SpaCy class
+# --------------------------------------------------------------------------------
+class Pipeline:
+    """Class for SpaCy Language Pretrained Pipeline
+    SpaCy call the pretrained language pipeline as "nlp" or "Language" or "Pipeline".
+    Use "Pipeline" to represent the Spacy Language class instance that consists of
+    components to provide a pipeline (tokenizer -> tagger -> parser -> NER -> ...)
+    to produce processed "Document" instance from a text.
+    """
+    # --------------------------------------------------------------------------------
+    # Properties
+    # --------------------------------------------------------------------------------
+    @property
+    def space(self):
+        """Provide a space character for the language"""
+        # TODO: use space character of the target language which may not be ASCII space.
+        return ' '
+
+    @property
+    def model(self) -> spacy.language.Language:
+        """Provide the pretrained pipeline model for the language"""
+        return self._nlp
+
+    @property
+    def stopwords(self) -> List[str]:
+        """Provide the stop words for the language"""
+        return self._stopwords
+
+    @property
+    def named_entity_labels(self) -> List[str]:
+        """List of the supported NER labels of the current language
+        Returns: List of named entity labels
+        """
+        return self._named_entity_labels
+
+    def process(self, text) -> spacy.tokens.Doc:
+        """Process the text with the pretrained language pipeline
+        Args:
+            text: text to get the entities from
+        Returns: spacy.tokens.Doc instance
+        """
+        return self.model(text)
+
+    # --------------------------------------------------------------------------------
+    # Initialization
+    # --------------------------------------------------------------------------------
+    def __init__(self, model_name: str = "en_core_web_sm"):
+        # --------------------------------------------------------------------------------
+        # Language pipeline
+        # --------------------------------------------------------------------------------
+        self._language: str = get_language_from_code(model_name.split('_')[0])
+        self._model_name = model_name
+        try:
+            self._nlp: Language = spacy.load(model_name)
+        except OSError:
+            spacy.cli.download("en_core_web_sm")
+            self._nlp = spacy.load(model_name)
+
+        # --------------------------------------------------------------------------------
+        # Language stop words
+        # --------------------------------------------------------------------------------
+        try:
+            self._stopwords: List[str] = nltk.corpus.stopwords.words(self._language)
+        except OSError:
+            nltk.download('stopwords')
+            self._stopwords: List[str] = nltk.corpus.stopwords.words(self._language)
+
+        # --------------------------------------------------------------------------------
+        # Named Entity
+        # --------------------------------------------------------------------------------
+        self._named_entity_labels: List[str] = self._nlp.get_pipe('ner').labels
+
+    # --------------------------------------------------------------------------------
+    # Functions
+    # --------------------------------------------------------------------------------
+    @staticmethod
+    def exists_similar_entity(
+            similarity_threshold: float,
+            text: str,
+            entities: Set[str]
+    ) -> bool:
+        """Check if similar entity to 'text' is in already in 'entities'.
+        Args:
+            similarity_threshold: threshold to decide if similar or not
+            text: text to find similarity
+        Return: True if exists else False
+        """
+        if similarity_threshold > 0.0:
+            for entity in entities:
+                if string_similarity_score(text.lower(), entity.lower()) > similarity_threshold:
+                    return True
+
+        return False
+
+    def remove_stopwords_from_text(self, text: str) -> str:
+        """Remove stop words from the text
+        Returns: text with stop words being removed.
+        """
+        return self.space.join([
+            word for word in text.split()
+            if word not in self.stopwords
+        ])
+
+    def clean_text(
+            self,
+            text: str,
+            remove_special_characters: bool = True,
+            remove_stopwords: bool = True,
+    ) -> str:
+        """
+        Args:
+            text: text to clean
+            remove_special_characters: remove special characters
+            remove_stopwords: remove stop characters
+        """
+        if remove_special_characters:
+            text = remove_special_characters_from_text(text=text)
+        if remove_stopwords:
+            text = self.remove_stopwords_from_text(text=text)
+
+        return text
+
+    def get_named_entities_from_document(
+            self,
+            doc: spacy.tokens.Doc,
+            excludes: Optional[List[str]] = None,
+            remove_special_characters: bool = True,
+            remove_stopwords: bool = True,
+            return_value_only: bool = False,
+            remove_similarity_threshold: float = 0.0
+    ) -> Dict[str, List[Any]]:
+        """Get named entities from the text
+        Args:
+            doc: document instance to get the entities from
+            excludes: entity labels to exclude, e.g. ["ORDINAL", "CARDINAL", "PERCENT", "DATE"]
+            remove_special_characters: remove special characters
+            remove_stopwords: remove stop characters
+            return_value_only: return entity value only for each label
+            remove_similarity_threshold:
+                not add entity if an entity with similarity > * remove_similarity_threshold exists.
+                only valid when return_value_only is True
+
+        Returns: {
+                "<label>": [values*],
+                ...
+            } when return_value_only is True, or {
+                "<label>": [
+                    "start": <character offset start position of the entity in the text>,
+                    "end": <character offset end position of the entity in the tex>,
+                    "value": <entity value>
+                ],
+                ...
+            }
+        """
+        excludes = [
+            _entity.upper() for _entity in excludes
+            if isinstance(_entity, str)
+        ] if excludes else []
+
+        if return_value_only:
+            # First use set to remove duplicates
+            entity_label_to_value_map: Dict[str, Union[Set, List]] = {
+                _label: set()
+                for _label in self._named_entity_labels
+                if _label not in excludes
+            }
+            for entity in doc.ents:
+                if entity.label_ not in excludes:
+                    value: str = self.clean_text(
+                        text=entity.text.strip(),
+                        remove_special_characters=remove_special_characters,
+                        remove_stopwords=remove_stopwords,
+                    )
+                    if not self.exists_similar_entity(
+                        similarity_threshold=remove_similarity_threshold,
+                        text=value,
+                        entities=entity_label_to_value_map[entity.label_]
+                    ):
+                        entity_label_to_value_map[entity.label_].add(value)
+
+            # Then convert to list
+            entity_label_to_value_map = {
+                _label: list(entity_label_to_value_map[_label])
+                for _label in entity_label_to_value_map
+            }
+
+        else:
+            entity_label_to_value_map: Dict[str, List] = {
+                _label: []
+                for _label in self._named_entity_labels
+                if _label not in excludes
+            }
+            for entity in doc.ents:
+                if entity.label_ not in excludes:
+                    value: str = self.clean_text(
+                        text=entity.text.strip(),
+                        remove_special_characters=remove_special_characters,
+                        remove_stopwords=remove_stopwords,
+                    )
+                    entity_label_to_value_map[entity.label_].append({
+                        "start": entity.start_char,     # character offset start position in the text
+                        "end": entity.end_char,         # character offset end position in the text
+                        "value": value
+                    })
+
+        return entity_label_to_value_map
+
+    def get_noun_phrases_from_document(
+            self,
+            doc: spacy.tokens.Doc,
+            remove_special_characters: bool = True,
+            remove_stopwords: bool = False,
+    ) -> List[str]:
+        """
+        Args:
+            doc: document instance to get the entities from
+            remove_special_characters: remove special characters
+            remove_stopwords: remove stop characters
+
+        Returns: list of noun phrases
+        """
+        return [
+            self.clean_text(
+                text=chunk.text,
+                remove_special_characters=remove_special_characters,
+                remove_stopwords=remove_stopwords,
+            )
+            for chunk in doc.noun_chunks
+            # --------------------------------------------------------------------------------
+            # Skip the phrase if it is the same with its root because it can be a single word,
+            # hence, not a phrase noun with multiple words.
+            #
+            # Skip single unit phrase like 85% which is a phrase (85, %).
+            # --------------------------------------------------------------------------------
+            if chunk.text.lower() != chunk.root.text.lower() and len(chunk.text.split()) > 1
+        ]
+
+    @staticmethod
+    def get_keywords_from_document(
+            doc: Doc,
+            windows_size: int = 20,
+            top_n: int =10
+    ) -> List[str]:
+        """Get keywords form text using textrank
+        https://textacy.readthedocs.io/en/latest/api_reference/root.html
+        """
+        # [kps for kps, weights in textacy.extract.keyterms.sgrank(doc=doc, ngrams=[1,2,3,4,5], topn=top_n)]
+        return [
+            key for key, weights in textacy.extract.keyterms.textrank(
+                doc=doc, window_size=windows_size, topn=top_n
+            )
+        ]
+
+    def get_named_entities_from_text(
+            self,
+            text: str,
+            excludes: Optional[List[str]] = None,
+            remove_special_characters: bool = True,
+            remove_stopwords: bool = True,
+            return_value_only: bool = False,
+            remove_similarity_threshold: float = 0.0,
+            include_noun_phrases: bool = True,
+            include_entities: Tuple = ("PERSON", "ORG", "FAC", "LOC", "GPE"),
+            include_keywords: bool = True,
+            top_n: int = 10
+    ) -> Dict[str, List[Any]]:
+        """Get named entities from the text
+        Args:
+            text: text to get the entities from
+            excludes: entity labels to exclude, e.g. ["ORDINAL", "CARDINAL", "PERCENT", "DATE"]
+            remove_special_characters: remove special characters
+            remove_stopwords: remove stop characters
+            return_value_only: return entity value only for each label
+            remove_similarity_threshold:
+                not add entity if an entity with similarity > * remove_similarity_threshold exists.
+                only valid when return_value_only is True
+            include_noun_phrases: include noun phrase as entity if True
+            include_entities: entity types to include the noun phrase when include_noun_phrases is True
+            include_keywords: include keywords from text if True
+            top_n: number of keywords to return if include_keywords is True
+
+        Returns: {
+                "<label>": [values*],
+                ...
+            } when return_value_only is True, or {
+                "<label>": [
+                    "start": <character offset start position of the entity in the text>,
+                    "end": <character offset end position of the entity in the tex>,
+                    "value": <entity value>
+                ],
+                ...
+            }
+        """
+        name: str = "get_named_entities_from_text()"
+        assert isinstance(text, str) and len(text.strip()) > 0, f"invalid text:[{text}]"
+
+        doc: Doc = self.process(text=text)
+
+        # --------------------------------------------------------------------------------
+        # Named Entities
+        # --------------------------------------------------------------------------------
+        entities: Dict[str, List] = self.get_named_entities_from_document(
+            doc=doc,
+            excludes=excludes,
+            remove_special_characters=remove_special_characters,
+            remove_stopwords=remove_stopwords,
+            return_value_only=return_value_only,
+            remove_similarity_threshold=remove_similarity_threshold
+        )
+
+        # --------------------------------------------------------------------------------
+        # Include noun phrases as entities if required.
+        # --------------------------------------------------------------------------------
+        if include_noun_phrases:
+            phrases = self.get_noun_phrases_from_document(
+                doc=doc,
+                remove_special_characters=False,
+                remove_stopwords=False,
+            )
+
+            phrase_index_to_phrase_words_mapping: Dict[int, Set[Any]] = {
+                index: set(phrase.split())
+                for index, phrase in enumerate(phrases)
+            }
+
+            for _label in entities:
+                if _label not in include_entities:
+                    continue
+
+                match = None
+                for index, words_from_phrase in phrase_index_to_phrase_words_mapping.items():
+                    # If the words in an entity is the subset of the words of the phrase, include it.
+                    # A noun phrase "Australian Melissa Georgiou" will be included as an entity
+                    # if "Melissa" is in the already-identified entities.
+                    for _entity in entities[_label]:
+                        words_from_entity = set(_entity.split())
+                        if words_from_entity.issubset(words_from_phrase) and words_from_entity < words_from_phrase:
+                            match = phrases[index]
+                            break
+
+                    if match:
+                        _logger.info("%s: adding [%s] as an entity for label:[%s]", name, match, _label)
+                        entities[_label] += [match]
+                        break
+
+        # --------------------------------------------------------------------------------
+        # Include keywords if required
+        # --------------------------------------------------------------------------------
+        if include_keywords:
+            entities["KEYWORDS"] = self.get_keywords_from_document(doc=doc, top_n=top_n)
+
+        return entities
