@@ -406,6 +406,10 @@ class Pipeline:
                     # be included as an organization with a match with  "Australian government".
                     #
                     # One match is enough to break the loop for each entity type.
+                    #
+                    # TODO:
+                    # Use embedding vector similarity (e.g. sentence transformer embedding or SpaCy
+                    # Transformer embedding using _trf model.
                     # --------------------------------------------------------------------------------
                     for _entity in entities[_label]:
                         words_from_entity = set(_entity.split())
