@@ -326,7 +326,7 @@ class Pipeline:
             return_value_only: bool = False,
             remove_similarity_threshold: float = 0.0,
             include_noun_phrases: bool = True,
-            include_entities: Tuple = ("PERSON", "ORG", "FAC", "LOC", "GPE"),
+            include_entities: Tuple = ("PERSON", "ORG", "FAC"),
             include_keywords: bool = True,
             top_n: int = 10
     ) -> Dict[str, List[Any]]:
@@ -395,12 +395,24 @@ class Pipeline:
 
                 match = None
                 for index, words_from_phrase in phrase_index_to_phrase_words_mapping.items():
+                    # --------------------------------------------------------------------------------
+                    # Matching a phrase with entity:
                     # If the words in an entity is the subset of the words of the phrase, include it.
                     # A noun phrase "Australian Melissa Georgiou" will be included as an entity
-                    # if "Melissa" is in the already-identified entities.
+                    # if "Melissa Georgiou" is in the already-identified entities.
+                    #
+                    # Match is when at least two words from the entity is included in the phrase
+                    # to reduce unexpected inclusion. Otherwise "Australian Melissa Georgiou" can
+                    # be included as an organization with a match with  "Australian government".
+                    #
+                    # One match is enough to break the loop for each entity type.
+                    # --------------------------------------------------------------------------------
                     for _entity in entities[_label]:
                         words_from_entity = set(_entity.split())
-                        if words_from_entity.issubset(words_from_phrase) and words_from_entity < words_from_phrase:
+                        if (
+                                words_from_entity.issubset(words_from_phrase)
+                                and 1 < len(words_from_entity) < len(words_from_phrase)
+                        ):
                             match = phrases[index]
                             break
 
