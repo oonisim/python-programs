@@ -2,6 +2,8 @@
 References:
     https://www.nltk.org/data.html
 """
+import os
+import glob
 import logging
 from typing import (
     List,
@@ -110,7 +112,11 @@ class Pipeline:
     # --------------------------------------------------------------------------------
     # Initialization
     # --------------------------------------------------------------------------------
-    def __init__(self, model_name: str = "en_core_web_sm"):
+    def __init__(
+            self,
+            model_name: str = "en_core_web_sm",
+            download_dir: Optional[str] = None
+    ):
         # --------------------------------------------------------------------------------
         # Language pipeline
         # --------------------------------------------------------------------------------
@@ -118,16 +124,39 @@ class Pipeline:
         self._model_name = model_name
         try:
             self._nlp: Language = spacy.load(model_name)
+
         except OSError:
-            spacy.cli.download("en_core_web_sm")
-            self._nlp = spacy.load(model_name)
+            # --------------------------------------------------------------------------------
+            # Spacy downloads pretrained pipelines under the user's home directory, which can
+            # cause an issue e.g. inside the AWS runtime as it is read-only causing the error:
+            # ERROR: Could not install packages due to an OSError:
+            # [Errno 30] Read-only file system: '/home/sbx_user1051'
+            #
+            # Hence, need to download to e.g. /tmp/. However, loading the downloaded ones
+            # appears to require the version name, which is not a clean way.
+            # --------------------------------------------------------------------------------
+            if download_dir is not None:
+                spacy.cli.download(model_name, False, False, "--target", download_dir)
+                _logger.info(
+                    "downloaded spacy pipeline [%s] under [%s]:\n%s",
+                    model_name, download_dir, glob.glob(os.path.join(download_dir, model_name, "*"))
+                )
+                # spacy.__version__ can be 3.5.2, but the name still is -3.5.0
+                # spacy.load(f"/tmp/spacy/en_core_web_sm/{model_name}-{spacy.__version__}/")
+                # self._nlp = spacy.load(f'/tmp/spacy/{model_name}/{model_name}-3.5.0')
+                raise NotImplementedError("need to find a way to load the downloaded.")
+            else:
+                spacy.cli.download(model_name)
+                self._nlp = spacy.load(model_name)
 
         # --------------------------------------------------------------------------------
         # Language stop words
         # --------------------------------------------------------------------------------
         try:
+            # NLTK raises LookupError if not yet downloaded, instead of OSError.
             self._stopwords: List[str] = nltk.corpus.stopwords.words(self._language)
-        except OSError:
+        except (LookupError, OSError) as error:
+            _logger.debug("downloading nltk stopwords because of [%s].", error)
             nltk.download('stopwords')
             self._stopwords: List[str] = nltk.corpus.stopwords.words(self._language)
 
@@ -238,9 +267,9 @@ class Pipeline:
                         remove_stopwords=remove_stopwords,
                     )
                     if not self.exists_similar_entity(
-                        similarity_threshold=remove_similarity_threshold,
-                        text=value,
-                        entities=entity_label_to_value_map[entity.label_]
+                            similarity_threshold=remove_similarity_threshold,
+                            text=value,
+                            entities=entity_label_to_value_map[entity.label_]
                     ):
                         entity_label_to_value_map[entity.label_].add(value)
 
@@ -285,7 +314,7 @@ class Pipeline:
 
         Returns: list of noun phrases
         """
-        return [
+        return list({
             self.clean_text(
                 text=chunk.text,
                 remove_special_characters=remove_special_characters,
@@ -299,13 +328,13 @@ class Pipeline:
             # Skip single unit phrase like 85% which is a phrase (85, %).
             # --------------------------------------------------------------------------------
             if chunk.text.lower() != chunk.root.text.lower() and len(chunk.text.split()) > 1
-        ]
+        })
 
     @staticmethod
     def get_keywords_from_document(
             doc: Doc,
             windows_size: int = 20,
-            top_n: int =10
+            top_n: int = 10
     ) -> List[str]:
         """Get keywords form text using textrank
         https://textacy.readthedocs.io/en/latest/api_reference/root.html
@@ -385,7 +414,7 @@ class Pipeline:
             )
 
             phrase_index_to_phrase_words_mapping: Dict[int, Set[Any]] = {
-                index: set(phrase.split())
+                index: set(phrase.lower().split())
                 for index, phrase in enumerate(phrases)
             }
 
@@ -393,8 +422,8 @@ class Pipeline:
                 if _label not in include_entities:
                     continue
 
-                match = None
                 for index, words_from_phrase in phrase_index_to_phrase_words_mapping.items():
+                    match = None
                     # --------------------------------------------------------------------------------
                     # Matching a phrase with entity:
                     # If the words in an entity is the subset of the words of the phrase, include it.
@@ -412,18 +441,21 @@ class Pipeline:
                     # Transformer embedding using _trf model.
                     # --------------------------------------------------------------------------------
                     for _entity in entities[_label]:
-                        words_from_entity = set(_entity.split())
+                        words_from_entity = set(_entity.lower().split())
                         if (
                                 words_from_entity.issubset(words_from_phrase)
                                 and 1 < len(words_from_entity) < len(words_from_phrase)
                         ):
                             match = phrases[index]
+                            # Break because once the phrase is added, no need to check with the rest.
                             break
 
                     if match:
-                        _logger.info("%s: adding [%s] as an entity for label:[%s]", name, match, _label)
+                        _logger.info(
+                            "%s: adding the nown phrase [%s] as an entity for label:[%s]",
+                            name, match, _label
+                        )
                         entities[_label] += [match]
-                        break
 
         # --------------------------------------------------------------------------------
         # Include keywords if required
