@@ -71,7 +71,7 @@ class ComprehendDetect(Base):
         """
         assert isinstance(language_code, str)
         return language_code.lower() in SUPPORTED_LANGUAGES_CODES
-    
+
     @staticmethod
     def is_entity_type_supported(entity_type: str):
         """Check if the entity type is supported by Comprehand"""
@@ -181,8 +181,8 @@ class ComprehendDetect(Base):
         """
         name: str = "detect_entities()"
         assert (
-            (auto_detect_language is False and isinstance(language_code, str)) or
-            (auto_detect_language is True and language_code is None)
+                (auto_detect_language is False and isinstance(language_code, str)) or
+                (auto_detect_language is True and language_code is None)
         ), \
             f"invalid combination of auto_detect_language:[{auto_detect_language}] " \
             f"and language_code:[{language_code}]"
@@ -209,7 +209,7 @@ class ComprehendDetect(Base):
             entities: List[Any] = response['Entities']
             _logger.debug("%s: number of entities detected is [%s].", name, len(entities))
             return entities
-        
+
         except self.comprehend_client.exceptions.TextSizeLimitExceededException as error:
             msg: str = f"length of the text [{len(text)}] exceeded the max size.\ncause:[{error}]"
             _logger.error("%s: %s error: %s", name, msg, error)
@@ -272,6 +272,8 @@ class ComprehendDetect(Base):
             list of values of the entity_type if return_entity_value_only is True.
             Otherwise, list of entities
         """
+        assert 0. <= score_threshold <= 1.0, f"invalid score_threshold:[{score_threshold}]."
+
         name: str = "detect_entities_by_type()"
         result: Optional[List[Any]] = None
 
@@ -291,6 +293,10 @@ class ComprehendDetect(Base):
         # If no entity types, return the detected entities as is. ignore score_threshold.
         # --------------------------------------------------------------------------------
         if not entity_types:
+            detected_entities = [
+                _entity for _entity in detected_entities
+                if _entity['Score'] >= score_threshold
+            ] if score_threshold > 0.0 else detected_entities
             return sorted(
                 detected_entities, reverse=True, key=lambda _entity: _entity['Score']
             ) if sort_by_score else detected_entities
@@ -307,7 +313,7 @@ class ComprehendDetect(Base):
             if self.is_entity_type_supported(_type)
         }
         if len(entity_type_set) == 0:
-            msg: str = f"the entity types provided {entity_types} are not in "\
+            msg: str = f"the entity types provided {entity_types} are not in " \
                        f"valid types {SUPPORTED_ENTITY_TYPES}."
             _logger.error("%s %s", name, msg)
             raise ValueError(msg)
@@ -322,7 +328,8 @@ class ComprehendDetect(Base):
                 if entity['Type'].lower() in entity_type_set:
                     if entity['Score'] >= score_threshold:
                         text: str = entity['Text']
-                        if text not in entities or entities[text] < entity['Score']:
+                        # When find the same text, take the one with the higher score.
+                        if text not in entities or entity['Score'] > entities[text]:
                             # Create {text: score} pair and sort by score later in sorted().
                             entities[text] = entity['Score']
 
@@ -377,8 +384,8 @@ class ComprehendDetect(Base):
         """
         name: str = "detect_pii_entities()"
         assert (
-            (auto_detect_language is False and isinstance(language_code, str)) or
-            (auto_detect_language is True and language_code is None)
+                (auto_detect_language is False and isinstance(language_code, str)) or
+                (auto_detect_language is True and language_code is None)
         ), \
             f"invalid combination of auto_detect_language:[{auto_detect_language}] " \
             f"and language_code:[{language_code}]"
@@ -400,7 +407,7 @@ class ComprehendDetect(Base):
             msg: str = f"language code detected or specified [{language_code}] is not supported."
             _logger.error("%s: %s", name, msg)
             raise ValueError(msg)
-            
+
         # --------------------------------------------------------------------------------
         # Entity detections
         # --------------------------------------------------------------------------------
@@ -414,7 +421,7 @@ class ComprehendDetect(Base):
                 start: int = int(_entity['BeginOffset'])
                 end: int = int(_entity['EndOffset'])
                 _entity['Text'] = text[start:end]
-            
+
             _logger.debug("%s: number of entities detected is [%s].", name, len(entities))
 
         except self.comprehend_client.exceptions.TextSizeLimitExceededException as error:
