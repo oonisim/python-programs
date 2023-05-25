@@ -70,7 +70,7 @@ def retry_with_exponential_backoff(
                     if num_retries > max_retries:
                         msg += f"and maximum number of retries ({max_retries}) exceeded."
                         _logger.error("%s", msg)
-                        raise RuntimeError(msg)
+                        raise RuntimeError(msg) from error
 
                     delay *= exponential_base * (1 + jitter * random.random())
                     msg += f"and retry in {delay} seconds."
