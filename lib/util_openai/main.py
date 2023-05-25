@@ -78,7 +78,7 @@ class OpenAI:
 
     @retry_with_exponential_backoff(
         proactive_delay=1.0,
-        errors=(openai.error.RateLimitError,)
+        errors=(openai.error.RateLimitError, openai.error.APIConnectionError)
     )
     def get_chat_completion_by_prompt(self, prompt) -> str:
         """Send a chat completion request as a prompt
@@ -111,7 +111,7 @@ class OpenAI:
 
     @retry_with_exponential_backoff(
         proactive_delay=1.0,
-        errors=(openai.error.RateLimitError,)
+        errors=(openai.error.RateLimitError, openai.error.APIConnectionError)
     )
     def get_chat_completion_by_messages(
             self, messages: List[Dict[str, str]]
