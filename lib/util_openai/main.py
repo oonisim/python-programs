@@ -10,6 +10,20 @@ https://platform.openai.com/docs/models/model-endpoint-compatibility
 | ENDPOINT             | MODEL NAME    (As of MAR/2023)                                                  |
 |----------------------|---------------------------------------------------------------------------------|
 | /v1/chat/completions | gpt-4, gpt-4-0314, gpt-4-32k, gpt-4-32k-0314, gpt-3.5-turbo, gpt-3.5-turbo-0301 |
+
+[Request Limits]
+OpenAI API has separate limits for requests per minute and tokens per minute.
+
+- openai.error.RateLimitError
+429: 'Too Many Requests' when the request rate exceeded the limit.
+https://platform.openai.com/docs/guides/rate-limits/overview
+https://github.com/openai/openai-cookbook/blob/main/examples/How_to_handle_rate_limits.ipynb
+
+Throttling parallel requests to avoid rate limit errors:
+https://github.com/openai/openai-cookbook/blob/main/examples/api_request_parallel_processor.py
+
+[Batching requests]
+https://platform.openai.com/docs/guides/rate-limits/batching-requests
 """
 import os
 import re
@@ -18,6 +32,9 @@ from typing import (
     Dict,
 )
 
+from util_python.function import (
+    retry_with_exponential_backoff
+)
 import openai
 
 
@@ -55,6 +72,10 @@ class OpenAI:
     def model_text_completions(self):
         return self._model_text_completions
 
+    @retry_with_exponential_backoff(
+        proactive_delay=1.0,
+        errors=(openai.error.RateLimitError,)
+    )
     def get_chat_completion_by_prompt(self, prompt) -> str:
         """Send a chat completion request as a prompt
         https://platform.openai.com/docs/api-reference/completions/create
@@ -78,16 +99,20 @@ class OpenAI:
         response = openai.ChatCompletion.create(
             model=self.model_chat_completions,
             messages=[
-                {"role": "assistant", "content": "You are short and simple."},
+                {"role": "assistant", "content": "You are succinct and simple."},
                 {"role": "user", "content": re.sub(r"['\"/\s]+", ' ', prompt, flags=re.MULTILINE)}
             ]
         )
         return response['choices'][0]['message']['content']
 
+    @retry_with_exponential_backoff(
+        proactive_delay=1.0,
+        errors=(openai.error.RateLimitError,)
+    )
     def get_chat_completion_by_messages(
             self, messages: List[Dict[str, str]]
     ) -> str:
-        """Send a chat completion request as a prompt
+        """Send a chat completion request as a message
         https://platform.openai.com/docs/api-reference/completions/create
 
         Message example:
