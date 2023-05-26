@@ -2,6 +2,7 @@
 OpenAPI Chat API module
 [References]
     https://platform.openai.com/docs/api-reference
+    https://platform.openai.com/docs/api-reference/chat/create
     https://github.com/openai/openai-cookbook
 
 [Models]
@@ -30,11 +31,14 @@ import re
 from typing import (
     List,
     Dict,
+    Tuple,
+    Optional,
 )
 
 from util_python.function import (  # pylint: disable=import-error
     retry_with_exponential_backoff
 )
+
 import openai
 
 
@@ -47,6 +51,11 @@ OPENAI_MODELS = [
 ]
 OPENAI_MODEL_CHAT_COMPLETIONS = "gpt-3.5-turbo"
 OPENAI_MODEL_TEXT_COMPLETIONS = "text-davinci-003"
+OPENAI_ERRORS_TO_RETRY: Tuple = (
+    openai.error.RateLimitError,
+    openai.error.APIConnectionError,
+    openai.error.APIError
+)
 
 
 # --------------------------------------------------------------------------------
@@ -54,6 +63,17 @@ OPENAI_MODEL_TEXT_COMPLETIONS = "text-davinci-003"
 # --------------------------------------------------------------------------------
 class OpenAI:
     """OpenAI API implementation class"""
+    # --------------------------------------------------------------------------------
+    # Static
+    # --------------------------------------------------------------------------------
+    @staticmethod
+    def list_models():
+        """List Open AI Models"""
+        return openai.Model.list()
+
+    # --------------------------------------------------------------------------------
+    # Instance
+    # --------------------------------------------------------------------------------
     def __init__(
             self,
             path_to_api_key: str,
@@ -78,9 +98,15 @@ class OpenAI:
 
     @retry_with_exponential_backoff(
         proactive_delay=1.0,
-        errors=(openai.error.RateLimitError, openai.error.APIConnectionError)
+        errors=OPENAI_ERRORS_TO_RETRY
     )
-    def get_chat_completion_by_prompt(self, prompt) -> str:
+    def get_chat_completion_by_prompt(
+            self,
+            prompt,
+            temperature: float = 0.0,
+            max_tokens: Optional[int] = None,
+            stream=False,
+    ) -> str:
         """Send a chat completion request as a prompt
         https://platform.openai.com/docs/api-reference/completions/create
 
@@ -98,6 +124,9 @@ class OpenAI:
 
         Args:
             prompt: A task instruction to the model
+            temperature: randomness of the generated responses
+            max_tokens: The maximum number of tokens to generate in the chat completion.
+            stream: if set, partial message deltas will be sent, like in ChatGPT
         Returns: Completion
         """
         response = openai.ChatCompletion.create(
@@ -105,13 +134,16 @@ class OpenAI:
             messages=[
                 {"role": "assistant", "content": "You are succinct and simple."},
                 {"role": "user", "content": re.sub(r"['\"/\s]+", ' ', prompt, flags=re.MULTILINE)}
-            ]
+            ],
+            temperature=temperature,
+            max_tokens=max_tokens,
+            stream=stream,
         )
         return response['choices'][0]['message']['content']
 
     @retry_with_exponential_backoff(
         proactive_delay=1.0,
-        errors=(openai.error.RateLimitError, openai.error.APIConnectionError)
+        errors=OPENAI_ERRORS_TO_RETRY
     )
     def get_chat_completion_by_messages(
             self, messages: List[Dict[str, str]]
