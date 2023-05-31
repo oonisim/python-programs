@@ -446,7 +446,7 @@ class Pipeline:
                                 words_from_entity.issubset(words_from_phrase)
                                 and 1 < len(words_from_entity) < len(words_from_phrase)
                         ):
-                            match = phrases[index]
+                            match = phrases[index].strip()
                             # Break because once the phrase is added, no need to check with the rest.
                             break
 
