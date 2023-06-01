@@ -32,8 +32,22 @@ def _to_json(text: str) -> Dict[str, Any]:
 # --------------------------------------------------------------------------------
 # OpenAI
 # --------------------------------------------------------------------------------
-class ChatTask(OpenAI):
-    """Class for Open AI chat task operations"""
+class ChatTaskForTextTagging(OpenAI):
+    """Class for text tagging using Open AI chat task operations"""
+    TAG_ENTITY_TYPE_PERSON: str = "PERSON"
+    TAG_ENTITY_TYPE_LOCATION: str = "LOCATION"
+    TAG_ENTITY_TYPE_ORGANIZATION: str = "ORGANIZATION"
+    TAG_ENTITY_TYPES = {
+        TAG_ENTITY_TYPE_PERSON,
+        TAG_ENTITY_TYPE_LOCATION,
+        TAG_ENTITY_TYPE_ORGANIZATION
+    }
+
+    @staticmethod
+    def tag_entity_types():
+        """List of text tag entity types"""
+        return ChatTaskForTextTagging.TAG_ENTITY_TYPES
+
     def __init__(self, path_to_api_key: str):
         super().__init__(path_to_api_key=path_to_api_key)
 
@@ -169,30 +183,26 @@ class ChatTask(OpenAI):
             top_n:
 
         Returns: organizations as JSON/dictionary in the form of {
-            "theme": THEME,
-            "summary": SUMMARY,
             "keywords": KEYWORDS,
             "phrases": NOUN PHRASES,
             "people": KEY FIGURES,
             "locations": GEOGRAPHIC LOCATIONS
         }
         """
-        prompt = f"""
-THEME from the TEXT within {max_words} words.
-SUMMARY from the TEXT.
-KEYWORDS that induce the THEME.
-NOUN PHRASES that induce the THEME.
-KEY FIGURES in the TEXT. 
-GEOGRAPHIC LOCATIONS in the TEXT that are critical for the THEME.
+        prompt_that_takes_longer = f"""
+THEME is '{theme}'.
+
+Top {top_n} KEYWORDS from the TEXT that induces the THEME.
+Top {top_n} PERSON as title and name from the TEXT who participated to the THEME.
+Top {top_n} ORGANIZATIONS as name and explanation that induced the THEME in the the TEXT. 
+Top {top_n} GEOGRAPHIC LOCATIONS where the THEME occurs in the TEXT.
 
 Return a JSON in the following format that the python json.loads method can handle.
 {{
-    "theme": THEME,
-    "summary": SUMMARY,
-    "keywords": KEYWORDS,
-    "phrases": NOUN PHRASES,
-    "people": KEY FIGURES,
-    "locations": GEOGRAPHIC LOCATIONS
+    "KEYWORD": [{{keyword:explanation}}] or [],
+    "PERSON": [{{name:title}}] or [],
+    "ORGANIZATION": [{{name:explanation}}] or [],
+    "LOCATION": [{{location:explanation}}] or []
 }}
 
 TEXT={text}
@@ -200,20 +210,19 @@ TEXT={text}
         prompt = f"""
 THEME is '{theme}'.
 
-Top {top_n} KEYWORDS from the TEXT that are critical to induce the THEME.
-Top {top_n} PERSON from the TEXT who is essential to the THEME where PERSON = TITLE + NAME. MUST include TITLE if any.
-Top {top_n} ORGANIZATION from the TEXT that are essential to the THEME. 
-Top {top_n} GEOGRAPHIC LOCATIONS in the TEXT where the THEME did occurred.
+Top {top_n} KEYWORDS from the TEXT that induces the THEME.
+Top {top_n} PERSON as title and name from the TEXT who participated to the THEME. 
+Max {top_n} ORGANIZATIONS that induced the THEME in the the TEXT. Must be less than {top_n+1}. 
+Max {top_n} GEOGRAPHIC LOCATIONS that induced the THEME in the the TEXT. Must be less than {top_n+1}. 
 
 Return a JSON in the following format that the python json.loads method can handle.
 {{
-    "keywords": KEYWORDS  or [],
-    "people": PERSONS or [],
-    "organization": ORGANIZATION or [],
-    "locations": GEOGRAPHIC LOCATIONS or []
+    "KEYWORD": KEYWORDS  or [],
+    "{self.TAG_ENTITY_TYPE_PERSON}": [{{name:title}}] or [],
+    "{self.TAG_ENTITY_TYPE_ORGANIZATION}": ORGANIZATION or [],
+    "{self.TAG_ENTITY_TYPE_LOCATION}": GEOGRAPHIC LOCATIONS or []
 }}
 
 TEXT={text}
 """
-
         return _to_json(text=self.get_chat_completion_by_prompt(prompt=prompt))

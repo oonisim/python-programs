@@ -1,3 +1,4 @@
+"""Module for tagging using OpenAI GPT"""
 import os
 import json
 import logging
@@ -16,21 +17,44 @@ from .ner import (
     get_named_entities
 )
 from .gpt import (
-    ChatTask
+    ChatTaskForTextTagging
 )
 
 
+# --------------------------------------------------------------------------------
+# Logging
+# --------------------------------------------------------------------------------
 logger: logging.Logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-chat = ChatTask(
+
+
+# --------------------------------------------------------------------------------
+# GPT
+# --------------------------------------------------------------------------------
+chat = ChatTaskForTextTagging(
     path_to_api_key=f"{os.path.expanduser('~')}/.openai/api_key"
 )
 
 
-def validate_extraction_with_entities(candidates, entities):
-    """Validate GPT extraction with Spacy NER"""
-    result = set()
+# --------------------------------------------------------------------------------
+# Utilities
+# --------------------------------------------------------------------------------
+def validate_gpt_extraction_with_spacy_entities(candidates, entities):
+    """Validate GPT extraction with Spacy NER
+    TODO:
+        Implement proper validation logic. Currently crude/naive comparison where
+        if one of the word in GPT tag is included in the words of Spacy identified entity,
+        it is regarded as match. Hence GPT extracted "North Korea" as a location and
+        SpaCy identified entity include "North America", it is regarded as validated,
+        although "North Korea" is NOT "North America".
 
+    Args:
+        candidates: GPT extracted tags
+        entities: SpaCy identified entities
+    """
+    result = []
+
+    all_words_in_entities = set(" ".join(entities).strip().lower().split())
     words_of_entities = [
         set(entity.strip().lower().split())
         for entity in entities
@@ -38,17 +62,20 @@ def validate_extraction_with_entities(candidates, entities):
 
     for candidate in candidates:
         words_in_candidate = set(candidate.strip().lower().split())
-        for words_of_entity in words_of_entities:
-            intersection = words_in_candidate.intersection(words_of_entity)
-            if intersection and len(intersection) >= len(words_of_entity) -1:
-                result.add(candidate)
-                break
+        if words_in_candidate.intersection(all_words_in_entities):
+            # for words_of_entity in words_of_entities:
+            #    intersection = words_in_candidate.intersection(words_of_entity)
+            #    if intersection and len(intersection) >= len(words_of_entity) -1:
+            #     result.append(candidate)
+            #     break
+            result.append(candidate)
 
-    return sorted(result)
+    return result
 
 
 @timer
 def get_theme(text: str) -> str:
+    """Extract theme of the text"""
     return chat.get_theme(text=text)
 
 
@@ -58,7 +85,7 @@ def get_people(text: str, entities: List[str]) -> List[str]:
     people_titles_mapping: dict[str, str] = chat.get_people(text=text)
     candidates = list(people_titles_mapping.keys())
     if entities:
-        validated: List[str] = validate_extraction_with_entities(
+        validated: List[str] = validate_gpt_extraction_with_spacy_entities(
             candidates=candidates, entities=entities
         )
     else:
@@ -82,11 +109,11 @@ def get_organizations(text: str, theme: str, entities: Optional[List[str]] = Non
     if not entities:
         return candidates
 
-    validated: List[str] = validate_extraction_with_entities(
+    validated: List[str] = validate_gpt_extraction_with_spacy_entities(
         candidates=candidates, entities=entities
     )
     result: List[str] = []
-    for name, description in organization_description_mapping.items():
+    for name, _ in organization_description_mapping.items():
         if name in validated:
             result.append(name)
 
@@ -95,11 +122,118 @@ def get_organizations(text: str, theme: str, entities: Optional[List[str]] = Non
 
 @timer
 def distill(text: str, theme: str) -> Dict[str, Any]:
-    return chat.distill(text=text, theme=theme)
+    """Distilled version of tagging
+    Example:
+    {
+        "KEYWORD": [
+            "Finland",
+            "happiest country",
+            "World Happiness Report",
+            "Nordic countries",
+            "sisu",
+            "COVID-19 pandemic"
+        ],
+        "PERSON": [
+            {
+                "name": "Melissa Georgio",
+                "title": "Australian"
+            },
+            {
+                "name": "Frank Martela",
+                "title": "happiness expert and researcher"
+            }
+        ],
+        "ORGANIZATION": [
+            "United Nations",
+            "Ipsos Group"
+        ],
+        "LOCATION": [
+            "Finland",
+            "Sydney",
+            "Nordic countries",
+            "Europe",
+            "COVID-19 pandemic",
+            "Asia"
+        ]
+    }
+    """
+    distilled: Dict[str, Any] = chat.distill(text=text, theme=theme)
+    if not isinstance(distilled, dict):
+        msg: str = f"expected JSON response, got {distilled}."
+        logger.error("%s. verify the prompt and the GPT response format is JSON.")
+        raise RuntimeError(msg)
+
+    # --------------------------------------------------------------------------------
+    # PERSON
+    # --------------------------------------------------------------------------------
+    people = distilled.get('PERSON', None)
+    if people is None or not isinstance(people, list):
+        msg: str = f"expected PERSON element as list in {distilled}."
+        logger.error("%s. verify the prompt and the GPT response format has PERSON.")
+        raise RuntimeError(msg)
+
+    try:
+        distilled['PERSON'] = [
+            " ".join([_person.get('title', ""), _person['name']]).strip()
+            for _person in people
+        ]
+    except KeyError as error:
+        msg: str = f"PERSON element has 'name' in {people}."
+        logger.error("%s. verify the prompt and the GPT response format for PERSON.")
+        raise RuntimeError(msg) from error
+
+    return distilled
 
 
+def validate_gpt_extraction(gpt_distilled, spacy_entities, entity_type: Optional[str]):
+    """Validate GPT extracted entities with Spacy identified entities
+    Args:
+        gpt_distilled: GPT extracted entities
+        spacy_entities: SpaCy identified entities
+        entity_type: type of entity e.g. location.
+    """
+    if entity_type is None:
+        # --------------------------------------------------------------------------------
+        # PERSON
+        # --------------------------------------------------------------------------------
+        gpt_distilled[ChatTaskForTextTagging.TAG_ENTITY_TYPE_PERSON] = \
+            validate_gpt_extraction_with_spacy_entities(
+                candidates=gpt_distilled[ChatTaskForTextTagging.TAG_ENTITY_TYPE_PERSON],
+                entities=spacy_entities['PERSON']
+            )
+        # --------------------------------------------------------------------------------
+        # Organization
+        # --------------------------------------------------------------------------------
+        gpt_distilled[ChatTaskForTextTagging.TAG_ENTITY_TYPE_ORGANIZATION] = \
+            validate_gpt_extraction_with_spacy_entities(
+                candidates=gpt_distilled[ChatTaskForTextTagging.TAG_ENTITY_TYPE_ORGANIZATION],
+                entities=spacy_entities['ORG']
+            )
+        # --------------------------------------------------------------------------------
+        # Location
+        # --------------------------------------------------------------------------------
+        gpt_distilled[ChatTaskForTextTagging.TAG_ENTITY_TYPE_LOCATION] = \
+            validate_gpt_extraction_with_spacy_entities(
+                candidates=gpt_distilled[ChatTaskForTextTagging.TAG_ENTITY_TYPE_LOCATION],
+                entities=spacy_entities['GPE']+spacy_entities['LOC']
+            )
+
+        return gpt_distilled
+
+    if entity_type.upper() in ChatTaskForTextTagging.tag_entity_types():
+        return validate_gpt_extraction_with_spacy_entities(
+            candidates=gpt_distilled[entity_type.upper()],
+            entities=spacy_entities
+        )
+
+    return []
+
+
+# --------------------------------------------------------------------------------
+# Tagging
+# --------------------------------------------------------------------------------
 def extract(data: Dict[str, Any]):
-    """Extract entities"""
+    """Extract tags"""
     name: str = "extract()"
     logger.debug(
         "%s: event:%s",
@@ -109,38 +243,38 @@ def extract(data: Dict[str, Any]):
     # --------------------------------------------------------------------------------
     # Entity detection
     # --------------------------------------------------------------------------------
+    result: Dict[str, Any] = {}
     try:
         text: str = data['text']
-        entity_type: str = data['entity_type']
+        entity_type: str = data.get('entity_type', None)
+        use_gpt: bool = data.get('use_gpt', False)
 
         entities = get_named_entities(
             text=get_en_translation(text=text, language_code=None),
-            # entity_type=entity_type
-            entity_type=None
+            entity_type=entity_type
         )
-        if len(entities) == 0:
+        if entities:
+            logger.debug("%s: entities extracted:%s", name, entities)
+        else:
             msg: str = "no entity detected in the text"
             msg = msg + (f" for the entity_type [{entity_type}]." if entity_type else ".")
             logger.warning("%s", msg)
-        else:
-            logger.debug("%s: returning entities:%s", name, entities)
+
+        result = entities if entity_type is None else {
+            entity_type.upper(): entities
+        }
 
         # --------------------------------------------------------------------------------
-        # theme
+        # GPT
         # --------------------------------------------------------------------------------
-        theme: str = get_theme(text=text)
-        entities['Z_GPT_TAGGING'] = distill(text=text, theme=theme)
+        if use_gpt:
+            theme: str = get_theme(text=text)
+            distilled = distill(text=text, theme=theme)
+            result['Z_GPT_TAGGING'] = validate_gpt_extraction(
+                gpt_distilled=distilled, spacy_entities=entities, entity_type=entity_type
+            )
 
-        # --------------------------------------------------------------------------------
-        # Person
-        # --------------------------------------------------------------------------------
-        # if entities['PERSON']:
-        #     people: List[str] = get_people(text=text, entities=entities['PERSON'])
-        #     entities['PEOPLE'] = people
-        # else:
-        #     entities['PEOPLE'] = []
-
-        return entities
+        return result
 
     except (RuntimeError, ValueError, KeyError) as error:
         logger.error("%s: failed due to [%s].", name, error)
@@ -151,7 +285,7 @@ if __name__ == "__main__":
     # with open("example.txt", "r", encoding='utf-8') as example_text:
     #    example: str = example_text.read()
     example: str = """
-Australian Melissa Georgiou (Melissa Georgiou) moved to Finland over a decade ago 
+Australian Melissa Georgiou moved to Finland over a decade ago 
 to seek happiness in one of the coldest and darkest places on Earth. 
 “One of my favorite things about living here is that it's easy to get close to 
 nature whether you're in a residential area or in the middle of the city,” Melissa said. 
@@ -187,6 +321,7 @@ Finns, she said, are happy to accept portrayals of themselves as melancholy and 
     import re
     extracted = extract({
         "text": re.sub(r'[\s]+', ' ', example),
-        "entity_type": "location",
+        "entity_type": "person",
+        "use_gpt": True
     })
     print(json.dumps(extracted, indent=4, default=str, ensure_ascii=False))
