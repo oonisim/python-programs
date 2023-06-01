@@ -33,7 +33,21 @@ def _to_json(text: str) -> Dict[str, Any]:
 # OpenAI
 # --------------------------------------------------------------------------------
 class ChatTaskForTextTagging(OpenAI):
-    """Class for Open AI chat task operations"""
+    """Class for text tagging using Open AI chat task operations"""
+    TAG_ENTITY_TYPE_PERSON: str = "PERSON"
+    TAG_ENTITY_TYPE_LOCATION: str = "LOCATION"
+    TAG_ENTITY_TYPE_ORGANIZATION: str = "ORGANIZATION"
+    TAG_ENTITY_TYPES = {
+        TAG_ENTITY_TYPE_PERSON,
+        TAG_ENTITY_TYPE_LOCATION,
+        TAG_ENTITY_TYPE_ORGANIZATION
+    }
+
+    @staticmethod
+    def tag_entity_types():
+        """List of text tag entity types"""
+        return ChatTaskForTextTagging.TAG_ENTITY_TYPES
+
     def __init__(self, path_to_api_key: str):
         super().__init__(path_to_api_key=path_to_api_key)
 
@@ -204,9 +218,9 @@ Max {top_n} GEOGRAPHIC LOCATIONS that induced the THEME in the the TEXT. Must be
 Return a JSON in the following format that the python json.loads method can handle.
 {{
     "KEYWORD": KEYWORDS  or [],
-    "PERSON": [{{name:title}}] or [],
-    "ORGANIZATION": ORGANIZATION or [],
-    "LOCATION": GEOGRAPHIC LOCATIONS or []
+    "{self.TAG_ENTITY_TYPE_PERSON}": [{{name:title}}] or [],
+    "{self.TAG_ENTITY_TYPE_ORGANIZATION}": ORGANIZATION or [],
+    "{self.TAG_ENTITY_TYPE_LOCATION}": GEOGRAPHIC LOCATIONS or []
 }}
 
 TEXT={text}
