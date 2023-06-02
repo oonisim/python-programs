@@ -18,6 +18,7 @@ from util_openai import (   # pylint: disable=import-error
 # Logging
 # --------------------------------------------------------------------------------
 _logger: logging.Logger = get_logger(__name__)
+_logger.setLevel(logging.DEBUG)
 
 
 def _to_json(text: str) -> Dict[str, Any]:
