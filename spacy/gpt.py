@@ -207,13 +207,13 @@ Return a JSON in the following format that the python json.loads method can hand
 
 TEXT={text}
 """
-        prompt = f"""
+        prompt_replaced = f"""
 THEME is '{theme}'.
 
 Top {top_n} KEYWORDS from the TEXT that induces the THEME.
 Top {top_n} PERSON as title and name from the TEXT who participated to the THEME. 
 Max {top_n} ORGANIZATIONS that induced the THEME in the the TEXT. Must be less than {top_n+1}. 
-Max {top_n} GEOGRAPHIC LOCATIONS that induced the THEME in the the TEXT. Must be less than {top_n+1}. 
+Top {top_n} GEOGRAPHIC LOCATIONS where the THEME does occur.
 
 Return a JSON in the following format that the python json.loads method can handle.
 {{
@@ -224,5 +224,24 @@ Return a JSON in the following format that the python json.loads method can hand
 }}
 
 TEXT={text}
+
+"""
+        prompt = f"""
+Top {top_n} news categories or topics as KEYWORDS about the NEWS.
+Top {top_n} PERSON as title and name who is connected to the incident of the NEWS.
+Top {top_n} ORGANIZATIONS that participated in the incident of the NEWS.
+Maximum {top_n} GEOGRAPHIC COUNTRY and its LOCATIONS where the incident of the NEWS happened.
+Maximum three CATEGORIES of the NEWS such as 'culture', 'sports', 'crime', 'politics', 'technology'.
+
+Return a JSON in the following format that the python json.loads method can handle.
+{{
+    "KEYWORD": KEYWORDS  or [],
+    "{self.TAG_ENTITY_TYPE_PERSON}": [{{name:title}}] or [],
+    "{self.TAG_ENTITY_TYPE_ORGANIZATION}": ORGANIZATION or [],
+    "{self.TAG_ENTITY_TYPE_LOCATION}": GEOGRAPHIC COUNTRIES and LOCATIONS or []
+    "CATEGORY": CATEGORIES  or []
+}}
+
+NEWS={text}
 """
         return _to_json(text=self.get_chat_completion_by_prompt(prompt=prompt))

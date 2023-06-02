@@ -2,6 +2,7 @@
 import os
 import json
 import logging
+import traceback
 from typing import (
     List,
     Dict,
@@ -32,6 +33,7 @@ logger.setLevel(logging.DEBUG)
 # GPT
 # --------------------------------------------------------------------------------
 chat = ChatTaskForTextTagging(
+    # TODO: Replace the API key acquisition via Secret Manager
     path_to_api_key=f"{os.path.expanduser('~')}/.openai/api_key"
 )
 
@@ -53,22 +55,22 @@ def validate_gpt_extraction_with_spacy_entities(candidates, entities):
         entities: SpaCy identified entities
     """
     result = []
+    if entities:
+        all_words_in_entities = set(" ".join(entities).strip().lower().split())
+        words_of_entities = [
+            set(entity.strip().lower().split())
+            for entity in entities
+        ]
 
-    all_words_in_entities = set(" ".join(entities).strip().lower().split())
-    words_of_entities = [
-        set(entity.strip().lower().split())
-        for entity in entities
-    ]
-
-    for candidate in candidates:
-        words_in_candidate = set(candidate.strip().lower().split())
-        if words_in_candidate.intersection(all_words_in_entities):
-            # for words_of_entity in words_of_entities:
-            #    intersection = words_in_candidate.intersection(words_of_entity)
-            #    if intersection and len(intersection) >= len(words_of_entity) -1:
-            #     result.append(candidate)
-            #     break
-            result.append(candidate)
+        for candidate in candidates:
+            words_in_candidate = set(candidate.strip().lower().split())
+            if words_in_candidate.intersection(all_words_in_entities):
+                # for words_of_entity in words_of_entities:
+                #    intersection = words_in_candidate.intersection(words_of_entity)
+                #    if intersection and len(intersection) >= len(words_of_entity) -1:
+                #     result.append(candidate)
+                #     break
+                result.append(candidate)
 
     return result
 
@@ -157,29 +159,62 @@ def distill(text: str, theme: str) -> Dict[str, Any]:
         ]
     }
     """
+    _name: str = "distill()"
     distilled: Dict[str, Any] = chat.distill(text=text, theme=theme)
     if not isinstance(distilled, dict):
         msg: str = f"expected JSON response, got {distilled}."
-        logger.error("%s. verify the prompt and the GPT response format is JSON.")
+        logger.error("%s: %s. verify the prompt and the GPT response format is JSON.", _name, msg)
         raise RuntimeError(msg)
+
+    logger.debug(
+        "%s: response from GPT is %s",
+        _name, json.dumps(distilled, indent=4, default=str, ensure_ascii=False)
+    )
 
     # --------------------------------------------------------------------------------
     # PERSON
     # --------------------------------------------------------------------------------
-    people = distilled.get('PERSON', None)
-    if people is None or not isinstance(people, list):
-        msg: str = f"expected PERSON element as list in {distilled}."
-        logger.error("%s. verify the prompt and the GPT response format has PERSON.")
-        raise RuntimeError(msg)
-
     try:
-        distilled['PERSON'] = [
-            " ".join([_person.get('title', ""), _person['name']]).strip()
-            for _person in people
-        ]
+        people = distilled.get('PERSON', None)
+        if people is None or not isinstance(people, list):
+            msg: str = f"expected PERSON element as list in {distilled}."
+            logger.error("%s: %s. verify the prompt and the GPT response format has PERSON.", _name, msg)
+            raise RuntimeError(msg)
+
+        list_title_name = []
+        for _person in people:
+            if not isinstance(_person, dict):
+                msg: str = f"internal error: expected person as dictionary, got {_person}."
+                logger.error("%s: %s. verify the prompt and the GPT response format.", _name, msg)
+                raise RuntimeError(msg)
+
+            # --------------------------------------------------------------------------------
+            # GPT may return {
+            #    "name": "Elisabeth Borne",
+            #    "title": "Prime Minister"
+            # }
+            # or
+            # {'Elisabeth Borne': 'Prime Minister'}
+            # --------------------------------------------------------------------------------
+            name = title = None
+            if 'name' in _person:
+                title = _person.get('title', "")    # title may not exist, hence ""
+                name = _person['name']
+                if not name:
+                    raise RuntimeError(f"invalid name in person:{_person}")
+            else:
+                for key, value in _person.items():
+                    name = key
+                    title = value if value else ""  # title may not exist, hence ""
+                    break
+
+            list_title_name.append(f"{title} {name}".strip())
+
+        distilled['PERSON'] = list_title_name
+
     except KeyError as error:
-        msg: str = f"PERSON element has 'name' in {people}."
-        logger.error("%s. verify the prompt and the GPT response format for PERSON.")
+        msg: str = f"internal error of expected key not exist in GPT response: {error}."
+        logger.error("%s: %s verify the prompt and the GPT response format for PERSON.", _name, msg)
         raise RuntimeError(msg) from error
 
     return distilled
@@ -192,7 +227,7 @@ def validate_gpt_extraction(gpt_distilled, spacy_entities, entity_type: Optional
         spacy_entities: SpaCy identified entities
         entity_type: type of entity e.g. location.
     """
-    if entity_type is None:
+    if entity_type is None or len(entity_type.strip()) == 0:
         # --------------------------------------------------------------------------------
         # PERSON
         # --------------------------------------------------------------------------------
@@ -241,44 +276,81 @@ def extract(data: Dict[str, Any]):
     )
 
     # --------------------------------------------------------------------------------
-    # Entity detection
+    # Tagging
     # --------------------------------------------------------------------------------
     result: Dict[str, Any] = {}
     try:
-        text: str = data['text']
-        entity_type: str = data.get('entity_type', None)
-        use_gpt: bool = data.get('use_gpt', False)
+        # --------------------------------------------------------------------------------
+        # payload
+        # --------------------------------------------------------------------------------
+        entity_type: str = data.get('entity_type', "")
+        use_gpt: bool = data.get('use_gpt', True)
+        title: str = data.get('title', None)            # Title/theme of the text
+        text: str = data.get('text', None)
+        if text is None:
+            raise RuntimeError("expected 'text' in the request, got none.")
 
+        # --------------------------------------------------------------------------------
+        # Auto detect language and translate to English to use with the SpaCy EN model.
+        # GPT can handle multi language, however SpaCy non EN models do not perform well. 
+        # Hence, use English.
+        # --------------------------------------------------------------------------------
+        text = get_en_translation(text=text, language_code=None)
+
+        # --------------------------------------------------------------------------------
+        # Spacy NER
+        # --------------------------------------------------------------------------------
         entities = get_named_entities(
-            text=get_en_translation(text=text, language_code=None),
+            text=text,
             entity_type=entity_type
         )
+        
         if entities:
             logger.debug("%s: entities extracted:%s", name, entities)
         else:
             msg: str = "no entity detected in the text"
             msg = msg + (f" for the entity_type [{entity_type}]." if entity_type else ".")
-            logger.warning("%s", msg)
+            logger.warning("%s: %s", name, msg)
+            raise RuntimeError(msg)
 
-        result = entities if entity_type is None else {
-            entity_type.upper(): entities
-        }
+        # --------------------------------------------------------------------------------
+        # 'entities' is list if entity_type is specified e.g. "location", otherwise dictionary.
+        # --------------------------------------------------------------------------------
+        if entity_type:
+            result[entity_type.upper()] = entities
+        else:
+            result['NER'] = entities
 
         # --------------------------------------------------------------------------------
         # GPT
         # --------------------------------------------------------------------------------
         if use_gpt:
-            theme: str = get_theme(text=text)
+            # --------------------------------------------------------------------------------
+            # Tagging with GPT
+            # --------------------------------------------------------------------------------
+            theme: str = title if title else get_theme(text=text)
             distilled = distill(text=text, theme=theme)
-            result['Z_GPT_TAGGING'] = validate_gpt_extraction(
-                gpt_distilled=distilled, spacy_entities=entities, entity_type=entity_type
+
+            # --------------------------------------------------------------------------------
+            # Validate extracted tag e.g. location is correct with Spacy Named Entity.
+            # --------------------------------------------------------------------------------
+            validated = validate_gpt_extraction(
+                gpt_distilled=distilled, 
+                spacy_entities=entities, 
+                entity_type=entity_type
             )
+            
+            result['GPT'] = validated
 
         return result
 
-    except (RuntimeError, ValueError, KeyError) as error:
+    # Intentional catch all
+    except Exception as error:
         logger.error("%s: failed due to [%s].", name, error)
-        raise
+        logger.error("%s", traceback.format_exc())
+        return {
+            "error": str(error)
+        }
 
 
 if __name__ == "__main__":
@@ -321,7 +393,7 @@ Finns, she said, are happy to accept portrayals of themselves as melancholy and 
     import re
     extracted = extract({
         "text": re.sub(r'[\s]+', ' ', example),
-        "entity_type": "person",
+        "entity_type": "",
         "use_gpt": True
     })
     print(json.dumps(extracted, indent=4, default=str, ensure_ascii=False))
