@@ -328,8 +328,9 @@ def extract(data: Dict[str, Any]):
             # --------------------------------------------------------------------------------
             # Tagging with GPT
             # --------------------------------------------------------------------------------
-            theme: str = title if title else get_theme(text=text)
-            distilled = distill(text=text, theme=theme)
+            # theme: str = title if title else get_theme(text=text)
+            # distilled = distill(text=text, theme=theme)
+            distilled = distill(text=text, theme="not applicable")
 
             # --------------------------------------------------------------------------------
             # Validate extracted tag e.g. location is correct with Spacy Named Entity.

@@ -2,6 +2,7 @@
 import json
 import logging
 from typing import (
+    List,
     Dict,
     Any,
     Optional,
@@ -19,6 +20,16 @@ from util_openai import (   # pylint: disable=import-error
 # --------------------------------------------------------------------------------
 _logger: logging.Logger = get_logger(__name__)
 _logger.setLevel(logging.DEBUG)
+
+
+# --------------------------------------------------------------------------------
+# Constant
+# --------------------------------------------------------------------------------
+CATEGORY_EXAMPLES: List[str] = [
+    'culture', 'sports', 'war', 'crime', 'politics', 'technology', 'food',
+    'lifestyle', 'science', 'business', "society", "philosophy", "innovation",
+    "relationship", "economy", "energy", "history"
+]
 
 
 def _to_json(text: str) -> Dict[str, Any]:
@@ -232,7 +243,7 @@ Top {top_n} news categories or topics as KEYWORDS about the NEWS.
 Top {top_n} PERSON as title and name who is connected to the incident of the NEWS.
 Top {top_n} ORGANIZATIONS that participated in the incident of the NEWS.
 Maximum {top_n} GEOGRAPHIC COUNTRY and its LOCATIONS where the incident of the NEWS happened.
-Maximum three CATEGORIES of the NEWS such as 'culture', 'sports', 'crime', 'politics', 'technology'.
+Maximum three CATEGORIES of the NEWS such as {', '.join(CATEGORY_EXAMPLES)}.
 
 Return a JSON in the following format that the python json.loads method can handle.
 {{
