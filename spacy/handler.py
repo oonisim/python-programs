@@ -292,7 +292,7 @@ def extract(data: Dict[str, Any]):
 
         # --------------------------------------------------------------------------------
         # Auto detect language and translate to English to use with the SpaCy EN model.
-        # GPT can handle multi language, however SpaCy non EN models do not perform well. 
+        # GPT can handle multi language, however SpaCy non EN models do not perform well.
         # Hence, use English.
         # --------------------------------------------------------------------------------
         text = get_en_translation(text=text, language_code=None)
@@ -304,7 +304,7 @@ def extract(data: Dict[str, Any]):
             text=text,
             entity_type=entity_type
         )
-        
+
         if entities:
             logger.debug("%s: entities extracted:%s", name, entities)
         else:
@@ -335,17 +335,17 @@ def extract(data: Dict[str, Any]):
             # Validate extracted tag e.g. location is correct with Spacy Named Entity.
             # --------------------------------------------------------------------------------
             validated = validate_gpt_extraction(
-                gpt_distilled=distilled, 
-                spacy_entities=entities, 
+                gpt_distilled=distilled,
+                spacy_entities=entities,
                 entity_type=entity_type
             )
-            
+
             result['GPT'] = validated
 
         return result
 
     # Intentional catch all
-    except Exception as error:
+    except Exception as error:  # pylint: disable=broad-exception-caught
         logger.error("%s: failed due to [%s].", name, error)
         logger.error("%s", traceback.format_exc())
         return {
