@@ -33,6 +33,22 @@ CATEGORY_EXAMPLES: List[str] = [
     "Innovation", "Relationship",  "Roman History"
 ]
 
+SENTIMENTS = {
+    "Uplifting": "story covering inspiring people, making people feel sense of hope.",
+    "Light": "story that may leave the audience feeling bemused or entertained "
+             "which is suitable for ‘Divert Me’ stories.",
+    "Neutral": "story covering topics the audience will find interesting and important, "
+               "but unlikely to stir great emotion. "
+               "Eg, announcements on interest rate rises, cost of living advice",
+    "Serious": "story covering a serious issue eg: "
+               "people struggling with interest rate rises, "
+               "alcohol addiction, crime, policies relating to extremism, "
+               "domestic violence policy, visa/work exploitation, politician talking about war",
+    "Heavy": "story covering topics likely to elicit strong emotion or story covering heavy violence, "
+             "suicide, deaths in custody, incidents of domestic violence, severe impacts of mental health, "
+             "impacts of war. Anything requiring a content warning."
+}
+
 
 def _to_json(text: str) -> Dict[str, Any]:
     try:
@@ -172,11 +188,51 @@ class ChatTaskForTextTagging(OpenAI):
         # prompt = f"Order top {top_n} important keywords from the TEXT that directly induce '{theme}'. " \
         #          f"Return as a JSON list. " \
         #          f"TEXT={text}."
-        prompt = f"Top {top_n} critical keywords from the TEXT that directly induce '{theme}'. " \
-                 f"Return as a JSON list. " \
-                 f"Order by importance. " \
-                 f"TEXT={text}."
+        prompt = f"""Top {top_n} key noun phrases from the TEXT that directly induce '{theme}'. 
+Let's do step by step.
+1. Identify {top_n} KEY EVENT of the TEXT that occurred.
+2. Generate a NOUN PHRASE for each event within 5 words.
+3. Order by importance. 
+4. Return as JSON.
 
+JSON format:
+{{
+    "NOUN PHRASE": "KEY EVENT"
+}}
+
+TEXT={text}.
+"""
+
+        return _to_json(text=self.get_chat_completion_by_prompt(prompt=prompt))
+
+    def get_sentiment(self, text: str) -> Dict[str, Any]:
+        """Get the sentiment of the text
+        Args:
+            text: text to get the sentiment from.
+        """
+        prompt = f"""With Sentiment={json.dumps(SENTIMENTS, indent=2, ensure_ascii=False, default=str)}, 
+Give one sentiment about the TEXT and its reason as JSON. 
+ 
+JSON FORMAT:
+{{
+    "sentiment": sentiment,
+    "reason": reason
+}}"
+
+Example:
+{{
+    "sentiment": "Serious",
+    "reason": "The text discusses the case of Kathleen Folbigg, who spent 20 years in jail for 
+the deaths of her four children. It highlights the serious nature of the legal system, 
+the impact on individuals, and the need for post-conviction reviews. 
+The story addresses topics such as wrongful convictions, the flaws in the legal system, 
+and the potential for compensation. 
+The seriousness of the subject matter and the focus on social issues make it fitting 
+for the 'Serious' sentiment."
+}}
+
+TEXT={text}
+"""
         return _to_json(text=self.get_chat_completion_by_prompt(prompt=prompt))
 
     def distill(
