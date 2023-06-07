@@ -240,12 +240,11 @@ class ChatTaskForTextTagging(OpenAI):
 # TEXT={text}
 # 
 # """
-
         prompt = f"""
 Top {top_n} news categories or topics as KEYWORDS about the NEWS.
 Top {top_n} PERSON as title and name who are world well known and participated in the key events of the NEWS. Must be known figures.
 Top {top_n} ORGANIZATIONS that participated in the key events of the NEWS.
-Maximum 3 GEOGRAPHIC COUNTRY or LOCATION where the key events of the NEWS happened. Must be Maximum 3.
+Maximum 3 GEOGRAPHIC COUNTRY or LOCATION where the key events of the NEWS happened such as 'Paris France', 'Grafton Australia'. Must be Maximum 3.
 Maximum 3 CATEGORIES of the NEWS such as {', '.join(CATEGORY_EXAMPLES)}.
 
 Return a JSON in the following format that the python json.loads method can handle.
