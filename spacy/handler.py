@@ -99,6 +99,8 @@ def get_people(text: str, entities: List[str]) -> List[str]:
             if title:
                 result.append(f"{title} {name}")
             else:
+                # Add person without title (e.g. president) not to miss key figures
+                # without title (e.g. michael jordan may appear without title).
                 result.append(name)
 
     return result
