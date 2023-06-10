@@ -9,9 +9,6 @@ from typing import (
     Any,
     Optional
 )
-from util_python._time import (
-    timer
-)
 
 from .ner import (
     get_en_translation,
