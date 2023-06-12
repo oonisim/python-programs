@@ -476,7 +476,6 @@ NEWS={text}
                 f"expected JSON response from categorize_locations(), got {categorized_locations}"
 
             # Empty the LOCATION to replace with PLACE from the categorized
-            original: List[str] = entities.pop(self.LABEL_LOCATION)
             entities[self.LABEL_LOCATION] = []
 
             # --------------------------------------------------------------------------------
