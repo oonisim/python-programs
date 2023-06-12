@@ -82,7 +82,7 @@ class ChatTaskForTextTagging(OpenAI):
     @staticmethod
     def tag_entity_types():
         """List of text tag entity types"""
-        return ChatTaskForTextTagging.TAG_ENTITY_TYPES
+        return ChatTaskForTextTagging.LABELS
 
     def __init__(self, path_to_api_key: str):
         super().__init__(path_to_api_key=path_to_api_key)
@@ -372,12 +372,13 @@ TEXT={text}
 """
         return _to_json(text=self.get_chat_completion_by_prompt(prompt=prompt))
 
-    def distill(
+    def get_entities(
             self,
             text: str,
-            theme: str,                 # pylint: disable=unused-argument
-            max_words: int = 25,        # pylint: disable=unused-argument
-            top_n: int = 6
+            theme: Optional[str] = None,    # pylint: disable=unused-argument
+            max_words: int = 25,            # pylint: disable=unused-argument
+            top_n: int = 6,
+            do_categorize: bool = True
     ) -> Dict[str, Any]:
         """
         Get theme, summary, keywords, key phrases, people, locations from the text
@@ -387,7 +388,8 @@ TEXT={text}
             text: text to extract the key events from.
             theme: theme of the text to which the organizations are related with
             max_words: max words for summary
-            top_n:
+            top_n: number of entities to return
+            do_categorize:
 
         Returns: organizations as JSON/dictionary in the form of {
             "keywords": KEYWORDS,
@@ -433,11 +435,12 @@ TEXT={text}
         # TEXT={text}
         #
         # """
+
         prompt = f"""
 Top {top_n} news categories or topics as KEYWORDS about the NEWS.
 Top {top_n} PERSON as title and name who are world well known and participated in the key events of the NEWS. Must be known figures.
 Top {top_n} ORGANIZATIONS that participated in the key events of the NEWS.
-Maximum 3 GEOGRAPHIC COUNTRY or LOCATION where the key events of the NEWS happened such as 'Paris France', 'Grafton Australia'. Must be Maximum 3.
+Maximum 3 GEOGRAPHIC COUNTRY or LOCATION where the key events of the NEWS happened. Must be Maximum 3.
 Maximum 3 CATEGORIES of the NEWS such as {', '.join(CATEGORY_EXAMPLES)}.
 
 Return a JSON in the following format that the python json.loads method can handle.
@@ -451,4 +454,156 @@ Return a JSON in the following format that the python json.loads method can hand
 
 NEWS={text}
 """
-        return _to_json(text=self.get_chat_completion_by_prompt(prompt=prompt))
+        entities: Dict[str, Any] = \
+            _to_json(text=self.get_chat_completion_by_prompt(prompt=prompt))
+
+        assert self.LABEL_PERSON in entities
+        assert self.LABEL_ORGANIZATION in entities
+        assert self.LABEL_LOCATION in entities
+
+        if do_categorize:
+            categorized_locations: Dict[str, Any] = \
+                self.categorize_locations(locations=entities[self.LABEL_LOCATION])
+            assert isinstance(categorized_locations, dict), \
+                f"expected JSON response from categorize_locations(), got {categorized_locations}"
+
+            # Empty the LOCATION to replace with PLACE from the categorized
+            original: List[str] = entities.pop(self.LABEL_LOCATION)
+            entities[self.LABEL_LOCATION] = []
+
+            # --------------------------------------------------------------------------------
+            # {
+            #     "GOVERNMENT": [
+            #         "Parliament",
+            #         "NSW prison"
+            #     ],
+            #     "ORGANIZATION": [
+            #         "Ipsos Group",
+            #         "Apple Inc"
+            #     ],,
+            #     "INSTITUTION": [
+            #         "Sydney University"
+            #     ],
+            #     "PLACE": {
+            #         "Sydney": {
+            #             "country": "Australia",
+            #             "state": "New South Wales",
+            #             "latitude": -33.8688,
+            #             "longitude": 151.2093
+            #         },
+            #         "Bathurst": {
+            #             "country": "Australia",
+            #             "state": "New South Wales",
+            #             "latitude": -33.4193,
+            #             "longitude": 149.5775
+            #         },
+            #         "Australia": {
+            #             "country": "Australia",
+            #             "state": null,
+            #             "latitude": -25.2744,
+            #             "longitude": 133.7751
+            #         }
+            #     },
+            #     "OTHER": [
+            #         "December quarter"
+            #     ]
+            # }
+            # --------------------------------------------------------------------------------
+            for key, values in categorized_locations.items():
+                # --------------------------------------------------------------------------------
+                # ORGANIZATION
+                # --------------------------------------------------------------------------------
+                if key.strip().lower() in [
+                    self.LABEL_GOVERNMENT.lower(),
+                    self.LABEL_ORGANIZATION.lower(),
+                    self.LABEL_INSTITUTION.lower()
+                ]:
+                    assert isinstance(values, list), f"expected LIST, got {values}."
+                    if self.LABEL_ORGANIZATION in entities:
+                        entities[self.LABEL_ORGANIZATION] += values
+                    else:
+                        entities[self.LABEL_ORGANIZATION] = values
+
+                # --------------------------------------------------------------------------------
+                # FACILITY
+                # --------------------------------------------------------------------------------
+                if key.strip().lower() in [
+                    self.LABEL_FACILITY.lower(),
+                ]:
+                    assert isinstance(values, (dict, list)), \
+                        f"expected LIST or DICT for FACILITY, got {values}."
+
+                    facilities: List[str] = []
+                    for facility in values:
+                        if isinstance(facility, str):
+                            facilities.append(facility)
+                        elif isinstance(facility, dict) and 'name' in facility:
+                            facilities.append(facility['name'])
+                        else:
+                            assert False, f"unexpected facility {facility}."
+
+                    if self.LABEL_FACILITY in entities:
+                        entities[self.LABEL_FACILITY] += facilities
+                    else:
+                        entities[self.LABEL_FACILITY] = facilities
+
+                # --------------------------------------------------------------------------------
+                # PLACE
+                # --------------------------------------------------------------------------------
+                if key.strip().lower() in [
+                    "place"
+                ]:
+                    assert isinstance(values, (list, dict)), \
+                        f"expected JSON for PLACE, got {values}."
+
+                    places: List[str] = []
+                    if isinstance(values, dict):
+                        for name, information in values.items():
+                            assert isinstance(information, dict), \
+                                f"expected dict for PLACE element, got {information}"
+
+                            if (
+                                    'state' in information
+                                    and information['state']
+                                    and information['state'] not in name
+                            ):
+                                name += f", {information['state']}"
+
+                            if (
+                                    'country' in information
+                                    and information['country']
+                                    and information['country'] not in name
+                            ):
+                                name += f", {information['country']}"
+
+                            places.append(name)
+
+                    elif isinstance(values, list):
+                        for information in values:
+                            assert isinstance(information, dict), \
+                                f"expected dictionary as location, got {information}."
+                            assert 'name' in information, f"expected 'name' element in {information}."
+
+                            name: str = information['name']
+                            if (
+                                    'state' in information
+                                    and information['state']
+                                    and information['state'] not in name
+                            ):
+                                name += f", {information['state']}"
+
+                            if (
+                                    'country' in information
+                                    and information['country']
+                                    and information['country'] not in name
+                            ):
+                                name += f", {information['country']}"
+
+                            places.append(name)
+
+                    if self.LABEL_LOCATION in entities:
+                        entities[self.LABEL_LOCATION] += places
+                    else:
+                        entities[self.LABEL_LOCATION] = places
+
+        return entities
