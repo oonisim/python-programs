@@ -4,6 +4,7 @@ import logging
 from typing import (
     List,
     Dict,
+    Set,
     Any,
     Optional,
 )
@@ -406,6 +407,7 @@ TEXT={text}
             "locations": GEOGRAPHIC LOCATIONS
         }
         """
+        _func_name: str = "get_entities()"
         #         prompt_that_takes_longer = f"""
         # THEME is '{theme}'.
         #
@@ -475,8 +477,18 @@ NEWS={text}
             assert isinstance(categorized_locations, dict), \
                 f"expected JSON response from categorize_locations(), got {categorized_locations}"
 
+            # --------------------------------------------------------------------------------
             # Empty the LOCATION to replace with PLACE from the categorized
+            # --------------------------------------------------------------------------------
+            originals: Set[str] = {
+                _location.lower() for _location in entities.pop(self.LABEL_LOCATION)
+            }
             entities[self.LABEL_LOCATION] = []
+            _logger.debug(
+                "%s: location (lowered) before categorize:%s", _func_name, originals
+            )
+
+            locations: Set[str] = set()
 
             # --------------------------------------------------------------------------------
             # {
@@ -540,22 +552,20 @@ NEWS={text}
                     assert isinstance(values, list), \
                         f"expected LIST for COUNTRY, got {values}."
 
-                    countries: List[str] = []
-                    for country in values:
-                        if isinstance(country, str):
-                            countries.append(country)
-                        elif isinstance(country, dict) and 'name' in country:
-                            countries.append(country['name'])
+                    for _country in values:
+                        if isinstance(_country, str):
+                            _lowered = _country.lower()
+                            if _lowered not in locations and _lowered in originals:
+                                locations.add(_lowered)
+                                entities[self.LABEL_LOCATION].append(_country)
+                        elif isinstance(_country, dict) and 'name' in _country:
+                            _lowered = _country['name'].lower()
+                            if _lowered not in locations and _lowered in originals:
+                                locations.add(_lowered)
+                                entities[self.LABEL_LOCATION].append(_country['name'])
                         else:
-                            assert False, f"unexpected country {country}."
-
-                    if self.LABEL_LOCATION in entities:
-                        entities[self.LABEL_LOCATION] += [
-                            _country for _country in countries
-                            if _country not in entities[self.LABEL_LOCATION]
-                        ]
-                    else:
-                        entities[self.LABEL_LOCATION] = countries
+                            assert False, f"unexpected country {_country}."
+                # end COUNTRY
 
                 # --------------------------------------------------------------------------------
                 # PLACE
@@ -566,12 +576,26 @@ NEWS={text}
                     assert isinstance(values, (list, dict)), \
                         f"expected JSON for PLACE, got {values}."
 
-                    places: List[str] = []
                     if isinstance(values, dict):
                         for name, information in values.items():
                             assert isinstance(information, dict), \
                                 f"expected dict for PLACE element, got {information}"
 
+                            _lowered = name.lower()
+
+                            if _lowered not in originals:
+                                # GPT can make up a location that is not in original locations.
+                                # For instance, categorize may generate 'Helsinki, Finland' for 'Finland'
+                                # although 'Helsinki' does not exist in locations before categorize.
+                                # Those locations returned from categorize must exist in original.
+                                del _lowered
+                                continue
+
+                            # categorize may generate {
+                            #     "name": "Finland",
+                            #     "country": "Finland"
+                            # }
+                            # Avoid generating "Finland, Finland" as a location.
                             if (
                                     'state' in information
                                     and information['state']
@@ -586,7 +610,9 @@ NEWS={text}
                             ):
                                 name += f", {information['country']}"
 
-                            places.append(name)
+                            if name.lower() not in locations:
+                                locations.add(name.lower())
+                                entities[self.LABEL_LOCATION].append(name)
 
                     elif isinstance(values, list):
                         for information in values:
@@ -595,6 +621,19 @@ NEWS={text}
                             assert 'name' in information, f"expected 'name' element in {information}."
 
                             name: str = information['name']
+                            _lowered = name.lower()
+                            if _lowered not in originals:
+                                # GPT can make up a location that not in original locations.
+                                # For instance, 'Helsinki, Finland' for 'Finland' at categorize.
+                                # Those locations returned from categorize must exist in original.
+                                del _lowered
+                                continue
+
+                            # categorize may generate {
+                            #     "name": "Finland",
+                            #     "country": "Finland"
+                            # }
+                            # Avoid generating "Finland, Finland" as a location.
                             if (
                                     'state' in information
                                     and information['state']
@@ -609,14 +648,15 @@ NEWS={text}
                             ):
                                 name += f", {information['country']}"
 
-                            places.append(name)
+                            if name.lower() not in locations:
+                                locations.add(name.lower())
+                                entities[self.LABEL_LOCATION].append(name)
+                # end PLACE
+            # end for key, values in categorized_locations.items()
 
-                    if self.LABEL_LOCATION in entities:
-                        entities[self.LABEL_LOCATION] += [
-                            _place for _place in places
-                            if _place not in entities[self.LABEL_LOCATION]
-                        ]
-                    else:
-                        entities[self.LABEL_LOCATION] = places
+            _logger.debug(
+                "%s: location after categorize:%s", _func_name, entities[self.LABEL_LOCATION]
+            )
+        # end do_categorize
 
         return entities
