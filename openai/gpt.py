@@ -28,6 +28,7 @@ _logger.setLevel(logging.DEBUG)
 CATEGORY_EXAMPLES: List[str] = [
     'Culture of Finland', 'Australian sports', 'War Crime', 'French Politics',
     'Quantum Technology', 'Asian Food', 'lifestyle', 'Life Science', "Energy Policy",
+    "Cost of Living", "Immigration Policy", "Legal System",
     'Financial Business', "Financial Market", "British Society", "Political Philosophy",
     "Diplomatic Relationship with China", "Australian Economy", "Solar Energy",
     "Innovation", "Relationship",  "Roman History"
@@ -51,19 +52,20 @@ SENTIMENTS = {
 
 
 def _to_json(text: str) -> Dict[str, Any]:
+    _func_name: str = "_to_json()"
     try:
         return json.loads(text)
     except json.decoder.JSONDecodeError as _error:
         msg: str = f"cannot decode to JSON from the GPT response [{text}]"
-        _logger.error("%s due to [%s].", msg, _error)
+        _logger.error("%s: %s due to [%s].", _func_name, msg, _error)
         raise RuntimeError from _error
 
 
 # --------------------------------------------------------------------------------
 # OpenAI
 # --------------------------------------------------------------------------------
-class ChatTaskForTextTagging(OpenAI):
-    """Class for text tagging using Open AI chat task operations"""
+class ChatCompletion(OpenAI):
+    """Class for Open AI chat completion task operations"""
     LABEL_PERSON: str = "PERSON"
     LABEL_LOCATION: str = "LOCATION"
     LABEL_ORGANIZATION: str = "ORGANIZATION"
@@ -74,7 +76,7 @@ class ChatTaskForTextTagging(OpenAI):
         LABEL_ORGANIZATION,
         LABEL_FACILITY
     }
-
+    LABEL_COUNTRY: str = "COUNTRY"
     LABEL_INSTITUTION: str = "INSTITUTION"
     LABEL_GOVERNMENT: str = "GOVERNMENT"
     LABEL_BUSINESS: str = "BUSINESS"
@@ -82,7 +84,7 @@ class ChatTaskForTextTagging(OpenAI):
     @staticmethod
     def tag_entity_types():
         """List of text tag entity types"""
-        return ChatTaskForTextTagging.LABELS
+        return ChatCompletion.LABELS
 
     def __init__(self, path_to_api_key: str):
         super().__init__(path_to_api_key=path_to_api_key)
@@ -127,9 +129,9 @@ class ChatTaskForTextTagging(OpenAI):
             <event noun phrase>: <description>
         }
         """
-        prompt = "Critical events in the TEXT. " \
-                 f"Return as JSON where key is event as noun phrase within {max_words} words " \
-                 f"and value is explanation. TEXT={text}"
+        # prompt = "Critical events in the TEXT. " \
+        #          f"Return as JSON where key is event as noun phrase within {max_words} words " \
+        #          f"and value is explanation. TEXT={text}"
 
         prompt = f"""Critical EVENTS in the TEXT as JSON in the format:
 {{
@@ -222,48 +224,49 @@ TEXT={text}.
             locations: locations to validate
             text: text from where the locations are extracted
         Returns: dictionary of categorized locations in the format of {
-            "GOVERNMENT": [
-                "Parliament",
-                "NSW prison"
-            ],
             "ORGANIZATION": [
-                "Ipsos Group",
-                "Apple Inc"
-            ],,
-            "INSTITUTION": [
-                "Sydney University"
+                "Microsoft",
+                "Tesla Giga Factory",
+                "SBS News",
+                "The Sydney Morning Herald"
             ],
-            "PLACE": {
-                "Sydney": {
-                    "country": "Australia",
-                    "state": "New South Wales",
-                    "latitude": -33.8688,
-                    "longitude": 151.2093
+            "INSTITUTION": [
+                "Sydney University",
+                "NSW Prison",
+                "Clarence Correctional Centre"
+            ],
+            "COUNTRY": [
+                "Afghanistan",
+                "Australia",
+                "Singapore"
+            ],
+            "PLACE": [
+                {
+                    "name": "Bali",
+                    "country": "Indonesia"
                 },
-                "Bathurst": {
-                    "country": "Australia",
-                    "state": "New South Wales",
-                    "latitude": -33.4193,
-                    "longitude": 149.5775
+                {
+                    "name": "Seattle",
+                    "country": "United States",
+                    "state": "Washington",
+                    "latitude": "47.6062° N",
+                    "longitude": "122.3321° W"
                 },
-                "Australia": {
-                    "country": "Australia",
-                    "state": null,
-                    "latitude": -25.2744,
-                    "longitude": 133.7751
+                {
+                    "name": "New South Wales",
+                    "country": "Australia"
                 }
-            },
-            "OTHER": [
-                "December quarter"
-            ]
+            ],
+            "GOVERNMENT": [
+                "Parliament"
+            ],
+            "OTHER": []
         }
         OR
         {
             "GOVERNMENT": [],
             "ORGANIZATION": [],
-            "INSTITUTION": [],
-            "BUSINESS": [],
-            "FACILITY": [
+            "INSTITUTION": [
                 {
                     "name": "Clarence Correctional Centre",
                     "country": "Australia",
@@ -286,16 +289,12 @@ TEXT={text}.
         """
         prompt = f"""
 Categorize {locations} into
-government or organization or institution or business or facility or place or other.
+country or place or organization or institution or government other.
 as JSON in the format:
 {{
-    "{self.LABEL_GOVERNMENT}": [government names],
     "{self.LABEL_ORGANIZATION}": [organizations names],
     "{self.LABEL_INSTITUTION}": [institution names],
-    '{self.LABEL_BUSINESS}": [business names],
-    "{self.LABEL_FACILITY}": [
-        facility names
-    ],
+    "{self.LABEL_COUNTRY}": [ country names ],
     "PLACE": [
         {{
             "name": place name,
@@ -305,9 +304,11 @@ as JSON in the format:
             "longitude: longitude
         }}
     ],
+    "{self.LABEL_GOVERNMENT}": [government names],
     "OTHER": [other names]
 }}
 """
+
         _func_name: str = "categorize_locations()"
         _logger.debug(
             "%s: locations to categorize: %s", _func_name, locations
@@ -326,24 +327,31 @@ as JSON in the format:
             text: text to extract the key events from.
             theme: theme of the text to which the organizations are related with
             top_n: number of organizations to return
-        Returns: organizations as JSON/dictionary in the form of {
-            <name>: <description>
-        }
+        Returns: keywords as JSON/dictionary
         """
-        # prompt = f"Top {top_n} most important keywords in the TEXT as a JSON list. TEXT={text}."
-        # prompt = f"Order top {top_n} important keywords from the TEXT that directly induce '{theme}'. " \
+        # prompt = f"Top {top_n} critical keywords from the TEXT that directly induce '{theme}'. " \
         #          f"Return as a JSON list. " \
+        #          f"Order by importance. " \
         #          f"TEXT={text}."
-        prompt = f"""Top {top_n} key noun phrases from the TEXT that directly induce '{theme}'.
-Let's do step by step.
-1. Identify {top_n} KEY EVENT of the TEXT that occurred.
-2. Generate a NOUN PHRASE for each event within 5 words.
-3. Order by importance.
-4. Return as JSON.
 
-JSON format:
+        #         prompt = f"""Top {top_n} key noun phrases from the TEXT that directly induce '{theme}'.
+        # Let's do step by step.
+        # 1. Identify {top_n} KEY EVENT of the TEXT that occurred.
+        # 2. Generate a NOUN PHRASE for each event within 5 words.
+        # 3. Order by importance.
+        # 4. Return as JSON.
+        #
+        # JSON format:
+        # {{
+        #     "NOUN PHRASE": "KEY EVENT"
+        # }}
+        #
+        # TEXT={text}.
+        # """
+        prompt = f"""Top {top_n} KEYWORD and REASON from the TEXT that directly induce '{theme}'
+as JSON in the format:
 {{
-    "NOUN PHRASE": "KEY EVENT"
+    "KEYWORD": "REASON"
 }}
 
 TEXT={text}.
@@ -525,27 +533,30 @@ NEWS={text}
                         entities[self.LABEL_ORGANIZATION] = values
 
                 # --------------------------------------------------------------------------------
-                # FACILITY
+                # COUNTRY
                 # --------------------------------------------------------------------------------
                 if key.strip().lower() in [
-                    self.LABEL_FACILITY.lower(),
+                    self.LABEL_COUNTRY.lower(),
                 ]:
-                    assert isinstance(values, (dict, list)), \
-                        f"expected LIST or DICT for FACILITY, got {values}."
+                    assert isinstance(values, list), \
+                        f"expected LIST for COUNTRY, got {values}."
 
-                    facilities: List[str] = []
-                    for facility in values:
-                        if isinstance(facility, str):
-                            facilities.append(facility)
-                        elif isinstance(facility, dict) and 'name' in facility:
-                            facilities.append(facility['name'])
+                    countries: List[str] = []
+                    for country in values:
+                        if isinstance(country, str):
+                            countries.append(country)
+                        elif isinstance(country, dict) and 'name' in country:
+                            countries.append(country['name'])
                         else:
-                            assert False, f"unexpected facility {facility}."
+                            assert False, f"unexpected country {country}."
 
-                    if self.LABEL_FACILITY in entities:
-                        entities[self.LABEL_FACILITY] += facilities
+                    if self.LABEL_LOCATION in entities:
+                        entities[self.LABEL_LOCATION] += [
+                            _country for _country in countries
+                            if _country not in entities[self.LABEL_LOCATION]
+                        ]
                     else:
-                        entities[self.LABEL_FACILITY] = facilities
+                        entities[self.LABEL_LOCATION] = countries
 
                 # --------------------------------------------------------------------------------
                 # PLACE
@@ -602,7 +613,10 @@ NEWS={text}
                             places.append(name)
 
                     if self.LABEL_LOCATION in entities:
-                        entities[self.LABEL_LOCATION] += places
+                        entities[self.LABEL_LOCATION] += [
+                            _place for _place in places
+                            if _place not in entities[self.LABEL_LOCATION]
+                        ]
                     else:
                         entities[self.LABEL_LOCATION] = places
 
