@@ -27,8 +27,8 @@ _logger.setLevel(logging.DEBUG)
 # --------------------------------------------------------------------------------
 CATEGORY_EXAMPLES: List[str] = [
     'Culture of Finland', 'Australian sports', 'War Crime', 'French Politics',
-    'Quantum Technology', 'Asian Food', 'lifestyle', 'Life Science', "Energy Policy"
-                                                                     'Financial Business', "Financial Market", "British Society", "Political Philosophy",
+    'Quantum Technology', 'Asian Food', 'lifestyle', 'Life Science', "Energy Policy",
+    'Financial Business', "Financial Market", "British Society", "Political Philosophy",
     "Diplomatic Relationship with China", "Australian Economy", "Solar Energy",
     "Innovation", "Relationship",  "Roman History"
 ]
@@ -64,14 +64,20 @@ def _to_json(text: str) -> Dict[str, Any]:
 # --------------------------------------------------------------------------------
 class ChatTaskForTextTagging(OpenAI):
     """Class for text tagging using Open AI chat task operations"""
-    TAG_ENTITY_TYPE_PERSON: str = "PERSON"
-    TAG_ENTITY_TYPE_LOCATION: str = "LOCATION"
-    TAG_ENTITY_TYPE_ORGANIZATION: str = "ORGANIZATION"
-    TAG_ENTITY_TYPES = {
-        TAG_ENTITY_TYPE_PERSON,
-        TAG_ENTITY_TYPE_LOCATION,
-        TAG_ENTITY_TYPE_ORGANIZATION
+    LABEL_PERSON: str = "PERSON"
+    LABEL_LOCATION: str = "LOCATION"
+    LABEL_ORGANIZATION: str = "ORGANIZATION"
+    LABEL_FACILITY: str = "FACILITY"
+    LABELS = {
+        LABEL_PERSON,
+        LABEL_LOCATION,
+        LABEL_ORGANIZATION,
+        LABEL_FACILITY
     }
+
+    LABEL_INSTITUTION: str = "INSTITUTION"
+    LABEL_GOVERNMENT: str = "GOVERNMENT"
+    LABEL_BUSINESS: str = "BUSINESS"
 
     @staticmethod
     def tag_entity_types():
@@ -168,7 +174,12 @@ TEXT={text}.
                  f"Return JSON null if there is no organization.  TEXT={text}."
         return _to_json(text=self.get_chat_completion_by_prompt(prompt=prompt))
 
-    def get_geographic_locations(self, text: str, theme: Optional[str], top_n: int = 6) -> Dict[str, Any]:
+    def get_geographic_locations(
+            self,
+            text: str,
+            theme: Optional[str],   # pylint: disable=unused-argument
+            top_n: int = 6
+    ) -> Dict[str, Any]:
         """Get geographical locations from the text.
         Args:
             text: text to extract the key events from.
@@ -191,30 +202,104 @@ TEXT={text}.
 
         return _to_json(text=self.get_chat_completion_by_prompt(prompt=prompt))
 
-    def validate_get_geographic_locations(
+    def categorize_locations(
             self,
             locations: List[str],
-            text: Optional[str] = None      # pylint: disable=unused-argument
+            text: Optional[str] = None  # pylint: disable=unused-argument
     ) -> Dict[str, Any]:
-        """validate the geographic locations extracted from text
+        """categorize the locations extracted from text
+        GPT regards government (e.g. parliament), institution (e.g. university) as
+        locations besides the place names. Hence, classify them into
+        1. government
+        2. organization
+        3. institution
+        4. business
+        5. facility
+        6. geographic territory place name
+        7. other
+
         Args:
             locations: locations to validate
             text: text from where the locations are extracted
-        Returns: list of validated locations
+        Returns: dictionary of categorized locations in the format of {
+            "GOVERNMENT": [
+                "Parliament",
+                "NSW prison"
+            ],
+            "ORGANIZATION": [
+                "Ipsos Group",
+                "Apple Inc"
+            ],,
+            "INSTITUTION": [
+                "Sydney University"
+            ],
+            "PLACE": {
+                "Sydney": {
+                    "country": "Australia",
+                    "state": "New South Wales",
+                    "latitude": -33.8688,
+                    "longitude": 151.2093
+                },
+                "Bathurst": {
+                    "country": "Australia",
+                    "state": "New South Wales",
+                    "latitude": -33.4193,
+                    "longitude": 149.5775
+                },
+                "Australia": {
+                    "country": "Australia",
+                    "state": null,
+                    "latitude": -25.2744,
+                    "longitude": 133.7751
+                }
+            },
+            "OTHER": [
+                "December quarter"
+            ]
+        }
+        OR
+        {
+            "GOVERNMENT": [],
+            "ORGANIZATION": [],
+            "INSTITUTION": [],
+            "BUSINESS": [],
+            "FACILITY": [
+                {
+                    "name": "Clarence Correctional Centre",
+                    "country": "Australia",
+                    "state": "New South Wales",
+                    "latitude": -29.7072,
+                    "longitude": 152.9322
+                }
+            ],
+            "PLACE": [
+                {
+                    "name": "Grafton",
+                    "country": "Australia",
+                    "state": "New South Wales",
+                    "latitude": -29.6903,
+                    "longitude": 152.9333
+                }
+            ],
+            "OTHER": []
+        }
         """
         prompt = f"""
 Categorize {locations} into
 government or organization or institution or business or facility or place or other.
 as JSON in the format:
 {{
-    "GOVERNMENT": [government names],
-    "ORGANIZATION": [organizations names],
-    "INSTITUTION": [institution names],
-    'BUSINESS": [business names],
-    "FACILITY": [facility names],
+    "{self.LABEL_GOVERNMENT}": [government names],
+    "{self.LABEL_ORGANIZATION}": [organizations names],
+    "{self.LABEL_INSTITUTION}": [institution names],
+    '{self.LABEL_BUSINESS}": [business names],
+    "{self.LABEL_FACILITY}": [
+        facility names
+    ],
     "PLACE": [
-        "name": {{
-            "country": country name in ,
+        {{
+            "name": place name,
+            "country": country name,
             "state": state name,
             "latitude": latitude,
             "longitude: longitude
@@ -223,7 +308,17 @@ as JSON in the format:
     "OTHER": [other names]
 }}
 """
-        return _to_json(text=self.get_chat_completion_by_prompt(prompt=prompt))
+        _func_name: str = "categorize_locations()"
+        _logger.debug(
+            "%s: locations to categorize: %s", _func_name, locations
+        )
+
+        categorized: Dict[str, Any] = _to_json(text=self.get_chat_completion_by_prompt(prompt=prompt))
+        _logger.debug(
+            "%s: categorized locations: %s",
+            _func_name, json.dumps(categorized, indent=4, default=str, ensure_ascii=False)
+        )
+        return categorized
 
     def get_keywords(self, text: str, theme: str, top_n: int = 5) -> Dict[str, Any]:
         """Get keywords from the text that directly induce the theme.
@@ -330,9 +425,9 @@ TEXT={text}
         # Return a JSON in the following format that the python json.loads method can handle.
         # {{
         #     "KEYWORD": KEYWORDS  or [],
-        #     "{self.TAG_ENTITY_TYPE_PERSON}": [{{name:title}}] or [],
-        #     "{self.TAG_ENTITY_TYPE_ORGANIZATION}": ORGANIZATION or [],
-        #     "{self.TAG_ENTITY_TYPE_LOCATION}": GEOGRAPHIC LOCATIONS or []
+        #     "{self.LABEL_PERSON}": [{{name:title}}] or [],
+        #     "{self.LABEL_ORGANIZATION}": ORGANIZATION or [],
+        #     "{self.LABEL_LOCATION}": GEOGRAPHIC LOCATIONS or []
         # }}
         #
         # TEXT={text}
@@ -348,9 +443,9 @@ Maximum 3 CATEGORIES of the NEWS such as {', '.join(CATEGORY_EXAMPLES)}.
 Return a JSON in the following format that the python json.loads method can handle.
 {{
     "KEYWORD": KEYWORDS  or [],
-    "{self.TAG_ENTITY_TYPE_PERSON}": [{{name:title}}] or [],
-    "{self.TAG_ENTITY_TYPE_ORGANIZATION}": ORGANIZATION or [],
-    "{self.TAG_ENTITY_TYPE_LOCATION}": GEOGRAPHIC COUNTRIES or LOCATION or []
+    "{self.LABEL_PERSON}": [{{name:title}}] or [],
+    "{self.LABEL_ORGANIZATION}": ORGANIZATION or [],
+    "{self.LABEL_LOCATION}": GEOGRAPHIC COUNTRIES or LOCATION or []
     "CATEGORY": CATEGORIES  or []
 }}
 

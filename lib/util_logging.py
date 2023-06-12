@@ -8,8 +8,9 @@ from typing import (
 # --------------------------------------------------------------------------------
 # Logging
 # --------------------------------------------------------------------------------
-DEFAULT_LOG_LEVEL_NAME = logging.getLevelName(logging.ERROR)
+DEFAULT_LOG_LEVEL_NAME = logging.getLevelName(logging.DEBUG)
 DEFAULT_LOG_LEVEL = getattr(logging, DEFAULT_LOG_LEVEL_NAME)
+logging.basicConfig(level=DEFAULT_LOG_LEVEL)
 
 
 def get_log_level_name(level: int) -> str:
