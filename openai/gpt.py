@@ -166,12 +166,46 @@ class ChatTaskForTextTagging(OpenAI):
             <name>: <description>
         }
         """
-        prompt = f"{top_n} geographic locations in the TEXT where the THEME '{theme}' is related. " \
+        prompt = f"{top_n} geographic locations in the TEXT where the THEME '{theme}' occurred. " \
                  f"The locations must exist in the Google map. " \
                  "Return as a JSON object where the key is geographic location and the value is explanation " \
                  "why the location is important to the THEME. " \
                  f"Return JSON null if there is no geographic locations. TEXT={text}"
 
+        return _to_json(text=self.get_chat_completion_by_prompt(prompt=prompt))
+
+    def validate_get_geographic_locations(
+            self,
+            locations: List[str],
+            text: Optional[str] = None      # pylint: disable=unused-argument
+    ) -> Dict[str, Any]:
+        """validate the geographic locations extracted from text
+        Args:
+            locations: locations to validate
+            text: text from where the locations are extracted
+        Returns: list of validated locations
+        """
+        prompt = f"""
+Categorize {locations} into
+government or organization or institution or business or facility or place or other.
+as JSON in the format:
+{{
+    "GOVERNMENT": [government names],
+    "ORGANIZATION": [organizations names],
+    "INSTITUTION": [institution names],
+    'BUSINESS": [business names],
+    "FACILITY": [facility names],
+    "PLACE": [
+        "name": {{
+            "country": country name in ,
+            "state": state name,
+            "latitude": latitude,
+            "longitude: longitude
+        }}
+    ],
+    "OTHER": [other names]
+}}
+"""
         return _to_json(text=self.get_chat_completion_by_prompt(prompt=prompt))
 
     def get_keywords(self, text: str, theme: str, top_n: int = 5) -> Dict[str, Any]:
@@ -188,11 +222,11 @@ class ChatTaskForTextTagging(OpenAI):
         # prompt = f"Order top {top_n} important keywords from the TEXT that directly induce '{theme}'. " \
         #          f"Return as a JSON list. " \
         #          f"TEXT={text}."
-        prompt = f"""Top {top_n} key noun phrases from the TEXT that directly induce '{theme}'. 
+        prompt = f"""Top {top_n} key noun phrases from the TEXT that directly induce '{theme}'.
 Let's do step by step.
 1. Identify {top_n} KEY EVENT of the TEXT that occurred.
 2. Generate a NOUN PHRASE for each event within 5 words.
-3. Order by importance. 
+3. Order by importance.
 4. Return as JSON.
 
 JSON format:
@@ -210,25 +244,16 @@ TEXT={text}.
         Args:
             text: text to get the sentiment from.
         """
-        prompt = f"""With Sentiment={json.dumps(SENTIMENTS, indent=2, ensure_ascii=False, default=str)}, 
-Give one sentiment about the TEXT and its reason as JSON. 
- 
-JSON FORMAT:
-{{
-    "sentiment": sentiment,
-    "reason": reason
-}}"
+        prompt = f"""With Sentiment={json.dumps(SENTIMENTS, indent=2, ensure_ascii=False, default=str)},
+Select one SENTIMENT about the TEXT and its REASON as JSON in the format {{
+    "sentiment": "SENTIMENT",
+    "reason": "REASON"
+}}
 
 Example:
 {{
     "sentiment": "Serious",
-    "reason": "The text discusses the case of Kathleen Folbigg, who spent 20 years in jail for 
-the deaths of her four children. It highlights the serious nature of the legal system, 
-the impact on individuals, and the need for post-conviction reviews. 
-The story addresses topics such as wrongful convictions, the flaws in the legal system, 
-and the potential for compensation. 
-The seriousness of the subject matter and the focus on social issues make it fitting 
-for the 'Serious' sentiment."
+    "reason": "The text discusses the case of Kathleen Folbigg, who spent 20 years in jail"
 }}
 
 TEXT={text}
@@ -238,8 +263,8 @@ TEXT={text}
     def distill(
             self,
             text: str,
-            theme: str,
-            max_words: int = 25,
+            theme: str,                 # pylint: disable=unused-argument
+            max_words: int = 25,        # pylint: disable=unused-argument
             top_n: int = 6
     ) -> Dict[str, Any]:
         """
@@ -261,12 +286,12 @@ TEXT={text}
         """
 #         prompt_that_takes_longer = f"""
 # THEME is '{theme}'.
-# 
+#
 # Top {top_n} KEYWORDS from the TEXT that induces the THEME.
 # Top {top_n} PERSON as title and name from the TEXT who participated to the THEME.
-# Top {top_n} ORGANIZATIONS as name and explanation that induced the THEME in the the TEXT. 
+# Top {top_n} ORGANIZATIONS as name and explanation that induced the THEME in the the TEXT.
 # Top {top_n} GEOGRAPHIC LOCATIONS where the THEME occurs in the TEXT.
-# 
+#
 # Return a JSON in the following format that the python json.loads method can handle.
 # {{
 #     "KEYWORD": [{{keyword:explanation}}] or [],
@@ -274,17 +299,17 @@ TEXT={text}
 #     "ORGANIZATION": [{{name:explanation}}] or [],
 #     "LOCATION": [{{location:explanation}}] or []
 # }}
-# 
+#
 # TEXT={text}
 # """
 #         prompt_replaced = f"""
 # THEME is '{theme}'.
-# 
+#
 # Top {top_n} KEYWORDS from the TEXT that induces the THEME.
-# Top {top_n} PERSON as title and name from the TEXT who participated to the THEME. 
-# Max {top_n} ORGANIZATIONS that induced the THEME in the the TEXT. Must be less than {top_n+1}. 
+# Top {top_n} PERSON as title and name from the TEXT who participated to the THEME.
+# Max {top_n} ORGANIZATIONS that induced the THEME in the the TEXT. Must be less than {top_n+1}.
 # Top {top_n} GEOGRAPHIC LOCATIONS where the THEME does occur.
-# 
+#
 # Return a JSON in the following format that the python json.loads method can handle.
 # {{
 #     "KEYWORD": KEYWORDS  or [],
@@ -292,9 +317,9 @@ TEXT={text}
 #     "{self.TAG_ENTITY_TYPE_ORGANIZATION}": ORGANIZATION or [],
 #     "{self.TAG_ENTITY_TYPE_LOCATION}": GEOGRAPHIC LOCATIONS or []
 # }}
-# 
+#
 # TEXT={text}
-# 
+#
 # """
         prompt = f"""
 Top {top_n} news categories or topics as KEYWORDS about the NEWS.
