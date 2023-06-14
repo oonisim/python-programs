@@ -26,6 +26,7 @@ https://github.com/openai/openai-cookbook/blob/main/examples/api_request_paralle
 [Batching requests]
 https://platform.openai.com/docs/guides/rate-limits/batching-requests
 """
+import logging
 import os
 import re
 from typing import (
@@ -38,8 +39,20 @@ from typing import (
 from util_python.function import (  # pylint: disable=import-error
     retry_with_exponential_backoff
 )
+from util_cryptography import (
+    RSA
+)
+from util_logging import (
+    get_logger
+)
 
 import openai
+
+
+# --------------------------------------------------------------------------------
+# Logging
+# --------------------------------------------------------------------------------
+_logger: logging.Logger = get_logger(__name__)
 
 
 # --------------------------------------------------------------------------------
@@ -64,6 +77,11 @@ OPENAI_ERRORS_TO_RETRY: Tuple = (
 class OpenAI:
     """OpenAI API implementation class"""
     # --------------------------------------------------------------------------------
+    # Constant
+    # --------------------------------------------------------------------------------
+    PATH_TO_RSA_PRIMATE_PEM: str = "./.private_rsa_key.pem"
+
+    # --------------------------------------------------------------------------------
     # Static
     # --------------------------------------------------------------------------------
     @staticmethod
@@ -76,12 +94,35 @@ class OpenAI:
     # --------------------------------------------------------------------------------
     def __init__(
             self,
-            path_to_api_key: str,
+            path_to_api_key: Optional[str] = None,
+            path_to_rsa_private_key_pem: Optional[str] = PATH_TO_RSA_PRIMATE_PEM,
             model_chat_completions: str = OPENAI_MODEL_CHAT_COMPLETIONS,
             model_text_completions: str = OPENAI_MODEL_TEXT_COMPLETIONS
     ):
-        with open(file=path_to_api_key, encoding='utf-8') as api_key:
-            openai.api_key = api_key.readline().strip()
+        _func_name: str = "init()"
+        if os.path.isfile(path_to_api_key):
+            with open(file=path_to_api_key, mode="r", encoding='utf-8') as api_key:
+                openai.api_key = api_key.readline().strip()
+        elif (
+                os.environ.get('OPENAI_API_KEY_ENCRYPTED', None) is not None
+                and os.environ.get('PHRASE', None) is not None
+                and os.path.isfile(".pem")
+        ):
+            phrase: str = os.environ['PHRASE']
+            private_key = RSA.load_private_key(
+                path_to_private_key_pem_file=path_to_rsa_private_key_pem,
+                passphrase=phrase
+            )
+            api_key_encrypted: bytes = os.environ['OPENAI_API_KEY_ENCRYPTED'].encode()
+            api_key: bytes = RSA.decrypt(
+                encrypted_base64=api_key_encrypted,
+                private_key=private_key
+            )
+            openai.api_key = api_key.decode('utf-8')
+        else:
+            msg: str = "no Open AI key available"
+            _logger.error("%s: %s", _func_name, msg)
+            raise RuntimeError(msg)
 
         self._model_chat_completions: str = model_chat_completions
         self._model_text_completions: str = model_text_completions
