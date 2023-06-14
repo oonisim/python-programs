@@ -100,25 +100,54 @@ class OpenAI:
             model_text_completions: str = OPENAI_MODEL_TEXT_COMPLETIONS
     ):
         _func_name: str = "init()"
+        # --------------------------------------------------------------------------------
+        # Open AI API key
+        # 1. OPENAI_API_KEY environment variable
+        # --------------------------------------------------------------------------------
         if os.path.isfile(path_to_api_key):
             with open(file=path_to_api_key, mode="r", encoding='utf-8') as api_key:
                 openai.api_key = api_key.readline().strip()
+            _logger.info(
+                "%s: using [%s] file for Open AI API Key.",
+                _func_name, path_to_api_key
+            )
+        elif 'OPENAI_API_KEY' in os.environ:
+            _logger.info(
+                "%s: using 'OPENAI_API_KEY' environment variable for Open AI API Key.",
+                _func_name
+            )
+            pass
         elif (
                 os.environ.get('OPENAI_API_KEY_ENCRYPTED', None) is not None
                 and os.environ.get('PHRASE', None) is not None
                 and os.path.isfile(".pem")
         ):
-            phrase: str = os.environ['PHRASE']
-            private_key = RSA.load_private_key(
-                path_to_private_key_pem_file=path_to_rsa_private_key_pem,
-                passphrase=phrase
-            )
-            api_key_encrypted: bytes = os.environ['OPENAI_API_KEY_ENCRYPTED'].encode()
-            api_key: bytes = RSA.decrypt(
-                encrypted_base64=api_key_encrypted,
-                private_key=private_key
-            )
-            openai.api_key = api_key.decode('utf-8')
+            try:
+                phrase: str = os.environ['PHRASE']
+                private_key = RSA.load_private_key(
+                    path_to_private_key_pem_file=path_to_rsa_private_key_pem,
+                    passphrase=phrase
+                )
+                api_key_encrypted: bytes = os.environ['OPENAI_API_KEY_ENCRYPTED'].encode()
+                api_key: bytes = RSA.decrypt(
+                    encrypted_base64=api_key_encrypted,
+                    private_key=private_key
+                )
+                openai.api_key = api_key.decode('utf-8')
+                _logger.info(
+                    "%s: using 'OPENAI_API_KEY_ENCRYPTED' environment variable for "
+                    "Open AI API Key using [%s] file as the PEM file to decrypt.",
+                    _func_name, path_to_rsa_private_key_pem
+                )
+            except (RuntimeError, ValueError, KeyError, OSError) as error:
+                _logger.error(
+                    "%s: decrypting 'OPENAI_API_KEY_ENCRYPTED' environment variable "
+                    "with [%s] as the PEM failed due to [%s].\n"
+                    "OPENAI_API_KEY_ENCRYPTED=[%s].",
+                    _func_name,
+                    path_to_rsa_private_key_pem,
+                    os.environ['OPENAI_API_KEY_ENCRYPTED']
+                )
         else:
             msg: str = "no Open AI key available"
             _logger.error("%s: %s", _func_name, msg)
