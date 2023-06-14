@@ -25,9 +25,16 @@ https://github.com/openai/openai-cookbook/blob/main/examples/api_request_paralle
 
 [Batching requests]
 https://platform.openai.com/docs/guides/rate-limits/batching-requests
+
+[API Key]
+No API key provided. You can set your API key in code using 'openai.api_key = <API-KEY>',
+or you can set the environment variable OPENAI_API_KEY=<API-KEY>).
+or you can point the openai module at it with 'openai.api_key_path = <PATH>'.
+You can generate API keys in the OpenAI web interface
 """
 import logging
 import os
+import pathlib
 import re
 from typing import (
     List,
@@ -99,31 +106,44 @@ class OpenAI:
             model_chat_completions: str = OPENAI_MODEL_CHAT_COMPLETIONS,
             model_text_completions: str = OPENAI_MODEL_TEXT_COMPLETIONS
     ):
+        """Class instance initialization
+        1. Setup Open AI API Key
+        2. Setup Open AI API Model(s)
+
+        Raises:
+            RuntimeError: API Key setup failed.
+        """
         _func_name: str = "init()"
+
         # --------------------------------------------------------------------------------
-        # Open AI API key
+        # Open AI API key retrieval
         # 1. OPENAI_API_KEY environment variable
+        # 2. From file specified with the path_to_api_key arg.
+        # 3. OPENAI_API_KEY_ENCRYPTED environment variable.
+        #    Decryption key PEM is specified with path_to_rsa_private_key_pem whose
+        #    pass phrase is set at RSA_PRIVATE_KEY_PASSPHRASE environment variable.
         # --------------------------------------------------------------------------------
-        if isinstance(path_to_api_key, str) and os.path.isfile(path_to_api_key):
-            with open(file=path_to_api_key, mode="r", encoding='utf-8') as api_key:
-                openai.api_key = api_key.readline().strip()
-            _logger.info(
-                "%s: using [%s] file for Open AI API Key.",
-                _func_name, path_to_api_key
-            )
-        elif 'OPENAI_API_KEY' in os.environ:
+        if 'OPENAI_API_KEY' in os.environ:
             _logger.info(
                 "%s: using 'OPENAI_API_KEY' environment variable for Open AI API Key.",
                 _func_name
             )
-            pass
+            openai.api_key = os.environ['OPENAI_API_KEY']
+        elif isinstance(path_to_api_key, str) and os.path.isfile(path_to_api_key):
+            # with open(file=path_to_api_key, mode="r", encoding='utf-8') as api_key:
+            #     openai.api_key = api_key.readline().strip()
+            openai.api_key_path = str(pathlib.Path(path_to_api_key).resolve())
+            _logger.info(
+                "%s: using [%s] file for Open AI API Key.",
+                _func_name, path_to_api_key
+            )
         elif (
                 len(os.environ.get('OPENAI_API_KEY_ENCRYPTED', "").strip()) > 0
-                and len(os.environ.get('PHRASE', "").strip()) > 0
+                and len(os.environ.get('RSA_PRIVATE_KEY_PASSPHRASE', "").strip()) > 0
                 and os.path.isfile(path_to_rsa_private_key_pem)
         ):
             try:
-                phrase: str = os.environ['PHRASE']
+                phrase: str = os.environ['RSA_PRIVATE_KEY_PASSPHRASE']
                 private_key = RSA.load_private_key(
                     path_to_private_key_pem_file=path_to_rsa_private_key_pem,
                     passphrase=phrase
