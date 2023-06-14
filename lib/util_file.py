@@ -209,6 +209,13 @@ def get_dir_name(path: str) -> str:
     return str(pathlib.Path(path).parent)
 
 
+def get_home_directory() -> str:
+    """Get the home directory of the current OS user
+    Returns: path to the user home directory
+    """
+    return os.path.expanduser('~')
+
+
 def mkdir(path: str, mode=0o777, create_parents: bool = True):
     """make directory if it does not exist and can be created. Do nothing if already exists.
     Args:
