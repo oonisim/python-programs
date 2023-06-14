@@ -104,7 +104,7 @@ class OpenAI:
         # Open AI API key
         # 1. OPENAI_API_KEY environment variable
         # --------------------------------------------------------------------------------
-        if os.path.isfile(path_to_api_key):
+        if isinstance(path_to_api_key, str) and os.path.isfile(path_to_api_key):
             with open(file=path_to_api_key, mode="r", encoding='utf-8') as api_key:
                 openai.api_key = api_key.readline().strip()
             _logger.info(
@@ -118,9 +118,9 @@ class OpenAI:
             )
             pass
         elif (
-                os.environ.get('OPENAI_API_KEY_ENCRYPTED', None) is not None
-                and os.environ.get('PHRASE', None) is not None
-                and os.path.isfile(".pem")
+                len(os.environ.get('OPENAI_API_KEY_ENCRYPTED', "").strip()) > 0
+                and len(os.environ.get('PHRASE', "").strip()) > 0
+                and os.path.isfile(path_to_rsa_private_key_pem)
         ):
             try:
                 phrase: str = os.environ['PHRASE']
