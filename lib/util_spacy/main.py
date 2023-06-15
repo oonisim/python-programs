@@ -355,7 +355,7 @@ class Pipeline:
             return_value_only: bool = False,
             remove_similarity_threshold: float = 0.0,
             include_noun_phrases: bool = True,
-            include_entities: Tuple = ("PERSON", "ORG", "FAC"),
+            include_entities: Tuple = ("PERSON", "FAC"),
             include_keywords: bool = True,
             top_n: int = 10
     ) -> Dict[str, List[Any]]:
@@ -437,8 +437,13 @@ class Pipeline:
                     # One match is enough to break the loop for each entity type.
                     #
                     # TODO:
-                    # Use embedding vector similarity (e.g. sentence transformer embedding or SpaCy
-                    # Transformer embedding using _trf model.
+                    #   Use embedding vector similarity (e.g. sentence transformer embedding or SpaCy
+                    #   Transformer embedding using _trf model.
+                    #
+                    # TODO:
+                    #   Incorrect matching detection. e.g. 'Fair Work Commission president Adam Hatcher'
+                    #   can be matched with "Fair Work Commission" and it can be added to the ORG
+                    #   although it is a person. For now, exclude 'ORG' from 'include_entities' arg.
                     # --------------------------------------------------------------------------------
                     for _entity in entities[_label]:
                         words_from_entity = set(_entity.lower().split())
