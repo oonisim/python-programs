@@ -22,7 +22,9 @@ import base64
 import json
 import logging
 from typing import (
+    List,
     Dict,
+    Set,
     Any,
     Optional
 )
@@ -49,17 +51,89 @@ _logger: logging.Logger = get_logger(__name__)
 # --------------------------------------------------------------------------------
 # AWS KMS
 # --------------------------------------------------------------------------------
-class KMSRSA(Base):
-    """Class to provide AWS KMS RSA asymmetric key functions.
+class KMSRSAEncryptDecrypt(Base):
+    """Class to provide AWS KMS RSA asymmetric key encryption/decryption functions.
     Note that for encryption/decryption, the KMS key usage needs to have 
     been set to Encryption/Decryption.
     """
     RSA_ENCRYPTION_ALGORITHM: str = 'RSAES_OAEP_SHA_256'
+    RSA_KEY_SPECIFICATIONS: Set[str] = {'RSA_2048', 'RSA_3072', 'RSA_4096'}
 
     # pylint: disable=too-few-public-methods
     # --------------------------------------------------------------------------------
     # Static
     # --------------------------------------------------------------------------------
+    @staticmethod
+    def create_key(
+            keyspec: str,
+            description: Optional[str] = None,
+            tags: Optional[List[Dict]]= None
+    ) -> Dict[str, Any]:
+        """Create KMS RSA key
+        Args:
+            keyspec: 'RSA_2048'|'RSA_3072'|'RSA_4096'
+            description: explanation of the key
+            tags: AWS resource tag in the format: [
+                {
+                    'TagKey': 'string',
+                    'TagValue': 'string'
+                },
+                ...
+            ]
+        Returns: {
+            "KeyId": KeyId,
+            "Arn": Arn,
+            "EncryptionAlgorithms": [EncryptionAlgorithms],
+            "CreationDate": CreationDate datetime instance,
+            "ValidTo": ValidTo datetime instance
+        }
+        """
+        _func_name: str = "create_key()"
+        assert tags is None or isinstance(tags, List) and isinstance(tags[0], Dict)
+        if keyspec.upper() not in KMSRSAEncryptDecrypt.RSA_KEY_SPECIFICATIONS:
+            msg: str = f"expected one of {KMSRSAEncryptDecrypt.RSA_KEY_SPECIFICATIONS}, " \
+                  f"got {keyspec}."
+            _logger.error("%s: %s", _func_name, msg)
+            raise ValueError(msg)
+
+        _client = boto3.client('kms')
+        try:
+            response = _client.create_key(
+                KeySpec=keyspec,
+                KeyUsage='ENCRYPT_DECRYPT',
+                Description=description,
+                Tags=tags
+            )
+            assert response['KeyMetadata']['KeySpec'] == keyspec.upper(), \
+                f"invalid KeySpec {response['KeyMetadata']['KeySpec']}"
+            assert response['KeyMetadata']['KeyUsage'] == 'ENCRYPT_DECRYPT', \
+                f"invalid KeyUsage {response['KeyMetadata']['KeyUsage']}"
+            assert response['KeyMetadata']['Enabled'], \
+                f"invalid status {response['KeyMetadata']['Enabled']}"
+
+            return {
+                "KeyId": response['KeyMetadata']['KeyId'],
+                "Arn": response['KeyMetadata']['Arn'],
+                "EncryptionAlgorithms": response['KeyMetadata']['EncryptionAlgorithms'],
+                "CreationDate": response['KeyMetadata']['CreationDate'],
+                "ValidTo": response['KeyMetadata']['ValidTo']
+            }
+
+        except _client.exceptions.TagException as error:
+            msg: str = f"KMS key creation failed due to {error} with tags:{tags}."
+            _logger.error("%s: %s", _func_name, msg)
+            raise ValueError(msg) from error
+        except (
+            _client.exceptions.LimitExceededException,
+            _client.exceptions.KMSInternalException,
+            _client.exceptions.DependencyTimeoutException
+        ) as error:
+            msg: str = f"KMS key creation failed due to {error}."
+            _logger.error("%s: %s", _func_name, msg)
+            raise RuntimeError(msg) from error
+
+        finally:
+            del _client
 
     # --------------------------------------------------------------------------------
     # Instance
@@ -86,7 +160,7 @@ class KMSRSA(Base):
         super().__init__()
         self._client = kms_client if kms_client else boto3.client('kms')
         self._key_id: str = kms_key_id
-        self._encryption_algorithm: str = KMSRSA.RSA_ENCRYPTION_ALGORITHM
+        self._encryption_algorithm: str = KMSRSAEncryptDecrypt.RSA_ENCRYPTION_ALGORITHM
 
         # --------------------------------------------------------------------------------
         # Validate KMS key is for RSA encrypt/decrypt
@@ -100,14 +174,14 @@ class KMSRSA(Base):
                   f"in {[description['KeyMetadata']['KeyState']]} state."
         if not description['KeyMetadata']['KeyUsage'] == 'ENCRYPT_DECRYPT':
             msg = f"KMS key [{self._key_id}] usage is not encrypt/decrypt."
-        if not KMSRSA.RSA_ENCRYPTION_ALGORITHM in description['KeyMetadata']['EncryptionAlgorithms']:
+        if not KMSRSAEncryptDecrypt.RSA_ENCRYPTION_ALGORITHM in description['KeyMetadata']['EncryptionAlgorithms']:
             msg = "RSAES_OAEP_SHA_256 algorithm is not available, verify correct one to use."
         if msg:
             raise RuntimeError(msg)
 
         _logger.info(
             "%s: KMS Key description: %s",
-            KMSRSA.__name__,
+            KMSRSAEncryptDecrypt.__name__,
             json.dumps(description, indent=4, default=str, ensure_ascii=False)
         )
 

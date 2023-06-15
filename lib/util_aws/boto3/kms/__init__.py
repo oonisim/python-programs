@@ -1,3 +1,3 @@
 from .main import (
-    KMSRSA
+    KMSRSAEncryptDecrypt
 )
