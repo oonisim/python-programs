@@ -2,7 +2,6 @@
 import logging
 import os
 from typing import (
-    List,
     Optional
 )
 
@@ -38,3 +37,5 @@ def get_aws_region():
         msg: str = "AWS_DEFAULT_REGION nor AWS_REGION defined in the environment."
         _logger.error("%s: %s", _name, msg)
         raise RuntimeError(msg)
+
+    return region

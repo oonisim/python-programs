@@ -94,9 +94,12 @@ from typing import (
     List,
     Dict,
     Any,
-    Optional,
     Union,
     Iterable,
+)
+
+from util_logging import (              # pylint: disable=import-error
+    get_logger
 )
 
 import botocore
@@ -105,9 +108,12 @@ import botocore
 # --------------------------------------------------------------------------------
 # Logging
 # --------------------------------------------------------------------------------
-_logger: logging.Logger = logging.getLogger()
+_logger: logging.Logger = get_logger(__name__)
 
 
+# --------------------------------------------------------------------------------
+# Class
+# --------------------------------------------------------------------------------
 class LambdaFunction:
     # --------------------------------------------------------------------------------
     # Instance

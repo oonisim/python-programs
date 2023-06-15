@@ -4,6 +4,10 @@
 import re
 import logging
 
+from util_aws.common import (   # pylint: disable=import-error
+    get_aws_region
+)
+
 
 # --------------------------------------------------------------------------------
 # Logging
@@ -16,6 +20,9 @@ _logger: logging.Logger = logging.getLogger(__name__)
 # --------------------------------------------------------------------------------
 class Base:
     """Class to provide base functionalities."""
+    # --------------------------------------------------------------------------------
+    # Static
+    # --------------------------------------------------------------------------------
     @staticmethod
     def validate_text(text: str):
         """Validate if the text is string with length
@@ -37,3 +44,9 @@ class Base:
             raise ValueError(msg)
 
         return text
+
+    # --------------------------------------------------------------------------------
+    # Instance
+    # --------------------------------------------------------------------------------
+    def __init__(self):
+        self._aws_region: str = get_aws_region()

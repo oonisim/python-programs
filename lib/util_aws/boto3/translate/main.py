@@ -11,13 +11,17 @@ from util_aws.boto3.common import (
     Base
 )
 
+from util_logging import (              # pylint: disable=import-error
+    get_logger
+)
+
 import botocore
 
 
 # --------------------------------------------------------------------------------
 # Logging
 # --------------------------------------------------------------------------------
-_logger: logging.Logger = logging.getLogger(__name__)
+_logger: logging.Logger = get_logger(__name__)
 
 
 # --------------------------------------------------------------------------------
@@ -38,6 +42,7 @@ class Translate(Base):
         Args:
             translate_client: A Boto3 Translate client.
         """
+        super().__init__()
         self._client = translate_client
 
     def list_languages(

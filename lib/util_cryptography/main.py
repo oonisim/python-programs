@@ -1,5 +1,6 @@
 """Module for cryptography utility"""
 import base64
+import logging
 from typing import (
     Tuple,
     Optional
@@ -21,6 +22,15 @@ from cryptography.hazmat.primitives.asymmetric.rsa import (
 from util_python import (
     is_base64_encoded
 )
+from util_logging import (              # pylint: disable=import-error
+    get_logger
+)
+
+
+# --------------------------------------------------------------------------------
+# Logging
+# --------------------------------------------------------------------------------
+logger: logging.Logger = get_logger(__name__)
 
 
 # ----------------------------------------------------------------------
