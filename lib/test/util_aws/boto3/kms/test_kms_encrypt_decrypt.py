@@ -5,7 +5,7 @@ from typing import (
     Any
 )
 
-from util_aws.boto3.kms import (
+from util_aws.boto3.kms import (    # pylint: disable=import-error
     KMSRSAEncryptDecrypt
 )
 
