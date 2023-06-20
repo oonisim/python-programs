@@ -28,11 +28,17 @@ _logger.setLevel(logging.DEBUG)
 # --------------------------------------------------------------------------------
 CATEGORY_EXAMPLES: List[str] = [
     'Culture of Finland', 'Australian sports', 'War Crime', 'French Politics',
-    'Quantum Technology', 'Asian Food', 'lifestyle', 'Life Science', "Energy Policy",
-    "Cost of Living", "Immigration Policy", "Legal System",
-    'Financial Business', "Financial Market", "British Society", "Political Philosophy",
+    'Quantum Technology', 'Asian Food', 'Lifestyle', 'Life Science', "Energy Policy",
+    "Cost of Living", "Immigration Policy", "Legal System", "Gender Equality", "Civil Rights"
+                                                                               'Financial Business', "Financial Market", "British Society", "Political Philosophy",
     "Diplomatic Relationship with China", "Australian Economy", "Solar Energy",
     "Innovation", "Relationship",  "Roman History"
+]
+
+KEYWORD_EXAMPLES: List[str] = [
+    "Defamation Trial", "Inflation", "Criminal Investigation", "No Confidence Vote",
+    "Artificial Intelligence", "Sexual Abuse", "Global Happiness Index", "Global Warming",
+    "Happiness in Life"
 ]
 
 SENTIMENTS = {
@@ -59,7 +65,7 @@ def _to_json(text: str) -> Dict[str, Any]:
     except json.decoder.JSONDecodeError as _error:
         msg: str = f"cannot decode to JSON from the GPT response [{text}]"
         _logger.error("%s: %s due to [%s].", _func_name, msg, _error)
-        raise RuntimeError from _error
+        raise RuntimeError(msg) from _error
 
 
 # --------------------------------------------------------------------------------
@@ -87,7 +93,7 @@ class ChatCompletion(OpenAI):
         """List of text tag entity types"""
         return ChatCompletion.LABELS
 
-    def __init__(self, path_to_api_key: str):
+    def __init__(self, path_to_api_key: Optional[str] = None):
         super().__init__(path_to_api_key=path_to_api_key)
 
     def get_summary(self, text: str, max_words: int = 25) -> str:
@@ -447,7 +453,7 @@ TEXT={text}
         # """
 
         prompt = f"""
-Top {top_n} news categories or topics as KEYWORDS about the NEWS.
+Top {top_n} news categories or topics as truecased KEYWORDS about the NEWS such as {', '.join(KEYWORD_EXAMPLES)}.
 Top {top_n} PERSON as title and name who are world well known and participated in the key events of the NEWS. Must be known figures.
 Top {top_n} ORGANIZATIONS that participated in the key events of the NEWS.
 Maximum 3 GEOGRAPHIC COUNTRY or LOCATION where the key events of the NEWS happened. Must be Maximum 3.
