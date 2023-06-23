@@ -522,7 +522,7 @@ class Pipeline:
     def get_tokens_of_pos_from_text(
             self,
             text: str,
-            pos_tags: List[str]
+            pos_tags: Optional[Union[List[str], Set[str]]] = None
     ) -> List[spacy.tokens.Token]:
         """Extract tokens of the PoS (e.g. [NOUN, ADJ]) from the text
         Args:
@@ -532,14 +532,22 @@ class Pipeline:
         Returns: List of tokens
         """
         assert isinstance(text, str) and len(text.strip()) > 0, f"invalid text:[{text}]."
-        assert isinstance(pos_tags, list) and len(pos_tags) > 0, f"invalid pos tags {pos_tags}"
 
-        pos_tags = set(pos_tags)
-        assert pos_tags.issubset(set(self.pos_tags)), \
-            f"invalid pos tag included in {pos_tags}, expected tags:{self.pos_tags}."
+        if pos_tags is not None:
+            assert isinstance(pos_tags, list) and len(pos_tags) > 0, f"invalid pos tags {pos_tags}"
 
-        result: List[spacy.tokens.Token] = [
-            token for token in self.process(text)
-            if token.pos_ in pos_tags
-        ]
+            pos_tags = set(pos_tags)
+            assert pos_tags.issubset(set(self.pos_tags)), \
+                f"invalid pos tag included in {pos_tags}, expected tags:{self.pos_tags}."
+
+            result: List[spacy.tokens.Token] = [
+                token for token in self.process(text)
+                if token.pos_ in pos_tags
+            ]
+
+        else:
+            result: List[spacy.tokens.Token] = [
+                token for token in self.process(text)
+            ]
+
         return result

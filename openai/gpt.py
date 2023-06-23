@@ -391,7 +391,7 @@ TEXT={text}
             self,
             text: str,
             theme: Optional[str] = None,    # pylint: disable=unused-argument
-            max_words: int = 25,            # pylint: disable=unused-argument
+            max_words: int = 15,            # pylint: disable=unused-argument
             top_n: int = 6,
             do_categorize: bool = True
     ) -> Dict[str, Any]:
