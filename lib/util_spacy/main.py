@@ -23,7 +23,7 @@ from util_python.string import (
     remove_special_characters_from_text,
 )
 
-import nltk
+# import nltk
 import textacy
 import spacy
 from spacy.tokens import Doc
@@ -76,6 +76,10 @@ class Pipeline:
     to produce processed "Document" instance from a text.
     """
     # --------------------------------------------------------------------------------
+    # Static
+    # --------------------------------------------------------------------------------
+
+    # --------------------------------------------------------------------------------
     # Properties
     # --------------------------------------------------------------------------------
     @property
@@ -101,6 +105,13 @@ class Pipeline:
         """
         return self._named_entity_labels
 
+    @property
+    def pos_tags(self) -> List[str]:
+        """List of the supported PoS tags of the current language
+        Returns: List of PoS tags
+        """
+        return self._part_of_speech_tags
+
     def process(self, text) -> spacy.tokens.Doc:
         """Process the text with the pretrained language pipeline
         Args:
@@ -125,7 +136,7 @@ class Pipeline:
         try:
             self._nlp: Language = spacy.load(model_name)
 
-        except OSError:
+        except OSError as error:
             # --------------------------------------------------------------------------------
             # Spacy downloads pretrained pipelines under the user's home directory, which can
             # cause an issue e.g. inside the AWS runtime as it is read-only causing the error:
@@ -144,26 +155,55 @@ class Pipeline:
                 # spacy.__version__ can be 3.5.2, but the name still is -3.5.0
                 # spacy.load(f"/tmp/spacy/en_core_web_sm/{model_name}-{spacy.__version__}/")
                 # self._nlp = spacy.load(f'/tmp/spacy/{model_name}/{model_name}-3.5.0')
-                raise NotImplementedError("need to find a way to load the downloaded.")
-            else:
-                spacy.cli.download(model_name)
-                self._nlp = spacy.load(model_name)
+                raise NotImplementedError("need to find a way to load the downloaded.") from error
+
+            spacy.cli.download(model_name)
+            self._nlp = spacy.load(model_name)
 
         # --------------------------------------------------------------------------------
         # Language stop words
         # --------------------------------------------------------------------------------
-        try:
-            # NLTK raises LookupError if not yet downloaded, instead of OSError.
-            self._stopwords: List[str] = nltk.corpus.stopwords.words(self._language)
-        except (LookupError, OSError) as error:
-            _logger.debug("downloading nltk stopwords because of [%s].", error)
-            nltk.download('stopwords')
-            self._stopwords: List[str] = nltk.corpus.stopwords.words(self._language)
+        # try:
+        #     # NLTK raises LookupError if not yet downloaded, instead of OSError.
+        #     self._stopwords: List[str] = nltk.corpus.stopwords.words(self._language)
+        # except (LookupError, OSError) as error:
+        #     _logger.debug("downloading nltk stopwords because of [%s].", error)
+        #     nltk.download('stopwords')
+        #     self._stopwords: List[str] = nltk.corpus.stopwords.words(self._language)
+        self._stopwords: List[str] = self._nlp.Defaults.stop_words
 
         # --------------------------------------------------------------------------------
-        # Named Entity
+        # PoS Tags (https://github.com/explosion/spaCy/blob/master/spacy/glossary.py)
+        # https://universaldependencies.org/u/pos/
+        # ADJ: adjective, e.g. big, old, green, incomprehensible, first
+        # ADP: adposition, e.g. in, to, during
+        # ADV: adverb, e.g. very, tomorrow, down, where, there
+        # AUX: auxiliary, e.g. is, has (done), will (do), should (do)
+        # CONJ: conjunction, e.g. and, or, but
+        # CCONJ: coordinating conjunction, e.g. and, or, but
+        # DET: determiner, e.g. a, an, the
+        # INTJ: interjection, e.g. psst, ouch, bravo, hello
+        # NOUN: noun, e.g. girl, cat, tree, air, beauty
+        # NUM: numeral, e.g. 1, 2017, one, seventy-seven, IV, MMXIV
+        # PART: particle, e.g. ’s, not,
+        # PRON: pronoun, e.g I, you, he, she, myself, themselves, somebody
+        # PROPN: proper noun, e.g. Mary, John, London, NATO, HBO
+        # PUNCT: punctuation, e.g. ., (, ), ?
+        # SCONJ: subordinating conjunction, e.g. if, while, that
+        # SYM: symbol, e.g. $, %, §, ©, +, −, ×, ÷, =, :), 😝
+        # VERB: verb, e.g. run, runs, running, eat, ate, eating
+        # --------------------------------------------------------------------------------
+        self._part_of_speech_tags: List[str] = self._nlp.get_pipe('tagger').labels
+
+        # --------------------------------------------------------------------------------
+        # Named Entity Labels
         # --------------------------------------------------------------------------------
         self._named_entity_labels: List[str] = self._nlp.get_pipe('ner').labels
+
+        # --------------------------------------------------------------------------------
+        # PoS Tags (https://github.com/explosion/spaCy/blob/master/spacy/glossary.py)
+        # --------------------------------------------------------------------------------
+        self._dependency_tags: List[str] = self._nlp.get_pipe("parser").labels
 
     # --------------------------------------------------------------------------------
     # Functions
@@ -178,6 +218,7 @@ class Pipeline:
         Args:
             similarity_threshold: threshold to decide if similar or not
             text: text to find similarity
+            entities: list of existing entities to check against
         Return: True if exists else False
         """
         if similarity_threshold > 0.0:
@@ -457,7 +498,7 @@ class Pipeline:
 
                     if match:
                         _logger.info(
-                            "%s: adding the nown phrase [%s] as an entity for label:[%s]",
+                            "%s: adding the noun phrase [%s] as an entity for label:[%s]",
                             name, match, _label
                         )
                         entities[_label] += [match]
@@ -469,3 +510,36 @@ class Pipeline:
             entities["KEYWORDS"] = self.get_keywords_from_document(doc=doc, top_n=top_n)
 
         return entities
+
+    def is_pos_tag(self, pos_tag: str) -> bool:
+        """Check if the pos tag is valid
+        Args:
+            pos_tag: tag to check
+        Returns: True if valid, else False
+        """
+        return isinstance(pos_tag, str) and pos_tag in self.pos_tags
+
+    def get_tokens_of_pos_from_text(
+            self,
+            text: str,
+            pos_tags: List[str]
+    ) -> List[spacy.tokens.Token]:
+        """Extract tokens of the PoS (e.g. [NOUN, ADJ]) from the text
+        Args:
+            text: text to extract the tokens
+            pos_tags: case-sensitive Part of Speech tags e.g. ['NOUN', "ADJ"]
+
+        Returns: List of tokens
+        """
+        assert isinstance(text, str) and len(text.strip()) > 0, f"invalid text:[{text}]."
+        assert isinstance(pos_tags, list) and len(pos_tags) > 0, f"invalid pos tags {pos_tags}"
+
+        pos_tags = set(pos_tags)
+        assert pos_tags.issubset(set(self.pos_tags)), \
+            f"invalid pos tag included in {pos_tags}, expected tags:{self.pos_tags}."
+
+        result: List[spacy.tokens.Token] = [
+            token for token in self.process(text)
+            if token.pos_ in pos_tags
+        ]
+        return result
