@@ -1,4 +1,6 @@
-"""Module for AWS Translate operations using Boto3"""
+"""Module for AWS Translate operations using Boto3
+https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/translate.html
+"""
 import json
 import logging
 from typing import (
@@ -73,6 +75,8 @@ class Translate(Base):
     def translate_text(self, text: str, source_language_code: str, target_language_code: str):
         """
         Translate text in source language to the target language
+        https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/translate/client/translate_text.html
+
         Args:
             text: text in UTF-8 encoding to translate
             source_language_code: language code of the text to translate
