@@ -295,7 +295,7 @@ def list_files_in_directory(path: str, pattern: str = None) -> List[str]:
         pattern: glob pattern string or None
     Returns: Set of file names (not including path/to/dir) found
     """
-    assert is_dir(path), f"[{path} does not exit or not a directory."
+    assert is_dir(path), f"[{path} does not exist or not a directory."
 
     result: Set[str]
     if pattern is not None and len(pattern) > 0:

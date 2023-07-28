@@ -203,7 +203,7 @@ class KMSRSAEncryptDecrypt(Base):
                 self._client.exceptions.NotFoundException,
                 self._client.exceptions.InvalidArnException
         ) as error:
-            msg: str = f"KMS key [{self._key_id}] does not exit in [{self._aws_region}]."
+            msg: str = f"KMS key [{self._key_id}] does not exist in [{self._aws_region}]."
             _logger.error("%s: %s", _func_name, msg)
             raise ValueError(msg) from error
 
@@ -239,7 +239,7 @@ class KMSRSAEncryptDecrypt(Base):
                 self._client.exceptions.NotFoundException,
                 self._client.exceptions.InvalidArnException
         ) as error:
-            msg: str = f"KMS key [{self._key_id}] does not exit in [{self._aws_region}]."
+            msg: str = f"KMS key [{self._key_id}] does not exist in [{self._aws_region}]."
             _logger.error("%s: %s", _func_name, msg)
             raise ValueError(msg) from error
 
@@ -272,7 +272,7 @@ class KMSRSAEncryptDecrypt(Base):
                 self._client.exceptions.NotFoundException,
                 self._client.exceptions.InvalidArnException
         ) as error:
-            msg: str = f"KMS key [{self._key_id}] does not exit in [{self._aws_region}]."
+            msg: str = f"KMS key [{self._key_id}] does not exist in [{self._aws_region}]."
             _logger.error("%s: %s", _func_name, msg)
             raise ValueError(msg) from error
 
