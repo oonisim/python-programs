@@ -29,6 +29,21 @@ RE_NOISE_CHARACTERS = re.compile(r'[&#<>{}\[\]\\]')
 # --------------------------------------------------------------------------------
 # Functions
 # --------------------------------------------------------------------------------
+def redact_special_characters(text: str, replacement: str = '') -> str:
+    """
+    Remove special characters (non words nor space from text using regexp.
+    re module is unicode aware and can handle non english
+
+    TODO: Move to common library
+
+    Args:
+        text: text to remove the special characters from
+        replacement: string to replace with
+    Returns: test with special characters being removed
+    """
+    return re.sub(r'[^\w\s]', replacement, text.strip())
+
+
 def decontracted(text: str) -> str:
     """Restore the contracted words"""
     # specific
