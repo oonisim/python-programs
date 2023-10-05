@@ -190,6 +190,10 @@ def normalize(text: str):
 
     text = redact_emojis(text)
     text = redact_phone_numbers(text)
+    text = redact_urls(text)
+    text = redact_email_addresses(text)
+    text = redact_noise(text)
+    text = redact_special_characters(text)
 
     return text
 
