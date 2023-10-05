@@ -17,7 +17,6 @@ from nltk.corpus import (
 )
 import textacy.preprocessing
 
-
 # --------------------------------------------------------------------------------
 # Constant
 # --------------------------------------------------------------------------------
@@ -29,9 +28,9 @@ RE_NOISE_CHARACTERS = re.compile(r'[&#<>{}\[\]\\]')
 # --------------------------------------------------------------------------------
 # Functions
 # --------------------------------------------------------------------------------
-def redact_special_characters(text: str, replacement: str = '') -> str:
+def redact_non_word_characters(text: str, replacement: str = '') -> str:
     """
-    Remove special characters (non words nor space from text using regexp.
+    Redact characters that cannot be used in a word
     re module is unicode aware and can handle non english
 
     TODO: Move to common library
@@ -39,9 +38,24 @@ def redact_special_characters(text: str, replacement: str = '') -> str:
     Args:
         text: text to remove the special characters from
         replacement: string to replace with
-    Returns: test with special characters being removed
+    Returns: test with special non word characters being removed
     """
     return re.sub(r'[^\w\s]', replacement, text.strip())
+
+
+def redact_non_english_characters(text: str, replacement: str = '') -> str:
+    """Redact non English characters
+    Args:
+        text: text to remove the special characters from
+        replacement: string to replace with
+    Returns: test with non ENglish characters being removed
+    """
+    regexp: str = rf"[^{string.ascii_letters + string.punctuation + string.whitespace + string.digits}]"
+    return re.sub(
+        pattern=regexp,
+        repl=replacement,
+        string=text
+    )
 
 
 def decontracted(text: str) -> str:
@@ -91,6 +105,21 @@ def redact_urls(text: str, replacement: str = "<URL>") -> str:
     return textacy.preprocessing.replace.urls(text=text, repl=replacement)
 
 
+def redact_abn(text: str, replacement: str = "<ABN>") -> str:
+    """Redact ABN with the replacement
+    Args:
+        text: text to run the redaction
+        replacement: replacement for the ABN
+    Return: redacted text
+    """
+    return re.sub(
+        pattern=r"ABN\s*\d{2}\s*\d{3}\s*\d{3}\s*\d{3}",
+        repl=replacement,
+        string=text,
+        flags=re.I
+    )
+
+
 def redact_phone_numbers(text: str, replacement: str = "<PHONE_NUMBER>") -> str:
     """Redact phone with the replacement
     Args:
@@ -103,7 +132,20 @@ def redact_phone_numbers(text: str, replacement: str = "<PHONE_NUMBER>") -> str:
     #     replacement,
     #     text
     # )
-    return textacy.preprocessing.replace.phone_numbers(text=text, repl=replacement)
+    text = textacy.preprocessing.replace.phone_numbers(text=text, repl=replacement)
+    # +61 8 3465 8974
+    text = re.sub(
+        pattern=r"\+[1-9][0-9]?\s*\d{1,3}\s*\d{3,4}\s*\d{3,4}",
+        repl=replacement,
+        string=text
+    )
+    # 08 3465 8974
+    text = re.sub(
+        pattern=r"\(?0\d{1,3}\)?\s*\d{3,4}\s*\d{3,4}",
+        repl=replacement,
+        string=text
+    )
+    return text
 
 
 def redact_emojis(text: str, replacement: str = "") -> str:
@@ -124,7 +166,7 @@ def redact_emojis(text: str, replacement: str = "") -> str:
 def redact_noise(
         text: str,
         regexp=rf'([{string.punctuation}]){{2,}}.*',
-        replacement="UNK"
+        replacement="<UNK>"
 ) -> str:
     """Redact noise characters defined by regexp with the replacement
     Args:
@@ -157,12 +199,23 @@ def redact_non_english_words(text: str, replacement="<UNK>") -> str:
     """Redact non English words with the replacement
     Args:
         text: text to run the redaction
-        replacement: replacement for the non English characters
+        replacement: replacement for the non English word
     Return: redacted text
     """
     return SPACE.join([
         _word for _word in text.split() if is_english_word(_word)
     ])
+
+
+def redact_white_spaces(text: str, replacement: str = SPACE) -> str:
+    """Remove repetition of white spaces
+    Args:
+        text: text to run the redaction
+        replacement: replacement for the white characters
+    Return: redacted text
+    """
+    regexp: str = rf"[{string.whitespace}]+"
+    return re.sub(pattern=regexp, repl=replacement, string=text)
 
 
 def noise_character_ratio_in_text(text: str, min_length: int = 10) -> float:
@@ -182,19 +235,19 @@ def noise_character_ratio_in_text(text: str, min_length: int = 10) -> float:
 
 def normalize(text: str):
     text = textacy.preprocessing.normalize.unicode(text)
-    text = textacy.preprocessing.normalize.whitespace(text)
     text = textacy.preprocessing.remove.accents(text)
     text = textacy.preprocessing.normalize.bullet_points(text)
     text = textacy.preprocessing.normalize.hyphenated_words(text)
     text = textacy.preprocessing.normalize.quotation_marks(text)
 
     text = redact_emojis(text)
+    text = redact_abn(text)
     text = redact_phone_numbers(text)
     text = redact_urls(text)
     text = redact_email_addresses(text)
-    text = redact_noise(text)
-    text = redact_special_characters(text)
+    text = redact_non_english_characters(text)
 
-    return text
+    text = redact_noise(text)
+    return SPACE.join(text.split())
 
 
