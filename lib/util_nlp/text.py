@@ -5,6 +5,7 @@ import re
 import string
 
 import nltk
+
 nltk.download('words')
 nltk.download('wordnet')
 
@@ -165,21 +166,25 @@ def redact_emojis(text: str, replacement: str = "") -> str:
 
 def redact_noise(
         text: str,
-        regexp=rf'([{string.punctuation}]){{2,}}.*',
-        replacement="<UNK>"
+        replacement=""
 ) -> str:
     """Redact noise characters defined by regexp with the replacement
     Args:
         text: text to run the redaction
-        regexp: pattern to identify noise character sequence
         replacement: replacement for the noise
+
+        Replace if repeat more than 3 times (must be 2+)
     Return: redacted text
     """
-    return re.sub(
-        pattern=regexp,
+    text = re.sub(pattern=r"\.{2,}", repl='.', string=text)
+    text = re.sub(
+        # Does not work. '^' causes a problem of matching '.' or any.
+        # pattern=rf"([{string.punctuation.replace('.', '')}]){{2,}}",
+        pattern='[\\!"#$%&\'()\\*\\+,\\-/:;<=>?@[\\]\\^_`{|}~]{2,}',
         repl=replacement,
         string=text
     )
+    return text
 
 
 def is_english_word(lemma: str) -> bool:
@@ -234,6 +239,8 @@ def noise_character_ratio_in_text(text: str, min_length: int = 10) -> float:
 
 
 def normalize(text: str):
+    text = redact_non_english_characters(text)
+
     text = textacy.preprocessing.normalize.unicode(text)
     text = textacy.preprocessing.remove.accents(text)
     text = textacy.preprocessing.normalize.bullet_points(text)
@@ -245,9 +252,7 @@ def normalize(text: str):
     text = redact_phone_numbers(text)
     text = redact_urls(text)
     text = redact_email_addresses(text)
-    text = redact_non_english_characters(text)
 
     text = redact_noise(text)
+
     return SPACE.join(text.split())
-
-
