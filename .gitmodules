@@ -1,0 +1,3 @@
+[submodule "books/blueprints-text"]
+	path = books/blueprints-text
+	url = https://github.com/blueprints-for-text-analytics-python/blueprints-text.git
