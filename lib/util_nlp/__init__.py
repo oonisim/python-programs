@@ -9,6 +9,9 @@ from .text import (
     redact_urls,
     redact_email_addresses,
     is_english_word,
-    noise_character_ratio_in_text,
     normalize
+)
+
+from .docment import (
+    parse
 )

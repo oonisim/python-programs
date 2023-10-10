@@ -1,9 +1,10 @@
 """
 Module for NLP utilities
 """
-import re
 import string
 
+import textacy.preprocessing
+import regex as re
 import nltk
 
 nltk.download('words')
@@ -16,25 +17,37 @@ from nltk.corpus import (
     wordnet,
     words
 )
-import textacy.preprocessing
 
 # --------------------------------------------------------------------------------
 # Constant
 # --------------------------------------------------------------------------------
 SPACE: str = " "
 NLTK_ENGLISH_WORDS = set(words.words())
-RE_NOISE_CHARACTERS = re.compile(r'[&#<>{}\[\]\\]')
+
+
+# --------------------------------------------------------------------------------
+# Regex
+# --------------------------------------------------------------------------------
+RE_AUSTRALIAN_BUSINESS_NUMBER: re.Pattern = re.compile(
+    pattern=r"ABN[\s:]*\d{2}\s*\d{3}\s*\d{3}\s*\d{3}", flags=re.I
+)
+TAG_AUSTRALIAN_BUSINESS_NUMBER: str = " ABN "
+RE_AUSTRALIAN_PHONE_NUMBER: re.Pattern = re.compile(
+    pattern=r'(?<!\S)(\+?\(?61\)?)?[-\s]*(\(?0?[2-57-8])\)?\s*?(\d\d([- ]'\
+            '(?=\d{3})|(?!\d\d[- ]?\d[- ]))\d\d[- ]?\d[- ]?\d{3})(?!\S)'
+)
+TAG_AUSTRALIAN_PHONE_NUMBER: str = " PHONE_NUMBER "
 
 
 # --------------------------------------------------------------------------------
 # Functions
 # --------------------------------------------------------------------------------
-def redact_non_word_characters(text: str, replacement: str = '') -> str:
+def redact_non_word_characters(
+        text: str, replacement: str = ''
+) -> str:
     """
     Redact characters that cannot be used in a word
     re module is unicode aware and can handle non english
-
-    TODO: Move to common library
 
     Args:
         text: text to remove the special characters from
@@ -49,7 +62,7 @@ def redact_non_english_characters(text: str, replacement: str = '') -> str:
     Args:
         text: text to remove the special characters from
         replacement: string to replace with
-    Returns: test with non ENglish characters being removed
+    Returns: test with non EEnglish characters being removed
     """
     regexp: str = rf"[^{string.ascii_letters + string.punctuation + string.whitespace + string.digits}]"
     return re.sub(
@@ -106,47 +119,50 @@ def redact_urls(text: str, replacement: str = "<URL>") -> str:
     return textacy.preprocessing.replace.urls(text=text, repl=replacement)
 
 
-def redact_abn(text: str, replacement: str = "<ABN>") -> str:
+def redact_abn(
+        text: str,
+        replacement: str = TAG_AUSTRALIAN_BUSINESS_NUMBER
+) -> str:
     """Redact ABN with the replacement
     Args:
         text: text to run the redaction
         replacement: replacement for the ABN
     Return: redacted text
     """
-    return re.sub(
-        pattern=r"ABN\s*\d{2}\s*\d{3}\s*\d{3}\s*\d{3}",
-        repl=replacement,
-        string=text,
-        flags=re.I
-    )
-
-
-def redact_phone_numbers(text: str, replacement: str = "<PHONE_NUMBER>") -> str:
-    """Redact phone with the replacement
-    Args:
-        text: text to run the redaction
-        replacement: replacement for the phone number
-    Return: redacted text
-    """
-    # return re.sub(
-    #     r"[\w.+-]+@\w+.[a-zA-Z]{2,3}",
-    #     replacement,
-    #     text
-    # )
-    text = textacy.preprocessing.replace.phone_numbers(text=text, repl=replacement)
-    # +61 8 3465 8974
     text = re.sub(
-        pattern=r"\+[1-9][0-9]?\s*\d{1,3}\s*\d{3,4}\s*\d{3,4}",
-        repl=replacement,
-        string=text
-    )
-    # 08 3465 8974
-    text = re.sub(
-        pattern=r"\(?0\d{1,3}\)?\s*\d{3,4}\s*\d{3,4}",
+        pattern=RE_AUSTRALIAN_BUSINESS_NUMBER,
         repl=replacement,
         string=text
     )
     return text
+
+
+def redact_phone_numbers(
+        text: str,
+        country: str = "AU",
+        replacement: str = TAG_AUSTRALIAN_PHONE_NUMBER
+) -> str:
+    """Redact phone with the replacement
+    See https://github.com/google/libphonenumber
+    To validate, see https://github.com/daviddrysdale/python-phonenumbers
+
+    Args:
+        text: text to run the redaction
+        country: phone number country. Only AU is supported for now.
+        replacement: replacement for the phone number
+
+    Return: redacted text
+    """
+    if country == "AU":
+        # TODO: handle '+(610) 455 562 400' as invalid
+        text = re.sub(
+            pattern=RE_AUSTRALIAN_PHONE_NUMBER,
+            repl=replacement,
+            string=text
+        )
+        return text
+    else:
+        raise NotImplementedError()
 
 
 def redact_emojis(text: str, replacement: str = "") -> str:
@@ -176,14 +192,37 @@ def redact_noise(
         Replace if repeat more than 3 times (must be 2+)
     Return: redacted text
     """
+    # Remove repeating '.'
     text = re.sub(pattern=r"\.{2,}", repl='.', string=text)
+
+    # Remove prepending punctuations and spaces.
+    text = re.sub(pattern=r"^[[:punct:][:space:]]*", repl='', string=text)
+
+    # Remove repeating '(', ')', '[', ']', '{', '}'.
+    text = re.sub(
+        pattern=r'([][(){}}])\1+',
+        repl='\\1',
+        string=text
+    )
+
+    # Remove repeating punctuations but not '(...).' or '(...):'
     text = re.sub(
         # Does not work. '^' causes a problem of matching '.' or any.
         # pattern=rf"([{string.punctuation.replace('.', '')}]){{2,}}",
-        pattern='[\\!"#$%&\'()\\*\\+,\\-/:;<=>?@[\\]\\^_`{|}~]{2,}',
+
+        # Do not remove '(...).' as it has valid meaning.
+        pattern='[\\!"#$%&\'\\*\\+,\\-/:;<=>?@\\^_`|~]{2,}',
         repl=replacement,
         string=text
     )
+
+    # Remove trailing punctuations and spaces.
+    text = re.sub(
+        pattern='[[:space:]\\!"#$%&\'\\*\\+,\\-/:;<=>?@\\^_`|~]$',
+        repl='',
+        string=text
+    )
+
     return text
 
 
@@ -223,36 +262,23 @@ def redact_white_spaces(text: str, replacement: str = SPACE) -> str:
     return re.sub(pattern=regexp, repl=replacement, string=text)
 
 
-def noise_character_ratio_in_text(text: str, min_length: int = 10) -> float:
-    """percentage of noise characters in the text
-    Args:
-        text: string to check
-        min_length: length of the text below which return 0.0
-    """
-    assert text is not None and min_length > 0
-    text = ''.join(text.split())
-    length: int = len(text)
-    if length >= min_length:
-        return len(RE_NOISE_CHARACTERS.findall(text)) / length
-    else:
-        return 0.0
-
-
 def normalize(text: str):
     text = redact_non_english_characters(text)
+    text = decontracted(text)
 
     text = textacy.preprocessing.normalize.unicode(text)
     text = textacy.preprocessing.remove.accents(text)
     text = textacy.preprocessing.normalize.bullet_points(text)
     text = textacy.preprocessing.normalize.hyphenated_words(text)
     text = textacy.preprocessing.normalize.quotation_marks(text)
-
     text = redact_emojis(text)
+
     text = redact_abn(text)
     text = redact_phone_numbers(text)
     text = redact_urls(text)
     text = redact_email_addresses(text)
 
     text = redact_noise(text)
+    text = redact_white_spaces(text)
 
     return SPACE.join(text.split())
