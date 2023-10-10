@@ -93,22 +93,21 @@ def get_signature(text):
     # note - these opening statements *must* be in lower case for
     # sig within sig searching to work later in this func
     sig_opening_statements = [
+        "regards",
         "warm regards",
         "kind regards",
-        "regards",
-        "cheers",
-        "many thanks",
-        "sincerely",
-        "ciao",
-        "Best",
-        "bGIF",
-        "thanks",
-        "thank you",
-        "thankyou",
-        "talk soon",
+        "best regards",
+        "with warm regards",
+        "with kind regards",
+        "with best regards",
+        "all the best"
         "cordially",
         "yours truly",
-        "thanking You",
+        "cheers",
+        "sincerely",
+        "ciao",
+        "bye",
+        "talk soon",
         "please do not hesitate",
         "sent from my iphone"
     ]
