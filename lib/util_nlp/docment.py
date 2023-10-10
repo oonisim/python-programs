@@ -98,17 +98,18 @@ def get_signature(text):
         "regards",
         "cheers",
         "many thanks",
-        "thanks",
         "sincerely",
         "ciao",
         "Best",
         "bGIF",
+        "thanks",
         "thank you",
         "thankyou",
         "talk soon",
         "cordially",
         "yours truly",
         "thanking You",
+        "please do not hesitate",
         "sent from my iphone"
     ]
     # pattern = "(?P<signature>(" + string.join(sig_opening_statements, "|") + ")(.)*)"
@@ -116,7 +117,6 @@ def get_signature(text):
     groups = re.search(pattern, text, re.IGNORECASE + re.DOTALL)
     signature = None
     if groups:
-        # if groups.groupdict().has_key("signature"):
         if "signature" in groups.groupdict():
             signature = groups.groupdict()["signature"]
             reply_text = get_reply_text(text[text.find(signature):])
@@ -163,8 +163,8 @@ def get_body(text, check_salutation=True, check_signature=True, check_reply_text
     if check_salutation:
         sal = get_salutation(text)
         if sal:
-            # text = text[len(sal):]
-            text = text[text.find(sal) + len(sal):]
+            # text = text[text.find(sal) + len(sal):]
+            text = text[text.find(sal):]
 
     if check_signature:
         sig = get_signature(text)
@@ -188,9 +188,11 @@ def get_salutation(text):
     # Notes on regex:
     # Max of 5 words succeeding first Hi/To etc, otherwise is probably an entire sentence
     openings = [
-        "dear",
         "hello",
         "hi",
+        "dear",
+        "re:",
+        "thank you for referring"
     ]
     salutations = [
         "dr",
@@ -202,9 +204,8 @@ def get_salutation(text):
     ]
 
     pattern = (
-        rf"\s*({'|'.join(openings)})" +
-        rf"\s*({'|'.join(openings)})*\s*" +
-        rf"({'|'.join(salutations)})*" +
+        rf"((?<!\S)({'|'.join(openings)})(?!\S)\s*)+" +
+        rf"(\s*(?<!\S)({'|'.join(salutations)})(?!\S))?" +
         rf"(\s*\w*)(\s*\w*)(\s*\w*)(\s*\w*)(\s*\w*)([.\s]*)"
     )
     match = re.search(pattern, text, re.IGNORECASE)

@@ -31,12 +31,14 @@ NLTK_ENGLISH_WORDS = set(words.words())
 RE_AUSTRALIAN_BUSINESS_NUMBER: re.Pattern = re.compile(
     pattern=r"ABN[\s:]*\d{2}\s*\d{3}\s*\d{3}\s*\d{3}", flags=re.I
 )
-TAG_AUSTRALIAN_BUSINESS_NUMBER: str = " ABN "
+TAG_AUSTRALIAN_BUSINESS_NUMBER: str = " TAG_ABN "
 RE_AUSTRALIAN_PHONE_NUMBER: re.Pattern = re.compile(
     pattern=r'(?<!\S)(\+?\(?61\)?)?[-\s]*(\(?0?[2-57-8])\)?\s*?(\d\d([- ]'\
             '(?=\d{3})|(?!\d\d[- ]?\d[- ]))\d\d[- ]?\d[- ]?\d{3})(?!\S)'
 )
-TAG_AUSTRALIAN_PHONE_NUMBER: str = " PHONE_NUMBER "
+TAG_AUSTRALIAN_PHONE_NUMBER: str = " TAG_PHONE_NUMBER "
+TAG_EMAIL: str = " TAG_EMAIL "
+TAG_URL: str = " TAG_URL "
 
 
 # --------------------------------------------------------------------------------
@@ -89,7 +91,7 @@ def decontracted(text: str) -> str:
     return text
 
 
-def redact_email_addresses(text: str, replacement: str = "<EMAIL>") -> str:
+def redact_email_addresses(text: str, replacement: str = TAG_EMAIL) -> str:
     """Redact email address with the replacement
     Args:
         text: text to run the redaction
@@ -104,7 +106,7 @@ def redact_email_addresses(text: str, replacement: str = "<EMAIL>") -> str:
     return textacy.preprocessing.replace.emails(text=text, repl=replacement)
 
 
-def redact_urls(text: str, replacement: str = "<URL>") -> str:
+def redact_urls(text: str, replacement: str = TAG_URL) -> str:
     """Redact URLs with the replacement
     Args:
         text: text to run the redaction
