@@ -4,7 +4,7 @@
 from typing import (
     Set,
 )
-from util_file import (
+from lib.util_file import (
     get_file_suffix,
     list_files_in_directory,
     get_dir_name,

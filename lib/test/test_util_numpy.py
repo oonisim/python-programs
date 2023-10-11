@@ -1,10 +1,10 @@
 import numpy as np
 
-from util_constant import (
+from lib.util_constant import (
     TYPE_FLOAT,
     TYPE_INT,
 )
-from util_numpy import (
+from lib.util_numpy import (
     get_cosine_similarity,
     get_orthogonal_3d_vectors,
     get_orthogonal_vectors,
