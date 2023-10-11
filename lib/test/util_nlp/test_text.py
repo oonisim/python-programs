@@ -66,6 +66,7 @@ def test_redact_phone_numbers__australia_success():
         '+(61) 455 562 400',
         '(02) 4371 3164',
         '(02) 4371-3164',
+        '0416117205',
         '02 80268989',
         '03 80268989',
         '04 80268989',
@@ -84,6 +85,70 @@ def test_redact_phone_numbers__australia_success():
             country="AU"
         ) == TAG_AUSTRALIAN_PHONE_NUMBER, \
             f"expected phone number redaction for [{number}]."
+
+    number = '0416117205.'
+    expected = f"{TAG_AUSTRALIAN_PHONE_NUMBER}."
+    assert redact_phone_numbers(
+        text=number,
+        country="AU"
+    ) == expected, \
+        f"expected phone number redaction [{expected}] for [{number}]."
+
+    number = '#0416117205'
+    expected = f"#{TAG_AUSTRALIAN_PHONE_NUMBER}"
+    assert redact_phone_numbers(
+        text=number,
+        country="AU"
+    ) == expected, \
+        f"expected phone number redaction [{expected}] for [{number}]."
+
+    number = '#0416117205.'
+    expected = f"#{TAG_AUSTRALIAN_PHONE_NUMBER}."
+    assert redact_phone_numbers(
+        text=number,
+        country="AU"
+    ) == expected, \
+        f"expected phone number redaction [{expected}] for [{number}]."
+
+    number = '@0416117205'
+    expected = f"@{TAG_AUSTRALIAN_PHONE_NUMBER}"
+    assert redact_phone_numbers(
+        text=number,
+        country="AU"
+    ) == expected, \
+        f"expected phone number redaction [{expected}] for [{number}]."
+
+    number = '@0416117205.'
+    expected = f"@{TAG_AUSTRALIAN_PHONE_NUMBER}."
+    assert redact_phone_numbers(
+        text=number,
+        country="AU"
+    ) == expected, \
+        f"expected phone number redaction [{expected}] for [{number}]."
+
+    number = 'at 0416117205'
+    expected = f"at{TAG_AUSTRALIAN_PHONE_NUMBER}"
+    assert redact_phone_numbers(
+        text=number,
+        country="AU"
+    ) == expected, \
+        f"expected phone number redaction [{expected}] for [{number}]."
+
+    number = 'on 0416117205'
+    expected = f"on{TAG_AUSTRALIAN_PHONE_NUMBER}"
+    assert redact_phone_numbers(
+        text=number,
+        country="AU"
+    ) == expected, \
+        f"expected phone number redaction [{expected}] for [{number}]."
+
+    number = 'on 0416117205.'
+    expected = f"on{TAG_AUSTRALIAN_PHONE_NUMBER}."
+    assert redact_phone_numbers(
+        text=number,
+        country="AU"
+    ) == expected, \
+        f"expected phone number redaction for [{number}]."
 
 
 def test_redact_phone_numbers__australia_fail():

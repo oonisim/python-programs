@@ -31,7 +31,7 @@ SPACE: str = " "
 NLTK_ENGLISH_WORDS = set(words.words())
 
 TAG_AUSTRALIAN_BUSINESS_NUMBER: str = " TAG_ABN "
-TAG_AUSTRALIAN_PHONE_NUMBER: str = " TAG_PHONE_NUMBER "
+TAG_AUSTRALIAN_PHONE_NUMBER: str = " TAG_PHONE_NUMBER"
 TAG_EMAIL: str = " TAG_EMAIL "
 TAG_URL: str = " TAG_URL "
 
@@ -43,10 +43,18 @@ RE_AUSTRALIAN_BUSINESS_NUMBER: re.Pattern = re.compile(
     pattern=r"ABN[\s:]*\d{2}\s*\d{3}\s*\d{3}\s*\d{3}", flags=re.I
 )
 RE_AUSTRALIAN_PHONE_NUMBER: re.Pattern = re.compile(
-#    pattern=r'(?<!\S)(\+?\(?61\)?)?[-\s]*(\(?0?[2-57-8])\)?\s*?(\d\d([- ]'\
-#            '(?=\d{3})|(?!\d\d[- ]?\d[- ]))\d\d[- ]?\d[- ]?\d{3})(?!\S)'
-    pattern=r'(?<!\S)(\+?\(?61\)?)?[-\s]*(\(?0?[2-57-8]\)?)[-\s]*(\d\d([- ]' \
-            '(?=\d{3})|(?!\d\d[- ]?\d[- ]))\d\d[- ]?\d[- ]?\d{3})(?!\S)',
+    # Allow 'at 046911112222', 'at 046911112222.', '@046911112222,'
+    # patten=r'(?<!\S)(\+?\(?61\)?)?[-\s]*(\(?0?[2-57-8]\)?)[-\s]*(\d\d([- ]' \
+    # '(?=\d{3})|(?!\d\d[- ]?\d[- ]))\d\d[- ]?\d[- ]?\d{3})(?!\S)'
+    pattern=r'(?<!\S)'\
+            '(#|@|at|on)?'\
+            '(\+?\(?61\)?)?[-\s]*'\
+            '(\(?0?[2-57-8]\)?)[-\s]*'\
+            '(\d\d([- ]' \
+            '(?=\d{3})|(?!\d\d[- ]?\d[- ]))\d\d[- ]?\d[- ]?\d{3})'\
+            '([.,]?)'\
+            '(?!\S)',
+    flags=re.IGNORECASE
 )
 
 
@@ -196,7 +204,7 @@ def redact_phone_numbers(
         # TODO: handle '+(610) 455 562 400' as invalid
         text = re.sub(
             pattern=RE_AUSTRALIAN_PHONE_NUMBER,
-            repl=replacement,
+            repl=f'\\1{replacement}\\6',
             string=text
         )
         return text
