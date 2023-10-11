@@ -1,6 +1,6 @@
 from .text import (
     normalize_typographical_unicode_characters,
-    decontracted,
+    restore_contracted,
     redact_emojis,
     redact_phone_numbers,
     redact_non_english_characters,

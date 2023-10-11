@@ -125,7 +125,7 @@ class Pipeline:
     # --------------------------------------------------------------------------------
     def __init__(
             self,
-            model_name: str = "en_core_web_sm",
+            model_name: str = "en_core_web_lg",
             download_dir: Optional[str] = None
     ):
         # --------------------------------------------------------------------------------

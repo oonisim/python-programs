@@ -8,7 +8,7 @@ import regex as re
 
 from lib.util_nlp.text import (
     normalize_typographical_unicode_characters,
-    decontracted,
+    restore_contracted,
     redact_phone_numbers,
     normalize,
     TAG_AUSTRALIAN_PHONE_NUMBER,
@@ -44,10 +44,10 @@ def test_decontracted():
     """ Verify the de-contraction.
     Expected: contraction e.g. won't -> will not
     """
-    assert decontracted("I'm not into it.") == "I am not into it."
-    assert decontracted("we won't make it.") == "we will not make it."
-    assert decontracted("they're well prepared.") == "they are well prepared."
-    assert decontracted("Here's the coffee.") == "Here is the coffee."
+    assert restore_contracted("I'm not into it.") == "I am not into it."
+    assert restore_contracted("we won't make it.") == "we will not make it."
+    assert restore_contracted("they're well prepared.") == "they are well prepared."
+    assert restore_contracted("Here's the coffee.") == "Here is the coffee."
 
 
 def test_redact_phone_numbers__australia_success():

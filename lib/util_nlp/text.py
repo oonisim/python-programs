@@ -119,12 +119,14 @@ def redact_non_english_characters(text: str, replacement: str = '') -> str:
     )
 
 
-def decontracted(text: str) -> str:
-    """Restore the contracted words"""
-    # specific
+def restore_contracted(text: str) -> str:
+    """Restore the contracted expression
+    Args:
+        text: text to run the redaction
+    Return: restored text
+    """
     text = re.sub(r"won\'t", "will not", text, flags=re.IGNORECASE)
     text = re.sub(r"can\'t", "can not", text, flags=re.IGNORECASE)
-    # general
     text = re.sub(r"n\'t", " not", text, flags=re.IGNORECASE)
     text = re.sub(r"\'re", " are", text, flags=re.IGNORECASE)
     text = re.sub(r"\'s", " is", text, flags=re.IGNORECASE)
@@ -209,7 +211,7 @@ def redact_phone_numbers(
         )
         return text
     else:
-        raise NotImplementedError()
+        raise NotImplementedError("Currently AU only")
 
 
 def redact_emojis(text: str, replacement: str = "") -> str:
@@ -245,7 +247,7 @@ def redact_noise(
     # Remove prepending punctuations and spaces.
     text = re.sub(pattern=r"^[[:punct:][:space:]]*", repl='', string=text)
 
-    # Replace repeating punctuations with single.
+    # Replace repetition of the same punctuation character with single one.
     # NOTE: There can be valid repetition e.g. Unix ".." as parent directory.
     text = re.sub(
         pattern=r'([[:punct:]])\1+',
@@ -253,7 +255,8 @@ def redact_noise(
         string=text
     )
 
-    # Remove repeating punctuations but not '(...).' or '(...):'
+    # Remove repeating punctuations but not brace or parenthesis
+    # e.g. '(...).' or '(...):'
     text = re.sub(
         # Does not work. '^' causes a problem of matching '.' or any.
         # pattern=rf"([{string.punctuation.replace('.', '')}]){{2,}}",
@@ -289,7 +292,7 @@ def is_english_word(lemma: str) -> bool:
 
 
 def redact_non_english_words(text: str, replacement="<UNK>") -> str:
-    """Redact non English words with the replacement
+    """Redact non-English words with the replacement
     Args:
         text: text to run the redaction
         replacement: replacement for the non English word
@@ -301,7 +304,7 @@ def redact_non_english_words(text: str, replacement="<UNK>") -> str:
 
 
 def redact_white_spaces(text: str, replacement: str = SPACE) -> str:
-    """Remove repetition of white spaces
+    """Redact repetition of white spaces with the replacement.
     Args:
         text: text to run the redaction
         replacement: replacement for the white characters
@@ -314,7 +317,7 @@ def redact_white_spaces(text: str, replacement: str = SPACE) -> str:
 def normalize(text: str):
     text = normalize_typographical_unicode_characters(text)
     text = redact_non_english_characters(text)
-    text = decontracted(text)
+    text = restore_contracted(text)
 
     text = textacy.preprocessing.normalize.unicode(text)
     text = textacy.preprocessing.remove.accents(text)
