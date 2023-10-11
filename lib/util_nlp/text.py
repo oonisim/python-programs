@@ -1,11 +1,17 @@
 """
-Module for NLP utilities
+Module for NLP text manipulation utilities
 """
 import string
+import unicodedata
+from typing import (
+    List,
+    Set
+)
 
-import textacy.preprocessing
-import regex as re
 import nltk
+import regex as re
+import textacy.preprocessing
+import unidecode
 
 nltk.download('words')
 nltk.download('wordnet')
@@ -24,6 +30,11 @@ from nltk.corpus import (
 SPACE: str = " "
 NLTK_ENGLISH_WORDS = set(words.words())
 
+TAG_AUSTRALIAN_BUSINESS_NUMBER: str = " TAG_ABN "
+TAG_AUSTRALIAN_PHONE_NUMBER: str = " TAG_PHONE_NUMBER "
+TAG_EMAIL: str = " TAG_EMAIL "
+TAG_URL: str = " TAG_URL "
+
 
 # --------------------------------------------------------------------------------
 # Regex
@@ -31,19 +42,45 @@ NLTK_ENGLISH_WORDS = set(words.words())
 RE_AUSTRALIAN_BUSINESS_NUMBER: re.Pattern = re.compile(
     pattern=r"ABN[\s:]*\d{2}\s*\d{3}\s*\d{3}\s*\d{3}", flags=re.I
 )
-TAG_AUSTRALIAN_BUSINESS_NUMBER: str = " TAG_ABN "
 RE_AUSTRALIAN_PHONE_NUMBER: re.Pattern = re.compile(
-    pattern=r'(?<!\S)(\+?\(?61\)?)?[-\s]*(\(?0?[2-57-8])\)?\s*?(\d\d([- ]'\
-            '(?=\d{3})|(?!\d\d[- ]?\d[- ]))\d\d[- ]?\d[- ]?\d{3})(?!\S)'
+#    pattern=r'(?<!\S)(\+?\(?61\)?)?[-\s]*(\(?0?[2-57-8])\)?\s*?(\d\d([- ]'\
+#            '(?=\d{3})|(?!\d\d[- ]?\d[- ]))\d\d[- ]?\d[- ]?\d{3})(?!\S)'
+    pattern=r'(?<!\S)(\+?\(?61\)?)?[-\s]*(\(?0?[2-57-8]\)?)[-\s]*(\d\d([- ]' \
+            '(?=\d{3})|(?!\d\d[- ]?\d[- ]))\d\d[- ]?\d[- ]?\d{3})(?!\S)',
 )
-TAG_AUSTRALIAN_PHONE_NUMBER: str = " TAG_PHONE_NUMBER "
-TAG_EMAIL: str = " TAG_EMAIL "
-TAG_URL: str = " TAG_URL "
 
 
 # --------------------------------------------------------------------------------
 # Functions
 # --------------------------------------------------------------------------------
+def normalize_typographical_unicode_characters(text: str) -> str:
+    """Convert non-ascii typographical characters for punctuations and spaces
+    into ascii equivalents.
+    Unicode has variants of Ascii characters, e.g. EM-Dash (U+2014), EN-Dash (U+2013).
+    for Ascii hyphen-minus (U+002D). Convert them into Ascii equivalent.
+    """
+    normalized: str = unicodedata.normalize("NFC", text)
+    _buf: List[str] = []
+    for c in normalized:
+        category: str = unicodedata.category(c)
+        # --------------------------------------------------------------------------------
+        # Punctuation (e.g. Pc, Pd) or Separate space, etc
+        # --------------------------------------------------------------------------------
+        if category[0] == 'P' or category[0] == 'Z':
+            # Removing repeating punctuations as EM-dash is decoded to '--'.
+            _buf.append(
+                re.sub(
+                    pattern=r'([[:punct:][:blank:]])\1+',
+                    repl='\\1',
+                    string=unidecode.unidecode(c)
+                )
+            )
+        else:
+            _buf.append(c)
+
+    return ''.join(_buf)
+
+
 def redact_non_word_characters(
         text: str, replacement: str = ''
 ) -> str:
@@ -56,7 +93,7 @@ def redact_non_word_characters(
         replacement: string to replace with
     Returns: test with special non word characters being removed
     """
-    return re.sub(r'[^\w\s]', replacement, text.strip())
+    return re.sub(pattern=r'[^\w\s]', repl=replacement, string=text.strip())
 
 
 def redact_non_english_characters(text: str, replacement: str = '') -> str:
@@ -200,9 +237,10 @@ def redact_noise(
     # Remove prepending punctuations and spaces.
     text = re.sub(pattern=r"^[[:punct:][:space:]]*", repl='', string=text)
 
-    # Remove repeating '(', ')', '[', ']', '{', '}'.
+    # Replace repeating punctuations with single.
+    # NOTE: There can be valid repetition e.g. Unix ".." as parent directory.
     text = re.sub(
-        pattern=r'([][(){}}])\1+',
+        pattern=r'([[:punct:]])\1+',
         repl='\\1',
         string=text
     )
@@ -218,14 +256,15 @@ def redact_noise(
         string=text
     )
 
-    # Remove trailing punctuations and spaces.
+    # Remove trailing specific punctuations and spaces.
+    # Some punctuations e.g. '.', "'", '"" can be at the end of the document.
     text = re.sub(
-        pattern='[[:space:]\\!"#$%&\'\\*\\+,\\-/:;<=>?@\\^_`|~]$',
+        pattern='[[:space:]\\#$%&\\*\\+,\\-/:;<=>@\\^_`|~]$',
         repl='',
         string=text
     )
 
-    return text
+    return text.strip()
 
 
 def is_english_word(lemma: str) -> bool:
@@ -265,6 +304,7 @@ def redact_white_spaces(text: str, replacement: str = SPACE) -> str:
 
 
 def normalize(text: str):
+    text = normalize_typographical_unicode_characters(text)
     text = redact_non_english_characters(text)
     text = decontracted(text)
 

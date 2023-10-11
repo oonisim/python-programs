@@ -1,4 +1,5 @@
 from .text import (
+    normalize_typographical_unicode_characters,
     decontracted,
     redact_emojis,
     redact_phone_numbers,

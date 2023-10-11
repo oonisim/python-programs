@@ -109,6 +109,8 @@ def get_signature(text):
         "bye",
         "talk soon",
         "please do not hesitate",
+        "thank (you)? again for referring",
+        "thanks again for referring",
         "sent from my iphone"
     ]
     # pattern = "(?P<signature>(" + string.join(sig_opening_statements, "|") + ")(.)*)"
@@ -187,11 +189,13 @@ def get_salutation(text):
     # Notes on regex:
     # Max of 5 words succeeding first Hi/To etc, otherwise is probably an entire sentence
     openings = [
+        "re:",
+        "thank you for referring",
+        "thank you for (your|the) referral of",
+        "thanks for (your|the) referral of",
         "hello",
         "hi",
         "dear",
-        "re:",
-        "thank you for referring"
     ]
     salutations = [
         "dr",

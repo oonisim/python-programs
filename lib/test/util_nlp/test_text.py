@@ -4,11 +4,50 @@ from typing import (
     List
 )
 
+import regex as re
+
 from lib.util_nlp.text import (
+    normalize_typographical_unicode_characters,
+    decontracted,
     redact_phone_numbers,
+    normalize,
     TAG_AUSTRALIAN_PHONE_NUMBER,
     TAG_AUSTRALIAN_BUSINESS_NUMBER,
 )
+
+
+# --------------------------------------------------------------------------------
+# Tests
+# --------------------------------------------------------------------------------
+def test_normalize_typographical_unicode_characters():
+    """Verify typographical non-ascii unicode e.g. EM-dash
+    Test conditions:
+    1. EM-dash is decoded into two hyphen-minus
+    2. Right single quote is decoded into single quote.
+    """
+    # Test condition #1
+    normalized: str = normalize_typographical_unicode_characters('\u2014')
+    assert normalized == '-', \
+        f"expected EM-dash (\u2014) normalized as '-' got {normalized}"
+
+    # Test condition #2
+    normalized: str = normalize_typographical_unicode_characters('\u2019')
+    assert normalized == "'", \
+        f"expected right single quotation (\u2019) normalized as ''' got {normalized}"
+
+    normalized: str = normalize_typographical_unicode_characters("ÔÇÿ\u2014Ö\u2019")
+    assert normalized == "ÔÇÿ-Ö'", \
+        f"expected (ÔÇÿ\u2014Ö\u2019) normalized as ÔÇÿ-Ö' got {normalized}"
+
+
+def test_decontracted():
+    """ Verify the de-contraction.
+    Expected: contraction e.g. won't -> will not
+    """
+    assert decontracted("I'm not into it.") == "I am not into it."
+    assert decontracted("we won't make it.") == "we will not make it."
+    assert decontracted("they're well prepared.") == "they are well prepared."
+    assert decontracted("Here's the coffee.") == "Here is the coffee."
 
 
 def test_redact_phone_numbers__australia_success():
@@ -18,6 +57,7 @@ def test_redact_phone_numbers__australia_success():
     """
     for number in [
         '+(61) 455 562 400',
+        '+61-02-8088-3433',
         '+(61)455562400',
         '+61-455-562-400',
         '+61 455 562 400',
@@ -71,3 +111,31 @@ def test_redact_phone_numbers__australia_fail():
             country="AU"
         ) == number, \
             f"expected phone number not redacted for [{number}]."
+
+
+def test_normalize():
+    """Verify text normalization
+    """
+    text: str = """
+    Dear Dr... Ian FlemingÔÇÿ.
+    Re: ÔÇÿpatient James Bond:
+    After the injury at the Sky Never Fall, he made a complete recovery 
+    ((To my surprise 😉... TBCH 🤣😁😄)).
+    Email ian.fleming@mi6.gov.uk
+    Phone: +61 (02)\u20148088\u20143433
+    URL: https://www.sis.gov.uk/mi6
+    """
+
+    expected: str = """
+    Dear Dr. Ian Fleming. Re: patient James Bond: 
+    After the injury at the Sky Never Fall, he made a complete recovery
+    (To my surprise . TBCH ).
+    Email TAG_EMAIL Phone: 
+    TAG_PHONE_NUMBER 
+    URL: TAG_URL
+    """
+
+    expected = re.sub(pattern=r'\s+', repl=' ', string=expected).strip()
+    actual: str = normalize(text)
+    assert actual == expected, \
+        f"expected [{text}]\nnormalized as \n[{expected}],\ngot[{actual}]."
