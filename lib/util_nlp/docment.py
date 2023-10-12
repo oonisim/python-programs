@@ -18,13 +18,14 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 """
-import re
+import regex as re
 import string
 
 
 def parse(text, remove_quoted_statements=False):
     text = text.strip()
-    text = strip_automated_notation(text)    
+    text = strip_ocr_page_header(text)
+    text = strip_automated_notation(text)
     if remove_quoted_statements:
         pattern = """(?P<quoted_statement>".*?")"""
         matches = re.findall(pattern, text, re.IGNORECASE + re.DOTALL)
@@ -37,6 +38,24 @@ def parse(text, remove_quoted_statements=False):
         "reply_text":get_reply_text(text)
     }
     return result
+
+
+def strip_ocr_page_header(text: str) -> str:
+    """Remove Page n of N from ATT m of M if the text start with it.
+    """
+    if re.match(
+        pattern=r"^p?age \d+ of \d+ from ATT \d+ of \d+",
+        string=text,
+        flags=re.IGNORECASE
+    ):
+        text = re.sub(
+            pattern=r"p?age \d+ of \d+ from ATT \d+ of \d+\s*",
+            repl="\n\n",
+            string=text,
+            flags=re.IGNORECASE
+        )
+
+    return text.lstrip()
 
 
 # automated_notation could be any labels or sections in the email giving special notation for

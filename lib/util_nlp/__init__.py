@@ -15,5 +15,6 @@ from .text import (
 )
 
 from .docment import (
-    parse
+    parse,
+    strip_ocr_page_header
 )
