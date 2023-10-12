@@ -22,7 +22,7 @@ import re
 import string
 
 
-def parse(text, remove_quoted_statements=True):
+def parse(text, remove_quoted_statements=False):
     text = text.strip()
     text = strip_automated_notation(text)    
     if remove_quoted_statements:
@@ -197,6 +197,8 @@ def get_salutation(text):
         "thank you for referring",
         "thank you for (your|the) referral of",
         "thanks for (your|the) referral of",
+        "good morning",
+        "good afternoon",
         "hello",
         "hi",
         "dear",

@@ -5,7 +5,8 @@ import string
 import unicodedata
 from typing import (
     List,
-    Set
+    Set,
+    Iterable
 )
 
 import nltk
@@ -39,9 +40,21 @@ TAG_URL: str = " TAG_URL "
 # --------------------------------------------------------------------------------
 # Regex
 # --------------------------------------------------------------------------------
+# TO allow "ABN: 861-2222-1111"
+# RE_AUSTRALIAN_BUSINESS_NUMBER: re.Pattern = re.compile(
+#    pattern=r"ABN[\s:]*\d{2}\s*\d{3}\s*\d{3}\s*\d{3}", flags=re.I
+# )
 RE_AUSTRALIAN_BUSINESS_NUMBER: re.Pattern = re.compile(
-    pattern=r"ABN[\s:]*\d{2}\s*\d{3}\s*\d{3}\s*\d{3}", flags=re.I
+    pattern=r"""
+    (?<!\S)
+    (?:\W*)                      
+    (ABN[\s:#]*(\d[-\s]*){11})  # group(1), and group(2) as (\d[-\s]*) 
+    (?:\W*)                     
+    (?!\S)
+    """,
+    flags=re.IGNORECASE | re.VERBOSE
 )
+
 RE_AUSTRALIAN_PHONE_NUMBER: re.Pattern = re.compile(
     # Allow 'at 046911112222', 'at 046911112222.', '@046911112222,'
     # patten=r'(?<!\S)(\+?\(?61\)?)?[-\s]*(\(?0?[2-57-8]\)?)[-\s]*(\d\d([- ]' \
@@ -168,6 +181,31 @@ def redact_urls(text: str, replacement: str = TAG_URL) -> str:
     return textacy.preprocessing.replace.urls(text=text, repl=replacement)
 
 
+def is_valid_abn(abn: str) -> bool:
+    if abn is None:
+        return False
+
+    abn = abn.replace(" ","")
+    weight = [10, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19]
+    weightedSum = 0
+
+    if len(abn) != 11:
+        return False
+    if not abn.isnumeric():
+        return False
+
+    i = 0
+    for number in abn:
+        weightedSum += int(number) * weight[i]
+        i += 1
+
+    # This is the same as subtracting 1 from the first digit.
+    weightedSum -= 10
+
+    result = weightedSum % 89 == 0
+    return result
+
+
 def redact_abn(
         text: str,
         replacement: str = TAG_AUSTRALIAN_BUSINESS_NUMBER
@@ -178,12 +216,30 @@ def redact_abn(
         replacement: replacement for the ABN
     Return: redacted text
     """
-    text = re.sub(
-        pattern=RE_AUSTRALIAN_BUSINESS_NUMBER,
-        repl=replacement,
-        string=text
+    # text = re.sub(
+    #     pattern=RE_AUSTRALIAN_BUSINESS_NUMBER,
+    #     repl=replacement,
+    #     string=text
+    # )
+    # return text
+
+    redacted: str = ""  # buffer to store ABN redacted text
+    cursor: int = 0
+    matches: Iterable[re.Match] = re.finditer(
+        pattern=RE_AUSTRALIAN_BUSINESS_NUMBER, string=text
     )
-    return text
+    for match in matches:
+        _abn: str = re.sub(pattern=r'[^\d]', string=match.group(1), repl='')
+        if is_valid_abn(_abn):
+            redacted += text[cursor:match.start(1)] + replacement
+        else:
+            redacted += text[cursor:match.start(1)] + match.group(1)
+
+        cursor = match.end(1)
+
+    # Collect the rest in the text
+    redacted += text[cursor:]
+    return redacted
 
 
 def redact_phone_numbers(
@@ -255,14 +311,14 @@ def redact_noise(
         string=text
     )
 
-    # Remove repeating punctuations but not brace or parenthesis
+    # Remove repeating punctuations but not brace, parenthesis, quotations.
     # e.g. '(...).' or '(...):'
     text = re.sub(
         # Does not work. '^' causes a problem of matching '.' or any.
-        # pattern=rf"([{string.punctuation.replace('.', '')}]){{2,}}",
-
         # Do not remove '(...).' as it has valid meaning.
-        pattern='[\\!"#$%&\'\\*\\+,\\-/:;<=>?@\\^_`|~]{2,}',
+        # Do not remove quotations "..." or '...'.
+        # pattern=rf"([{string.punctuation.replace('.', '')}]){{2,}}",
+        pattern='[\\!#$%&\\*\\+,\\-/:;<=>?@\\^_`|~]{2,}',
         repl=replacement,
         string=text
     )

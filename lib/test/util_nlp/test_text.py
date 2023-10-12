@@ -9,6 +9,7 @@ import regex as re
 from lib.util_nlp.text import (
     normalize_typographical_unicode_characters,
     restore_contracted,
+    redact_abn,
     redact_phone_numbers,
     normalize,
     TAG_AUSTRALIAN_PHONE_NUMBER,
@@ -40,7 +41,7 @@ def test_normalize_typographical_unicode_characters():
         f"expected (ÔÇÿ\u2014Ö\u2019) normalized as ÔÇÿ-Ö' got {normalized}"
 
 
-def test_decontracted():
+def test_restore_contracted():
     """ Verify the de-contraction.
     Expected: contraction e.g. won't -> will not
     """
@@ -48,6 +49,72 @@ def test_decontracted():
     assert restore_contracted("we won't make it.") == "we will not make it."
     assert restore_contracted("they're well prepared.") == "they are well prepared."
     assert restore_contracted("Here's the coffee.") == "Here is the coffee."
+
+
+def test_redact_abn__success():
+    """Verify the valid ABN redaction.
+    Test conditions:
+    Valid ABN is redacted (see https://abr.business.gov.au/Help/AbnFormat).
+    1. ABN: 861-4924-1458
+    2. ABN : 861-4924-1458
+    3. ABN #861-4924-1458
+    4. ABN 861-4924-1458
+    5. ABN 86 149 241 458
+    6. ABN 86149 241 458
+    7. ABN 86149 241 458.
+    8. ABN 86149 241 458,
+    """
+    for abn in [
+        "ABN: 861-4924-1458",
+        "ABN : 861-4924-1458",
+        "ABN #861-4924-1458",
+        "ABN 861-4924-1458",
+        "ABN 86 149 241 458",
+        "ABN 86149 241 458",
+    ]:
+        assert redact_abn(abn) == TAG_AUSTRALIAN_BUSINESS_NUMBER, \
+            f"expected ABN redaction for [{abn}], got [{redact_abn(abn)}]."
+
+    abn: str = "ABN 86149 241 458."
+    expected: str = f"{TAG_AUSTRALIAN_BUSINESS_NUMBER}."
+    assert redact_abn(abn) == expected, \
+        f"expected ABN redaction {expected} for [{abn}], got [{redact_abn(abn)}]."
+
+    abn: str = "(abN 86149 241 458),"
+    expected: str = f"({TAG_AUSTRALIAN_BUSINESS_NUMBER}),"
+    assert redact_abn(abn) == expected, \
+        f"expected ABN redaction {expected} for [{abn}], got [{redact_abn(abn)}]."
+
+    abn: str = "St. Vincent Hospital (abN 86149 241 458), is a private hospital in NSW."
+    expected: str = f"St. Vincent Hospital ({TAG_AUSTRALIAN_BUSINESS_NUMBER}), "\
+                    "is a private hospital in NSW."
+    assert redact_abn(abn) == expected, \
+        f"expected ABN redaction {expected} for [{abn}], got [{redact_abn(abn)}]."
+
+
+def test_redact_abn__fail():
+    """Verify the valid ABN redaction.
+    Test conditions:
+    Invalid ABN not following the rule is not redacted.
+    (see https://abr.business.gov.au/Help/AbnFormat)
+    1. ABN 16149 241 458 is returned as is.
+    2. ABN 241 458 is returned as is.
+    3. BBN 86149 241 458 is returned as is.
+    """
+    for abn in [
+        "ABN 16149 241 458",
+        "ABN 241 458",
+        "BBN 86149 241 458"
+    ]:
+        redacted: str = redact_abn(abn)
+        assert redacted == abn, \
+            f"expected no redaction for [{abn}], got [{redacted}]."
+
+    abn: str = "St. Vincent Hospital ,abn 6149 241 458, is a private hospital in NSW."
+    expected: str = f"St. Vincent Hospital ({TAG_AUSTRALIAN_BUSINESS_NUMBER}), "\
+                    "is a private hospital in NSW."
+    assert redact_abn(abn) == abn, \
+        f"expected no redaction for [{abn}], got [{redacted}]."
 
 
 def test_redact_phone_numbers__australia_success():

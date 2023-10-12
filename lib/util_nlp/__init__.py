@@ -7,6 +7,7 @@ from .text import (
     redact_non_word_characters,
     redact_non_english_words,
     redact_noise,
+    redact_abn,
     redact_urls,
     redact_email_addresses,
     is_english_word,
