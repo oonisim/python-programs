@@ -1,15 +1,15 @@
 from .text import (
     normalize_typographical_unicode_characters,
     restore_contracted,
-    redact_emojis,
-    redact_phone_numbers,
+    redact_emoji,
+    redact_phone_number,
     redact_non_english_characters,
     redact_non_word_characters,
-    redact_non_english_words,
+    redact_non_english_word,
     redact_noise,
     redact_abn,
-    redact_urls,
-    redact_email_addresses,
+    redact_url,
+    redact_email_address,
     is_english_word,
     normalize
 )

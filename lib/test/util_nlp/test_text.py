@@ -10,10 +10,14 @@ from lib.util_nlp.text import (
     normalize_typographical_unicode_characters,
     restore_contracted,
     redact_abn,
-    redact_phone_numbers,
+    redact_phone_number,
+    redact_email_address,
+    redact_url,
     normalize,
     TAG_AUSTRALIAN_PHONE_NUMBER,
     TAG_AUSTRALIAN_BUSINESS_NUMBER,
+    TAG_EMAIL,
+    TAG_URL
 )
 
 
@@ -117,7 +121,7 @@ def test_redact_abn__fail():
         f"expected no redaction for [{abn}], got [{redacted}]."
 
 
-def test_redact_phone_numbers__australia_success():
+def test_redact_phone_number__australia_success():
     """
     Verify the phone number redaction.
     expected: Australian phone number redacted.
@@ -147,7 +151,7 @@ def test_redact_phone_numbers__australia_success():
         '0854587456',
         '+61854587456'
     ]:
-        assert redact_phone_numbers(
+        assert redact_phone_number(
             text=number,
             country="AU"
         ) == TAG_AUSTRALIAN_PHONE_NUMBER, \
@@ -155,7 +159,7 @@ def test_redact_phone_numbers__australia_success():
 
     number = '0416117205.'
     expected = f"{TAG_AUSTRALIAN_PHONE_NUMBER}."
-    assert redact_phone_numbers(
+    assert redact_phone_number(
         text=number,
         country="AU"
     ) == expected, \
@@ -163,7 +167,7 @@ def test_redact_phone_numbers__australia_success():
 
     number = '#0416117205'
     expected = f"#{TAG_AUSTRALIAN_PHONE_NUMBER}"
-    assert redact_phone_numbers(
+    assert redact_phone_number(
         text=number,
         country="AU"
     ) == expected, \
@@ -171,7 +175,7 @@ def test_redact_phone_numbers__australia_success():
 
     number = '#0416117205.'
     expected = f"#{TAG_AUSTRALIAN_PHONE_NUMBER}."
-    assert redact_phone_numbers(
+    assert redact_phone_number(
         text=number,
         country="AU"
     ) == expected, \
@@ -179,7 +183,7 @@ def test_redact_phone_numbers__australia_success():
 
     number = '@0416117205'
     expected = f"@{TAG_AUSTRALIAN_PHONE_NUMBER}"
-    assert redact_phone_numbers(
+    assert redact_phone_number(
         text=number,
         country="AU"
     ) == expected, \
@@ -187,7 +191,7 @@ def test_redact_phone_numbers__australia_success():
 
     number = '@0416117205.'
     expected = f"@{TAG_AUSTRALIAN_PHONE_NUMBER}."
-    assert redact_phone_numbers(
+    assert redact_phone_number(
         text=number,
         country="AU"
     ) == expected, \
@@ -195,7 +199,7 @@ def test_redact_phone_numbers__australia_success():
 
     number = 'at 0416117205'
     expected = f"at{TAG_AUSTRALIAN_PHONE_NUMBER}"
-    assert redact_phone_numbers(
+    assert redact_phone_number(
         text=number,
         country="AU"
     ) == expected, \
@@ -203,7 +207,7 @@ def test_redact_phone_numbers__australia_success():
 
     number = 'on 0416117205'
     expected = f"on{TAG_AUSTRALIAN_PHONE_NUMBER}"
-    assert redact_phone_numbers(
+    assert redact_phone_number(
         text=number,
         country="AU"
     ) == expected, \
@@ -211,14 +215,14 @@ def test_redact_phone_numbers__australia_success():
 
     number = 'on 0416117205.'
     expected = f"on{TAG_AUSTRALIAN_PHONE_NUMBER}."
-    assert redact_phone_numbers(
+    assert redact_phone_number(
         text=number,
         country="AU"
     ) == expected, \
         f"expected phone number redaction for [{number}]."
 
 
-def test_redact_phone_numbers__australia_fail():
+def test_redact_phone_number__australia_fail():
     """
     Verify the phone number redaction.
     expected: Non-Australian phone number reduction fails
@@ -238,11 +242,76 @@ def test_redact_phone_numbers__australia_fail():
         '9854587456',
         '+6185458745'
     ]:
-        assert redact_phone_numbers(
+        assert redact_phone_number(
             text=number,
             country="AU"
         ) == number, \
             f"expected phone number not redacted for [{number}]."
+
+
+def test_redact_email__success():
+    """Verify valid email address is redacted.
+
+    Valid email format follow the "local-part@domain" format.
+    The local-part of an email address can contain any of the following ASCII characters:
+    * Uppercase and lowercase Latin letters A to Z and a to z
+    * Digits 0 to 9
+    * The following printable characters: !#$%&'*+-/=?^_`{|}~
+
+    The following guidelines apply to the local-part of a valid email address:
+    * The dot (.) character is allowed but cannot be the first or last character and cannot appear consecutively.
+    * Spaces are not allowed.
+
+    The domain of an email address can contain any of the following ASCII characters:
+    * Uppercase and lowercase Latin letters A to Z and a to z
+    * Digits 0 to 9
+
+    The following guidelines apply to the domain of a valid email address:
+    * The domain must match the requirements for a hostname, and include a list of dot (.) separated DNS labels.
+    * The dot (.) character is allowed but cannot be the first or last character and cannot appear consecutively.
+    * No digits are allowed in the top-level domain (TLD). The TLD is the portion of the domain after the dot (.).
+    * The TLD must contain a minimum of 2 and a maximum of 9 characters.
+    * Spaces are not allowed.
+
+    Test conditions.
+    """
+    for email in [
+        "simple@example.com",
+        "very.common@example.com",
+        "abc@example.co.uk",
+        "disposable.style.email.with+symbol@example.com",
+        "other.email-with-hyphen@example.com",
+        "fully-qualified-domain@example.com",
+        "user.name+tag+sorting@example.com",
+        "example-indeed@strange-example.com",
+        "example-indeed@strange-example.inininini",
+        "1234567890123456789012345678901234567890123456789012345678901234+x@example.com"
+    ]:
+        actual: str = redact_email_address(email)
+        expected: str = TAG_EMAIL
+        assert actual == expected, \
+            f"expected email [{email}] redacted as [{expected}], got [{actual}]."
+
+    email: str = "contact, in case of emergency,simple@example.com."
+    actual: str = redact_email_address(email)
+    expected: str = f"contact, in case of emergency,{TAG_EMAIL}."
+    assert actual == expected, \
+        f"expected email [{email}] redacted as [{expected}], got [{actual}]."
+
+
+def test_redact_email__fail():
+    """Verify invalid email address will not be redacted.
+    Test conditions.
+    1. Invalid email not redacted.
+    """
+    for email in [
+        'Abc.example.com',                      # No @ character',
+        'A@b@c@example.com',                    # Only one @ is allowed,
+    ]:
+        actual: str = redact_email_address(email)
+        expected: str = email
+        assert actual == expected, \
+            f"expected the string [{email}] not redacted, got [{actual}]."
 
 
 def test_normalize():

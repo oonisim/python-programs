@@ -118,7 +118,7 @@ def redact_non_word_characters(
 
 
 def redact_non_english_characters(text: str, replacement: str = '') -> str:
-    """Redact non English characters
+    """Redact non-English characters
     Args:
         text: text to remove the special characters from
         replacement: string to replace with
@@ -151,22 +151,17 @@ def restore_contracted(text: str) -> str:
     return text
 
 
-def redact_email_addresses(text: str, replacement: str = TAG_EMAIL) -> str:
+def redact_email_address(text: str, replacement: str = TAG_EMAIL) -> str:
     """Redact email address with the replacement
     Args:
         text: text to run the redaction
         replacement: replacement for the email
     Return: redacted text
     """
-    # return re.sub(
-    #     r"[\w.+-]+@\w+.[a-zA-Z]{2,3}",
-    #     replacement,
-    #     text
-    # )
     return textacy.preprocessing.replace.emails(text=text, repl=replacement)
 
 
-def redact_urls(text: str, replacement: str = TAG_URL) -> str:
+def redact_url(text: str, replacement: str = TAG_URL) -> str:
     """Redact URLs with the replacement
     Args:
         text: text to run the redaction
@@ -242,7 +237,7 @@ def redact_abn(
     return redacted
 
 
-def redact_phone_numbers(
+def redact_phone_number(
         text: str,
         country: str = "AU",
         replacement: str = TAG_AUSTRALIAN_PHONE_NUMBER
@@ -270,7 +265,7 @@ def redact_phone_numbers(
         raise NotImplementedError("Currently AU only")
 
 
-def redact_emojis(text: str, replacement: str = "") -> str:
+def redact_emoji(text: str, replacement: str = "") -> str:
     """Redact emoji with the replacement
     Args:
         text: text to run the redaction
@@ -347,7 +342,7 @@ def is_english_word(lemma: str) -> bool:
     )
 
 
-def redact_non_english_words(text: str, replacement="<UNK>") -> str:
+def redact_non_english_word(text: str, replacement="<UNK>") -> str:
     """Redact non-English words with the replacement
     Args:
         text: text to run the redaction
@@ -380,12 +375,12 @@ def normalize(text: str):
     text = textacy.preprocessing.normalize.bullet_points(text)
     text = textacy.preprocessing.normalize.hyphenated_words(text)
     text = textacy.preprocessing.normalize.quotation_marks(text)
-    text = redact_emojis(text)
+    text = redact_emoji(text)
 
     text = redact_abn(text)
-    text = redact_phone_numbers(text)
-    text = redact_urls(text)
-    text = redact_email_addresses(text)
+    text = redact_phone_number(text)
+    text = redact_url(text)
+    text = redact_email_address(text)
 
     text = redact_noise(text)
     text = redact_white_spaces(text)

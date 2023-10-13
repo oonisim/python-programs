@@ -103,17 +103,16 @@ def get_reply_text(text):
     return reply_text
     
 
-def get_signature(text):
+def get_signature(text: str, search_signature_in_signature: bool = False):
     
     # try not to have the signature be the very start of the message if we can avoid it
     salutation = get_salutation(text)
-    if salutation: text = text[len(salutation):]
+    if salutation : text = text[len(salutation):]
     
     # note - these opening statements *must* be in lower case for
     # sig within sig searching to work later in this func
     sig_opening_statements = [
-        "please do not hesitate",
-        "regards",
+        "regards(?!\s+(to|with))",  # Not to match 'in regards to/with'
         "warm regards",
         "kind regards",
         "best regards",
@@ -132,6 +131,8 @@ def get_signature(text):
         "ciao",
         "bye",
         "talk soon",
+        # "please do not hesitate",
+        # "please feel free to",
         "thank (you)? again for referring",
         "thanks again for referring",
         "sent from my iphone"
@@ -147,13 +148,14 @@ def get_signature(text):
             if reply_text: signature = signature.replace(reply_text, "")
             
             # search for a sig within current sig to lessen chance of accidentally stealing words from body
-            tmp_sig = signature
-            for s in sig_opening_statements:
-                if tmp_sig.lower().find(s) == 0:
-                    tmp_sig = tmp_sig[len(s):]
-            groups = re.search(pattern, tmp_sig, re.IGNORECASE + re.DOTALL)
-            if groups:
-                signature = groups.groupdict()["signature"]
+            if search_signature_in_signature:
+                tmp_sig = signature
+                for s in sig_opening_statements:
+                    if tmp_sig.lower().find(s) == 0:
+                        tmp_sig = tmp_sig[len(s):]
+                groups = re.search(pattern, tmp_sig, re.IGNORECASE + re.DOTALL)
+                if groups:
+                    signature = groups.groupdict()["signature"]
         
     # if no standard formatting has been provided (e.g. Regards, <name>),
     # try a probabilistic approach by looking for phone numbers, names etc. to derive sig
@@ -213,14 +215,16 @@ def get_salutation(text):
     # Max of 5 words succeeding first Hi/To etc, otherwise is probably an entire sentence
     openings = [
         "re:",
-        "thank you for referring",
-        "thank you for (your|the) referral of",
-        "thanks for (your|the) referral of",
         "good morning",
         "good afternoon",
         "hello",
         "hi",
         "dear",
+        "hope you are well",
+        "hope you have been wel"
+        "thank you for referring",
+        "thank you for (your|the) referral of",
+        "thanks for (your|the) referral of",
     ]
     salutations = [
         "dr",
@@ -232,8 +236,8 @@ def get_salutation(text):
     ]
 
     pattern = (
-        rf"((?<!\S)({'|'.join(openings)})(?!\S)\s*)+" +
-        rf"(\s*(?<!\S)({'|'.join(salutations)})(?!\S))?" +
+        rf"((?<!\S)({'|'.join(openings)})(?:\W*)(?!\S)\s*)+" +
+        rf"(\s*(?<!\S)({'|'.join(salutations)})(?:\W*)(?!\S))?" +
         rf"(\s*\w*)(\s*\w*)(\s*\w*)(\s*\w*)(\s*\w*)([.\s]*)"
     )
     match = re.search(pattern, text, re.IGNORECASE)
