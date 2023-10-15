@@ -227,29 +227,6 @@ class Pipeline:
 
         return False
 
-    @staticmethod
-    def get_words_in_text(
-            doc: spacy.tokens.Doc,
-            pos_to_include: Tuple[str] = ('ADJ', 'NOUN', 'VERB', 'PRON', 'PROPN'),
-            minmum_word_frequencey: int = 1,
-            lemmatise_word: bool = True,
-            filter_stopword: bool = True,
-            filter_numbers: bool = True,
-            filter_punctuation: bool = True
-    ) -> List[str]:
-        return [
-            token.lemma_ if lemmatise_word else token.text
-            for token in textacy.extract.words(
-                doc,
-                filter_stops=filter_stopword,
-                filter_punct=filter_punctuation,
-                filter_nums=filter_numbers,
-                include_pos=pos_to_include,
-                exclude_pos=None,
-                min_freq=minmum_word_frequencey
-            )
-        ]
-
     def process(self, text) -> spacy.tokens.Doc:
         """Process the text with the pretrained language pipeline
         Args:
@@ -257,71 +234,6 @@ class Pipeline:
         Returns: spacy.tokens.Doc instance
         """
         return self.model(text)
-
-    def _find_patterns_from_document(
-            self,
-            doc: spacy.tokens.Doc,
-            patterns: List[List[Dict[str, Any]]]
-    ) -> List[spacy.tokens.Span]:
-        """Find words or phrases with the Spacy Matcher pattern rules
-        https://spacy.io/api/matcher
-        https://spacy.io/usage/rule-based-matching
-
-        Pattern example:
-        pattern=[
-            {"POS": "ADJ", "OP": "{1,}"},
-            {"POS": "NOUN", "OP": "{1}"}
-        ]
-
-        Args:
-            doc: Document
-            patterns: spacy Matcher pattern
-
-        Returns:
-            List of Spans matched
-        """
-        matcher = Matcher(self.model.vocab)
-        matcher.add("_", patterns)
-        return matcher(doc, as_spans=True)
-
-    def find_patterns_from_document(
-            self,
-            doc: spacy.tokens.Doc,
-            patterns: List[List[Dict[str, Any]]],
-            lemmatise: bool = True,
-            sep=' '
-    ) -> List[str]:
-        return [
-            sep.join([token.lemma_ if lemmatise else token.text for token in span])
-            for span in self._find_patterns_from_document(doc=doc, patterns=patterns)
-        ]
-
-    def find_noun_phrases_from_document(
-            self,
-            doc: spacy.tokens.Doc,
-            preceding_patterns: List[Dict[str, Any]] = [],
-            sep:str = ' ',
-            lemmatise: bool = True,
-    ):
-        """
-        Find noun phrase preceded with the POS word specified
-        in the preceding_pos argument
-
-        Args:
-            doc: Spacy document instance
-            preceding_patterns:
-                List of Spacy Matcher patterns to precede nouns
-                e.g. [{"POS": "NUM", "OP": "{1,}"}], {"POS": "ADJ", "OP": "{1,2}"}]
-            sep: separate to insert between matched pattern defaulting to ' '.
-`           lemmatise: flag to lemmatise matched word
-        """
-        base: List[Dict[str, Any]] = [{"POS": "NOUN", "OP": "+"}]
-        for pattern in preceding_patterns:
-            base.insert(0, pattern)
-
-        return self.find_patterns_from_document(
-            doc=doc, patterns=[base], sep=sep, lemmatise=lemmatise
-        )
 
     def remove_stopwords_from_text(self, text: str) -> str:
         """Remove stop words from the text
@@ -648,3 +560,94 @@ class Pipeline:
         return result
 
 
+class Document:
+    def __init__(
+            self,
+            doc: spacy.tokens.Doc
+    ):
+        self._doc: spacy.tokens.Doc = doc
+
+    def _find_patterns_from_document(
+            self,
+            patterns: List[List[Dict[str, Any]]]
+    ) -> List[spacy.tokens.Span]:
+        """Find words or phrases with the Spacy Matcher pattern rules
+        https://spacy.io/api/matcher
+        https://spacy.io/usage/rule-based-matching
+
+        Pattern example:
+        pattern=[
+            {"POS": "ADJ", "OP": "{1,}"},
+            {"POS": "NOUN", "OP": "{1}"}
+        ]
+
+        Args:
+            doc: Document
+            patterns: spacy Matcher pattern
+
+        Returns:
+            List of Spans matched
+        """
+        matcher = Matcher(self._doc.vocab)
+        matcher.add("_", patterns)
+        return matcher(self._doc, as_spans=True)
+
+    def find_patterns(
+            self,
+            patterns: List[List[Dict[str, Any]]],
+            lemmatise: bool = True,
+            sep=' '
+    ) -> List[str]:
+        return [
+            sep.join([token.lemma_ if lemmatise else token.text for token in span])
+            for span in self._find_patterns_from_document(patterns=patterns)
+        ]
+
+    def find_noun_phrases(
+            self,
+            preceding_patterns: List[Dict[str, Any]] = [],
+            sep:str = ' ',
+            lemmatise: bool = True,
+    ):
+        """
+        Find noun phrase preceded with the POS word specified
+        in the preceding_pos argument
+
+        Args:
+            doc: Spacy document instance
+            preceding_patterns:
+                List of Spacy Matcher patterns to precede nouns
+                e.g. [{"POS": "NUM", "OP": "{1,}"}], {"POS": "ADJ", "OP": "{1,2}"}]
+            sep: separate to insert between matched pattern defaulting to ' '.
+`           lemmatise: flag to lemmatise matched word
+        """
+        base: List[Dict[str, Any]] = [{"POS": "NOUN", "OP": "+"}]
+        for pattern in preceding_patterns:
+            base.insert(0, pattern)
+
+        return self.find_patterns(
+            patterns=[base], sep=sep, lemmatise=lemmatise
+        )
+
+    def get_words(
+            self,
+            pos_to_include: Tuple[str] = ('ADJ', 'NOUN', 'VERB', 'PRON', 'PROPN'),
+            minimum_word_frequency: int = 1,
+            lemmatise_word: bool = True,
+            filter_stopword: bool = True,
+            filter_numbers: bool = True,
+            filter_punctuation: bool = True
+    ) -> List[str]:
+        """Get words in the documents"""
+        return [
+            token.lemma_ if lemmatise_word else token.text
+            for token in textacy.extract.words(
+                self._doc,
+                filter_stops=filter_stopword,
+                filter_punct=filter_punctuation,
+                filter_nums=filter_numbers,
+                include_pos=pos_to_include,
+                exclude_pos=None,
+                min_freq=minimum_word_frequency
+            )
+        ]
