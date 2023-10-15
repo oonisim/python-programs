@@ -1,4 +1,5 @@
 from .text import (
+    regex_match_generator,
     normalize_typographical_unicode_characters,
     restore_contracted,
     redact_emoji,

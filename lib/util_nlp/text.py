@@ -6,7 +6,10 @@ import unicodedata
 from typing import (
     List,
     Set,
-    Iterable
+    Tuple,
+    Iterable,
+    Generator,
+    Union,
 )
 
 import nltk
@@ -40,6 +43,52 @@ TAG_URL: str = " TAG_URL "
 # --------------------------------------------------------------------------------
 # Regex
 # --------------------------------------------------------------------------------
+RE_EMAIL: re.Pattern = re.compile(
+    # --------------------------------------------------------------------------------
+    # Valid email format follow the "local-part@domain" format.
+    # The local-part of an email address can contain any of the following ASCII characters:
+    # * Uppercase and lowercase Latin letters A to Z and a to z
+    # * Digits 0 to 9
+    # * The following printable characters: !#$%&'*+-/=?^_`{|}~
+    #
+    # The following guidelines apply to the local-part of a valid email address:
+    # * The dot (.) character is allowed but cannot be the first or last character and cannot appear consecutively.
+    # * Spaces are not allowed.
+    #
+    # The domain of an email address can contain any of the following ASCII characters:
+    # * Uppercase and lowercase Latin letters A to Z and a to z
+    # * Digits 0 to 9
+    #
+    # The following guidelines apply to the domain of a valid email address:
+    # * The domain must match the requirements for a hostname, and include a list of dot (.) separated DNS labels.
+    # * The dot (.) character is allowed but cannot be the first or last character and cannot appear consecutively.
+    # * No digits are allowed in the top-level domain (TLD). The TLD is the portion of the domain after the dot (.).
+    # * The TLD must contain a minimum of 2 and a maximum of 9 characters.
+    # * Spaces are not allowed.
+    # --------------------------------------------------------------------------------
+    pattern=r"""
+    ([^\]'><",):[;\\(@.'\s](\.(?!\.))?)*?           # local name that may include single dot.
+    [^\]'><",):[;\\(@.'\s]                          # local name last part 
+    @([-a-z0-9]{2,9}(\.(?!\.))?){1,}(\.[a-z]{2,9})  # domain
+    """,
+    flags=re.IGNORECASE | re.UNICODE | re.VERBOSE
+)
+
+RE_URL: re.Pattern = re.compile(
+    pattern=r"""
+    (?:^|(?<![\w/.]))
+    (?:(?:https?://|ftp://|www\d{0,3}\.))
+    (?:\S+(?::\S*)?@)?(?:(?!(?:10|127)(?:\.\d{1,3}){3})(?!(?:169\.254|192\.168)
+    (?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})
+    (?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}
+    (?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z\u00a1-\uffff0-9]-?)*[a-z\u00a1-\uffff0-9])
+    (?:\.(?:[a-z\u00a1-\uffff0-9]-?)*[a-z\u00a1-\uffff0-9])*
+    (?:\.(?:[a-z\u00a1-\uffff]{2,})))(?::\d{2,5})?(?:/\S*)?(?:$|(?![\w?!+&/]))
+    """,
+    flags=re.IGNORECASE | re.UNICODE | re.VERBOSE
+)
+
+
 # TO allow "ABN: 861-2222-1111"
 # RE_AUSTRALIAN_BUSINESS_NUMBER: re.Pattern = re.compile(
 #    pattern=r"ABN[\s:]*\d{2}\s*\d{3}\s*\d{3}\s*\d{3}", flags=re.I
@@ -49,7 +98,7 @@ RE_AUSTRALIAN_BUSINESS_NUMBER: re.Pattern = re.compile(
     (?<!\S)
     (?:\W*)                      
     (ABN[\s:#]*(\d[-\s]*){11})  # group(1), and group(2) as (\d[-\s]*) 
-    (?:\W*)                     
+    (?:\W*)
     (?!\S)
     """,
     flags=re.IGNORECASE | re.VERBOSE
@@ -61,7 +110,7 @@ RE_AUSTRALIAN_PHONE_NUMBER: re.Pattern = re.compile(
     # '(?=\d{3})|(?!\d\d[- ]?\d[- ]))\d\d[- ]?\d[- ]?\d{3})(?!\S)'
     pattern=r'(?<!\S)'\
             '(#|@|at|on)?'\
-            '(\+?\(?61\)?)?[-\s]*'\
+            '(\+?\(?61\)?)?[-   \s]*'\
             '(\(?0?[2-57-8]\)?)[-\s]*'\
             '(\d\d([- ]' \
             '(?=\d{3})|(?!\d\d[- ]?\d[- ]))\d\d[- ]?\d[- ]?\d{3})'\
@@ -74,6 +123,22 @@ RE_AUSTRALIAN_PHONE_NUMBER: re.Pattern = re.compile(
 # --------------------------------------------------------------------------------
 # Functions
 # --------------------------------------------------------------------------------
+def regex_match_generator(
+        text: str, regexp: Union[str, re.Pattern]
+) -> Generator[Tuple[str, re.Match], None, None]:
+    redacted: str = ""  # buffer to store ABN redacted text
+    cursor: int = 0
+    matches: Iterable[re.Match] = re.finditer(
+        pattern=regexp, string=text
+    )
+    for match in matches:
+        yield text[cursor:match.start(0)], match.group(0)
+        cursor = match.end(1)
+
+    # Collect the rest in the text
+    yield text[cursor:], None
+
+
 def normalize_typographical_unicode_characters(text: str) -> str:
     """Convert non-ascii typographical characters for punctuations and spaces
     into ascii equivalents.
@@ -158,7 +223,12 @@ def redact_email_address(text: str, replacement: str = TAG_EMAIL) -> str:
         replacement: replacement for the email
     Return: redacted text
     """
-    return textacy.preprocessing.replace.emails(text=text, repl=replacement)
+    # return textacy.preprocessing.replace.emails(text=text, repl=replacement)
+    return re.sub(
+        pattern=RE_EMAIL,
+        string=text,
+        repl=replacement
+    )
 
 
 def redact_url(text: str, replacement: str = TAG_URL) -> str:
@@ -173,7 +243,12 @@ def redact_url(text: str, replacement: str = TAG_URL) -> str:
     #     replacement,
     #     text
     # )
-    return textacy.preprocessing.replace.urls(text=text, repl=replacement)
+    # return textacy.preprocessing.replace.urls(text=text, repl=replacement)
+    return re.sub(
+        pattern=RE_URL,
+        string=text,
+        repl=replacement
+    )
 
 
 def is_valid_abn(abn: str) -> bool:

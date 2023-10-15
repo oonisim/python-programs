@@ -298,6 +298,11 @@ def test_redact_email__success():
     assert actual == expected, \
         f"expected email [{email}] redacted as [{expected}], got [{actual}]."
 
+    email: str = "contact, (in case of emergency)simple@example.com."
+    actual: str = redact_email_address(email)
+    expected: str = f"contact, (in case of emergency){TAG_EMAIL}."
+    assert actual == expected, \
+        f"expected email [{email}] redacted as [{expected}], got [{actual}]."
 
 def test_redact_email__fail():
     """Verify invalid email address will not be redacted.
@@ -306,12 +311,22 @@ def test_redact_email__fail():
     """
     for email in [
         'Abc.example.com',                      # No @ character',
-        'A@b@c@example.com',                    # Only one @ is allowed,
+        'A@b@@example.com',                    # Only one @ is allowed,
+        'a...@hoge.co.uk'
     ]:
         actual: str = redact_email_address(email)
         expected: str = email
         assert actual == expected, \
             f"expected the string [{email}] not redacted, got [{actual}]."
+
+
+def test_redact_url__success():
+    for url in [
+        "http://MVSXX.COMPANY.COM:04445/CICSPLEXSM//JSMITH/VIEW/OURTASK?A_PRIORITY=200&O_PRIORITY=GT",
+        "https://www.ibm.com/docs/en/cics-ts/5.4?topic=menus-examples-valid-url-formats",
+        "ftp://explosion.ai/blog/sense2vec-reloaded/"
+    ]:
+        assert redact_url(url) == TAG_URL
 
 
 def test_normalize():
