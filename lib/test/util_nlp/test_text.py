@@ -284,7 +284,7 @@ def test_redact_email__success():
         "fully-qualified-domain@example.com",
         "user.name+tag+sorting@example.com",
         "example-indeed@strange-example.com",
-        "example-indeed@strange-example.inininini",
+        "example-indeed@strange-example.company",
         "1234567890123456789012345678901234567890123456789012345678901234+x@example.com"
     ]:
         actual: str = redact_email_address(email)
@@ -303,6 +303,7 @@ def test_redact_email__success():
     expected: str = f"contact, (in case of emergency){TAG_EMAIL}."
     assert actual == expected, \
         f"expected email [{email}] redacted as [{expected}], got [{actual}]."
+
 
 def test_redact_email__fail():
     """Verify invalid email address will not be redacted.

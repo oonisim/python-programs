@@ -14,8 +14,9 @@ from typing import (
 
 import nltk
 import regex as re
-import textacy.preprocessing
 import unidecode
+import tldextract
+import textacy.preprocessing
 
 nltk.download('words')
 nltk.download('wordnet')
@@ -66,10 +67,11 @@ RE_EMAIL: re.Pattern = re.compile(
     # * The TLD must contain a minimum of 2 and a maximum of 9 characters.
     # * Spaces are not allowed.
     # --------------------------------------------------------------------------------
-    pattern=r"""
-    ([^\]'><",):[;\\(@.'\s](\.(?!\.))?)*?           # local name that may include single dot.
-    [^\]'><",):[;\\(@.'\s]                          # local name last part 
-    @([-a-z0-9]{2,9}(\.(?!\.))?){1,}(\.[a-z]{2,9})  # domain
+    pattern=r"""(
+        ([^\]'><",):[;\\(@.'\s](\.(?!\.))?)*?           # local name that may include single dot.
+        [^\]'><",):[;\\(@.'\s]                          # local name last part 
+        @([-a-z0-9]{2,9}(\.(?!\.))?){1,}(\.[a-z]{2,9})  # domain
+    )
     """,
     flags=re.IGNORECASE | re.UNICODE | re.VERBOSE
 )
@@ -125,18 +127,18 @@ RE_AUSTRALIAN_PHONE_NUMBER: re.Pattern = re.compile(
 # --------------------------------------------------------------------------------
 def regex_match_generator(
         text: str, regexp: Union[str, re.Pattern]
-) -> Generator[Tuple[str, re.Match], None, None]:
+) -> Generator[Tuple[int, re.Match], None, None]:
     redacted: str = ""  # buffer to store ABN redacted text
     cursor: int = 0
     matches: Iterable[re.Match] = re.finditer(
         pattern=regexp, string=text
     )
     for match in matches:
-        yield text[cursor:match.start(0)], match.group(0)
-        cursor = match.end(1)
+        yield cursor, match
+        cursor = match.end(0)
 
     # Collect the rest in the text
-    yield text[cursor:], None
+    yield cursor, None
 
 
 def normalize_typographical_unicode_characters(text: str) -> str:
@@ -223,12 +225,25 @@ def redact_email_address(text: str, replacement: str = TAG_EMAIL) -> str:
         replacement: replacement for the email
     Return: redacted text
     """
-    # return textacy.preprocessing.replace.emails(text=text, repl=replacement)
-    return re.sub(
-        pattern=RE_EMAIL,
-        string=text,
-        repl=replacement
-    )
+    # return re.sub(
+    #     pattern=RE_EMAIL,
+    #     string=text,
+    #     repl=replacement
+    # )
+
+    redacted: str = ""
+    for cursor, match in regex_match_generator(text=text, regexp=RE_EMAIL):
+        if match:
+            email: str = match.group(0)
+            # Redact only when the email domain is valid.
+            if tldextract.extract(email).registered_domain:
+                redacted += text[cursor:match.start(0)] + " TAG_EMAIL "
+            else:
+                redacted += text[cursor:match.start(0)] + match.group(0)
+        else:
+            redacted += text[cursor:]
+
+    return redacted
 
 
 def redact_url(text: str, replacement: str = TAG_URL) -> str:
@@ -238,12 +253,6 @@ def redact_url(text: str, replacement: str = TAG_URL) -> str:
         replacement: replacement for the URL
     Return: redacted text
     """
-    # return re.sub(
-    #     r"[\w.+-]+@\w+.[a-zA-Z]{2,3}",
-    #     replacement,
-    #     text
-    # )
-    # return textacy.preprocessing.replace.urls(text=text, repl=replacement)
     return re.sub(
         pattern=RE_URL,
         string=text,
@@ -347,11 +356,6 @@ def redact_emoji(text: str, replacement: str = "") -> str:
         replacement: replacement for the emoji
     Return: redacted text
     """
-    # return re.sub(
-    #     r"[\w.+-]+@\w+.[a-zA-Z]{2,3}",
-    #     replacement,
-    #     text
-    # )
     return textacy.preprocessing.replace.emojis(text=text, repl=replacement)
 
 
