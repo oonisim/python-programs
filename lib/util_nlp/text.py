@@ -12,11 +12,11 @@ from typing import (
     Union,
 )
 
-import nltk
+import spacy
 import regex as re
-import unidecode
 import tldextract
 import textacy.preprocessing
+import unidecode
 
 nltk.download('words')
 nltk.download('wordnet')
