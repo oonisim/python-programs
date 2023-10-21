@@ -1,3 +1,6 @@
 [submodule "books/blueprints-text"]
 	path = books/blueprints-text
 	url = https://github.com/blueprints-for-text-analytics-python/blueprints-text.git
+[submodule "spacy-wordnet"]
+	path = spacy-wordnet
+	url = https://github.com/argilla-io/spacy-wordnet.git
