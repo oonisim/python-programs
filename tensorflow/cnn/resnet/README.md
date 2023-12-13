@@ -2,7 +2,7 @@
 
 ## Objective
 
-Implement a system to search similar images using the embedded image vector consine similarity.
+Implement a system to search similar images using the embedded image vector cosine similarity.
 
 ## Approach
 **ResNet50** ```avg_pool``` layer, which is in front of the fully connected layer, outputs a vector of 2048 dimensions
