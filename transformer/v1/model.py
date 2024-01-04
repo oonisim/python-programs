@@ -16,8 +16,135 @@ from transformer.v1.utility import (
 torch.manual_seed(42)
 
 
+def split(
+        x,                  # pylint: disable=invalid-name
+        h: int              # pylint: disable=invalid-name
+) -> Tensor:
+    """
+    Reshape embedding vector from (B,T,M) into (B,h,T,d) so that each head
+    of multiple heads attends (T,d).
+
+    Citation:
+    > Instead of performing a single attention function with d_model-dimensional
+    > keys, values and queries, we found it beneficial to linearly project
+    > the queries, keys and values h times with different, learned linear projections
+    > to d_k, d_k and d_v dimensions, respectively.
+
+    Args:
+        x: embedding of shape (B,T,M)
+        h: number of heads to split the embedding into.
+
+    Returns: split embedding of shape (B,h,T,d) where M = h * d
+    """
+    B, T, M = x.shape       # pylint: disable=invalid-name
+    d = M // h
+    return x.view(B, T, h, d).transpose(1, 2)   # (B,h,T,d)
+
+
+def calculate_relationships(
+        query,
+        key,
+        mask=None,
+):
+    """
+    Calculate relationship scores between query and keys using dot product similarity.
+
+    Args:
+        query: embedding vector of query of shape (B, h, T, d_k)
+        key: embedding vector of key of shape (B, h, T, d_k)
+        mask: mask value to prevent calculating relation with future time step
+
+    Returns: Relationship (closeness) between q and k of shape (B, h, T, T) where
+            last (T, T) represents relations between all query elements in T sequence
+            against all key elements in T sequence. If T is people in an organization,
+            (T,T) represents all (cartesian product) social connections among them.
+            The relation considers d_k number of features.
+    """
+    d_k = key.size[-1]                                      # head size
+
+    # --------------------------------------------------------------------------------
+    # Relationship between k and q as the first MatMul using dot product similarity:
+    # (B, h, T, d_k) @ (B, hH, d_k, T) ---> (B, h, T, T)
+    # --------------------------------------------------------------------------------
+    relationships = query @ key.transpose(-2, -1)           # dot product
+
+    # --------------------------------------------------------------------------------
+    # Scaling factor to standardize (div by standard deviation) the product q@k.T
+    # of two zero centered normal distributions q, k. The variance of the product
+    # is head_size d_k. See https://stats.stackexchange.com/a/52699/105137.
+    # --------------------------------------------------------------------------------
+    std = torch.sqrt(torch.tensor(d_k, dtype=TYPE_FLOAT))   # standard deviation
+
+    # --------------------------------------------------------------------------------
+    # Scale relationships of each head by std so that the variance is approx 1.
+    # Scaling regularize the softmax output so as not to overfit to features, by which
+    # features in query and key can relate among themselves better.
+    # Otherwise, features with higher value will be peaked by softmax, (which is good
+    # for use as classification head but not for Bag of Words to incorporate features
+    # to make them related), hence only specific features in query and key will be
+    # connected.
+    # --------------------------------------------------------------------------------
+    relationships = relationships / std                     # scaled dot product
+
+    # --------------------------------------------------------------------------------
+    # mask to make uni-direction (left to right only) for algorithm such as GPT.
+    # Skip masking for bi-directional e.g .BERT,
+    # --------------------------------------------------------------------------------
+    if mask is not None:
+        # TODO: Verify if the logic is correct.
+        relationships = relationships.masked_fill(mask == 0, float('-inf'))
+
+    # --------------------------------------------------------------------------------
+    # Normalize by softmax.
+    # exp(-inf) = 0 masks the relationships so that it will be uni-directional.
+    # --------------------------------------------------------------------------------
+    relationships = softmax(relationships, dim=-1)
+
+    return relationships                                    # shape:(B, h, T, T)
+
+
+def calculate_attentions(
+        relationships,
+        value
+):
+    """
+    For every q element, create a Bag of Words that encodes the relationships with
+    other elements (including itself) in T, using (q,k) relationship value as the
+    strength of the relationships.
+
+    Citation:
+    > On each of these projected versions of queries, keys and values we then perform
+    > the attention function in parallel, yielding d_v-dimensional output values.
+
+    ```
+    bows = []
+    for row in relationships:                 # relationship matrix of shape (T,T)
+        bow = sum([                           # bow:shape(d_v,)
+            k*v for (k,v) in zip(row,value)   # k:shape(), v:shape(d_v,)
+        ])
+        bows.append(bow)                      # bows:shape(T,d_v)
+    ```
+
+    Args:
+        relationships: q to k relationship strength matrix of shape (B, h, T, T)
+        value: elements of sequence with length T of shape (B, h, T, d_v)
+
+    Returns: Bag of Words for every q element of shape (B, h, T, d_v)
+    """
+    return relationships @ value     # (B,h,T,T) @ (B,h,T,d_v) -> (B,h,T,d_v)
+
+
 class MultiHeadAttention(nn.Module):
-    """Class to implement Transformer multi head attention"""
+    """Class to implement Transformer multi head attentions
+    Citation:
+    > Instead of performing a single attention function with d_model-dimensional
+    > keys, values and queries, we found it beneficial to linearly project
+    > the queries, keys and values h times with different, learned linear projections
+    > to d_k, d_k and d_v dimensions, respectively.
+    > On each of these projected versions of queries, keys and values we then perform
+    > the attention function in parallel, yielding d_v dimensional output values.
+
+    """
     @property
     def D(self) -> int:     # pylint: disable=invalid-name
         """Input vector dimension"""
@@ -38,8 +165,8 @@ class MultiHeadAttention(nn.Module):
             num_heads: int,
             dim_input: int,
             dim_output: int,
-            bias: bool = False,
-            dropout_ratio: float = 0.1
+            bias: bool,
+            dropout_ratio: float
     ):
         """Class to implement Multi Head Attention
         Args:
@@ -87,96 +214,7 @@ class MultiHeadAttention(nn.Module):
             p=dropout_ratio
         )
 
-    @staticmethod
-    def calculate_relationships(
-            query,
-            key,
-            mask=None,
-    ):
-        """
-        Calculate relationship scores between query and keys using dot product similarity.
-
-        Args:
-            query: embedding vector of query of shape (B, H, T, d)
-            key: embedding vector of key of shape (B, H, T, d)
-            mask: mask value to prevent calculating relation with future time step
-
-        Returns: Relationship (closeness) between q and k of shape (B, H, T, T) where
-                last (T, T) represents relations between all query elements in T sequence
-                against all key elements in T sequence. If T is people in an organization,
-                (T,T) represents all (cartesian product) social connections among them.
-                The relation considers d number of features.
-        """
-        d = key.size[-1]                                        # head size
-
-        # --------------------------------------------------------------------------------
-        # Relationship between k and q as the first MatMul using dot product similarity:
-        # (B, H, T, d) @ (B, H, d, T) ---> (B, H, T, T)
-        # --------------------------------------------------------------------------------
-        relationships = query @ key.transpose(-2, -1)           # dot product
-
-        # --------------------------------------------------------------------------------
-        # Scaling factor to standardize (div by standard deviation) the product q@k.T
-        # of two zero centered normal distributions q, k. The variance of the product
-        # is head_size d. See https://stats.stackexchange.com/a/52699/105137.
-        # --------------------------------------------------------------------------------
-        std = torch.sqrt(torch.tensor(d, dtype=TYPE_FLOAT))     # standard deviation
-
-        # --------------------------------------------------------------------------------
-        # Scale relationships of each head by std so that the variance is approx 1.
-        # Scaling regularize the softmax output so as not to overfit to features, by which
-        # features in query and key can relate among themselves better.
-        # Otherwise, features with higher value will be peaked by softmax, (which is good
-        # for use as classification head but not for Bag of Words to incorporate features
-        # to make them related), hence only specific features in query and key will be
-        # connected.
-        # --------------------------------------------------------------------------------
-        relationships = relationships / std                     # scaled dot product
-
-        # --------------------------------------------------------------------------------
-        # mask to make uni-direction (left to right only) for algorithm such as GPT.
-        # Skip masking for bi-directional e.g .BERT,
-        # --------------------------------------------------------------------------------
-        if mask is not None:
-            # TODO: Verify if the logic is correct.
-            relationships = relationships.masked_fill(mask == 0, float('-inf'))
-
-        # --------------------------------------------------------------------------------
-        # Normalize by softmax.
-        # exp(-inf) = 0 masks the relationships so that it will be uni-directional.
-        # --------------------------------------------------------------------------------
-        relationships = softmax(relationships, dim=-1)
-
-        return relationships                                    # shape:(B, H, T, T)
-
-    @staticmethod
-    def calculate_attentions(
-            relationships,
-            value
-    ):
-        """
-        For every q element, create a Bag of Words that encodes the relationships with
-        other elements (including itself) in T, using (q,k) relationship value as the
-        strength of the relationships.
-
-        ```
-        bows = []
-        for row in relationships:                   # relationship is matrix of shape (T,T)
-            bow = sum([                             # bow:shape(d,)
-                k*v for (k,v) in zip(row,value)     # k:shape(), v:shape(d,)
-            ])
-            bows.append(bow)                        # bows:shape(T,d)
-        ```
-
-        Args:
-            relationships: q to k relationship strength matrix of shape (B, H, T, T)
-            value: elements of sequence with length T of shape (B, H, T, d)
-
-        Returns: Bag of Words for every q element of shape (B, H, T, d)
-        """
-        return relationships @ value     # (B,H,T,T) @ (B,H,T,d) -> (B,H,T,d)
-
-    def run_multi_head_attentions(
+    def forward(
             self,
             x
     ):
@@ -198,11 +236,11 @@ class MultiHeadAttention(nn.Module):
         assert k.shape == (self.B, self.T, self.M)
 
         # --------------------------------------------------------------------------------
-        # Split Q, K into multiple heads
+        # Split into multiple heads
         # --------------------------------------------------------------------------------
-        q = q.view(B, T, self.H, self.M // self.H).transpose(1, 2)  # (B, H, T, d_k)
-        k = k.view(B, T, self.H, self.M // self.H).transpose(1, 2)  # (B, H, T, d_k)
-        v = v.view(B, T, self.H, self.M // self.H).transpose(1, 2)  # (B, H, T, d_k)
+        q = split(x=q, h=self.H)    # (B, H, T, d_k)
+        k = split(x=k, h=self.H)    # (B, H, T, d_k)
+        v = split(x=v, h=self.H)    # (B, H, T, d_k)
 
         # --------------------------------------------------------------------------------
         # Build relationships matrix between (q,k) for (q,k) combinations in Q, K.
@@ -211,7 +249,7 @@ class MultiHeadAttention(nn.Module):
         # (32 * 8 * 512 * 512) which is 64M. Each feature has 512 / H = 64 dimensions
         # of float32, hence the size is 16G bytes of memory requirement.
         # --------------------------------------------------------------------------------
-        relationships: Tensor = self.calculate_relationships(
+        relationships: Tensor = calculate_relationships(
             query=q,
             key=k,
             mask=None
@@ -220,7 +258,7 @@ class MultiHeadAttention(nn.Module):
         # --------------------------------------------------------------------------------
         # Generate attention values for each element in sequence of length T
         # --------------------------------------------------------------------------------
-        attentions: Tensor = self.calculate_attentions(
+        attentions: Tensor = calculate_attentions(
             relationships=relationships,
             value=v
         )   # shape: (B,H,T,d)
@@ -237,13 +275,3 @@ class MultiHeadAttention(nn.Module):
         attentions = self._dropout(attentions)
 
         return attentions.contiguous()
-
-    def forward(self, x) -> Tensor:
-        """Module forward path
-        Args:
-            x: input embedding vector of shape (B,T,D)
-
-        Returns: Attention values of shape (B,T,M)
-        """
-        y: Tensor = self.run_multi_head_attentions(x)
-        return y

@@ -13,3 +13,7 @@ D: int = DIM_TOKEN            # Abbreviation
 DIM_MODEL: int = 512          # Dimension ofd the Transformer encoder vector
 DIM_SINGLE_HEAD: int = DIM_MODEL // NUM_MULTI_ATTENTION_HEADS
 M: int = DIM_SINGLE_HEAD
+
+DROPOUT_RATIO: float = 0.1
+
+
