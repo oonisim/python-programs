@@ -41,13 +41,14 @@ def split(
     return x.view(B, T, h, d).transpose(1, 2)   # (B,h,T,d)
 
 
-def calculate_relationships(
+def calculate_similarities(
         query,
         key,
         mask=None,
 ):
     """
-    Calculate relationship scores between query and keys using dot product similarity.
+    Calculate similarity scores between query and keys using dot product.
+    Standardize the variance using sqrt(d_k) so that the variance will be 1.0 approx.
 
     Args:
         query: embedding vector of query of shape (B, h, T, d_k)
@@ -66,7 +67,7 @@ def calculate_relationships(
     # Relationship between k and q as the first MatMul using dot product similarity:
     # (B, h, T, d_k) @ (B, hH, d_k, T) ---> (B, h, T, T)
     # --------------------------------------------------------------------------------
-    relationships = query @ key.transpose(-2, -1)           # dot product
+    similarities = query @ key.transpose(-2, -1)            # dot product
 
     # --------------------------------------------------------------------------------
     # Scaling factor to standardize (div by standard deviation) the product q@k.T
@@ -76,7 +77,7 @@ def calculate_relationships(
     std = torch.sqrt(torch.tensor(d_k, dtype=TYPE_FLOAT))   # standard deviation
 
     # --------------------------------------------------------------------------------
-    # Scale relationships of each head by std so that the variance is approx 1.
+    # Scale similarities of each head by std so that the variance is approx 1.
     # Scaling regularize the softmax output so as not to overfit to features, by which
     # features in query and key can relate among themselves better.
     # Otherwise, features with higher value will be peaked by softmax, (which is good
@@ -84,7 +85,7 @@ def calculate_relationships(
     # to make them related), hence only specific features in query and key will be
     # connected.
     # --------------------------------------------------------------------------------
-    relationships = relationships / std                     # scaled dot product
+    similarities = similarities / std                       # scaled dot product
 
     # --------------------------------------------------------------------------------
     # mask to make uni-direction (left to right only) for algorithm such as GPT.
@@ -92,15 +93,15 @@ def calculate_relationships(
     # --------------------------------------------------------------------------------
     if mask is not None:
         # TODO: Verify if the logic is correct.
-        relationships = relationships.masked_fill(mask == 0, float('-inf'))
+        similarities = similarities.masked_fill(mask == 0, float('-inf'))
 
     # --------------------------------------------------------------------------------
     # Normalize by softmax.
-    # exp(-inf) = 0 masks the relationships so that it will be uni-directional.
+    # exp(-inf) = 0 masks the similarities so that it will be uni-directional.
     # --------------------------------------------------------------------------------
-    relationships = softmax(relationships, dim=-1)
+    similarities = softmax(similarities, dim=-1)
 
-    return relationships                                    # shape:(B, h, T, T)
+    return similarities                                    # shape:(B, h, T, T)
 
 
 def calculate_attentions(
@@ -249,7 +250,7 @@ class MultiHeadAttention(nn.Module):
         # (32 * 8 * 512 * 512) which is 64M. Each feature has 512 / H = 64 dimensions
         # of float32, hence the size is 16G bytes of memory requirement.
         # --------------------------------------------------------------------------------
-        relationships: Tensor = calculate_relationships(
+        relationships: Tensor = calculate_similarities(
             query=q,
             key=k,
             mask=None

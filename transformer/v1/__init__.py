@@ -4,6 +4,6 @@ from .constant import (
 )
 from .model import (
     MultiHeadAttention,
-    calculate_relationships,
+    calculate_similarities,
     calculate_attentions,
 )
