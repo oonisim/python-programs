@@ -15,6 +15,9 @@ from transformer.v1.constant import (
 from transformer.v1.utility import (
     softmax
 )
+from typing import (
+    Optional
+)
 
 
 torch.manual_seed(42)
@@ -123,10 +126,12 @@ def scale(
 
 def mask(
     similarities: Tensor,
+    mask_matrix: Tensor
 ) -> Tensor:
     """
     Args:
-        similarities: matrix to mask
+        similarities: matrix to mask of shape (B,H,T,T)
+        mask_matrix: boolean matrix of which elements in (T,T) to mask fill.
 
     Returns: masked similarity matrix
     """
@@ -134,15 +139,19 @@ def mask(
     # mask to make uni-direction (left to right only) for algorithm such as GPT.
     # Skip masking for bi-directional e.g .BERT,
     # --------------------------------------------------------------------------------
-    # TODO: Verify if the logic is correct.
     # exp(-inf) = 0 masks the similarities so that it will be uni-directional.
-    masked = similarities.masked_fill(mask == 0, float('-inf'))
+    assert (
+        similarities.ndim == 4 and                              # (B,H,T,T)
+        similarities.shape[-2] == similarities.shape[-1] and
+        similarities.shape[-1] == mask_matrix.shape[-1]
+    )
+    masked = similarities.masked_fill(mask=mask_matrix, value=float('-inf'))
     return masked
 
 
 def calculate_attentions(
         similarities,
-        value
+        values
 ):
     """
     For every q element, create a Bag of Words that encodes the relationships with
@@ -155,43 +164,56 @@ def calculate_attentions(
 
     ```
     bows = []
-    for row in relationships:                 # relationship matrix of shape (T,T)
-        bow = sum([                           # bow:shape(d_v,)
-            k*v for (k,v) in zip(row,value)   # k:shape(), v:shape(d_v,)
-        ])
-        bows.append(bow)                      # bows:shape(T,d_v)
+    for row in similarities:                    # similarity matrix of shape (T,T)
+        bow = sum([                             # bow:shape(d_v,)
+            # each column in row is (q,k) similarity score s
+            s*v for (s,v) in zip(row,values)    # k:shape(), v:shape(d_v,)
+=        ])
+        bows.append(bow)                        # bows:shape(T,d_v)
     ```
 
     Args:
         similarities: q to k relationship strength matrix of shape (B, h, T, T)
-        value: elements of sequence with length T of shape (B, h, T, d_v)
+        values: elements of sequence with length T of shape (B, h, T, d_v)
 
     Returns: Bag of Words for every q element of shape (B, h, T, d_v)
     """
-    return similarities @ value     # (B,h,T,T) @ (B,h,T,d_v) -> (B,h,T,d_v)
+    return similarities @ values     # (B,h,T,T) @ (B,h,T,d_v) -> (B,h,T,d_v)
 
 
 class ScaledDotProductAttention(nn.Module):
     """
     Class to implement Scaled Dot Product Attention (Figure 2 left in the paper).
     """
-    def __init__(self):
+    def __init__(self, do_mask: bool, max_time_steps: Optional[int]):
+        """
+        Args:
+            max_time_steps: max sequence length or time steps T
+        """
+        mask_matrix: Optional[Tensor]
         super().__init__()
+        if do_mask:
+            mask_matrix = torch.tril(torch.ones(max_time_steps, max_time_steps)) == 0
+        else:
+            mask_matrix = None
 
-    @staticmethod
+        self.register_buffer("mask_matrix", mask_matrix)
+        assert (
+            (not do_mask and self.mask_matrix is None) or
+            (do_mask and self.mask_matrix.ndim == 2 and self.mask_matrix.shape[-1] == max_time_steps)
+        )
+
     def forward(
+            self,
             q: Tensor,
             k: Tensor,
             v: Tensor,
-            masking: bool
     ):
         """Calculate the scaled dot product attention.
         Args:
             q: query of shape (B,h,T,d)
             k: key of shape (B,h,T,d)
             v: value of shape (B,h,T,d)
-            masking: flat to prevent calculating relation with future time step
-
         """
         # --------------------------------------------------------------------------------
         # First MatMul in the Scaled Dot Product Attention to calculate the similarities
@@ -215,8 +237,8 @@ class ScaledDotProductAttention(nn.Module):
         # --------------------------------------------------------------------------------
         # Mask if required
         # --------------------------------------------------------------------------------
-        if masking:
-            similarities = mask(similarities=similarities)
+        if self.mask_matrix is not None:
+            similarities = mask(similarities=similarities, mask_matrix=self.mask_matrix)
 
         # --------------------------------------------------------------------------------
         # Normalize by softmax.
@@ -224,11 +246,11 @@ class ScaledDotProductAttention(nn.Module):
         similarities = softmax(similarities, dim=-1)
 
         # --------------------------------------------------------------------------------
-        # Generate attention values for each element in sequence of length T
+        # Second MatMul to generate attention value for each token in sequence of length T
         # --------------------------------------------------------------------------------
         attentions: Tensor = calculate_attentions(
             similarities=similarities,
-            value=v
+            values=v
         )   # shape: (B,H,T,d)
 
         return attentions
@@ -263,25 +285,36 @@ class MultiHeadAttention(nn.Module):
         """Number of attention heads"""
         return self._H
 
+    @property
+    def T(self) -> int:     # pylint: disable=invalid-name
+        """Max time steps or max sequence length"""
+        return self._T
+
     def __init__(
             self,
             num_heads: int,
             dim_input: int,
             dim_output: int,
+            max_time_steps: int,
             bias: bool,
-            dropout_ratio: float
+            dropout_ratio: float,
+            do_mask: bool
     ):
         """Class to implement Multi Head Attention
         Args:
             num_heads: number of attention heads
             dim_input: input embedding vector dimension
             dim_output: output attention vector dimension
+            max_time_steps: max sequence length or time steps T
             bias: if learn additive bias at the linear layer.
+            dropout_ratio: ratio of dropout
+            do_mask: True when execute masking to not calculate attention with future time steps
         """
         super().__init__()
-        self._H: int = num_heads    # pylint: disable=invalid-name
-        self._D: int = dim_input    # pylint: disable=invalid-name
-        self._M: int = dim_output   # pylint: disable=invalid-name
+        self._H: int = num_heads        # pylint: disable=invalid-name
+        self._D: int = dim_input        # pylint: disable=invalid-name
+        self._M: int = dim_output       # pylint: disable=invalid-name
+        self._T: int = max_time_steps   # pylint: disable=invalid-name
 
         # To transfer embedded token of dim_input features to Q space of dim_output features
         self._Wq: nn.Module = nn.Linear(     # pylint: disable=invalid-name
@@ -311,7 +344,10 @@ class MultiHeadAttention(nn.Module):
             dtype=TYPE_FLOAT,
             bias=bias
         )
-        self._scaled_dot_product_attention: nn.Module = ScaledDotProductAttention()
+        self._scaled_dot_product_attention: nn.Module = ScaledDotProductAttention(
+            do_mask=do_mask,
+            max_time_steps=max_time_steps
+        )
         self._dropout: nn.Module = nn.Dropout(
             p=dropout_ratio
         )
@@ -327,6 +363,7 @@ class MultiHeadAttention(nn.Module):
         Returns: Attention values of shape (B,T,M)
         """
         # pylint: disable=invalid-name
+        assert x.ndim == 3
         B, T, _D = x.shape      # Batch, Tokens (or sequence length), Dimension
         assert _D == self.D, \
             f"input vector dimension is invalid, expected [{self.D}], got [{_D}]."

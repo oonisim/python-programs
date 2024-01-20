@@ -4,6 +4,9 @@ from .constant import (
 )
 from .model import (
     MultiHeadAttention,
+    ScaledDotProductAttention,
     calculate_dot_product_similarities,
     calculate_attentions,
+    scale,
+    mask,
 )
