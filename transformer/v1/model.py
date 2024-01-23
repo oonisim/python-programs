@@ -1,8 +1,10 @@
 """Module for the Transformers Model
 B: Batch size
 T: Sequence length or max token size e.g. 512 for BERT. 'T' because of 'Time steps = Sequence length'
+D: Dimensions of the model embedding vector, which is d_model in the paper.
 H: Number of heads in Multi-head attention
 """
+import math
 import torch
 from torch import (
     Tensor,
@@ -29,7 +31,7 @@ def split(
 ) -> Tensor:
     """Split an embedding vector into h segments where each segment has d dimensions
     and gets attended by an attention head. Instead of physically split, reshape the
-    embedding vector from (B,T,M) into (B,h,T,d) so that each attention head
+    embedding vector from (B,T,D) into (B,h,T,d) so that each attention head
     attends (T,d).
 
     Citation:
@@ -39,13 +41,13 @@ def split(
     > to d_k, d_k and d_v dimensions, respectively.
 
     Args:
-        x: embedding of shape (B,T,M)
+        x: embedding of shape (B,T,D)
         h: number of heads to split the embedding into.
 
-    Returns: split embedding of shape (B,h,T,d) where M = h * d
+    Returns: split embedding of shape (B,h,T,d) where D = h * d
     """
-    B, T, M = x.shape       # pylint: disable=invalid-name
-    d = M // h
+    B, T, D = x.shape       # pylint: disable=invalid-name
+    d = D // h
     return x.view(B, T, h, d).transpose(1, 2)   # (B,h,T,d)
 
 
@@ -260,25 +262,31 @@ class MultiHeadAttention(nn.Module):
     """
     Class to implement Multi Head Attention (Figure 2 right in the paper).
     Citation:
-    > Instead of performing a single attention function with d_model-dimensional
+    > The encoder is composed of a stack of N = 6 identical layers. Each layer has two
+    > sub-layers. The first is a multi-head self-attention mechanism, and the second is
+    > a simple, position-wise fully connected feed-forward network. ... To facilitate
+    > these residual connections, all sub-layers in the model, as well as the embedding
+    > layers, produce outputs of dimension d_model = 512.
+
+    > Instead of performing a single attention function with d_model dimensional
     > keys, values and queries, we found it beneficial to linearly project
     > the queries, keys and values h times with different, learned linear projections
     > to d_k, d_k and d_v dimensions, respectively.
     > On each of these projected versions of queries, keys and values we then perform
     > the attention function in parallel, yielding d_v dimensional output values.
+    > In this work we employ h = 8 parallel attention layers, or heads. For each of
+    > these we use dk = dv = dmodel /h = 64.
 
+    > We apply dropout to the output of each sub-layer, before it is added to the
+    > sub-layer input and normalized. In addition, we apply dropout to the sums of the
+    > embeddings and the positional encodings in both the encoder and decoder stacks.
+    > For the base model, we use a rate p_drop = 0.1.
     """
     @property
     def D(self) -> int:     # pylint: disable=invalid-name
-        """Dimensions (number of features) of the embedding vector (Q,K,V) of a token
-        fed into the Multi Head Attention.
+        """Dimensions (number of features) of the embedding vector d_model.
         """
         return self._D
-
-    @property
-    def M(self) -> int:     # pylint: disable=invalid-name
-        """Dimensions of the embedding vector output from the Multi Head Attention."""
-        return self._M
 
     @property
     def H(self) -> int:     # pylint: disable=invalid-name
@@ -292,64 +300,63 @@ class MultiHeadAttention(nn.Module):
 
     def __init__(
             self,
-            num_heads: int,
-            dim_input: int,
-            dim_output: int,
-            max_time_steps: int,
-            bias: bool,
-            dropout_ratio: float,
-            do_mask: bool
+            num_heads: int = 8,
+            d_model: int = 512,
+            dtype: type = TYPE_FLOAT,
+            do_mask: bool = False,
+            max_time_steps: int = 512,
+            bias: bool = True,
+            p_drop: float = 0.1,
     ):
-        """Class to implement Multi Head Attention
+        """Multi Head Attention initialization.
         Args:
             num_heads: number of attention heads
-            dim_input: input embedding vector dimension
-            dim_output: output attention vector dimension
-            max_time_steps: max sequence length or time steps T
-            bias: if learn additive bias at the linear layer.
-            dropout_ratio: ratio of dropout
+            d_model: dimensions of the model embedding vector.
+            dtype: data type
             do_mask: True when execute masking to not calculate attention with future time steps
+            max_time_steps: max sequence length or time steps T.
+            bias: Ture if learning the additive bias at the linear layer.
+            p_drop: dropout rate.
         """
         super().__init__()
-        self._H: int = num_heads        # pylint: disable=invalid-name
-        self._D: int = dim_input        # pylint: disable=invalid-name
-        self._M: int = dim_output       # pylint: disable=invalid-name
-        self._T: int = max_time_steps   # pylint: disable=invalid-name
+        self._D: int = d_model              # pylint: disable=invalid-name
+        self._H: int = num_heads            # pylint: disable=invalid-name
+        self._T: int = max_time_steps       # pylint: disable=invalid-name
 
-        # To transfer embedded token of dim_input features to Q space of dim_output features
-        self._Wq: nn.Module = nn.Linear(     # pylint: disable=invalid-name
-            in_features=dim_input,
-            out_features=dim_output,
-            dtype=TYPE_FLOAT,
+        # To transfer embedded token of dim_input features to Q space of d_model features
+        self.Wq: nn.Module = nn.Linear(     # pylint: disable=invalid-name
+            in_features=d_model,
+            out_features=d_model,
+            dtype=dtype,
             bias=bias
         )
-        # To transfer embedded token of dim_input features to K space of dim_output features
-        self._Wk: nn.Module = nn.Linear(     # pylint: disable=invalid-name
-            in_features=dim_input,
-            out_features=dim_output,
-            dtype=TYPE_FLOAT,
+        # To transfer embedded token of dim_input features to K space of d_model features
+        self.Wk: nn.Module = nn.Linear(     # pylint: disable=invalid-name
+            in_features=d_model,
+            out_features=d_model,
+            dtype=dtype,
             bias=bias
         )
-        # To transfer embedded token of dim_input features to V space of dim_output features
-        self._Wv: nn.Module = nn.Linear(     # pylint: disable=invalid-name
-            in_features=dim_input,
-            out_features=dim_output,
-            dtype=TYPE_FLOAT,
+        # To transfer embedded token of dim_input features to V space of d_model features
+        self.Wv: nn.Module = nn.Linear(     # pylint: disable=invalid-name
+            in_features=d_model,
+            out_features=d_model,
+            dtype=dtype,
             bias=bias
         )
         # Project to apply to the concatenated output of Self Dot Product Attention
-        self._Wo: nn.Module = nn.Linear(     # pylint: disable=invalid-name
-            in_features=dim_output,
-            out_features=dim_output,
-            dtype=TYPE_FLOAT,
+        self.Wo: nn.Module = nn.Linear(     # pylint: disable=invalid-name
+            in_features=d_model,
+            out_features=d_model,
+            dtype=dtype,
             bias=bias
         )
-        self._scaled_dot_product_attention: nn.Module = ScaledDotProductAttention(
+        self.scaled_dot_product_attention: nn.Module = ScaledDotProductAttention(
             do_mask=do_mask,
             max_time_steps=max_time_steps
         )
-        self._dropout: nn.Module = nn.Dropout(
-            p=dropout_ratio
+        self.dropout: nn.Module = nn.Dropout(
+            p=p_drop
         )
 
     def forward(
@@ -360,7 +367,7 @@ class MultiHeadAttention(nn.Module):
         Args:
             x: input embedding vector of shape (B,T,D)
 
-        Returns: Attention values of shape (B,T,M)
+        Returns: Attention values of shape (B,T,D)
         """
         # pylint: disable=invalid-name
         assert x.ndim == 3
@@ -374,11 +381,11 @@ class MultiHeadAttention(nn.Module):
         # layers Q, K, V respectively, but no need to physically split into H number of
         # Linear layers. Instead, use one Linear layer Wq, Wk, Wv for Q, K, V respectively.
         # --------------------------------------------------------------------------------
-        q: Tensor = self.Wq(x)   # Transfer to Q space. Shape=(B, T, M)
-        k: Tensor = self.Wk(x)   # Transfer to K space. Shape=(B, T, M)
-        v: Tensor = self.Wv(x)   # Transfer to V space. Shape=(B, T, M)
-        assert q.shape == (self.B, self.T, self.M)
-        assert k.shape == (self.B, self.T, self.M)
+        q: Tensor = self.Wq(x)   # Transfer to Q space. Shape=(B, T, D)
+        k: Tensor = self.Wk(x)   # Transfer to K space. Shape=(B, T, D)
+        v: Tensor = self.Wv(x)   # Transfer to V space. Shape=(B, T, D)
+        assert q.shape == (self.B, self.T, self.D)
+        assert k.shape == (self.B, self.T, self.D)
 
         # --------------------------------------------------------------------------------
         # Split into H segments for multiple heads to attend.
@@ -390,20 +397,256 @@ class MultiHeadAttention(nn.Module):
         # --------------------------------------------------------------------------------
         # Calculate self attention values
         # --------------------------------------------------------------------------------
-        attentions: Tensor = self._scaled_dot_product_attention(q=q, k=k, v=v)
-        assert attentions.shape == (B, self.H, T, self.M/self.H)
+        attentions: Tensor = self.scaled_dot_product_attention(q=q, k=k, v=v)
+        assert attentions.shape == (B, self.H, T, self.D/self.H)
 
         # --------------------------------------------------------------------------------
-        # Concatenate outputs from heads. First (B,H,T,d)->(B,T,H,d) then concatenate to (B,T,M)
+        # Concatenate outputs from heads into the model output with reshape.
+        # First (B,H,T,d)->(B,T,H,d) then to (B,T,D)
         # --------------------------------------------------------------------------------
         attentions = attentions.transpose(2, 1).view(B, T, -1)
-        assert attentions.shape == (B, T, self.M)
+        assert attentions.shape == (B, T, self.D)
 
         # --------------------------------------------------------------------------------
         # Last Wo Linear projection
         # --------------------------------------------------------------------------------
-        attentions = self.Wo(attentions)    # (B,T,M)@(M,M) -> (B,T,M)
-        attentions = self._dropout(attentions)
-        assert attentions.shape == (B, T, self.M)
+        attentions = self.Wo(attentions)    # (B,T,D)@(D,D) -> (B,T,D)
+
+        # --------------------------------------------------------------------------------
+        # Dropout
+        # --------------------------------------------------------------------------------
+        attentions = self.dropout(attentions)
+        assert attentions.shape == (B, T, self.D)
 
         return attentions.contiguous()
+
+
+class PositionwiseFeedForward(nn.Module):
+    """Class to implementation of Position-wise Feed-Forward Networks.
+    This is a single hidden layer nural network with ReLU activation.
+
+    Citation:
+    > The encoder is composed of a stack of N = 6 identical layers. Each layer has two
+    > sub-layers. The first is a multi-head self-attention mechanism, and the second is
+    > a simple, position-wise fully connected feed-forward network. ... To facilitate
+    > these residual connections, all sub-layers in the model, as well as the embedding
+    > layers, produce outputs of dimension d_model = 512.
+
+    > We apply dropout to the output of each sub-layer, before it is added to the
+    > sub-layer input and normalized. In addition, we apply dropout to the sums of the
+    > embeddings and the positional encodings in both the encoder and decoder stacks.
+    > For the base model, we use a rate p_drop = 0.1.
+
+    > each of the layers in our encoder and decoder contains a fully connected feed-forward
+    > network, which is applied to each position separately and identically. This consists
+    > of two linear transformations with a ReLU activation in between.
+    > Another way of describing this is as two convolutions with kernel size 1.
+    > The dimensionality of input and output is dmodel = 512, and the inner-layer has
+    > dimensionality of d_ff = 2048.
+    """
+    def __init__(
+            self,
+            d_model: int = 512,
+            d_ff: int = 2048,
+            dtype: type = TYPE_FLOAT,
+            bias: bool = True,
+            p_drop: float = 0.1
+    ):
+        """Initialize the class
+        Args:
+            d_model: dimensions of the model embedding vector.
+            d_ff: dimensions of the hidden layer output vector
+            dtype: data type
+            bias: True to learn additive bias in the layer.
+            p_drop: dropout rate.
+        """
+        super().__init__()
+        self.W1: nn.Module = nn.Linear(
+            in_features=d_model, out_features=d_ff, bias=bias, dtype=dtype
+        )
+        self.relu = nn.ReLU()
+        self.W2: nn.Module = nn.Linear(
+            in_features=d_ff, out_features=d_model, bias=bias, dtype=dtype
+        )
+        self.dropout: nn.Module = nn.Dropout(p=p_drop)
+
+    def forward(self, x):
+        """Feed-forward neural network forward propagation
+        Args:
+            x: input embedding vector of shape (B,T,D)
+
+        Returns: output embedding vector of shape (B,T,D)
+        """
+        return self.dropout(self.W2(self.relu(self.W1(x))))
+
+
+class EncodeLayer(nn.Module):
+    """Class to implement Encoder Layer"""
+    def __init__(
+            self,
+            num_heads: int = 8,
+            d_model: int = 512,
+            dtype: type = TYPE_FLOAT,
+            d_ff: int = 2048,
+            do_mask: bool = False,
+            max_time_steps: int = 512,
+            bias: bool = True,
+            p_drop: float = 0.1,
+            eps: float = 1e-5
+    ):
+        """
+        Args:
+            num_heads: number of attention heads
+            d_model: dimensions of the model embedding vector.
+            d_ff: dimensions of the positionwise feed forward hidden layer output vector
+            do_mask: True when execute masking to not calculate attention with future time steps
+            max_time_steps: max sequence length or time steps T.
+            bias: Ture if learning the additive bias at the linear layer.
+            p_drop: dropout rate.
+            eps: epsilon of LayerNorm
+        """
+        super().__init__()
+        self.multihead_attention: MultiHeadAttention = MultiHeadAttention(
+            num_heads=num_heads,
+            d_model=d_model,
+            dtype=dtype,
+            do_mask=do_mask,
+            max_time_steps=max_time_steps,
+            bias=bias,
+            p_drop=p_drop
+        )
+        self.layernorm_multihead: nn.LayerNorm = nn.LayerNorm(
+            normalized_shape=d_model,
+            eps=eps,
+            dtype=dtype
+        )
+        self.positionwise_feedforward: PositionwiseFeedForward = PositionwiseFeedForward(
+            d_model=d_model,
+            d_ff=d_ff,
+            dtype=dtype,
+            bias=bias,
+            p_drop=p_drop
+        )
+        self.layernorm_positionwise: nn.LayerNorm = nn.LayerNorm(
+            normalized_shape=d_model,
+            eps=eps,
+            dtype=dtype
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        """Embedding
+        Args:
+            x: embedding vector of shape (B,T,D)
+        """
+        x += self.layernorm_multihead(self.multihead_attention(x))
+        x += self.layernorm_positionwise(self.positionwise_feedforward(x))
+        return x
+
+
+class PositionalEncoding(nn.Module):
+    """Class to implement the positional encoding.
+    Taken from https://nlp.seas.harvard.edu/annotated-transformer/
+
+    Citation:
+    > In addition, we apply dropout to the sums of the embeddings and
+    > the positional encodings in both the encoder and decoder stacks.
+    > For the base model, we use a rate p_drop = 0.1.
+    """
+    def __init__(
+            self,
+            d_model,
+            max_positional_length: int = 5000,
+            p_drop: float = 0.1
+    ):
+        super().__init__()
+        self.dropout = nn.Dropout(p=p_drop)
+
+        # Compute the positional encodings once in log space.
+        position_encoding = torch.zeros(max_positional_length, d_model)
+        position = torch.arange(0, max_positional_length).unsqueeze(1)
+        div_term = torch.exp(
+            torch.arange(0, d_model, 2) * -(math.log(10000.0) / d_model)
+        )
+        position_encoding[:, 0::2] = torch.sin(position * div_term)
+        position_encoding[:, 1::2] = torch.cos(position * div_term)
+        position_encoding = position_encoding.unsqueeze(0)
+        self.register_buffer("position_encoding", position_encoding)
+
+    def forward(self, x: Tensor):
+        """Positional encoding
+        Args:
+            x: embedding vector of shape (B,T,D)
+        """
+        x = x + self.position_encoding[:, : x.size(1)].requires_grad_(False)
+        return self.dropout(x)
+
+
+class Encoder(nn.Module):
+    """Class to implement Transformer Encoder.
+    Citation:
+    > In addition, we apply dropout to the sums of the embeddings and
+    > the positional encodings in both the encoder and decoder stacks.
+    > For the base model, we use a rate p_drop = 0.1.
+    """
+    @property
+    def D(self) -> int:
+        """Dimension of the model embedding vector
+        """
+        return self._D
+
+    def __init__(
+            self,
+            vocabulary_size: int,
+            max_positional_length: int = 5000,
+            num_layers: int = 6,
+            num_heads: int = 8,
+            d_model: int = 512,
+            dtype: type = TYPE_FLOAT,
+            d_ff: int = 2048,
+            do_mask: bool = False,
+            max_time_steps: int = 512,
+            bias: bool = True,
+            p_drop: float = 0.1,
+            eps: float = 1e-5
+    ):
+        super().__init__()
+        self._D: int = d_model
+
+        self.embedding: nn.Embedding = nn.Embedding(
+            num_embeddings=vocabulary_size,
+            embedding_dim=d_model
+        )
+        self.positional_encoding: PositionalEncoding = PositionalEncoding(
+            d_model=d_model,
+            max_positional_length=max_positional_length,
+            p_drop=p_drop
+        )
+        self.dropout: nn.Dropout = nn.Dropout(p=p_drop)
+        self.layers: nn.ModuleList = nn.ModuleList([
+            EncodeLayer(
+                num_heads=num_heads, d_model=d_model, dtype=dtype, d_ff=d_ff,
+                do_mask=do_mask, max_time_steps=max_time_steps, bias=bias,
+                p_drop=p_drop, eps=eps
+            ) for _ in range(num_layers)
+        ])
+
+    def forward(self, indices: Tensor):
+        """Encode
+        Args:
+            indices: indices to tokens
+        """
+        B, T = indices.shape
+
+        # Embedding.
+        # > In the embedding layers, we multiply those weights by dmodel .
+        x = self.embedding(indices) * math.sqrt(self.D)
+
+        # Positional embedding.
+        positions = torch.arange(0, T, dtype=torch.long, device=indices.device)
+        x += self.positional_encoding(positions)
+        x = self.dropout(x)
+
+        for _layer in self.layers:
+            x = _layer(x)
+
+        return x
