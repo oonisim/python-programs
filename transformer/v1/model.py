@@ -528,23 +528,36 @@ class EncodeLayer(nn.Module):
         Args:
             x: embedding vector of shape (B,T,D)
         """
+        # Update:
+        # Original paper applied Layer Normalization after Residual Connection which is
+        # called Post Normalization. However, recent approach is Pre-Normalization where
+        # LayerNorm is applied before the sub-layer. See:
+        # https://datascience.stackexchange.com/a/126539/68313
+        # https://youtu.be/kCc8FmEb1nY?t=5729
+
         # --------------------------------------------------------------------------------
         # 1. First sub-layer followed by Dropout before added to sub-layer input x.
         # 2. Add Residual Connection.
         # 3. Layer Normalization.
         # --------------------------------------------------------------------------------
-        x = self.layernorm_multihead(
-            x + self.dropout_multihead(self.multihead_attention(x))
-        )
+        # x = self.layernorm_multihead(
+        #     x + self.dropout_multihead(self.multihead_attention(x))
+        # )
+
+        # DO NOT use += as it is in-place operation that can cause back-prop issue.
+        # https://stackoverflow.com/a/68600205/4281353
+        # https://crazyoscarchang.github.io/2018/10/04/in-pytorch-not-the-same/
+        x = x + self.dropout_multihead(self.multihead_attention(self.layernorm_multihead(x)))
 
         # --------------------------------------------------------------------------------
         # 1. Second sub-layer followed by Dropout before added to sub-layer input x.
         # 2. Add Residual Connection.
         # 3. Layer Normalization.
         # --------------------------------------------------------------------------------
-        x = self.layernorm_positionwise(
-            x + self.dropout_positionwise(self.positionwise_feedforward(x))
-        )
+        # x = self.layernorm_positionwise(
+        #     x + self.dropout_positionwise(self.positionwise_feedforward(x))
+        # )
+        x = x + self.dropout_positionwise(self.positionwise_feedforward(self.layernorm_positionwise(x)))
         return x
 
 
@@ -667,9 +680,12 @@ class Encoder(nn.Module):
 
         # --------------------------------------------------------------------------------
         # Add Positional Encoding followed by dropout.
+        # DO NOT use += as it is in-place operation that can cause back-prop issue.
+        # https://stackoverflow.com/a/68600205/4281353
+        # https://crazyoscarchang.github.io/2018/10/04/in-pytorch-not-the-same/
         # --------------------------------------------------------------------------------
         positions = torch.arange(0, T, dtype=torch.long, device=indices.device)
-        x += self.positional_encoding(positions)            # (B,T,D) + (1,T,D)
+        x = x + self.positional_encoding(positions)            # (B,T,D) + (1,T,D)
         x = self.dropout(x)
         assert x.shape == (B, T, self.D)
 
