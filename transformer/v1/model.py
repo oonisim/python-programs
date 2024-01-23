@@ -646,6 +646,7 @@ class Encoder(nn.Module):
         x += self.positional_encoding(positions)
         x = self.dropout(x)
 
+        # Encoder stack
         for _layer in self.layers:
             x = _layer(x)
 
