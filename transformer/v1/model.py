@@ -16,6 +16,9 @@ from torch import (
 )
 
 from transformer.v1.constant import (
+    NUM_LAYERS
+)
+from transformer.v1.constant import (
     TYPE_FLOAT,
 )
 from transformer.v1.utility import (
@@ -24,6 +27,24 @@ from transformer.v1.utility import (
 
 
 torch.manual_seed(42)
+
+
+def initialize_weights(
+        module: nn.Module,
+        output_projection: bool = False,
+        num_layers: int = NUM_LAYERS
+):
+    """Initialize the module weights"""
+    if isinstance(module, nn.Linear):
+        if output_projection:
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02/math.sqrt(2 * NUM_LAYERS))
+        else:
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+
+        if module.bias is not None:
+            torch.nn.init.zeros_(module.bias)
+    elif isinstance(module, nn.Embedding):
+        torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
 
 def split(
@@ -234,7 +255,7 @@ class ScaledDotProductAttention(nn.Module):
         # --------------------------------------------------------------------------------
         # Scale (standardize) the dot product similarity matrix with its standard deviation.
         # --------------------------------------------------------------------------------
-        d_k = k.size[-1]  # head size
+        d_k = k.shape[-1]  # head size
         similarities = scale(similarities=similarities, d_k=d_k)
 
         # --------------------------------------------------------------------------------
@@ -323,6 +344,7 @@ class MultiHeadAttention(nn.Module):
             dtype=dtype,
             bias=bias
         )
+        initialize_weights(module=self.Wq)
         # To transfer embedded token of dim_input features to K space of d_model features
         self.Wk: nn.Module = nn.Linear(     # pylint: disable=invalid-name
             in_features=d_model,
@@ -330,6 +352,7 @@ class MultiHeadAttention(nn.Module):
             dtype=dtype,
             bias=bias
         )
+        initialize_weights(module=self.Wk)
         # To transfer embedded token of dim_input features to V space of d_model features
         self.Wv: nn.Module = nn.Linear(     # pylint: disable=invalid-name
             in_features=d_model,
@@ -337,6 +360,7 @@ class MultiHeadAttention(nn.Module):
             dtype=dtype,
             bias=bias
         )
+        initialize_weights(module=self.Wv)
         # Project to apply to the concatenated output of Self Dot Product Attention
         self.Wo: nn.Module = nn.Linear(     # pylint: disable=invalid-name
             in_features=d_model,
@@ -344,6 +368,7 @@ class MultiHeadAttention(nn.Module):
             dtype=dtype,
             bias=bias
         )
+        initialize_weights(module=self.Wo, output_projection=True)
         self.scaled_dot_product_attention: nn.Module = ScaledDotProductAttention(
             do_mask=do_mask,
             max_time_steps=max_time_steps
@@ -374,8 +399,8 @@ class MultiHeadAttention(nn.Module):
         q: Tensor = self.Wq(x)   # Transfer to Q space. Shape=(B, T, D)
         k: Tensor = self.Wk(x)   # Transfer to K space. Shape=(B, T, D)
         v: Tensor = self.Wv(x)   # Transfer to V space. Shape=(B, T, D)
-        assert q.shape == (self.B, self.T, self.D)
-        assert k.shape == (self.B, self.T, self.D)
+        assert q.shape == (B, self.T, self.D)
+        assert k.shape == (B, self.T, self.D)
 
         # --------------------------------------------------------------------------------
         # Split into H segments for multiple heads to attend.
@@ -393,8 +418,9 @@ class MultiHeadAttention(nn.Module):
         # --------------------------------------------------------------------------------
         # Concatenate outputs from heads into the model output with reshape.
         # First (B,H,T,d)->(B,T,H,d) then to (B,T,D)
+        # "RuntimeError: view size is not compatible with input tensor's size and strid"
         # --------------------------------------------------------------------------------
-        attentions = attentions.transpose(2, 1).view(B, T, -1)
+        attentions = attentions.transpose(2, 1).contiguous().view(B, T, -1)
         assert attentions.shape == (B, T, self.D)
 
         # --------------------------------------------------------------------------------
@@ -403,7 +429,7 @@ class MultiHeadAttention(nn.Module):
         attentions = self.Wo(attentions)    # (B,T,D)@(D,D) -> (B,T,D)
         assert attentions.shape == (B, T, self.D)
 
-        return attentions.contiguous()
+        return attentions
 
 
 class PositionwiseFeedForward(nn.Module):
@@ -428,10 +454,12 @@ class PositionwiseFeedForward(nn.Module):
         self.W1: nn.Module = nn.Linear(     # pylint: disable=invalid-name
             in_features=d_model, out_features=d_ff, bias=bias, dtype=dtype
         )
+        initialize_weights(module=self.W1)
         self.relu = nn.ReLU()
         self.W2: nn.Module = nn.Linear(     # pylint: disable=invalid-name
             in_features=d_ff, out_features=d_model, bias=bias, dtype=dtype
         )
+        initialize_weights(module=self.W2, output_projection=True)
 
     def forward(self, x):
         """Feed-forward neural network forward propagation
@@ -531,11 +559,11 @@ class EncodeLayer(nn.Module):
         # Update:
         # Original paper applied Layer Normalization after Residual Connection which is
         # called Post Normalization. However, recent approach is Pre-Normalization where
-        # LayerNorm is applied before the sub-layer. See:
-        # https://datascience.stackexchange.com/a/126539/68313
-        # https://youtu.be/kCc8FmEb1nY?t=5729
+        # LayerNorm is applied before the sub-layer as in https://arxiv.org/pdf/2002.04745.pdf.
+        # See https://youtu.be/kCc8FmEb1nY?t=5729 and
 
         # --------------------------------------------------------------------------------
+        # Post Normalization in the original paper. Replaced with Pre Norm as in Update:
         # 1. First sub-layer followed by Dropout before added to sub-layer input x.
         # 2. Add Residual Connection.
         # 3. Layer Normalization.
@@ -550,6 +578,7 @@ class EncodeLayer(nn.Module):
         x = x + self.dropout_multihead(self.multihead_attention(self.layernorm_multihead(x)))
 
         # --------------------------------------------------------------------------------
+        # Post Normalization in the original paper. Replaced with Pre Norm as in Update:
         # 1. Second sub-layer followed by Dropout before added to sub-layer input x.
         # 2. Add Residual Connection.
         # 3. Layer Normalization.
@@ -563,8 +592,6 @@ class EncodeLayer(nn.Module):
 
 class PositionalEncoding(nn.Module):
     """Class to implement the positional encoding.
-    TODO: Understand the logic
-
     Taken from https://nlp.seas.harvard.edu/annotated-transformer/
     """
     def __init__(
@@ -574,14 +601,14 @@ class PositionalEncoding(nn.Module):
     ):
         super().__init__()
         # Compute the positional encodings once in log space.
-        position_encoding = torch.zeros(max_time_steps, d_model)    # shape:(T,D)
-        positions = torch.arange(0, max_time_steps).unsqueeze(1)     # shape:(T,1)
+        position_encoding = torch.zeros(max_time_steps, d_model)                    # shape:(T,D)
+        positions = torch.arange(0, max_time_steps, dtype=torch.long).unsqueeze(1)  # shape:(T,1)
         div_term = torch.exp(
             torch.arange(0, d_model, 2) * -(math.log(10000.0) / d_model)
         )
         position_encoding[:, 0::2] = torch.sin(positions * div_term)
         position_encoding[:, 1::2] = torch.cos(positions * div_term)
-        position_encoding = position_encoding.unsqueeze(0)          # shape:(1,T,D)
+        position_encoding = position_encoding.unsqueeze(0)                          # shape:(1,T,D)
         self.register_buffer("position_encoding", position_encoding)
         assert self.position_encoding.shape == (1, max_time_steps, d_model)
 
@@ -633,6 +660,7 @@ class Encoder(nn.Module):
             num_embeddings=vocabulary_size,
             embedding_dim=d_model
         )
+        initialize_weights(module=self.embedding)
         # --------------------------------------------------------------------------------
         # Position encoded vectors
         # --------------------------------------------------------------------------------
@@ -684,9 +712,7 @@ class Encoder(nn.Module):
         # https://stackoverflow.com/a/68600205/4281353
         # https://crazyoscarchang.github.io/2018/10/04/in-pytorch-not-the-same/
         # --------------------------------------------------------------------------------
-        positions = torch.arange(0, T, dtype=torch.long, device=indices.device)
-        x = x + self.positional_encoding(positions)            # (B,T,D) + (1,T,D)
-        x = self.dropout(x)
+        x = self.dropout(x + self.positional_encoding(x))   # (B,T,D) + (1,T,D)
         assert x.shape == (B, T, self.D)
 
         # --------------------------------------------------------------------------------
