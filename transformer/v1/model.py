@@ -37,7 +37,7 @@ def initialize_weights(
     """Initialize the module weights"""
     if isinstance(module, nn.Linear):
         if output_projection:
-            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02/math.sqrt(2 * NUM_LAYERS))
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02/math.sqrt(2 * num_layers))
         else:
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
