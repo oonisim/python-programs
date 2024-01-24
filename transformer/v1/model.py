@@ -361,7 +361,14 @@ class MultiHeadAttention(nn.Module):
             bias=bias
         )
         initialize_weights(module=self.Wv)
-        # Project to apply to the concatenated output of Self Dot Product Attention
+
+        # Self attention
+        self.scaled_dot_product_attention: nn.Module = ScaledDotProductAttention(
+            do_mask=do_mask,
+            max_time_steps=max_time_steps
+        )
+
+        # Projection to apply to the concatenated output of Self Dot Product Attention
         self.Wo: nn.Module = nn.Linear(     # pylint: disable=invalid-name
             in_features=d_model,
             out_features=d_model,
@@ -369,10 +376,6 @@ class MultiHeadAttention(nn.Module):
             bias=bias
         )
         initialize_weights(module=self.Wo, output_projection=True)
-        self.scaled_dot_product_attention: nn.Module = ScaledDotProductAttention(
-            do_mask=do_mask,
-            max_time_steps=max_time_steps
-        )
 
     def forward(
             self,
