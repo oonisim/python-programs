@@ -692,7 +692,10 @@ class Encoder(nn.Module):
         > 3.4 Embeddings and Softmax:
         > Similarly to other sequence transduction models, we use learned embeddings
         > to convert the input tokens and output tokens to vectors of dimension d_model.
-        > ... In the embedding layers, we multiply those weights by sqrt(dmodel).
+        > ... In the embedding layers, we multiply those weights by sqrt(d_model).
+
+        Note that it is not clear why embedding is multiplied by sqrt(d_model).
+        See https://datascience.stackexchange.com/a/87909/68313.
 
         > In addition, we apply dropout to the sums of the embeddings and the
         > positional encodings in both the encoder and decoder stacks.
