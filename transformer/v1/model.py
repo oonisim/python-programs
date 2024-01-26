@@ -34,7 +34,18 @@ def initialize_weights(
         output_projection: bool = False,
         num_layers: int = NUM_LAYERS
 ):
-    """Initialize the module weights"""
+    """Initialize the module weights
+    TODO: Research HuggingFace T5, BERT why they use 0.02 as STD for weight initialization.
+    https://stats.stackexchange.com/q/637798/105137
+    https://huggingface.co/docs/transformers/model_doc/bert#transformers.BertConfig
+    > initializer_range (float, optional, defaults to 0.02)
+    > The standard deviation of the truncated_normal_initializer for initializing all weight.
+
+    Depth Initialization - https://aclanthology.org/D19-1083.pdf
+    Fixup - https://arxiv.org/pdf/1901.09321.pdf
+    T-Fixup https://www.cs.toronto.edu/~mvolkovs/ICML2020_tfixup.pdf
+    Meta AI Effective Theory of Transformers at Initialization https://arxiv.org/pdf/2304.02034.pdf
+    """
     if isinstance(module, nn.Linear):
         if output_projection:
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02/math.sqrt(2 * num_layers))
