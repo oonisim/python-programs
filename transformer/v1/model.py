@@ -45,6 +45,8 @@ def initialize_weights(
     Fixup - https://arxiv.org/pdf/1901.09321.pdf
     T-Fixup https://www.cs.toronto.edu/~mvolkovs/ICML2020_tfixup.pdf
     Meta AI Effective Theory of Transformers at Initialization https://arxiv.org/pdf/2304.02034.pdf
+
+    Xavier will use 1/sqrt(D=512) = 0.044 but std=0.02 is used by BERT, BART, GPT.
     """
     if isinstance(module, nn.Linear):
         if output_projection:
