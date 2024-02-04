@@ -186,7 +186,7 @@ def mask(
     return masked
 
 
-def calculate_attentions(
+def calculate_attention_values(
         similarities,
         values
 ):
@@ -285,7 +285,7 @@ class ScaledDotProductAttention(nn.Module):
         # --------------------------------------------------------------------------------
         # Second MatMul to generate attention value for each token in sequence of length T
         # --------------------------------------------------------------------------------
-        attentions: Tensor = calculate_attentions(
+        attentions: Tensor = calculate_attention_values(
             similarities=similarities,
             values=v
         )   # shape: (B,H,T,d)
