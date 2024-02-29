@@ -1,28 +1,48 @@
+"""Module to download Huggingface model and tokenizer"""
 import argparse
-
-parser = argparse.ArgumentParser(description='argparse test program')
-parser.add_argument('-y', '--year', type=int, required=False, help='specify the target year')
-parser.add_argument('-q', '--qtr', type=int, choices=[1, 2, 3, 4], required=False, help='specify the target quarter', )
-parser.add_argument(
-    '-l', '--log_level', type=int, choices=[10, 20, 30, 40], required=False,
-    help='specify the logging level (10 for INFO)',
-)
-parser.add_argument(
-    '-s', '--source-directory', type=str, required=True,
-    help='path to source image directory'
+import json
+import logging
+import sys
+from typing import (
+    Dict,
+    Any
 )
 
-args, unknownargs = parser.parse_known_args()
-args = vars(args)
-print(type(args))
 
-print(unknownargs)
+def get_args():
+    """Get command line arguments"""
+    try:
+        parser = argparse.ArgumentParser(description=__name__)
+        parser.add_argument(
+            '-m', '--model_name', type=str, required=True,
+            help='name of the model'
+        )
+        parser.add_argument(
+            '-d', '--data-dir', type=str, required=True,
+            help='path to the data directory'
+        )
+        parser.add_argument(
+            '-l', '--log_level', type=int, required=False,
+            choices=[10, 20, 30, 40], default=logging.INFO,
+            help='specify the logging level (10 for INFO)',
+        )
+        parser.add_argument(
+            '--initialize', required=False, action='store_true',
+            help='initialize flag.'
+        )
+
+        _args, _ = parser.parse_known_args(sys.argv[1:])
+        _args = vars(_args)
+        return _args
+
+    except SystemExit as error:
+        logging.fatal("argparse failed due to %s", error)
+        raise error
 
 
-print(args.items())
-print(f"--year is {args['year']}")
-print(f"--qrt is {args['qtr']}")
-print(f"--log-level is {args['log_level']}")
+def main(args: Dict[str, Any]):
+    print(json.dumps(args, indent=4, default=str))
 
-print(f"--source-directory is {args['source_directory']}")
-print(f"args.get('log_legvel', None): {args.get('log_legvel', None)}")
+
+if __name__ == "__main__":
+    main(get_args())
