@@ -7,3 +7,6 @@
 [submodule "resources/simple-object-detector-from-scratch"]
 	path = resources/simple-object-detector-from-scratch
 	url = https://github.com/doleron/simple-object-detector-from-scratch.git
+[submodule "resources/dask-tutorial"]
+	path = resources/dask-tutorial
+	url = http://github.com/dask/dask-tutorial
