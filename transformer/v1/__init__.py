@@ -12,7 +12,7 @@ from .utility import (
 from .model import (
     initialize_weights,
     calculate_dot_product_similarities,
-    calculate_attentions,
+    calculate_attention_values,
     split,
     scale,
     mask,
