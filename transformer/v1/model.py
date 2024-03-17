@@ -1,7 +1,9 @@
 """Module for the Transformers Model
 B: Batch size
 T: Sequence length or max token size e.g. 512 for BERT. 'T' because of 'Time steps = Sequence length'
-D: Dimensions of the model embedding vector, which is d_model in the paper.
+D: Dimensions of the token embedding vector, which is d_model in the paper.
+   A token is represented by D number of features or attributes.
+   D can be signified as C (Channels).
 H: Number of heads in Multi-head attention
 """
 import math
@@ -609,6 +611,10 @@ class EncodeLayer(nn.Module):
 class PositionalEncoding(nn.Module):
     """Class to implement the positional encoding.
     Taken from https://nlp.seas.harvard.edu/annotated-transformer/
+
+    The responsibility of this class is add positional information to the token vectors.
+
+    NOTE: DO NOT forget Dropout in Encoder/Decoder classes.
     """
     def __init__(
             self,
@@ -679,6 +685,7 @@ class Encoder(nn.Module):
         initialize_weights(module=self.embedding)
         # --------------------------------------------------------------------------------
         # Position encoded vectors
+        # Citation:
         # --------------------------------------------------------------------------------
         self.positional_encoding: PositionalEncoding = PositionalEncoding(
             d_model=d_model,
@@ -686,6 +693,18 @@ class Encoder(nn.Module):
         )
         # --------------------------------------------------------------------------------
         # Dropout for the sums of the embeddings and the positional encodings
+        # 5.4 Regularization
+        # ...
+        # In addition, we apply dropout to the sums of the embeddings and the positional
+        # encodings in both the encoder and decoder stacks. For the base model, we use a
+        # rate of Pdrop = 0.1.
+        #
+        # Why apply Dropout to Position Encoded tokens removing 10% of tokens in the sequence?
+        # https://datascience.stackexchange.com/q/128328/68313
+        #
+        # TODO: Need to clarify Dropout implementation correctness.
+        # Dropout here may remove [CLS], [SEP], [MASK] tokens?
+        # https://stackoverflow.com/q/78173751/4281353
         # --------------------------------------------------------------------------------
         self.dropout: nn.Dropout = nn.Dropout(p=p_drop)
         # --------------------------------------------------------------------------------
