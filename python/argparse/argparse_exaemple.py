@@ -7,6 +7,7 @@ from typing import (
     Dict,
     Any
 )
+from unittest import mock
 
 
 def get_args():
@@ -20,6 +21,10 @@ def get_args():
         parser.add_argument(
             '-d', '--data-dir', type=str, required=True,
             help='path to the data directory'
+        )
+        parser.add_argument(
+            '-u', '--uid', type=int, required=False,
+            help='user id', default=-1
         )
         parser.add_argument(
             '-l', '--log_level', type=int, required=False,
@@ -45,4 +50,22 @@ def main(args: Dict[str, Any]):
 
 
 if __name__ == "__main__":
-    main(get_args())
+    DEBUG: bool = False
+    if DEBUG:
+        args = [
+            "dummy_script_name",
+            "-d",
+            "path/to/dir",
+            # "-u", "100",
+            "-m",
+            "model_name"
+        ]
+        try:
+            with mock.patch("sys.argv", args):
+                print(sys.argv[1:])
+                main(get_args())
+        except SystemExit as error:
+            print(error)
+            pass
+    else:
+        main(get_args())
