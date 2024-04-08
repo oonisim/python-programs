@@ -22,25 +22,25 @@ class Command(Enum):
 
 
 class BoardIF(ABC):
-    @abstractmethod
     @property
+    @abstractmethod
     def width(self) -> int:
         """Board width"""
 
-    @abstractmethod
     @property
+    @abstractmethod
     def height(self) -> int:
         """Board height"""
 
-    def __init__(self, w: int, h: int):
+    def __init__(self, width: int, height: int):
         """Initialize the robot and its limit
         Args:
-            w: board vertical size
-            h: board horizontal size
+            width: board vertical size
+            height: board horizontal size
         """
 
     @abstractmethod
-    def is_on_board(self, x, y) -> bool:
+    def is_on_board(self, x: int, y: int) -> bool:
         """Tell if the coordinate (x, y) is on-board.
         Args:
             x: x coordinate
