@@ -1,7 +1,9 @@
-from enum import Enum
-from typing import (
-    Tuple
+from abc import (
+    ABC,
+    abstractmethod,
 )
+from enum import Enum
+from typing import Tuple
 
 
 class Direction(Enum):
@@ -19,29 +21,26 @@ class Command(Enum):
     REPORT: int = 4
 
 
-X_MIN: int = 0
-X_MAX: int = 7
-Y_MIN: int = 0
-Y_MAX: int = 8
-
-
-class BoardIF:
+class BoardIF(ABC):
     @property
+    @abstractmethod
     def width(self) -> int:
         """Board width"""
 
     @property
+    @abstractmethod
     def height(self) -> int:
         """Board height"""
 
-    def __init__(self, n: int, m: int):
+    def __init__(self, width: int, height: int):
         """Initialize the robot and its limit
         Args:
-            n: board horizontal size
-            m: board vertical size
+            width: board vertical size
+            height: board horizontal size
         """
 
-    def is_on_board(self, x, y) -> bool:
+    @abstractmethod
+    def is_on_board(self, x: int, y: int) -> bool:
         """Tell if the coordinate (x, y) is on-board.
         Args:
             x: x coordinate
@@ -50,11 +49,11 @@ class BoardIF:
         """
 
 
-class RobotIF:
+class RobotIF(ABC):
     def __init__(self):
-        """Initialize the robot and its limit
-       """
+        """Initialize the robot and its limit"""
 
+    @abstractmethod
     def execute(self, command: Command, **cmdargs) -> Tuple[int, int, Direction]:
         """Execute the command from the operator
         Args:
@@ -63,3 +62,9 @@ class RobotIF:
 
         Returns: (x, y, direction) after the command execution.
         """
+
+    def __call__(self, *args, **kwargs) -> Tuple[int, int, Direction]:
+        """Reports the current coordinate and direction.
+        Returns: (x, y, direction) after the command execution.
+        """
+        return self.execute(command=Command.REPORT)
