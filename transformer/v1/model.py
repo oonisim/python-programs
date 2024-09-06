@@ -49,6 +49,26 @@ def initialize_weights(
     Meta AI Effective Theory of Transformers at Initialization https://arxiv.org/pdf/2304.02034.pdf
 
     Xavier will use 1/sqrt(D=512) = 0.044 but std=0.02 is used by BERT, BART, GPT.
+
+    DS-init paper (https://aclanthology.org/D19-1083.pdf):
+    Improving Deep Transformer with Depth-Scaled Initialization and Merged Attention
+    > self-attention sublayer in the encoder is not strong enough to counteract
+    > the gradient loss in the feedforward sublayer. That is why BERT and GPT
+    > adopt a much smaller standard deviation (0.02) for initialization,
+    > in a similar spirit to our solution
+
+    Point-wise feed forward (PwFF) internal dimension is 2048 and 1/sqrt(2048) is 0.022.
+    This may be the reason to use 0.02 to make the weight variance consistent throughout
+    the layers, but need to be verified. However then, setting the variance of the PwFF
+    weight to 0.02 should suffice, not all over the layers.
+
+    TODO: Implement the way to introspect the weight variance during the training.
+    (as Andrej Karpathy did but can be instead done by TensorBoard)
+
+    Args:
+        module: module whose weights to initialize
+        output_projection: TBD
+        num_layers: number of layers in encoder (or decoder)
     """
     if isinstance(module, nn.Linear):
         if output_projection:
@@ -107,7 +127,7 @@ def calculate_dot_product_similarities(
     """
     # --------------------------------------------------------------------------------
     # Relationship between k and q as the first MatMul using dot product similarity:
-    # (B, h, T, d_k) @ (B, hH, d_k, T) ---> (B, h, T, T)
+    # (B, h, T, d_k) @ (B, h, d_k, T) ---> (B, h, T, T)
     # --------------------------------------------------------------------------------
     similarities = query @ key.transpose(-2, -1)            # dot product
     return similarities                                     # shape:(B, h, T, T)
@@ -256,7 +276,7 @@ class ScaledDotProductAttention(nn.Module):
         """
         # --------------------------------------------------------------------------------
         # First MatMul in the Scaled Dot Product Attention to calculate the similarities
-        # matrix between (q,k) for every (q,k) combinations in Q, K.
+        # (attention) matrix between (q,k) for every (q,k) combinations in Q, K.
         # This is cartesian product matrix of shape (T, T) for every head and batch.
         # The number of features in similarities matrix is B*H*T*T which will be
         # (32 * 8 * 512 * 512) which is 64M. Each feature has 512 / H = 64 dimensions
@@ -404,7 +424,7 @@ class MultiHeadAttention(nn.Module):
         """
         # pylint: disable=invalid-name
         assert x.ndim == 3
-        B, T, _D = x.shape      # Batch, Tokens (or sequence length), Dimension
+        _B, _T, _D = x.shape      # Batch, Tokens (or sequence length), Dimension
         assert _D == self.D, \
             f"input vector dimension is invalid, expected [{self.D}], got [{_D}]."
 
@@ -417,8 +437,8 @@ class MultiHeadAttention(nn.Module):
         q: Tensor = self.Wq(x)   # Transfer to Q space. Shape=(B, T, D)
         k: Tensor = self.Wk(x)   # Transfer to K space. Shape=(B, T, D)
         v: Tensor = self.Wv(x)   # Transfer to V space. Shape=(B, T, D)
-        assert q.shape == (B, self.T, self.D)
-        assert k.shape == (B, self.T, self.D)
+        assert q.shape == (_B, self.T, self.D)
+        assert k.shape == (_B, self.T, self.D)
 
         # --------------------------------------------------------------------------------
         # Split into H segments for multiple heads to attend.
@@ -431,21 +451,21 @@ class MultiHeadAttention(nn.Module):
         # Calculate self attention values
         # --------------------------------------------------------------------------------
         attentions: Tensor = self.scaled_dot_product_attention(q=q, k=k, v=v)
-        assert attentions.shape == (B, self.H, T, self.D/self.H)
+        assert attentions.shape == (_B, self.H, _T, self.D/self.H)
 
         # --------------------------------------------------------------------------------
         # Concatenate outputs from heads into the model output with reshape.
         # First (B,H,T,d)->(B,T,H,d) then to (B,T,D)
         # "RuntimeError: view size is not compatible with input tensor's size and strid"
         # --------------------------------------------------------------------------------
-        attentions = attentions.transpose(2, 1).contiguous().view(B, T, -1)
-        assert attentions.shape == (B, T, self.D)
+        attentions = attentions.transpose(2, 1).contiguous().view(_B, _T, -1)
+        assert attentions.shape == (_B, _T, self.D)
 
         # --------------------------------------------------------------------------------
         # Last Wo Linear projection
         # --------------------------------------------------------------------------------
         attentions = self.Wo(attentions)    # (B,T,D)@(D,D) -> (B,T,D)
-        assert attentions.shape == (B, T, self.D)
+        assert attentions.shape == (_B, _T, self.D)
 
         return attentions
 
@@ -502,6 +522,7 @@ class EncodeLayer(nn.Module):
     """Class to implement Encoder Layer"""
     def __init__(
             self,
+            i_layer: int,
             num_heads: int = 8,
             d_model: int = 512,
             dtype: type = TYPE_FLOAT,
@@ -514,6 +535,7 @@ class EncodeLayer(nn.Module):
     ):
         """
         Args:
+            i_layer: layer index (i-th layer from the bottom)
             num_heads: number of attention heads
             d_model: dimensions of the model embedding vector.
             d_ff: dimensions of the positionwise feed forward hidden layer output vector
@@ -608,6 +630,40 @@ class EncodeLayer(nn.Module):
         return x
 
 
+class InputEmbedding(nn.Module):
+    """Class to implement the input embedding.
+    Citation:
+    > 3.4 Embeddings and Softmax:
+    > Similarly to other sequence transduction models, we use learned embeddings
+    > to convert the input tokens and output tokens to vectors of dimension d_model.
+    > ... In the embedding layers, we multiply those weights by sqrt(d_model).
+
+    Note that it is not clear why embedding is multiplied by sqrt(d_model).
+    See https://datascience.stackexchange.com/a/87909/68313.
+    """
+    def __init__(
+            self,
+            vocabulary_size: int,
+            d_model: int = 512,
+    ):
+        super().__init__()
+        self.D: int = d_model
+        self.embedding: nn.Embedding = nn.Embedding(
+            num_embeddings=vocabulary_size,
+            embedding_dim=d_model
+        )
+        initialize_weights(module=self.embedding)
+
+    def forward(self, indices: Tensor):
+        """Encode token indices into token embeddings.
+        Args:
+            indices: indices to tokens of shape (B, T)
+        Returns: Token embeddings of shape (B, T, D)
+        """
+        x = self.embedding(indices) * math.sqrt(self.D)     # x.shape=(B,T,D)
+        return x
+
+
 class PositionalEncoding(nn.Module):
     """Class to implement the positional encoding.
     Taken from https://nlp.seas.harvard.edu/annotated-transformer/
@@ -674,15 +730,21 @@ class Encoder(nn.Module):
     ):
         super().__init__()
         self._D: int = d_model      # pylint: disable=invalid-name
+        assert vocabulary_size > 0, f"invalid vocabulary size [{vocabulary_size}]."
 
         # --------------------------------------------------------------------------------
         # Token embeddings
         # --------------------------------------------------------------------------------
-        self.embedding: nn.Embedding = nn.Embedding(
-            num_embeddings=vocabulary_size,
-            embedding_dim=d_model
+        # self.embedding: nn.Embedding = nn.Embedding(
+        #     num_embeddings=vocabulary_size,
+        #     embedding_dim=d_model
+        # )
+        # initialize_weights(module=self.embedding)
+        self.input_embedding: InputEmbedding = InputEmbedding(
+            d_model=d_model,
+            vocabulary_size=vocabulary_size
         )
-        initialize_weights(module=self.embedding)
+
         # --------------------------------------------------------------------------------
         # Position encoded vectors
         # Citation:
@@ -720,32 +782,24 @@ class Encoder(nn.Module):
 
     def forward(self, indices: Tensor):
         """Encode
-        Citation:
-        > 3.4 Embeddings and Softmax:
-        > Similarly to other sequence transduction models, we use learned embeddings
-        > to convert the input tokens and output tokens to vectors of dimension d_model.
-        > ... In the embedding layers, we multiply those weights by sqrt(d_model).
-
-        Note that it is not clear why embedding is multiplied by sqrt(d_model).
-        See https://datascience.stackexchange.com/a/87909/68313.
-
-        > In addition, we apply dropout to the sums of the embeddings and the
-        > positional encodings in both the encoder and decoder stacks.
-
         Args:
             indices: indices to tokens
         """
-        assert torch.is_tensor(indices) and indices.ndim == 2
+        assert torch.is_tensor(indices) and indices.ndim == 2   # shape (B, T)
         B, T = indices.shape        # pylint: disable=invalid-name
 
         # --------------------------------------------------------------------------------
         # Token Embeddings multiplied by sqrt(d_model).
         # --------------------------------------------------------------------------------
-        x = self.embedding(indices) * math.sqrt(self.D)     # x.shape=(B,T,D)
+        # x = self.embedding(indices) * math.sqrt(self.D)     # x.shape=(B,T,D)
+        x = self.input_embedding(indices=indices)
         assert x.shape == (B, T, self.D)
 
         # --------------------------------------------------------------------------------
         # Add Positional Encoding followed by dropout.
+        # > 3.4 Embeddings and Softmax
+        # > In addition, we apply dropout to the sums of the embeddings and the
+        # > positional encodings in both the encoder and decoder stacks.
         # DO NOT use += as it is in-place operation that can cause back-prop issue.
         # https://stackoverflow.com/a/68600205/4281353
         # https://crazyoscarchang.github.io/2018/10/04/in-pytorch-not-the-same/
