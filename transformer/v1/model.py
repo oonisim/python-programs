@@ -22,6 +22,11 @@ from transformer.v1.constant import (
 )
 from transformer.v1.constant import (
     TYPE_FLOAT,
+    DIM_MODEL,
+    NUM_LAYERS,
+    NUM_HEADS,
+    MAX_SEQUENCE_LENGTH,
+    POSITION_ENCODE_DENOMINATOR_BASE,
 )
 from transformer.v1.utility import (
     softmax
@@ -351,11 +356,11 @@ class MultiHeadAttention(nn.Module):
 
     def __init__(
             self,
-            num_heads: int = 8,
-            d_model: int = 512,
+            num_heads: int = NUM_HEADS,
+            d_model: int = DIM_MODEL,
             dtype: type = TYPE_FLOAT,
             do_mask: bool = False,
-            max_time_steps: int = 512,
+            max_time_steps: int = MAX_SEQUENCE_LENGTH,
             bias: bool = True,
     ):
         """Multi Head Attention initialization.
@@ -476,7 +481,7 @@ class PositionwiseFeedForward(nn.Module):
     """
     def __init__(
             self,
-            d_model: int = 512,
+            d_model: int = DIM_MODEL,
             d_ff: int = 2048,
             dtype: type = TYPE_FLOAT,
             bias: bool = True,
@@ -492,11 +497,14 @@ class PositionwiseFeedForward(nn.Module):
         self.W1: nn.Module = nn.Linear(     # pylint: disable=invalid-name
             in_features=d_model, out_features=d_ff, bias=bias, dtype=dtype
         )
-        initialize_weights(module=self.W1)
+        # TODO: Consider using GELU after verifying the rationale
         self.relu = nn.ReLU()
         self.W2: nn.Module = nn.Linear(     # pylint: disable=invalid-name
             in_features=d_ff, out_features=d_model, bias=bias, dtype=dtype
         )
+
+        # TODO: Investigate the initialization to use for PwFF
+        initialize_weights(module=self.W1)
         initialize_weights(module=self.W2, output_projection=True)
 
     def forward(self, x):
@@ -523,12 +531,12 @@ class EncodeLayer(nn.Module):
     def __init__(
             self,
             i_layer: int,
-            num_heads: int = 8,
-            d_model: int = 512,
+            num_heads: int = NUM_HEADS,
+            d_model: int = DIM_MODEL,
             dtype: type = TYPE_FLOAT,
             d_ff: int = 2048,
             do_mask: bool = False,
-            max_time_steps: int = 512,
+            max_time_steps: int = MAX_SEQUENCE_LENGTH,
             bias: bool = True,
             p_drop: float = 0.1,
             eps: float = 1e-5
@@ -644,13 +652,21 @@ class InputEmbedding(nn.Module):
     def __init__(
             self,
             vocabulary_size: int,
-            d_model: int = 512,
+            d_model: int = DIM_MODEL,
+            dtype: torch.dtype = TYPE_FLOAT
     ):
+        """
+        Args:
+            vocabulary_size: number of vocabularies to encode
+            d_model: embedding vector dimension
+            dtype: data type of the embedding vector
+        """
         super().__init__()
         self.D: int = d_model
         self.embedding: nn.Embedding = nn.Embedding(
             num_embeddings=vocabulary_size,
-            embedding_dim=d_model
+            embedding_dim=d_model,
+            dtype=dtype
         )
         initialize_weights(module=self.embedding)
 
@@ -667,37 +683,51 @@ class InputEmbedding(nn.Module):
 class PositionalEncoding(nn.Module):
     """Class to implement the positional encoding.
     Taken from https://nlp.seas.harvard.edu/annotated-transformer/
-
-    The responsibility of this class is add positional information to the token vectors.
+    The responsibility of this class is to provide position encodings,
+    NOT to add them to the token vectors.
 
     NOTE: DO NOT forget Dropout in Encoder/Decoder classes.
     """
     def __init__(
             self,
-            max_time_steps: int = 512,
-            d_model: int = 512,
+            max_time_steps: int = MAX_SEQUENCE_LENGTH,
+            d_model: int = DIM_MODEL,
+            dtype: torch.dtype = TYPE_FLOAT
     ):
+        """
+        Args:
+            max_time_steps: max sequence length or time steps T
+            d_model: embedding vector dimension
+            dtype: data type of the embedding vector
+        """
         super().__init__()
+        self.D: int = d_model
+
         # Compute the positional encodings once in log space.
-        position_encoding = torch.zeros(max_time_steps, d_model)                    # shape:(T,D)
-        positions = torch.arange(0, max_time_steps, dtype=torch.long).unsqueeze(1)  # shape:(T,1)
+        position_encodings = torch.zeros(max_time_steps, d_model, dtype=dtype)  # shape:(T,D)
+        positions = torch.arange(0, max_time_steps, dtype=dtype).unsqueeze(1)   # shape:(T,1)
         div_term = torch.exp(
-            torch.arange(0, d_model, 2) * -(math.log(10000.0) / d_model)
+            torch.arange(0, d_model, 2, dtype=dtype) *
+            -1 * (math.log(torch.tensor(POSITION_ENCODE_DENOMINATOR_BASE, dtype=dtype)) / d_model)
         )
-        position_encoding[:, 0::2] = torch.sin(positions * div_term)
-        position_encoding[:, 1::2] = torch.cos(positions * div_term)
-        position_encoding = position_encoding.unsqueeze(0)                          # shape:(1,T,D)
-        self.register_buffer("position_encoding", position_encoding)
-        assert self.position_encoding.shape == (1, max_time_steps, d_model)
+        position_encodings[:, 0::2] = torch.sin(positions * div_term)
+        position_encodings[:, 1::2] = torch.cos(positions * div_term)
+        position_encodings = position_encodings.unsqueeze(0)                    # shape:(1,T,D)
+        self.register_buffer("position_encodings", position_encodings)
+        assert self.position_encodings.shape == (1, max_time_steps, d_model)
 
     def forward(self, x: Tensor):
         """Positional encoding.
         Args:
             x: token embedding vectors of shape (B,T,D)
+        Returns: Position encoding for x as shape (1, T, D)
         """
-        _, T, D = x.shape       # pylint: disable=invalid-name
-        y = self.position_encoding[:, :T].requires_grad_(False)
-        assert y.shape == (1, T, D)
+        assert x.ndim == 3, f"expected x.shape as (B, T, D), got {x.shape}."
+        _, _T, _D = x.shape       # pylint: disable=invalid-name
+        assert self.D == _D, f"expected the dimension of x element is [{self.D}], got [{_D}]."
+
+        y = self.position_encoding[:, :_T].requires_grad_(False)
+        assert y.shape == (1, _T, _D)
         return y
 
 
@@ -717,13 +747,13 @@ class Encoder(nn.Module):
     def __init__(
             self,
             vocabulary_size: int,
-            num_layers: int = 6,
-            num_heads: int = 8,
-            d_model: int = 512,
-            dtype: type = TYPE_FLOAT,
+            num_layers: int = NUM_LAYERS,
+            num_heads: int = NUM_HEADS,
+            d_model: int = DIM_MODEL,
+            dtype: Tensor.dtype = TYPE_FLOAT,
             d_ff: int = 2048,
             do_mask: bool = False,
-            max_time_steps: int = 512,
+            max_time_steps: int = MAX_SEQUENCE_LENGTH,
             bias: bool = True,
             p_drop: float = 0.1,
             eps: float = 1e-5
@@ -742,7 +772,8 @@ class Encoder(nn.Module):
         # initialize_weights(module=self.embedding)
         self.input_embedding: InputEmbedding = InputEmbedding(
             d_model=d_model,
-            vocabulary_size=vocabulary_size
+            vocabulary_size=vocabulary_size,
+            dtype=dtype
         )
 
         # --------------------------------------------------------------------------------
@@ -786,14 +817,14 @@ class Encoder(nn.Module):
             indices: indices to tokens
         """
         assert torch.is_tensor(indices) and indices.ndim == 2   # shape (B, T)
-        B, T = indices.shape        # pylint: disable=invalid-name
+        _B, _T = indices.shape        # pylint: disable=invalid-name
 
         # --------------------------------------------------------------------------------
         # Token Embeddings multiplied by sqrt(d_model).
         # --------------------------------------------------------------------------------
         # x = self.embedding(indices) * math.sqrt(self.D)     # x.shape=(B,T,D)
         x = self.input_embedding(indices=indices)
-        assert x.shape == (B, T, self.D)
+        assert x.shape == (_B, _T, self.D)
 
         # --------------------------------------------------------------------------------
         # Add Positional Encoding followed by dropout.
@@ -805,7 +836,7 @@ class Encoder(nn.Module):
         # https://crazyoscarchang.github.io/2018/10/04/in-pytorch-not-the-same/
         # --------------------------------------------------------------------------------
         x = self.dropout(x + self.positional_encoding(x))   # (B,T,D) + (1,T,D)
-        assert x.shape == (B, T, self.D)
+        assert x.shape == (_B, _T, self.D)
 
         # --------------------------------------------------------------------------------
         # Encoder layers
@@ -813,5 +844,5 @@ class Encoder(nn.Module):
         for _layer in self.layers:
             x = _layer(x)
 
-        assert x.shape == (B, T, self.D)
+        assert x.shape == (_B, _T, self.D)
         return x

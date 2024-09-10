@@ -2,7 +2,7 @@
 import numpy as np
 import torch
 
-TYPE_FLOAT = torch.float32
+TYPE_FLOAT: torch.Tensor.dtype = torch.float32
 
 NUM_HEADS: int = 8
 H: int = NUM_HEADS
@@ -14,3 +14,6 @@ DROPOUT_RATIO: float = 0.1
 NUM_LAYERS: int = 8
 N: int = NUM_LAYERS
 
+MAX_SEQUENCE_LENGTH: int = 512
+
+POSITION_ENCODE_DENOMINATOR_BASE: int = 10000
