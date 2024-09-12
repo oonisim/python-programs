@@ -9,7 +9,7 @@ from .constant import (
 from .utility import (
     softmax,
 )
-from .model import (
+from .encoder import (
     initialize_weights,
     calculate_dot_product_similarities,
     calculate_attention_values,
