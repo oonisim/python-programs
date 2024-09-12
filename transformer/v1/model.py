@@ -581,7 +581,7 @@ class PositionwiseFeedForward(nn.Module):
         return y
 
 
-class EncodeBlock(nn.Module):
+class EncodeLayer(nn.Module):
     """Class to implement Encoder Layer"""
     def __init__(
             self,
@@ -867,7 +867,7 @@ class Encoder(nn.Module):
         # Encoder layers
         # --------------------------------------------------------------------------------
         self.layers: nn.ModuleList = nn.ModuleList([
-            EncodeBlock(
+            EncodeLayer(
                 i_layer=_layer,
                 num_heads=num_heads, d_model=d_model, dtype=dtype, d_ff=d_ff,
                 do_mask=do_mask, max_time_steps=max_time_steps, bias=bias,
@@ -903,7 +903,7 @@ class Encoder(nn.Module):
         assert torch.all(torch.isfinite(x))
 
         # --------------------------------------------------------------------------------
-        # Encoder layers
+        # Encode
         # --------------------------------------------------------------------------------
         for _layer in self.layers:
             x = _layer(x)
