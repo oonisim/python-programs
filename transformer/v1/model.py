@@ -39,7 +39,8 @@ torch.manual_seed(42)
 def initialize_weights(
         module: nn.Module,
         output_projection: bool = False,
-        num_layers: int = NUM_LAYERS
+        i_layer: int = 0,
+        d_model: int = DIM_MODEL
 ):
     """Initialize the module weights
     TODO: Research HuggingFace T5, BERT why they use 0.02 as STD for weight initialization.
@@ -73,16 +74,26 @@ def initialize_weights(
     Args:
         module: module whose weights to initialize
         output_projection: TBD
-        num_layers: number of layers in encoder (or decoder)
+        i_layer: layer index
+        d_model: model weight dimension
     """
-    if isinstance(module, nn.Linear):
-        if output_projection:
-            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02/math.sqrt(2 * num_layers))
-        else:
-            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+    # 64 not to be too deep
+    assert 0 <= i_layer <= 64, \
+        f"expected layer index between {0} and {64}, got [{i_layer}]."
+    layer_level: int = i_layer + 1      # to avoid div by 0 at sqrt
 
-        if module.bias is not None:
-            torch.nn.init.zeros_(module.bias)
+    if module.bias is not None:
+        torch.nn.init.zeros_(module.bias)
+
+    if isinstance(module, nn.Linear):
+        # if output_projection:
+        #     torch.nn.init.normal_(module.weight, mean=0.0, std=0.02/math.sqrt(2 * num_layers))
+        # else:
+        #     torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+        torch.nn.init.normal_(
+            module.weight, mean=0.0, std=math.sqrt(d_model * layer_level)
+        )
+
     elif isinstance(module, nn.Embedding):
         torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
@@ -108,9 +119,9 @@ def split(
 
     Returns: split embedding of shape (B,h,T,d) where D = h * d
     """
-    B, T, D = x.shape       # pylint: disable=invalid-name
-    d = D // h
-    return x.view(B, T, h, d).transpose(1, 2)   # (B,h,T,d)
+    _B, _T, _D = x.shape        # pylint: disable=invalid-name
+    d_k = _D // h               # pylint: disable=invalid-name
+    return x.view(_B, _T, h, d_k).transpose(1, 2)   # (B,h,T,d)
 
 
 def calculate_dot_product_similarities(
@@ -194,7 +205,7 @@ def mask(
 ) -> Tensor:
     """
     Args:
-        similarities: matrix to mask of shape (B,H,T,T)
+        similarities: similarity (q to k) matrix to mask of shape (B,H,T,T)
         mask_matrix: boolean matrix of which elements in (T,T) to mask fill.
 
     Returns: masked similarity matrix
@@ -206,9 +217,15 @@ def mask(
     # exp(-inf) = 0 masks the similarities so that it will be uni-directional.
     assert (
         similarities.ndim == 4 and                              # (B,H,T,T)
-        similarities.shape[-2] == similarities.shape[-1] and
+        similarities.shape[-2] == similarities.shape[-1] and    # (..., T,T)
         similarities.shape[-1] == mask_matrix.shape[-1]
     )
+    # softmax will make the similarity value to 0 when -inf is filled.
+    # Mask the similarities (from q to k) matrix:(T,T) to prevent the communications
+    # with future time steps by replacing the similarity values with the -inf,
+    # meaning there is no relationship from q to k.
+    # Then, softmax will make the contribution to zero due to exp(-inf) = 0.
+    # This is the same with blocking relations between q and k.
     masked = similarities.masked_fill(mask=mask_matrix, value=float('-inf'))
     return masked
 
@@ -254,9 +271,10 @@ class ScaledDotProductAttention(nn.Module):
         Args:
             max_time_steps: max sequence length or time steps T
         """
-        mask_matrix: Optional[Tensor]
+        mask_matrix: Optional[Tensor] = None
         super().__init__()
         if do_mask:
+            # shape:(T, T)
             mask_matrix = torch.tril(torch.ones(max_time_steps, max_time_steps)) == 0
         else:
             mask_matrix = None
@@ -272,12 +290,14 @@ class ScaledDotProductAttention(nn.Module):
             q: Tensor,
             k: Tensor,
             v: Tensor,
+            return_similarities: bool = False
     ):
         """Calculate the scaled dot product attention.
         Args:
-            q: query of shape (B,h,T,d)
-            k: key of shape (B,h,T,d)
-            v: value of shape (B,h,T,d)
+            q: query of shape (B,h,T,d_k)
+            k: key of shape (B,h,T,d_k)
+            v: value of shape (B,h,T,d_v)
+            return_similarities: flag to return similarity (q to k) scores too.
         """
         # --------------------------------------------------------------------------------
         # First MatMul in the Scaled Dot Product Attention to calculate the similarities
@@ -290,7 +310,8 @@ class ScaledDotProductAttention(nn.Module):
         similarities: Tensor = calculate_dot_product_similarities(
             query=q,
             key=k,
-        )
+        )   # (B, h, T, T)
+        assert torch.all(torch.isfinite(similarities))
 
         # --------------------------------------------------------------------------------
         # Scale (standardize) the dot product similarity matrix with its standard deviation.
@@ -302,10 +323,13 @@ class ScaledDotProductAttention(nn.Module):
         # Mask if required
         # --------------------------------------------------------------------------------
         if self.mask_matrix is not None:
-            similarities = mask(similarities=similarities, mask_matrix=self.mask_matrix)
+            similarities = mask(
+                similarities=similarities,      # shape:(B,h,T,T)
+                mask_matrix=self.mask_matrix    # shape:(T,T)
+            )
 
         # --------------------------------------------------------------------------------
-        # Normalize by softmax.
+        # Normalize by softmax so that dimension -1 (q to k similarity) becomes probability.
         # --------------------------------------------------------------------------------
         similarities = softmax(similarities, dim=-1)
 
@@ -315,9 +339,9 @@ class ScaledDotProductAttention(nn.Module):
         attentions: Tensor = calculate_attention_values(
             similarities=similarities,
             values=v
-        )   # shape: (B,H,T,d)
+        )   # shape: (B,H,T,d_k)
 
-        return attentions
+        return attentions, similarities if return_similarities else attentions
 
 
 class MultiHeadAttention(nn.Module):
@@ -339,6 +363,16 @@ class MultiHeadAttention(nn.Module):
     > these we use dk = dv = dmodel /h = 64.
     """
     @property
+    def L(self) -> int:     # pylint: disable=invalid-name
+        """Layer number/index"""
+        return self._L
+
+    @property
+    def T(self) -> int:     # pylint: disable=invalid-name
+        """Max time steps or max sequence length"""
+        return self._T
+
+    @property
     def D(self) -> int:     # pylint: disable=invalid-name
         """Dimensions (number of features) of the embedding vector d_model.
         """
@@ -350,21 +384,23 @@ class MultiHeadAttention(nn.Module):
         return self._H
 
     @property
-    def T(self) -> int:     # pylint: disable=invalid-name
-        """Max time steps or max sequence length"""
-        return self._T
+    def d_k(self) -> int:     # pylint: disable=invalid-name
+        """Dimension (number of features) per head."""
+        return self._d_k
 
     def __init__(
             self,
+            i_layer: int,
             num_heads: int = NUM_HEADS,
             d_model: int = DIM_MODEL,
-            dtype: type = TYPE_FLOAT,
+            dtype: Tensor.dtype = TYPE_FLOAT,
             do_mask: bool = False,
             max_time_steps: int = MAX_SEQUENCE_LENGTH,
             bias: bool = True,
     ):
         """Multi Head Attention initialization.
         Args:
+            i_layer: layer index (i-th layer from the bottom)
             num_heads: number of attention heads
             d_model: dimensions of the model embedding vector.
             dtype: data type
@@ -372,10 +408,15 @@ class MultiHeadAttention(nn.Module):
             max_time_steps: max sequence length or time steps T.
             bias: Ture if learning the additive bias at the linear layer.
         """
+        assert d_model % num_heads == 0, \
+            f"d_model:[{d_model}] needs to be divisible by num_heads:[{num_heads}]."
+
         super().__init__()
-        self._D: int = d_model              # pylint: disable=invalid-name
-        self._H: int = num_heads            # pylint: disable=invalid-name
-        self._T: int = max_time_steps       # pylint: disable=invalid-name
+        self._L: int = i_layer                  # pylint: disable=invalid-name
+        self._T: int = max_time_steps           # pylint: disable=invalid-name
+        self._D: int = d_model                  # pylint: disable=invalid-name
+        self._H: int = num_heads                # pylint: disable=invalid-name
+        self._d_k: int = d_model // num_heads   # pylint: disable=invalid-name
 
         # To transfer embedded token of dim_input features to Q space of d_model features
         self.Wq: nn.Module = nn.Linear(     # pylint: disable=invalid-name
@@ -384,7 +425,7 @@ class MultiHeadAttention(nn.Module):
             dtype=dtype,
             bias=bias
         )
-        initialize_weights(module=self.Wq)
+        initialize_weights(module=self.Wq, i_layer=i_layer, d_model=d_model)
         # To transfer embedded token of dim_input features to K space of d_model features
         self.Wk: nn.Module = nn.Linear(     # pylint: disable=invalid-name
             in_features=d_model,
@@ -392,7 +433,7 @@ class MultiHeadAttention(nn.Module):
             dtype=dtype,
             bias=bias
         )
-        initialize_weights(module=self.Wk)
+        initialize_weights(module=self.Wk, i_layer=i_layer, d_model=d_model)
         # To transfer embedded token of dim_input features to V space of d_model features
         self.Wv: nn.Module = nn.Linear(     # pylint: disable=invalid-name
             in_features=d_model,
@@ -400,7 +441,7 @@ class MultiHeadAttention(nn.Module):
             dtype=dtype,
             bias=bias
         )
-        initialize_weights(module=self.Wv)
+        initialize_weights(module=self.Wv, i_layer=i_layer, d_model=d_model)
 
         # Self attention
         self.scaled_dot_product_attention: nn.Module = ScaledDotProductAttention(
@@ -415,7 +456,9 @@ class MultiHeadAttention(nn.Module):
             dtype=dtype,
             bias=bias
         )
-        initialize_weights(module=self.Wo, output_projection=True)
+        initialize_weights(
+            module=self.Wo, i_layer=i_layer, d_model=d_model, output_projection=True
+        )
 
     def forward(
             self,
@@ -448,19 +491,21 @@ class MultiHeadAttention(nn.Module):
         # --------------------------------------------------------------------------------
         # Split into H segments for multiple heads to attend.
         # --------------------------------------------------------------------------------
-        q = split(x=q, h=self.H)    # (B, H, T, d)
-        k = split(x=k, h=self.H)    # (B, H, T, d)
-        v = split(x=v, h=self.H)    # (B, H, T, d)
+        q = split(x=q, h=self.H)    # (B, H, T, d_k)
+        k = split(x=k, h=self.H)    # (B, H, T, d_k)
+        v = split(x=v, h=self.H)    # (B, H, T, d_k)
 
         # --------------------------------------------------------------------------------
         # Calculate self attention values
         # --------------------------------------------------------------------------------
         attentions: Tensor = self.scaled_dot_product_attention(q=q, k=k, v=v)
-        assert attentions.shape == (_B, self.H, _T, self.D/self.H)
+        assert attentions.shape == (_B, self.H, _T, self.d_k)
 
         # --------------------------------------------------------------------------------
         # Concatenate outputs from heads into the model output with reshape.
-        # First (B,H,T,d)->(B,T,H,d) then to (B,T,D)
+        # First (B,H,T,d)->(B,T,H,d) then to (B,T,D).
+        # To apply 'view' operation, the Tensor elements need to be stored contiguously in
+        # memory. Otherwise:
         # "RuntimeError: view size is not compatible with input tensor's size and strid"
         # --------------------------------------------------------------------------------
         attentions = attentions.transpose(2, 1).contiguous().view(_B, _T, -1)
@@ -470,7 +515,9 @@ class MultiHeadAttention(nn.Module):
         # Last Wo Linear projection
         # --------------------------------------------------------------------------------
         attentions = self.Wo(attentions)    # (B,T,D)@(D,D) -> (B,T,D)
-        assert attentions.shape == (_B, _T, self.D)
+        assert attentions.shape == (_B, _T, self.D), \
+            f"expected attention shape {(_B, _T, self.D)}, got {attentions.shape}."
+        assert torch.all(torch.isfinite(attentions))
 
         return attentions
 
@@ -481,13 +528,15 @@ class PositionwiseFeedForward(nn.Module):
     """
     def __init__(
             self,
+            i_layer: int,
             d_model: int = DIM_MODEL,
             d_ff: int = 2048,
-            dtype: type = TYPE_FLOAT,
+            dtype: Tensor.dtype = TYPE_FLOAT,
             bias: bool = True,
     ):
         """Initialize the class
         Args:
+            i_layer: layer index (i-th layer from the bottom)
             d_model: dimensions of the model embedding vector.
             d_ff: dimensions of the hidden layer output vector
             dtype: data type
@@ -497,15 +546,18 @@ class PositionwiseFeedForward(nn.Module):
         self.W1: nn.Module = nn.Linear(     # pylint: disable=invalid-name
             in_features=d_model, out_features=d_ff, bias=bias, dtype=dtype
         )
+        # Weight initialization for ReLU
+        torch.nn.init.zeros_(self.W1.bias)
+        torch.nn.init.kaiming_normal_(
+            self.W1.weight, a=0, mode='fan_in', nonlinearity='relu'
+        )
         # TODO: Consider using GELU after verifying the rationale
         self.relu = nn.ReLU()
+
         self.W2: nn.Module = nn.Linear(     # pylint: disable=invalid-name
             in_features=d_ff, out_features=d_model, bias=bias, dtype=dtype
         )
-
-        # TODO: Investigate the initialization to use for PwFF
-        initialize_weights(module=self.W1)
-        initialize_weights(module=self.W2, output_projection=True)
+        initialize_weights(module=self.W2, i_layer=i_layer, output_projection=True)
 
     def forward(self, x):
         """Feed-forward neural network forward propagation
@@ -523,17 +575,20 @@ class PositionwiseFeedForward(nn.Module):
 
         Returns: output embedding vector of shape (B,T,D)
         """
-        return self.W2(self.relu(self.W1(x)))
+        y = self.W2(self.relu(self.W1(x)))
+        assert torch.all(torch.isfinite(y))
+
+        return y
 
 
-class EncodeLayer(nn.Module):
+class EncodeBlock(nn.Module):
     """Class to implement Encoder Layer"""
     def __init__(
             self,
             i_layer: int,
             num_heads: int = NUM_HEADS,
             d_model: int = DIM_MODEL,
-            dtype: type = TYPE_FLOAT,
+            dtype: Tensor.dtype = TYPE_FLOAT,
             d_ff: int = 2048,
             do_mask: bool = False,
             max_time_steps: int = MAX_SEQUENCE_LENGTH,
@@ -555,7 +610,13 @@ class EncodeLayer(nn.Module):
         """
         super().__init__()
 
+        self.layernorm_multihead: nn.LayerNorm = nn.LayerNorm(
+            normalized_shape=d_model,
+            eps=eps,
+            dtype=dtype
+        )
         self.multihead_attention: MultiHeadAttention = MultiHeadAttention(
+            i_layer=i_layer,
             num_heads=num_heads,
             d_model=d_model,
             dtype=dtype,
@@ -564,24 +625,22 @@ class EncodeLayer(nn.Module):
             bias=bias,
         )
         self.dropout_multihead: nn.Module = nn.Dropout(p=p_drop)
-        self.layernorm_multihead: nn.LayerNorm = nn.LayerNorm(
+
+        self.layernorm_positionwise: nn.LayerNorm = nn.LayerNorm(
             normalized_shape=d_model,
             eps=eps,
+            elementwise_affine=True,
+            bias=True,
             dtype=dtype
         )
-
         self.positionwise_feedforward: PositionwiseFeedForward = PositionwiseFeedForward(
+            i_layer=i_layer,
             d_model=d_model,
             d_ff=d_ff,
             dtype=dtype,
             bias=bias,
         )
         self.dropout_positionwise: nn.Module = nn.Dropout(p=p_drop)
-        self.layernorm_positionwise: nn.LayerNorm = nn.LayerNorm(
-            normalized_shape=d_model,
-            eps=eps,
-            dtype=dtype
-        )
 
     def forward(self, x: Tensor) -> Tensor:
         """Encode.
@@ -635,6 +694,7 @@ class EncodeLayer(nn.Module):
         #     x + self.dropout_positionwise(self.positionwise_feedforward(x))
         # )
         x = x + self.dropout_positionwise(self.positionwise_feedforward(self.layernorm_positionwise(x)))
+        assert torch.all(torch.isfinite(x))
         return x
 
 
@@ -676,7 +736,9 @@ class InputEmbedding(nn.Module):
             indices: indices to tokens of shape (B, T)
         Returns: Token embeddings of shape (B, T, D)
         """
+        # Why multipy by sqrt(D) and increase the variance?
         x = self.embedding(indices) * math.sqrt(self.D)     # x.shape=(B,T,D)
+        assert torch.all(torch.isfinite(x))
         return x
 
 
@@ -727,6 +789,7 @@ class PositionalEncoding(nn.Module):
         assert self.D == _D, f"expected the dimension of x element is [{self.D}], got [{_D}]."
 
         y = self.position_encoding[:, :_T].requires_grad_(False)
+        assert torch.all(torch.isfinite(y))
         assert y.shape == (1, _T, _D)
         return y
 
@@ -804,11 +867,12 @@ class Encoder(nn.Module):
         # Encoder layers
         # --------------------------------------------------------------------------------
         self.layers: nn.ModuleList = nn.ModuleList([
-            EncodeLayer(
+            EncodeBlock(
+                i_layer=_layer,
                 num_heads=num_heads, d_model=d_model, dtype=dtype, d_ff=d_ff,
                 do_mask=do_mask, max_time_steps=max_time_steps, bias=bias,
                 p_drop=p_drop, eps=eps
-            ) for _ in range(num_layers)
+            ) for _layer in range(num_layers)
         ])
 
     def forward(self, indices: Tensor):
@@ -822,7 +886,6 @@ class Encoder(nn.Module):
         # --------------------------------------------------------------------------------
         # Token Embeddings multiplied by sqrt(d_model).
         # --------------------------------------------------------------------------------
-        # x = self.embedding(indices) * math.sqrt(self.D)     # x.shape=(B,T,D)
         x = self.input_embedding(indices=indices)
         assert x.shape == (_B, _T, self.D)
 
@@ -837,6 +900,7 @@ class Encoder(nn.Module):
         # --------------------------------------------------------------------------------
         x = self.dropout(x + self.positional_encoding(x))   # (B,T,D) + (1,T,D)
         assert x.shape == (_B, _T, self.D)
+        assert torch.all(torch.isfinite(x))
 
         # --------------------------------------------------------------------------------
         # Encoder layers

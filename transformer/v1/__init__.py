@@ -20,6 +20,6 @@ from .model import (
     ScaledDotProductAttention,
     PositionwiseFeedForward,
     PositionalEncoding,
-    EncodeLayer,
+    EncodeBlock,
     Encoder,
 )
