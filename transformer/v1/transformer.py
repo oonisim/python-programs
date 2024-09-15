@@ -7,11 +7,15 @@ from torch import (
 
 from transformer.v1.constant import (
     TYPE_FLOAT,
+    NUM_ENCODER_TOKENS,
+    NUM_DECODER_TOKENS,
     NUM_CLASSES,
+    MAX_TIME_STEPS,
     DIM_MODEL,
+    DIM_PWFF_HIDDEN,
     NUM_LAYERS,
     NUM_HEADS,
-    MAX_TIME_STEPS,
+    DROPOUT_RATIO,
 )
 from common import (
     Projection,
@@ -30,28 +34,28 @@ class Transformer(nn.Module):
         super().__init__()
 
         self.encoder: nn.Module = Encoder(
-            vocabulary_size=NUM_CLASSES,
+            vocabulary_size=NUM_ENCODER_TOKENS,
             num_layers=NUM_LAYERS,
             num_heads=NUM_HEADS,
             d_model=DIM_MODEL,
             dtype=TYPE_FLOAT,
-            d_ff=2024,
+            d_ff=DIM_PWFF_HIDDEN,
             do_mask=False,
             max_time_steps=MAX_TIME_STEPS,
             bias=True,
-            p_drop=0.1
+            p_drop=DROPOUT_RATIO
         )
 
         self.decoder: nn.Module = Decoder(
-            vocabulary_size=NUM_CLASSES,
+            vocabulary_size=NUM_DECODER_TOKENS,
             num_layers=NUM_LAYERS,
             num_heads=NUM_HEADS,
             d_model=DIM_MODEL,
             dtype=TYPE_FLOAT,
-            d_ff=2024,
+            d_ff=DIM_PWFF_HIDDEN,
             max_time_steps=MAX_TIME_STEPS,
             bias=True,
-            p_drop=0.1
+            p_drop=DROPOUT_RATIO
         )
 
         self.projection: nn.Module = Projection(

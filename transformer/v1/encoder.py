@@ -9,9 +9,12 @@ from torch import (
 from transformer.v1.constant import (
     TYPE_FLOAT,
     DIM_MODEL,
+    DIM_PWFF_HIDDEN,
+    MAX_TIME_STEPS,
     NUM_LAYERS,
     NUM_HEADS,
-    MAX_TIME_STEPS,
+    DROPOUT_RATIO,
+    EPSILON,
 )
 from transformer.v1.common import (
     PositionalEncoding,
@@ -29,12 +32,12 @@ class EncodeLayer(nn.Module):
             num_heads: int = NUM_HEADS,
             d_model: int = DIM_MODEL,
             dtype: Tensor.dtype = TYPE_FLOAT,
-            d_ff: int = 2048,
+            d_ff: int = DIM_PWFF_HIDDEN,
             do_mask: bool = False,
             max_time_steps: int = MAX_TIME_STEPS,
             bias: bool = True,
-            p_drop: float = 0.1,
-            eps: float = 1e-5
+            p_drop: float = DROPOUT_RATIO,
+            eps: float = EPSILON
     ):
         """
         Args:
@@ -161,12 +164,12 @@ class Encoder(nn.Module):
             num_heads: int = NUM_HEADS,
             d_model: int = DIM_MODEL,
             dtype: Tensor.dtype = TYPE_FLOAT,
-            d_ff: int = 2048,
+            d_ff: int = DIM_PWFF_HIDDEN,
             do_mask: bool = False,
             max_time_steps: int = MAX_TIME_STEPS,
             bias: bool = True,
-            p_drop: float = 0.1,
-            eps: float = 1e-5
+            p_drop: float = DROPOUT_RATIO,
+            eps: float = EPSILON
     ):
         super().__init__()
         self._D: int = d_model      # pylint: disable=invalid-name

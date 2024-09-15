@@ -22,6 +22,7 @@ from transformer.v1.constant import (
     TYPE_FLOAT,
     NUM_CLASSES,
     DIM_MODEL,
+    DIM_PWFF_HIDDEN,
     NUM_HEADS,
     MAX_TIME_STEPS,
     POSITION_ENCODE_DENOMINATOR_BASE,
@@ -575,7 +576,7 @@ class PositionwiseFeedForward(nn.Module):
             self,
             i_layer: int,
             d_model: int = DIM_MODEL,
-            d_ff: int = 2048,
+            d_ff: int = DIM_PWFF_HIDDEN,
             dtype: Tensor.dtype = TYPE_FLOAT,
             bias: bool = True,
     ):
