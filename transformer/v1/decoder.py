@@ -11,7 +11,7 @@ from transformer.v1.constant import (
     DIM_MODEL,
     NUM_LAYERS,
     NUM_HEADS,
-    MAX_SEQUENCE_LENGTH,
+    MAX_TIME_STEPS,
 )
 from transformer.v1.common import (
     PositionalEncoding,
@@ -55,7 +55,7 @@ class DecodeLayer(nn.Module):
             d_model: int = DIM_MODEL,
             dtype: Tensor.dtype = TYPE_FLOAT,
             d_ff: int = 2048,
-            max_time_steps: int = MAX_SEQUENCE_LENGTH,
+            max_time_steps: int = MAX_TIME_STEPS,
             bias: bool = True,
             p_drop: float = 0.1,
             eps: float = 1e-5
@@ -172,6 +172,11 @@ class Decoder(nn.Module):
     > In addition, we apply dropout to the sums of the embeddings and
     > the positional encodings in both the encoder and decoder stacks.
     > For the base model, we use a rate p_drop = 0.1.
+
+    Note that the input to the decoder during the training is the target sequence
+    shifted one position to the right by inserting the <START> token at the top
+    that signals the beginning of the sentence. Hence, there will be T predictions
+    for each sequence.
     """
     @property
     def D(self) -> int:     # pylint: disable=invalid-name
@@ -187,7 +192,7 @@ class Decoder(nn.Module):
             d_model: int = DIM_MODEL,
             dtype: Tensor.dtype = TYPE_FLOAT,
             d_ff: int = 2048,
-            max_time_steps: int = MAX_SEQUENCE_LENGTH,
+            max_time_steps: int = MAX_TIME_STEPS,
             bias: bool = True,
             p_drop: float = 0.1,
             eps: float = 1e-5
@@ -251,10 +256,12 @@ class Decoder(nn.Module):
             memory: Tensor,
     ) -> Tensor:
         """Decode the input embeddings.
-        Note that the input to the decoder during the training is the target sequence
-        shifted one position to the right by inserting the <START> token at the top
-        that signals the beginning of the sentence. Hence, there will be T predictions
-        for each sequence.
+        The memory (embeddings of the source sequence) is regarded as a prompt or context
+        to condition the model output given the historic tokens in the target sequence.
+
+        > https://youtu.be/kCc8FmEb1nY?t=6351
+        > The decoding is conditioned not only on the historic tokens in the target sequence,
+        > but on the encoded memory of the entire source sequence as a prompt, soft of.
 
         Args:
             indices: indices to target sequence tokens of shape (B, T)
@@ -292,3 +299,5 @@ class Decoder(nn.Module):
 
         assert x.shape == (_B, _T, self.D)
         return x
+
+

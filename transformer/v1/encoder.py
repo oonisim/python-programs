@@ -11,7 +11,7 @@ from transformer.v1.constant import (
     DIM_MODEL,
     NUM_LAYERS,
     NUM_HEADS,
-    MAX_SEQUENCE_LENGTH,
+    MAX_TIME_STEPS,
 )
 from transformer.v1.common import (
     PositionalEncoding,
@@ -31,7 +31,7 @@ class EncodeLayer(nn.Module):
             dtype: Tensor.dtype = TYPE_FLOAT,
             d_ff: int = 2048,
             do_mask: bool = False,
-            max_time_steps: int = MAX_SEQUENCE_LENGTH,
+            max_time_steps: int = MAX_TIME_STEPS,
             bias: bool = True,
             p_drop: float = 0.1,
             eps: float = 1e-5
@@ -163,7 +163,7 @@ class Encoder(nn.Module):
             dtype: Tensor.dtype = TYPE_FLOAT,
             d_ff: int = 2048,
             do_mask: bool = False,
-            max_time_steps: int = MAX_SEQUENCE_LENGTH,
+            max_time_steps: int = MAX_TIME_STEPS,
             bias: bool = True,
             p_drop: float = 0.1,
             eps: float = 1e-5

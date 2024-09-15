@@ -4,7 +4,8 @@ T: Sequence length or max token size e.g. 512 for BERT. 'T' because of 'Time ste
 D: Dimensions of the token embedding vector, which is d_model in the paper.
    A token is represented by D number of features or attributes.
    D can be signified as C (Channels).
-H: Number of heads in Multi-head attention
+H: Number of heads in Multi-head attention\
+V: Vocabulary size
 """
 import math
 from typing import (
@@ -19,9 +20,10 @@ from torch import (
 
 from transformer.v1.constant import (
     TYPE_FLOAT,
+    NUM_CLASSES,
     DIM_MODEL,
     NUM_HEADS,
-    MAX_SEQUENCE_LENGTH,
+    MAX_TIME_STEPS,
     POSITION_ENCODE_DENOMINATOR_BASE,
 )
 from transformer.v1.utility import (
@@ -399,7 +401,7 @@ class MultiHeadAttention(nn.Module):
             d_model: int = DIM_MODEL,
             dtype: Tensor.dtype = TYPE_FLOAT,
             do_mask: bool = False,
-            max_time_steps: int = MAX_SEQUENCE_LENGTH,
+            max_time_steps: int = MAX_TIME_STEPS,
             bias: bool = True,
     ):
         """Multi Head Attention initialization.
@@ -649,7 +651,7 @@ class PositionalEncoding(nn.Module):
     """
     def __init__(
             self,
-            max_time_steps: int = MAX_SEQUENCE_LENGTH,
+            max_time_steps: int = MAX_TIME_STEPS,
             d_model: int = DIM_MODEL,
             dtype: torch.dtype = TYPE_FLOAT
     ):
@@ -689,3 +691,36 @@ class PositionalEncoding(nn.Module):
         assert torch.all(torch.isfinite(y))
         assert y.shape == (1, _T, _D)
         return y
+
+
+class Projection(nn.Module):
+    """Class to project the predictions to class probabilities.
+     """
+    def __init__(
+            self,
+            d_model: int = DIM_MODEL,
+            num_classes: int = NUM_CLASSES,
+            dtype: Tensor.dtype = TYPE_FLOAT,
+            bias: bool = True,
+    ):
+        super().__init__()
+        self.projection: nn.Linear = nn.Linear(
+            in_features=d_model,
+            out_features=num_classes,
+            dtype=dtype,
+            bias=bias
+        )
+
+        initialize_weights()
+
+    def forward(
+            self,
+            y: Tensor
+    ):
+        """Project the prediction embedding to probabilities of vocabularies.
+        Args:
+            y: prediction of shape (B, T, D)
+
+        Returns: probabilities of shape (B, T, V)
+        """
+        return

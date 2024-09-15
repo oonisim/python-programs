@@ -1,19 +1,32 @@
 """Module for Transformers constant"""
-import numpy as np
 import torch
 
+VOCABULARY_SIZE: int = 10240
+
+# --------------------------------------------------------------------------------
+# Data types
+# --------------------------------------------------------------------------------
 TYPE_FLOAT: torch.Tensor.dtype = torch.float32
 
-NUM_HEADS: int = 8
-H: int = NUM_HEADS
+# --------------------------------------------------------------------------------
+# Time Step Sequence (e.g Sentence)
+# --------------------------------------------------------------------------------
+MAX_TIME_STEPS: int = 512
 
-DIM_MODEL: int = 512          # Dimension ofd the Transformer encoder vector
-
-DROPOUT_RATIO: float = 0.1
-
-NUM_LAYERS: int = 8
-N: int = NUM_LAYERS
-
-MAX_SEQUENCE_LENGTH: int = 512
-
+# --------------------------------------------------------------------------------
+# Encoding
+# --------------------------------------------------------------------------------
 POSITION_ENCODE_DENOMINATOR_BASE: int = 10000
+
+# --------------------------------------------------------------------------------
+# Network Hyper Parameters
+# --------------------------------------------------------------------------------
+NUM_CLASSES: int = VOCABULARY_SIZE
+DIM_MODEL: int = 512          # Dimension ofd the Transformer encoder vector
+DROPOUT_RATIO: float = 0.1
+NUM_LAYERS: int = 6
+
+# --------------------------------------------------------------------------------
+# Multi Head Attention
+# --------------------------------------------------------------------------------
+NUM_HEADS: int = 8
