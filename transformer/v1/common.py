@@ -35,6 +35,18 @@ from torch.nn.functional import (
 torch.manual_seed(42)
 
 
+def initialize_weights_xavier(
+        module: nn.Module,
+):
+    """Xavier weight initialization"""
+    if isinstance(module, nn.Linear):
+        torch.nn.init.zeros_(module.bias)
+        torch.nn.init.xavier_normal_(module.weight)
+
+    elif isinstance(module, nn.Embedding):
+        torch.nn.init.xavier_normal_(module.weight)
+
+
 def initialize_weights(
         module: nn.Module,
         output_projection: bool = False,    # pylint: disable=unused-argument
@@ -62,7 +74,7 @@ def initialize_weights(
     > adopt a much smaller standard deviation (0.02) for initialization,
     > in a similar spirit to our solution
 
-    Point-wise feed forward (PwFF) internal dimension is 2048 and 1/sqrt(2048) is 0.022.
+    Position-wise feed forward (PwFF) internal dimension is 2048 and 1/sqrt(2048) is 0.022.
     This may be the reason to use 0.02 to make the weight variance consistent throughout
     the layers, but need to be verified. However then, setting the variance of the PwFF
     weight to 0.02 should suffice, not all over the layers.
@@ -81,16 +93,16 @@ def initialize_weights(
         f"expected layer index between {0} and {64}, got [{i_layer}]."
     layer_level: int = i_layer + 1      # to avoid div by 0 at sqrt
 
-    if module.bias is not None:
-        torch.nn.init.zeros_(module.bias)
-
     if isinstance(module, nn.Linear):
+        torch.nn.init.zeros_(module.bias)
         # if output_projection:
         #     torch.nn.init.normal_(module.weight, mean=0.0, std=0.02/math.sqrt(2 * num_layers))
         # else:
         #     torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
         torch.nn.init.normal_(
-            module.weight, mean=0.0, std=math.sqrt(d_model * layer_level)
+            module.weight,
+            mean=0.0,
+            std=1/math.sqrt(2 * d_model * layer_level)  # x 2 is empirical to get close to 0.02 used in GPT/BERT.
         )
 
     elif isinstance(module, nn.Embedding):
@@ -335,6 +347,9 @@ class ScaledDotProductAttention(nn.Module):
             v: value of shape (B,h,T,d_v)
             return_similarities: flag to return similarity (q to k) scores too.
         """
+        assert q.ndim == 4
+        _B, _H, _T, _ = q.shape
+
         # --------------------------------------------------------------------------------
         # First MatMul in the Scaled Dot Product Attention to calculate the similarities
         # (attention) matrix between (q,k) for every (q,k) combinations in Q, K.
@@ -347,6 +362,7 @@ class ScaledDotProductAttention(nn.Module):
             query=q,
             key=k,
         )   # (B, h, T, T)
+        assert similarities.shape == (_B, _H, _T, _T)
         assert torch.all(torch.isfinite(similarities))
 
         # --------------------------------------------------------------------------------
@@ -354,6 +370,8 @@ class ScaledDotProductAttention(nn.Module):
         # --------------------------------------------------------------------------------
         d_k = k.shape[-1]  # head size
         similarities = scale(similarities=similarities, d_k=d_k)
+        assert similarities.shape == (_B, _H, _T, _T)
+        assert torch.all(torch.isfinite(similarities))
 
         # --------------------------------------------------------------------------------
         # Mask if required
@@ -363,6 +381,9 @@ class ScaledDotProductAttention(nn.Module):
                 similarities=similarities,      # shape:(B,h,T,T)
                 mask_matrix=self.mask_matrix    # shape:(T,T)
             )
+            assert similarities.shape == (_B, _H, _T, _T)
+            # mask() set -inf
+            # assert torch.all(torch.isfinite(similarities))
 
         # --------------------------------------------------------------------------------
         # Softmax normalization so that dim=-1 (q to k similarity) becomes probability.
@@ -376,8 +397,12 @@ class ScaledDotProductAttention(nn.Module):
             similarities=similarities,
             values=v
         )   # shape: (B,H,T,d_k)
+        assert attentions.shape == (_B, _H, _T, d_k)
 
-        return attentions, similarities if return_similarities else attentions
+        if return_similarities:
+            return attentions, similarities
+        else:
+            return attentions
 
 
 class MultiHeadAttention(nn.Module):
@@ -426,7 +451,7 @@ class MultiHeadAttention(nn.Module):
 
     def __init__(
             self,
-            i_layer: int,
+            i_layer: int = 0,
             num_heads: int = NUM_HEADS,
             d_model: int = DIM_MODEL,
             dtype: Tensor.dtype = TYPE_FLOAT,
@@ -533,6 +558,7 @@ class MultiHeadAttention(nn.Module):
         v: Tensor = self.Wv(v)   # Transfer to V space. Shape=(B, T, D)
         assert q.shape == (_B, self.T, self.D)
         assert k.shape == (_B, self.T, self.D)
+        assert v.shape == (_B, self.T, self.D)
 
         # --------------------------------------------------------------------------------
         # Split into H segments for multiple heads to attend.
@@ -574,7 +600,7 @@ class PositionwiseFeedForward(nn.Module):
     """
     def __init__(
             self,
-            i_layer: int,
+            i_layer: int = 0,
             d_model: int = DIM_MODEL,
             d_ff: int = DIM_PWFF_HIDDEN,
             dtype: Tensor.dtype = TYPE_FLOAT,
@@ -717,7 +743,7 @@ class PositionalEncoding(nn.Module):
         _, _T, _D = x.shape       # pylint: disable=invalid-name
         assert self.D == _D, f"expected the dimension of x element is [{self.D}], got [{_D}]."
 
-        y = self.position_encoding[:, :_T].requires_grad_(False)
+        y = self.position_encodings[:, :_T].requires_grad_(False)
         assert torch.all(torch.isfinite(y))
         assert y.shape == (1, _T, _D)
         return y
@@ -740,8 +766,7 @@ class Projection(nn.Module):
             dtype=dtype,
             bias=bias
         )
-        torch.nn.init.zeros_(self.projection.bias)
-        torch.nn.init.xavier_normal_(self.projection.weight)
+        initialize_weights(self.projection, d_model=d_model)
 
     def forward(
             self,

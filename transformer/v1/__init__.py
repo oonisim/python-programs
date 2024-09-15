@@ -6,10 +6,7 @@ from .constant import (
     DIM_MODEL,
     DROPOUT_RATIO
 )
-from .utility import (
-    softmax,
-)
-from .encoder import (
+from .common import (
     initialize_weights,
     calculate_dot_product_similarities,
     calculate_attention_values,
@@ -20,6 +17,8 @@ from .encoder import (
     ScaledDotProductAttention,
     PositionwiseFeedForward,
     PositionalEncoding,
+)
+from .encoder import (
     EncodeLayer,
     Encoder,
 )
