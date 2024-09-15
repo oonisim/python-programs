@@ -252,7 +252,7 @@ class Decoder(nn.Module):
 
     def forward(
             self,
-            indices: Tensor,
+            y: Tensor,
             memory: Tensor,
     ) -> Tensor:
         """Decode the input embeddings.
@@ -264,19 +264,19 @@ class Decoder(nn.Module):
         > but on the encoded memory of the entire source sequence as a prompt, soft of.
 
         Args:
-            indices: indices to target sequence tokens of shape (B, T)
+            y: indices to target sequence tokens of shape (B, T)
             memory: encoder embeddings
 
         Returns: Decoder next token predictions of shape (B, T, D)
         """
-        assert torch.is_tensor(indices) and indices.ndim == 2   # shape (B, T)
-        _B, _T = indices.shape        # pylint: disable=invalid-name
+        assert torch.is_tensor(y) and y.ndim == 2   # shape (B, T)
+        _B, _T = y.shape        # pylint: disable=invalid-name
 
         # --------------------------------------------------------------------------------
         # Input Embeddings multiplied by sqrt(d_model).
         # --------------------------------------------------------------------------------
-        x = self.output_embedding(indices=indices)
-        assert x.shape == (_B, _T, self.D)
+        y = self.output_embedding(indices=y)
+        assert y.shape == (_B, _T, self.D)
 
         # --------------------------------------------------------------------------------
         # Positional Encoding followed by dropout.
@@ -287,17 +287,17 @@ class Decoder(nn.Module):
         # https://stackoverflow.com/a/68600205/4281353
         # https://crazyoscarchang.github.io/2018/10/04/in-pytorch-not-the-same/
         # --------------------------------------------------------------------------------
-        x = self.dropout(x + self.positional_encoding(x))   # (B,T,D) + (1,T,D)
-        assert x.shape == (_B, _T, self.D)
-        assert torch.all(torch.isfinite(x))
+        y = self.dropout(y + self.positional_encoding(y))   # (B,T,D) + (1,T,D)
+        assert y.shape == (_B, _T, self.D)
+        assert torch.all(torch.isfinite(y))
 
         # --------------------------------------------------------------------------------
         # N x Encode Layers
         # --------------------------------------------------------------------------------
         for _layer in self.layers:
-            x = _layer(x=x, memory=memory)
+            y = _layer(x=y, memory=memory)
 
-        assert x.shape == (_B, _T, self.D)
-        return x
+        assert y.shape == (_B, _T, self.D)
+        return y
 
 

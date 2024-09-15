@@ -26,8 +26,8 @@ from transformer.v1.constant import (
     MAX_TIME_STEPS,
     POSITION_ENCODE_DENOMINATOR_BASE,
 )
-from transformer.v1.utility import (
-    softmax
+from torch.nn.functional import (
+    softmax,
 )
 
 
@@ -258,6 +258,35 @@ def calculate_attention_values(
     Returns: Bag of Words for every q element of shape (B, h, T, d_v)
     """
     return similarities @ values     # (B,h,T,T) @ (B,h,T,d_v) -> (B,h,T,d_v)
+
+
+class LayerNormalization(nn.Module):
+    """Class to implement LayerNormalization"""
+    def __init__(self, features: int, eps: float = 1e-6) -> None:
+        """Initialization of the class"""
+        super().__init__()
+        self.eps = eps
+        self.gamma = nn.Parameter(torch.ones(features))     # alpha is a learnable parameter
+        self.beta = nn.Parameter(torch.zeros(features))     # bias is a learnable parameter
+
+    def forward(self, x):
+        """Run Layer Normalization
+        Args:
+            x: input
+
+        Returns: y as normalized x
+        """
+        # x: (batch, seq_len, hidden_size)
+        # Keep the dimension for broadcasting
+        mean = x.mean(dim=-1, keepdim=True)     # (B, T, 1)
+        # Keep the dimension for broadcasting
+        std = x.std(dim=-1, keepdim=True)       # (B, T, 1)
+        # eps is to prevent dividing by zero or when std is very small
+        y = self.gamma * (x - mean) / (std + self.eps) + self.beta
+
+        # The variance of y is gamma**2. Divide it by
+        y = y / self.gamma
+        return y
 
 
 class ScaledDotProductAttention(nn.Module):
@@ -694,7 +723,7 @@ class PositionalEncoding(nn.Module):
 
 
 class Projection(nn.Module):
-    """Class to project the predictions to class probabilities.
+    """Class to project the predictions of shape (B, T, D) to class probabilities of shape (B, T).
      """
     def __init__(
             self,
@@ -710,8 +739,8 @@ class Projection(nn.Module):
             dtype=dtype,
             bias=bias
         )
-
-        initialize_weights()
+        torch.nn.init.zeros_(self.projection.bias)
+        torch.nn.init.xavier_normal_(self.projection.weight)
 
     def forward(
             self,
@@ -723,4 +752,6 @@ class Projection(nn.Module):
 
         Returns: probabilities of shape (B, T, V)
         """
-        return
+        # Use log_softmax for numerical stability as it prevents overflow issues
+        # by avoiding direct computation of exponential.
+        return torch.log_softmax(self.projection(y), dim=-1, dtype=TYPE_FLOAT)

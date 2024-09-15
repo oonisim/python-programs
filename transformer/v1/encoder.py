@@ -222,18 +222,18 @@ class Encoder(nn.Module):
             ) for _layer in range(num_layers)
         ])
 
-    def forward(self, indices: Tensor):
+    def forward(self, x: Tensor):
         """Encode
         Args:
-            indices: indices to tokens
+            x: indices to tokens
         """
-        assert torch.is_tensor(indices) and indices.ndim == 2   # shape (B, T)
-        _B, _T = indices.shape        # pylint: disable=invalid-name
+        assert torch.is_tensor(x) and x.ndim == 2   # shape (B, T)
+        _B, _T = x.shape        # pylint: disable=invalid-name
 
         # --------------------------------------------------------------------------------
         # Input Embeddings multiplied by sqrt(d_model).
         # --------------------------------------------------------------------------------
-        x = self.input_embedding(indices=indices)
+        x = self.input_embedding(indices=x)
         assert x.shape == (_B, _T, self.D)
 
         # --------------------------------------------------------------------------------
