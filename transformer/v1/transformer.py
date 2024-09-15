@@ -70,6 +70,14 @@ class Transformer(nn.Module):
         Args:
             x: Encoder source sequences as token indices of shape (B, T).
             y: Decoder target sequences as token indices of shape (B, T).
+
+        Returns: Indices to vocabularies for the predicted tokens.
         """
-        predictions = self.projection(y=self.decoder(y=y, memory=self.encoder(x=x)))
-        return torch.argmax(predictions)
+        assert x.ndim == 2, f"expected x.shape (B, T), got {x.shape}."
+        assert y.ndim == 2, f"expected y.shape (B, T), got {y.shape}."
+
+        predictions: Tensor = self.projection(y=self.decoder(y=y, memory=self.encoder(x=x)))
+        predictions = torch.argmax(predictions)
+        assert predictions.shape == x.shape
+
+        return predictions
