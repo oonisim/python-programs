@@ -1,10 +1,4 @@
-"""Module for the Transformers Model
-B: Batch size
-T: Sequence length or max token size e.g. 512 for BERT. 'T' because of 'Time steps = Sequence length'
-D: Dimensions of the token embedding vector, which is d_model in the paper.
-   A token is represented by D number of features or attributes.
-   D can be signified as C (Channels).
-H: Number of heads in Multi-head attention
+"""Module of the Encoder stack in the Transformers Model
 """
 import torch
 from torch import (
@@ -56,12 +50,12 @@ class EncodeLayer(nn.Module):
         """
         super().__init__()
 
-        self.layernorm_multihead: nn.LayerNorm = nn.LayerNorm(
+        self.layer_norm_input: nn.LayerNorm = nn.LayerNorm(             # Normalize encoder input
             normalized_shape=d_model,
             eps=eps,
             dtype=dtype
         )
-        self.multihead_attention: MultiHeadAttention = MultiHeadAttention(
+        self.bidirectional_attention: MultiHeadAttention = MultiHeadAttention(
             i_layer=i_layer,
             num_heads=num_heads,
             d_model=d_model,
@@ -70,23 +64,23 @@ class EncodeLayer(nn.Module):
             max_time_steps=max_time_steps,
             bias=bias,
         )
-        self.dropout_multihead: nn.Module = nn.Dropout(p=p_drop)
+        self.dropout_bidirectional: nn.Module = nn.Dropout(p=p_drop)
 
-        self.layernorm_positionwise: nn.LayerNorm = nn.LayerNorm(
+        self.layer_norm_bidirectional: nn.LayerNorm = nn.LayerNorm(     # Normalize bidirectional attention
             normalized_shape=d_model,
             eps=eps,
             elementwise_affine=True,
             bias=True,
             dtype=dtype
         )
-        self.positionwise_feedforward: PositionwiseFeedForward = PositionwiseFeedForward(
+        self.feedforward: PositionwiseFeedForward = PositionwiseFeedForward(
             i_layer=i_layer,
             d_model=d_model,
             d_ff=d_ff,
             dtype=dtype,
             bias=bias,
         )
-        self.dropout_positionwise: nn.Module = nn.Dropout(p=p_drop)
+        self.dropout_feedforward: nn.Module = nn.Dropout(p=p_drop)
 
     def forward(self, x: Tensor) -> Tensor:
         """Encode.
@@ -128,7 +122,10 @@ class EncodeLayer(nn.Module):
         # DO NOT use += as it is in-place operation that can cause back-prop issue.
         # https://stackoverflow.com/a/68600205/4281353
         # https://crazyoscarchang.github.io/2018/10/04/in-pytorch-not-the-same/
-        x = x + self.dropout_multihead(self.multihead_attention(self.layernorm_multihead(x)))
+
+        # TODO: Verify _q, _k, _v refer to the same memory location without copy.
+        _q = _k = _v = self.layer_norm_input(x)
+        x = x + self.dropout_bidirectional(self.bidirectional_attention(q=_q, k=_k, v=_v))
 
         # --------------------------------------------------------------------------------
         # Post Normalization in the original paper. Replaced with Pre Norm as in Update:
@@ -139,7 +136,7 @@ class EncodeLayer(nn.Module):
         # x = self.layernorm_positionwise(
         #     x + self.dropout_positionwise(self.positionwise_feedforward(x))
         # )
-        x = x + self.dropout_positionwise(self.positionwise_feedforward(self.layernorm_positionwise(x)))
+        x = x + self.dropout_feedforward(self.feedforward(self.layer_norm_bidirectional(x)))
         assert torch.all(torch.isfinite(x))
         return x
 

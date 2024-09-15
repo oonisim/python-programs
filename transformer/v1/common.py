@@ -1,4 +1,4 @@
-"""Module for the Transformers Model
+"""Module for the Transformers Model Components.
 B: Batch size
 T: Sequence length or max token size e.g. 512 for BERT. 'T' because of 'Time steps = Sequence length'
 D: Dimensions of the token embedding vector, which is d_model in the paper.
@@ -261,6 +261,14 @@ def calculate_attention_values(
 class ScaledDotProductAttention(nn.Module):
     """
     Class to implement Scaled Dot Product Attention (Figure 2 left in the paper).
+    > 3.2.3
+    > self-attention layers in the decoder allow each position in the decoder to
+    > attend to all positions in the decoder up to and including that position.
+    > We need to prevent leftward information flow in the decoder to preserve the
+    > auto-regressive property. We implement this inside of scaled dot-product
+    > attention by masking out (setting to −∞) all values in the input of the
+    > softmax which correspond to illegal connections.
+    > [NOTE] see mask() function.
     """
     def __init__(self, do_mask: bool, max_time_steps: Optional[int]):
         """
@@ -325,7 +333,7 @@ class ScaledDotProductAttention(nn.Module):
             )
 
         # --------------------------------------------------------------------------------
-        # Normalize by softmax so that dimension -1 (q to k similarity) becomes probability.
+        # Softmax normalization so that dim=-1 (q to k similarity) becomes probability.
         # --------------------------------------------------------------------------------
         similarities = softmax(similarities, dim=-1)
 
@@ -458,17 +466,27 @@ class MultiHeadAttention(nn.Module):
 
     def forward(
             self,
-            x
+            q: Tensor,
+            k: Tensor,
+            v: Tensor
     ):
         """Run multi head attention
         Args:
-            x: input embedding vector of shape (B,T,D)
+            q: input embedding vectors of shape (B,T,D)
+            k: input embedding vectors of shape (B,T,D)
+            v: input embedding vectors of shape (B,T,D)
 
         Returns: Attention values of shape (B,T,D)
         """
         # pylint: disable=invalid-name
-        assert x.ndim == 3
-        _B, _T, _D = x.shape      # Batch, Tokens (or sequence length), Dimension
+        assert q.ndim == 3 and k.ndim == 3 and v.ndim == 3, \
+            "expected q.ndim == 3 and k.ndim == 3 and v.ndim == 3, " \
+            f"got {q.ndim}, {k.ndim}, {v.ndim}"
+        assert q.shape == k.shape == v.shape, \
+            "expected q.shape == k.shape == v.shape, " \
+            f"got {q.shape}, {k.shape}, {v.shape}."
+
+        _B, _T, _D = q.shape      # Batch, Tokens (or sequence length), Dimension
         assert _D == self.D, \
             f"input vector dimension is invalid, expected [{self.D}], got [{_D}]."
 
@@ -478,9 +496,9 @@ class MultiHeadAttention(nn.Module):
         # layers Q, K, V respectively, but no need to physically split into H number of
         # Linear layers. Instead, use one Linear layer Wq, Wk, Wv for Q, K, V respectively.
         # --------------------------------------------------------------------------------
-        q: Tensor = self.Wq(x)   # Transfer to Q space. Shape=(B, T, D)
-        k: Tensor = self.Wk(x)   # Transfer to K space. Shape=(B, T, D)
-        v: Tensor = self.Wv(x)   # Transfer to V space. Shape=(B, T, D)
+        q: Tensor = self.Wq(q)   # Transfer to Q space. Shape=(B, T, D)
+        k: Tensor = self.Wk(k)   # Transfer to K space. Shape=(B, T, D)
+        v: Tensor = self.Wv(v)   # Transfer to V space. Shape=(B, T, D)
         assert q.shape == (_B, self.T, self.D)
         assert k.shape == (_B, self.T, self.D)
 
