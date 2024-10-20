@@ -49,9 +49,9 @@ def initialize_weights_xavier(
 
 def initialize_weights(
         module: nn.Module,
-        output_projection: bool = False,    # pylint: disable=unused-argument
+        d_model: int,                       # Must be explicitly specified.
         i_layer: int = 0,
-        d_model: int = DIM_MODEL
+        output_projection: bool = False,    # pylint: disable=unused-argument
 ):
     """Initialize the module weights
     TODO: Research HuggingFace T5, BERT why they use 0.02 as STD for weight initialization.
@@ -84,9 +84,9 @@ def initialize_weights(
 
     Args:
         module: module whose weights to initialize
+        d_model: model weight dimension (explicitly provided to avoid unexpected implicit default).
         output_projection: TBD
         i_layer: layer index
-        d_model: model weight dimension
     """
     # 64 not to be too deep
     assert 0 <= i_layer <= 64, \
@@ -104,9 +104,18 @@ def initialize_weights(
             mean=0.0,
             std=1/math.sqrt(2 * d_model * layer_level)  # x 2 is empirical to get close to 0.02 used in GPT/BERT.
         )
+    else:
+        assert False, "invalid module type"
 
-    elif isinstance(module, nn.Embedding):
+
+def initialize_embedding_weights(
+        module: nn.Module,
+):
+    """Initialize embedding module weights"""
+    if isinstance(module, nn.Embedding):
         torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+    else:
+        assert False, "invalid module type"
 
 
 def split(
@@ -683,7 +692,7 @@ class InputEmbedding(nn.Module):
             embedding_dim=d_model,
             dtype=dtype
         )
-        initialize_weights(module=self.embedding)
+        initialize_embedding_weights(module=self.embedding)
 
     def forward(self, indices: Tensor):
         """Encode token indices into token embeddings.

@@ -178,11 +178,6 @@ class Encoder(nn.Module):
         # --------------------------------------------------------------------------------
         # Token embeddings
         # --------------------------------------------------------------------------------
-        # self.embedding: nn.Embedding = nn.Embedding(
-        #     num_embeddings=vocabulary_size,
-        #     embedding_dim=d_model
-        # )
-        # initialize_weights(module=self.embedding)
         self.input_embedding: InputEmbedding = InputEmbedding(
             d_model=d_model,
             vocabulary_size=vocabulary_size,
