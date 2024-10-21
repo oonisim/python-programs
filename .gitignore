@@ -11,3 +11,4 @@
 books/Deep-Learning-with-TensorFlow-2-and-Keras/Chapter_7/data/*
 books/Deep-Learning-with-TensorFlow-2-and-Keras/Chapter_7/datasets/*
 /pytorch/training/data/
+/pytorch/tensorboard/FashionMNIST/
