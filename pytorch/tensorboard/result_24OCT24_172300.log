@@ -1,0 +1,2429 @@
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.85 beta2:0.9985 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.261
+training loss at batch:[01000]: 0.537
+training loss at batch:[02000]: 0.462
+val_acc 0.886 val_loss  0.315
+Starting epoch:[1].
+training loss at batch:[00000]: 0.206
+training loss at batch:[01000]: 0.319
+training loss at batch:[02000]: 0.316
+val_acc 0.903 val_loss  0.273
+Starting epoch:[2].
+training loss at batch:[00000]: 0.210
+training loss at batch:[01000]: 0.283
+training loss at batch:[02000]: 0.280
+val_acc 0.900 val_loss  0.274
+Starting epoch:[3].
+training loss at batch:[00000]: 0.209
+training loss at batch:[01000]: 0.258
+training loss at batch:[02000]: 0.260
+val_acc 0.905 val_loss  0.260
+Starting epoch:[4].
+training loss at batch:[00000]: 0.212
+training loss at batch:[01000]: 0.236
+training loss at batch:[02000]: 0.239
+val_acc 0.916 val_loss  0.230
+test_acc 0.389 test_loss  2.335
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.85 beta2:0.9985 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.316
+training loss at batch:[01000]: 0.549
+training loss at batch:[02000]: 0.466
+val_acc 0.887 val_loss  0.315
+Starting epoch:[1].
+training loss at batch:[00000]: 0.270
+training loss at batch:[01000]: 0.319
+training loss at batch:[02000]: 0.318
+val_acc 0.903 val_loss  0.278
+Starting epoch:[2].
+training loss at batch:[00000]: 0.105
+training loss at batch:[01000]: 0.275
+training loss at batch:[02000]: 0.277
+val_acc 0.904 val_loss  0.259
+Starting epoch:[3].
+training loss at batch:[00000]: 0.315
+training loss at batch:[01000]: 0.254
+training loss at batch:[02000]: 0.256
+val_acc 0.898 val_loss  0.274
+Starting epoch:[4].
+training loss at batch:[00000]: 0.058
+training loss at batch:[01000]: 0.236
+training loss at batch:[02000]: 0.240
+val_acc 0.914 val_loss  0.242
+test_acc 0.409 test_loss  1.825
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.85 beta2:0.9985 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.338
+training loss at batch:[01000]: 0.540
+training loss at batch:[02000]: 0.466
+val_acc 0.894 val_loss  0.304
+Starting epoch:[1].
+training loss at batch:[00000]: 0.627
+training loss at batch:[01000]: 0.319
+training loss at batch:[02000]: 0.311
+val_acc 0.899 val_loss  0.278
+Starting epoch:[2].
+training loss at batch:[00000]: 0.280
+training loss at batch:[01000]: 0.273
+training loss at batch:[02000]: 0.274
+val_acc 0.899 val_loss  0.273
+Starting epoch:[3].
+training loss at batch:[00000]: 0.290
+training loss at batch:[01000]: 0.247
+training loss at batch:[02000]: 0.250
+val_acc 0.914 val_loss  0.245
+Starting epoch:[4].
+training loss at batch:[00000]: 0.068
+training loss at batch:[01000]: 0.228
+training loss at batch:[02000]: 0.235
+val_acc 0.916 val_loss  0.233
+test_acc 0.394 test_loss  2.060
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.85 beta2:0.999 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.293
+training loss at batch:[01000]: 0.532
+training loss at batch:[02000]: 0.468
+val_acc 0.894 val_loss  0.303
+Starting epoch:[1].
+training loss at batch:[00000]: 0.566
+training loss at batch:[01000]: 0.320
+training loss at batch:[02000]: 0.314
+val_acc 0.900 val_loss  0.279
+Starting epoch:[2].
+training loss at batch:[00000]: 0.503
+training loss at batch:[01000]: 0.279
+training loss at batch:[02000]: 0.280
+val_acc 0.906 val_loss  0.265
+Starting epoch:[3].
+training loss at batch:[00000]: 0.206
+training loss at batch:[01000]: 0.253
+training loss at batch:[02000]: 0.255
+val_acc 0.904 val_loss  0.269
+Starting epoch:[4].
+training loss at batch:[00000]: 0.238
+training loss at batch:[01000]: 0.236
+training loss at batch:[02000]: 0.241
+val_acc 0.904 val_loss  0.271
+test_acc 0.603 test_loss  1.283
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.85 beta2:0.999 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.288
+training loss at batch:[01000]: 0.548
+training loss at batch:[02000]: 0.467
+val_acc 0.890 val_loss  0.305
+Starting epoch:[1].
+training loss at batch:[00000]: 0.100
+training loss at batch:[01000]: 0.324
+training loss at batch:[02000]: 0.316
+val_acc 0.905 val_loss  0.266
+Starting epoch:[2].
+training loss at batch:[00000]: 0.041
+training loss at batch:[01000]: 0.284
+training loss at batch:[02000]: 0.279
+val_acc 0.902 val_loss  0.264
+Starting epoch:[3].
+training loss at batch:[00000]: 0.436
+training loss at batch:[01000]: 0.259
+training loss at batch:[02000]: 0.255
+val_acc 0.903 val_loss  0.265
+Starting epoch:[4].
+training loss at batch:[00000]: 0.032
+training loss at batch:[01000]: 0.236
+training loss at batch:[02000]: 0.244
+val_acc 0.911 val_loss  0.243
+test_acc 0.407 test_loss  1.851
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.85 beta2:0.999 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.330
+training loss at batch:[01000]: 0.545
+training loss at batch:[02000]: 0.465
+val_acc 0.893 val_loss  0.298
+Starting epoch:[1].
+training loss at batch:[00000]: 0.274
+training loss at batch:[01000]: 0.322
+training loss at batch:[02000]: 0.317
+val_acc 0.894 val_loss  0.296
+Starting epoch:[2].
+training loss at batch:[00000]: 0.619
+training loss at batch:[01000]: 0.283
+training loss at batch:[02000]: 0.284
+val_acc 0.909 val_loss  0.254
+Starting epoch:[3].
+training loss at batch:[00000]: 0.444
+training loss at batch:[01000]: 0.261
+training loss at batch:[02000]: 0.260
+val_acc 0.908 val_loss  0.253
+Starting epoch:[4].
+training loss at batch:[00000]: 0.081
+training loss at batch:[01000]: 0.234
+training loss at batch:[02000]: 0.239
+val_acc 0.910 val_loss  0.249
+test_acc 0.518 test_loss  1.590
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.85 beta2:0.9995 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.338
+training loss at batch:[01000]: 0.540
+training loss at batch:[02000]: 0.461
+val_acc 0.886 val_loss  0.312
+Starting epoch:[1].
+training loss at batch:[00000]: 0.420
+training loss at batch:[01000]: 0.322
+training loss at batch:[02000]: 0.315
+val_acc 0.898 val_loss  0.278
+Starting epoch:[2].
+training loss at batch:[00000]: 0.113
+training loss at batch:[01000]: 0.277
+training loss at batch:[02000]: 0.280
+val_acc 0.904 val_loss  0.268
+Starting epoch:[3].
+training loss at batch:[00000]: 0.079
+training loss at batch:[01000]: 0.253
+training loss at batch:[02000]: 0.258
+val_acc 0.906 val_loss  0.262
+Starting epoch:[4].
+training loss at batch:[00000]: 0.358
+training loss at batch:[01000]: 0.240
+training loss at batch:[02000]: 0.240
+val_acc 0.907 val_loss  0.252
+test_acc 0.203 test_loss  3.168
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.85 beta2:0.9995 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.251
+training loss at batch:[01000]: 0.549
+training loss at batch:[02000]: 0.469
+val_acc 0.893 val_loss  0.317
+Starting epoch:[1].
+training loss at batch:[00000]: 0.662
+training loss at batch:[01000]: 0.333
+training loss at batch:[02000]: 0.324
+val_acc 0.901 val_loss  0.282
+Starting epoch:[2].
+training loss at batch:[00000]: 0.378
+training loss at batch:[01000]: 0.294
+training loss at batch:[02000]: 0.288
+val_acc 0.897 val_loss  0.281
+Starting epoch:[3].
+training loss at batch:[00000]: 0.522
+training loss at batch:[01000]: 0.251
+training loss at batch:[02000]: 0.259
+val_acc 0.908 val_loss  0.260
+Starting epoch:[4].
+training loss at batch:[00000]: 0.214
+training loss at batch:[01000]: 0.245
+training loss at batch:[02000]: 0.247
+val_acc 0.914 val_loss  0.236
+test_acc 0.358 test_loss  2.658
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.85 beta2:0.9995 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.225
+training loss at batch:[01000]: 0.540
+training loss at batch:[02000]: 0.462
+val_acc 0.896 val_loss  0.297
+Starting epoch:[1].
+training loss at batch:[00000]: 0.344
+training loss at batch:[01000]: 0.311
+training loss at batch:[02000]: 0.309
+val_acc 0.891 val_loss  0.298
+Starting epoch:[2].
+training loss at batch:[00000]: 0.217
+training loss at batch:[01000]: 0.280
+training loss at batch:[02000]: 0.273
+val_acc 0.913 val_loss  0.254
+Starting epoch:[3].
+training loss at batch:[00000]: 0.288
+training loss at batch:[01000]: 0.257
+training loss at batch:[02000]: 0.257
+val_acc 0.902 val_loss  0.273
+Starting epoch:[4].
+training loss at batch:[00000]: 0.303
+training loss at batch:[01000]: 0.242
+training loss at batch:[02000]: 0.241
+val_acc 0.914 val_loss  0.238
+test_acc 0.399 test_loss  1.674
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.9 beta2:0.9985 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.472
+training loss at batch:[01000]: 0.548
+training loss at batch:[02000]: 0.468
+val_acc 0.894 val_loss  0.298
+Starting epoch:[1].
+training loss at batch:[00000]: 0.410
+training loss at batch:[01000]: 0.313
+training loss at batch:[02000]: 0.311
+val_acc 0.905 val_loss  0.263
+Starting epoch:[2].
+training loss at batch:[00000]: 0.177
+training loss at batch:[01000]: 0.278
+training loss at batch:[02000]: 0.280
+val_acc 0.903 val_loss  0.273
+Starting epoch:[3].
+training loss at batch:[00000]: 0.110
+training loss at batch:[01000]: 0.253
+training loss at batch:[02000]: 0.255
+val_acc 0.890 val_loss  0.283
+Starting epoch:[4].
+training loss at batch:[00000]: 0.056
+training loss at batch:[01000]: 0.238
+training loss at batch:[02000]: 0.238
+val_acc 0.911 val_loss  0.250
+test_acc 0.474 test_loss  1.714
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.9 beta2:0.9985 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.311
+training loss at batch:[01000]: 0.547
+training loss at batch:[02000]: 0.473
+val_acc 0.874 val_loss  0.333
+Starting epoch:[1].
+training loss at batch:[00000]: 0.230
+training loss at batch:[01000]: 0.328
+training loss at batch:[02000]: 0.318
+val_acc 0.889 val_loss  0.308
+Starting epoch:[2].
+training loss at batch:[00000]: 0.152
+training loss at batch:[01000]: 0.279
+training loss at batch:[02000]: 0.278
+val_acc 0.907 val_loss  0.254
+Starting epoch:[3].
+training loss at batch:[00000]: 0.338
+training loss at batch:[01000]: 0.256
+training loss at batch:[02000]: 0.256
+val_acc 0.908 val_loss  0.249
+Starting epoch:[4].
+training loss at batch:[00000]: 0.567
+training loss at batch:[01000]: 0.238
+training loss at batch:[02000]: 0.237
+val_acc 0.914 val_loss  0.237
+test_acc 0.531 test_loss  1.158
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.9 beta2:0.9985 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.298
+training loss at batch:[01000]: 0.561
+training loss at batch:[02000]: 0.472
+val_acc 0.881 val_loss  0.326
+Starting epoch:[1].
+training loss at batch:[00000]: 0.127
+training loss at batch:[01000]: 0.328
+training loss at batch:[02000]: 0.321
+val_acc 0.905 val_loss  0.265
+Starting epoch:[2].
+training loss at batch:[00000]: 0.242
+training loss at batch:[01000]: 0.280
+training loss at batch:[02000]: 0.279
+val_acc 0.904 val_loss  0.263
+Starting epoch:[3].
+training loss at batch:[00000]: 0.152
+training loss at batch:[01000]: 0.252
+training loss at batch:[02000]: 0.255
+val_acc 0.909 val_loss  0.250
+Starting epoch:[4].
+training loss at batch:[00000]: 0.261
+training loss at batch:[01000]: 0.235
+training loss at batch:[02000]: 0.237
+val_acc 0.910 val_loss  0.243
+test_acc 0.250 test_loss  2.774
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.9 beta2:0.999 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.364
+training loss at batch:[01000]: 0.556
+training loss at batch:[02000]: 0.481
+val_acc 0.891 val_loss  0.308
+Starting epoch:[1].
+training loss at batch:[00000]: 0.164
+training loss at batch:[01000]: 0.327
+training loss at batch:[02000]: 0.324
+val_acc 0.876 val_loss  0.330
+Starting epoch:[2].
+training loss at batch:[00000]: 0.096
+training loss at batch:[01000]: 0.283
+training loss at batch:[02000]: 0.285
+val_acc 0.906 val_loss  0.265
+Starting epoch:[3].
+training loss at batch:[00000]: 0.202
+training loss at batch:[01000]: 0.264
+training loss at batch:[02000]: 0.256
+val_acc 0.916 val_loss  0.233
+Starting epoch:[4].
+training loss at batch:[00000]: 0.315
+training loss at batch:[01000]: 0.240
+training loss at batch:[02000]: 0.239
+val_acc 0.900 val_loss  0.278
+test_acc 0.420 test_loss  1.826
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.9 beta2:0.999 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.298
+training loss at batch:[01000]: 0.526
+training loss at batch:[02000]: 0.459
+val_acc 0.890 val_loss  0.313
+Starting epoch:[1].
+training loss at batch:[00000]: 0.049
+training loss at batch:[01000]: 0.320
+training loss at batch:[02000]: 0.324
+val_acc 0.902 val_loss  0.271
+Starting epoch:[2].
+training loss at batch:[00000]: 0.464
+training loss at batch:[01000]: 0.281
+training loss at batch:[02000]: 0.283
+val_acc 0.905 val_loss  0.261
+Starting epoch:[3].
+training loss at batch:[00000]: 0.253
+training loss at batch:[01000]: 0.258
+training loss at batch:[02000]: 0.259
+val_acc 0.906 val_loss  0.259
+Starting epoch:[4].
+training loss at batch:[00000]: 0.126
+training loss at batch:[01000]: 0.244
+training loss at batch:[02000]: 0.245
+val_acc 0.914 val_loss  0.241
+test_acc 0.330 test_loss  1.951
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.9 beta2:0.999 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.327
+training loss at batch:[01000]: 0.542
+training loss at batch:[02000]: 0.472
+val_acc 0.881 val_loss  0.331
+Starting epoch:[1].
+training loss at batch:[00000]: 0.200
+training loss at batch:[01000]: 0.326
+training loss at batch:[02000]: 0.315
+val_acc 0.887 val_loss  0.311
+Starting epoch:[2].
+training loss at batch:[00000]: 0.337
+training loss at batch:[01000]: 0.287
+training loss at batch:[02000]: 0.283
+val_acc 0.893 val_loss  0.286
+Starting epoch:[3].
+training loss at batch:[00000]: 0.179
+training loss at batch:[01000]: 0.259
+training loss at batch:[02000]: 0.260
+val_acc 0.906 val_loss  0.255
+Starting epoch:[4].
+training loss at batch:[00000]: 0.119
+training loss at batch:[01000]: 0.236
+training loss at batch:[02000]: 0.243
+val_acc 0.913 val_loss  0.241
+test_acc 0.322 test_loss  3.085
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.9 beta2:0.9995 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.303
+training loss at batch:[01000]: 0.533
+training loss at batch:[02000]: 0.462
+val_acc 0.867 val_loss  0.361
+Starting epoch:[1].
+training loss at batch:[00000]: 0.152
+training loss at batch:[01000]: 0.315
+training loss at batch:[02000]: 0.308
+val_acc 0.903 val_loss  0.270
+Starting epoch:[2].
+training loss at batch:[00000]: 0.756
+training loss at batch:[01000]: 0.272
+training loss at batch:[02000]: 0.271
+val_acc 0.910 val_loss  0.254
+Starting epoch:[3].
+training loss at batch:[00000]: 0.053
+training loss at batch:[01000]: 0.245
+training loss at batch:[02000]: 0.251
+val_acc 0.908 val_loss  0.252
+Starting epoch:[4].
+training loss at batch:[00000]: 0.143
+training loss at batch:[01000]: 0.231
+training loss at batch:[02000]: 0.234
+val_acc 0.910 val_loss  0.249
+test_acc 0.564 test_loss  1.403
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.9 beta2:0.9995 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.300
+training loss at batch:[01000]: 0.551
+training loss at batch:[02000]: 0.475
+val_acc 0.881 val_loss  0.325
+Starting epoch:[1].
+training loss at batch:[00000]: 0.088
+training loss at batch:[01000]: 0.319
+training loss at batch:[02000]: 0.314
+val_acc 0.898 val_loss  0.282
+Starting epoch:[2].
+training loss at batch:[00000]: 0.811
+training loss at batch:[01000]: 0.290
+training loss at batch:[02000]: 0.286
+val_acc 0.900 val_loss  0.273
+Starting epoch:[3].
+training loss at batch:[00000]: 0.117
+training loss at batch:[01000]: 0.255
+training loss at batch:[02000]: 0.258
+val_acc 0.907 val_loss  0.255
+Starting epoch:[4].
+training loss at batch:[00000]: 0.034
+training loss at batch:[01000]: 0.244
+training loss at batch:[02000]: 0.244
+val_acc 0.910 val_loss  0.247
+test_acc 0.587 test_loss  1.231
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.9 beta2:0.9995 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.261
+training loss at batch:[01000]: 0.559
+training loss at batch:[02000]: 0.478
+val_acc 0.885 val_loss  0.316
+Starting epoch:[1].
+training loss at batch:[00000]: 0.405
+training loss at batch:[01000]: 0.311
+training loss at batch:[02000]: 0.314
+val_acc 0.903 val_loss  0.276
+Starting epoch:[2].
+training loss at batch:[00000]: 0.115
+training loss at batch:[01000]: 0.279
+training loss at batch:[02000]: 0.278
+val_acc 0.905 val_loss  0.259
+Starting epoch:[3].
+training loss at batch:[00000]: 0.258
+training loss at batch:[01000]: 0.263
+training loss at batch:[02000]: 0.259
+val_acc 0.907 val_loss  0.256
+Starting epoch:[4].
+training loss at batch:[00000]: 0.226
+training loss at batch:[01000]: 0.250
+training loss at batch:[02000]: 0.245
+val_acc 0.916 val_loss  0.237
+test_acc 0.502 test_loss  1.579
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.95 beta2:0.9985 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.406
+training loss at batch:[01000]: 0.556
+training loss at batch:[02000]: 0.477
+val_acc 0.872 val_loss  0.345
+Starting epoch:[1].
+training loss at batch:[00000]: 0.261
+training loss at batch:[01000]: 0.318
+training loss at batch:[02000]: 0.315
+val_acc 0.891 val_loss  0.295
+Starting epoch:[2].
+training loss at batch:[00000]: 0.289
+training loss at batch:[01000]: 0.284
+training loss at batch:[02000]: 0.286
+val_acc 0.910 val_loss  0.255
+Starting epoch:[3].
+training loss at batch:[00000]: 0.478
+training loss at batch:[01000]: 0.255
+training loss at batch:[02000]: 0.253
+val_acc 0.914 val_loss  0.243
+Starting epoch:[4].
+training loss at batch:[00000]: 0.211
+training loss at batch:[01000]: 0.241
+training loss at batch:[02000]: 0.243
+val_acc 0.916 val_loss  0.228
+test_acc 0.319 test_loss  2.137
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.95 beta2:0.9985 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.311
+training loss at batch:[01000]: 0.532
+training loss at batch:[02000]: 0.467
+val_acc 0.880 val_loss  0.343
+Starting epoch:[1].
+training loss at batch:[00000]: 0.149
+training loss at batch:[01000]: 0.332
+training loss at batch:[02000]: 0.328
+val_acc 0.898 val_loss  0.280
+Starting epoch:[2].
+training loss at batch:[00000]: 0.339
+training loss at batch:[01000]: 0.289
+training loss at batch:[02000]: 0.286
+val_acc 0.886 val_loss  0.311
+Starting epoch:[3].
+training loss at batch:[00000]: 0.384
+training loss at batch:[01000]: 0.251
+training loss at batch:[02000]: 0.259
+val_acc 0.908 val_loss  0.253
+Starting epoch:[4].
+training loss at batch:[00000]: 0.230
+training loss at batch:[01000]: 0.245
+training loss at batch:[02000]: 0.242
+val_acc 0.918 val_loss  0.236
+test_acc 0.102 test_loss  4.430
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.95 beta2:0.9985 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.353
+training loss at batch:[01000]: 0.533
+training loss at batch:[02000]: 0.467
+val_acc 0.889 val_loss  0.314
+Starting epoch:[1].
+training loss at batch:[00000]: 0.618
+training loss at batch:[01000]: 0.317
+training loss at batch:[02000]: 0.322
+val_acc 0.895 val_loss  0.286
+Starting epoch:[2].
+training loss at batch:[00000]: 0.049
+training loss at batch:[01000]: 0.269
+training loss at batch:[02000]: 0.275
+val_acc 0.909 val_loss  0.250
+Starting epoch:[3].
+training loss at batch:[00000]: 0.259
+training loss at batch:[01000]: 0.258
+training loss at batch:[02000]: 0.260
+val_acc 0.901 val_loss  0.269
+Starting epoch:[4].
+training loss at batch:[00000]: 0.133
+training loss at batch:[01000]: 0.241
+training loss at batch:[02000]: 0.246
+val_acc 0.910 val_loss  0.253
+test_acc 0.159 test_loss  4.094
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.95 beta2:0.999 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.338
+training loss at batch:[01000]: 0.558
+training loss at batch:[02000]: 0.476
+val_acc 0.888 val_loss  0.309
+Starting epoch:[1].
+training loss at batch:[00000]: 0.253
+training loss at batch:[01000]: 0.315
+training loss at batch:[02000]: 0.314
+val_acc 0.895 val_loss  0.294
+Starting epoch:[2].
+training loss at batch:[00000]: 0.364
+training loss at batch:[01000]: 0.277
+training loss at batch:[02000]: 0.279
+val_acc 0.891 val_loss  0.303
+Starting epoch:[3].
+training loss at batch:[00000]: 0.108
+training loss at batch:[01000]: 0.259
+training loss at batch:[02000]: 0.260
+val_acc 0.906 val_loss  0.273
+Starting epoch:[4].
+training loss at batch:[00000]: 0.578
+training loss at batch:[01000]: 0.240
+training loss at batch:[02000]: 0.241
+val_acc 0.916 val_loss  0.235
+test_acc 0.408 test_loss  2.313
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.95 beta2:0.999 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.300
+training loss at batch:[01000]: 0.563
+training loss at batch:[02000]: 0.480
+val_acc 0.874 val_loss  0.360
+Starting epoch:[1].
+training loss at batch:[00000]: 0.349
+training loss at batch:[01000]: 0.327
+training loss at batch:[02000]: 0.322
+val_acc 0.889 val_loss  0.306
+Starting epoch:[2].
+training loss at batch:[00000]: 0.289
+training loss at batch:[01000]: 0.287
+training loss at batch:[02000]: 0.283
+val_acc 0.904 val_loss  0.268
+Starting epoch:[3].
+training loss at batch:[00000]: 0.177
+training loss at batch:[01000]: 0.257
+training loss at batch:[02000]: 0.259
+val_acc 0.909 val_loss  0.250
+Starting epoch:[4].
+training loss at batch:[00000]: 0.216
+training loss at batch:[01000]: 0.238
+training loss at batch:[02000]: 0.241
+val_acc 0.912 val_loss  0.247
+test_acc 0.383 test_loss  1.968
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.95 beta2:0.999 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.334
+training loss at batch:[01000]: 0.540
+training loss at batch:[02000]: 0.467
+val_acc 0.889 val_loss  0.314
+Starting epoch:[1].
+training loss at batch:[00000]: 0.246
+training loss at batch:[01000]: 0.326
+training loss at batch:[02000]: 0.320
+val_acc 0.902 val_loss  0.273
+Starting epoch:[2].
+training loss at batch:[00000]: 0.152
+training loss at batch:[01000]: 0.276
+training loss at batch:[02000]: 0.277
+val_acc 0.900 val_loss  0.277
+Starting epoch:[3].
+training loss at batch:[00000]: 0.572
+training loss at batch:[01000]: 0.257
+training loss at batch:[02000]: 0.258
+val_acc 0.908 val_loss  0.248
+Starting epoch:[4].
+training loss at batch:[00000]: 0.287
+training loss at batch:[01000]: 0.245
+training loss at batch:[02000]: 0.242
+val_acc 0.912 val_loss  0.241
+test_acc 0.411 test_loss  2.004
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.95 beta2:0.9995 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.282
+training loss at batch:[01000]: 0.559
+training loss at batch:[02000]: 0.476
+val_acc 0.867 val_loss  0.353
+Starting epoch:[1].
+training loss at batch:[00000]: 0.268
+training loss at batch:[01000]: 0.320
+training loss at batch:[02000]: 0.320
+val_acc 0.892 val_loss  0.296
+Starting epoch:[2].
+training loss at batch:[00000]: 0.186
+training loss at batch:[01000]: 0.277
+training loss at batch:[02000]: 0.285
+val_acc 0.902 val_loss  0.269
+Starting epoch:[3].
+training loss at batch:[00000]: 0.251
+training loss at batch:[01000]: 0.261
+training loss at batch:[02000]: 0.259
+val_acc 0.909 val_loss  0.249
+Starting epoch:[4].
+training loss at batch:[00000]: 0.216
+training loss at batch:[01000]: 0.238
+training loss at batch:[02000]: 0.241
+val_acc 0.912 val_loss  0.241
+test_acc 0.335 test_loss  2.324
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.95 beta2:0.9995 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.255
+training loss at batch:[01000]: 0.536
+training loss at batch:[02000]: 0.461
+val_acc 0.890 val_loss  0.311
+Starting epoch:[1].
+training loss at batch:[00000]: 0.367
+training loss at batch:[01000]: 0.326
+training loss at batch:[02000]: 0.315
+val_acc 0.904 val_loss  0.265
+Starting epoch:[2].
+training loss at batch:[00000]: 0.376
+training loss at batch:[01000]: 0.282
+training loss at batch:[02000]: 0.285
+val_acc 0.909 val_loss  0.255
+Starting epoch:[3].
+training loss at batch:[00000]: 0.297
+training loss at batch:[01000]: 0.260
+training loss at batch:[02000]: 0.264
+val_acc 0.892 val_loss  0.295
+Starting epoch:[4].
+training loss at batch:[00000]: 0.506
+training loss at batch:[01000]: 0.240
+training loss at batch:[02000]: 0.243
+val_acc 0.916 val_loss  0.234
+test_acc 0.306 test_loss  2.062
+
+--------------------------------------------------------------------------------
+lr:0.001 beat1:0.95 beta2:0.9995 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.382
+training loss at batch:[01000]: 0.534
+training loss at batch:[02000]: 0.464
+val_acc 0.887 val_loss  0.319
+Starting epoch:[1].
+training loss at batch:[00000]: 0.195
+training loss at batch:[01000]: 0.320
+training loss at batch:[02000]: 0.316
+val_acc 0.902 val_loss  0.279
+Starting epoch:[2].
+training loss at batch:[00000]: 0.458
+training loss at batch:[01000]: 0.272
+training loss at batch:[02000]: 0.279
+val_acc 0.899 val_loss  0.272
+Starting epoch:[3].
+training loss at batch:[00000]: 0.446
+training loss at batch:[01000]: 0.262
+training loss at batch:[02000]: 0.260
+val_acc 0.913 val_loss  0.243
+Starting epoch:[4].
+training loss at batch:[00000]: 0.424
+training loss at batch:[01000]: 0.235
+training loss at batch:[02000]: 0.238
+val_acc 0.901 val_loss  0.271
+test_acc 0.390 test_loss  1.915
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.85 beta2:0.9985 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.348
+training loss at batch:[01000]: 0.777
+training loss at batch:[02000]: 0.614
+val_acc 0.871 val_loss  0.366
+Starting epoch:[1].
+training loss at batch:[00000]: 0.477
+training loss at batch:[01000]: 0.359
+training loss at batch:[02000]: 0.355
+val_acc 0.886 val_loss  0.319
+Starting epoch:[2].
+training loss at batch:[00000]: 0.107
+training loss at batch:[01000]: 0.314
+training loss at batch:[02000]: 0.316
+val_acc 0.899 val_loss  0.292
+Starting epoch:[3].
+training loss at batch:[00000]: 0.284
+training loss at batch:[01000]: 0.307
+training loss at batch:[02000]: 0.304
+val_acc 0.906 val_loss  0.273
+Starting epoch:[4].
+training loss at batch:[00000]: 0.242
+training loss at batch:[01000]: 0.288
+training loss at batch:[02000]: 0.286
+val_acc 0.909 val_loss  0.261
+test_acc 0.321 test_loss  1.954
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.85 beta2:0.9985 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.383
+training loss at batch:[01000]: 0.821
+training loss at batch:[02000]: 0.646
+val_acc 0.875 val_loss  0.367
+Starting epoch:[1].
+training loss at batch:[00000]: 0.285
+training loss at batch:[01000]: 0.374
+training loss at batch:[02000]: 0.363
+val_acc 0.893 val_loss  0.315
+Starting epoch:[2].
+training loss at batch:[00000]: 0.279
+training loss at batch:[01000]: 0.326
+training loss at batch:[02000]: 0.323
+val_acc 0.892 val_loss  0.307
+Starting epoch:[3].
+training loss at batch:[00000]: 0.564
+training loss at batch:[01000]: 0.308
+training loss at batch:[02000]: 0.301
+val_acc 0.900 val_loss  0.286
+Starting epoch:[4].
+training loss at batch:[00000]: 0.286
+training loss at batch:[01000]: 0.283
+training loss at batch:[02000]: 0.286
+val_acc 0.904 val_loss  0.272
+test_acc 0.552 test_loss  1.423
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.85 beta2:0.9985 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.332
+training loss at batch:[01000]: 0.764
+training loss at batch:[02000]: 0.611
+val_acc 0.872 val_loss  0.368
+Starting epoch:[1].
+training loss at batch:[00000]: 0.174
+training loss at batch:[01000]: 0.372
+training loss at batch:[02000]: 0.366
+val_acc 0.889 val_loss  0.318
+Starting epoch:[2].
+training loss at batch:[00000]: 0.274
+training loss at batch:[01000]: 0.330
+training loss at batch:[02000]: 0.324
+val_acc 0.896 val_loss  0.293
+Starting epoch:[3].
+training loss at batch:[00000]: 0.451
+training loss at batch:[01000]: 0.309
+training loss at batch:[02000]: 0.307
+val_acc 0.900 val_loss  0.282
+Starting epoch:[4].
+training loss at batch:[00000]: 0.374
+training loss at batch:[01000]: 0.290
+training loss at batch:[02000]: 0.285
+val_acc 0.902 val_loss  0.280
+test_acc 0.316 test_loss  1.879
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.85 beta2:0.999 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.288
+training loss at batch:[01000]: 0.775
+training loss at batch:[02000]: 0.617
+val_acc 0.880 val_loss  0.357
+Starting epoch:[1].
+training loss at batch:[00000]: 0.187
+training loss at batch:[01000]: 0.362
+training loss at batch:[02000]: 0.356
+val_acc 0.894 val_loss  0.311
+Starting epoch:[2].
+training loss at batch:[00000]: 0.325
+training loss at batch:[01000]: 0.327
+training loss at batch:[02000]: 0.323
+val_acc 0.897 val_loss  0.292
+Starting epoch:[3].
+training loss at batch:[00000]: 0.343
+training loss at batch:[01000]: 0.294
+training loss at batch:[02000]: 0.295
+val_acc 0.897 val_loss  0.293
+Starting epoch:[4].
+training loss at batch:[00000]: 0.147
+training loss at batch:[01000]: 0.285
+training loss at batch:[02000]: 0.281
+val_acc 0.907 val_loss  0.264
+test_acc 0.548 test_loss  1.385
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.85 beta2:0.999 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.326
+training loss at batch:[01000]: 0.806
+training loss at batch:[02000]: 0.626
+val_acc 0.883 val_loss  0.349
+Starting epoch:[1].
+training loss at batch:[00000]: 0.274
+training loss at batch:[01000]: 0.361
+training loss at batch:[02000]: 0.354
+val_acc 0.895 val_loss  0.309
+Starting epoch:[2].
+training loss at batch:[00000]: 0.855
+training loss at batch:[01000]: 0.311
+training loss at batch:[02000]: 0.314
+val_acc 0.903 val_loss  0.283
+Starting epoch:[3].
+training loss at batch:[00000]: 0.392
+training loss at batch:[01000]: 0.298
+training loss at batch:[02000]: 0.293
+val_acc 0.900 val_loss  0.286
+Starting epoch:[4].
+training loss at batch:[00000]: 0.327
+training loss at batch:[01000]: 0.282
+training loss at batch:[02000]: 0.281
+val_acc 0.910 val_loss  0.261
+test_acc 0.408 test_loss  1.547
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.85 beta2:0.999 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.248
+training loss at batch:[01000]: 0.776
+training loss at batch:[02000]: 0.618
+val_acc 0.874 val_loss  0.362
+Starting epoch:[1].
+training loss at batch:[00000]: 0.292
+training loss at batch:[01000]: 0.370
+training loss at batch:[02000]: 0.366
+val_acc 0.885 val_loss  0.322
+Starting epoch:[2].
+training loss at batch:[00000]: 0.058
+training loss at batch:[01000]: 0.331
+training loss at batch:[02000]: 0.329
+val_acc 0.892 val_loss  0.307
+Starting epoch:[3].
+training loss at batch:[00000]: 0.416
+training loss at batch:[01000]: 0.312
+training loss at batch:[02000]: 0.307
+val_acc 0.903 val_loss  0.275
+Starting epoch:[4].
+training loss at batch:[00000]: 0.089
+training loss at batch:[01000]: 0.290
+training loss at batch:[02000]: 0.293
+val_acc 0.902 val_loss  0.272
+test_acc 0.390 test_loss  1.754
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.85 beta2:0.9995 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.295
+training loss at batch:[01000]: 0.792
+training loss at batch:[02000]: 0.623
+val_acc 0.869 val_loss  0.373
+Starting epoch:[1].
+training loss at batch:[00000]: 0.382
+training loss at batch:[01000]: 0.363
+training loss at batch:[02000]: 0.358
+val_acc 0.893 val_loss  0.311
+Starting epoch:[2].
+training loss at batch:[00000]: 0.415
+training loss at batch:[01000]: 0.316
+training loss at batch:[02000]: 0.317
+val_acc 0.899 val_loss  0.288
+Starting epoch:[3].
+training loss at batch:[00000]: 0.269
+training loss at batch:[01000]: 0.299
+training loss at batch:[02000]: 0.295
+val_acc 0.900 val_loss  0.279
+Starting epoch:[4].
+training loss at batch:[00000]: 0.356
+training loss at batch:[01000]: 0.272
+training loss at batch:[02000]: 0.277
+val_acc 0.907 val_loss  0.267
+test_acc 0.627 test_loss  1.303
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.85 beta2:0.9995 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.271
+training loss at batch:[01000]: 0.756
+training loss at batch:[02000]: 0.602
+val_acc 0.879 val_loss  0.352
+Starting epoch:[1].
+training loss at batch:[00000]: 0.257
+training loss at batch:[01000]: 0.363
+training loss at batch:[02000]: 0.363
+val_acc 0.890 val_loss  0.320
+Starting epoch:[2].
+training loss at batch:[00000]: 0.192
+training loss at batch:[01000]: 0.321
+training loss at batch:[02000]: 0.322
+val_acc 0.895 val_loss  0.295
+Starting epoch:[3].
+training loss at batch:[00000]: 0.138
+training loss at batch:[01000]: 0.301
+training loss at batch:[02000]: 0.300
+val_acc 0.903 val_loss  0.280
+Starting epoch:[4].
+training loss at batch:[00000]: 0.247
+training loss at batch:[01000]: 0.287
+training loss at batch:[02000]: 0.286
+val_acc 0.907 val_loss  0.267
+test_acc 0.595 test_loss  1.306
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.85 beta2:0.9995 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.243
+training loss at batch:[01000]: 0.796
+training loss at batch:[02000]: 0.630
+val_acc 0.864 val_loss  0.379
+Starting epoch:[1].
+training loss at batch:[00000]: 0.215
+training loss at batch:[01000]: 0.381
+training loss at batch:[02000]: 0.372
+val_acc 0.892 val_loss  0.319
+Starting epoch:[2].
+training loss at batch:[00000]: 0.270
+training loss at batch:[01000]: 0.328
+training loss at batch:[02000]: 0.329
+val_acc 0.899 val_loss  0.296
+Starting epoch:[3].
+training loss at batch:[00000]: 0.608
+training loss at batch:[01000]: 0.308
+training loss at batch:[02000]: 0.307
+val_acc 0.906 val_loss  0.277
+Starting epoch:[4].
+training loss at batch:[00000]: 0.299
+training loss at batch:[01000]: 0.293
+training loss at batch:[02000]: 0.292
+val_acc 0.907 val_loss  0.270
+test_acc 0.541 test_loss  1.606
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.9 beta2:0.9985 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.291
+training loss at batch:[01000]: 0.788
+training loss at batch:[02000]: 0.623
+val_acc 0.877 val_loss  0.359
+Starting epoch:[1].
+training loss at batch:[00000]: 0.666
+training loss at batch:[01000]: 0.372
+training loss at batch:[02000]: 0.366
+val_acc 0.890 val_loss  0.318
+Starting epoch:[2].
+training loss at batch:[00000]: 0.375
+training loss at batch:[01000]: 0.335
+training loss at batch:[02000]: 0.324
+val_acc 0.888 val_loss  0.316
+Starting epoch:[3].
+training loss at batch:[00000]: 0.182
+training loss at batch:[01000]: 0.306
+training loss at batch:[02000]: 0.302
+val_acc 0.898 val_loss  0.293
+Starting epoch:[4].
+training loss at batch:[00000]: 0.143
+training loss at batch:[01000]: 0.291
+training loss at batch:[02000]: 0.289
+val_acc 0.901 val_loss  0.276
+test_acc 0.260 test_loss  2.103
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.9 beta2:0.9985 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.334
+training loss at batch:[01000]: 0.783
+training loss at batch:[02000]: 0.625
+val_acc 0.869 val_loss  0.369
+Starting epoch:[1].
+training loss at batch:[00000]: 0.964
+training loss at batch:[01000]: 0.373
+training loss at batch:[02000]: 0.366
+val_acc 0.887 val_loss  0.315
+Starting epoch:[2].
+training loss at batch:[00000]: 0.196
+training loss at batch:[01000]: 0.322
+training loss at batch:[02000]: 0.316
+val_acc 0.900 val_loss  0.282
+Starting epoch:[3].
+training loss at batch:[00000]: 0.276
+training loss at batch:[01000]: 0.296
+training loss at batch:[02000]: 0.298
+val_acc 0.901 val_loss  0.280
+Starting epoch:[4].
+training loss at batch:[00000]: 0.428
+training loss at batch:[01000]: 0.282
+training loss at batch:[02000]: 0.283
+val_acc 0.906 val_loss  0.265
+test_acc 0.583 test_loss  1.395
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.9 beta2:0.9985 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.308
+training loss at batch:[01000]: 0.805
+training loss at batch:[02000]: 0.635
+val_acc 0.866 val_loss  0.378
+Starting epoch:[1].
+training loss at batch:[00000]: 0.353
+training loss at batch:[01000]: 0.373
+training loss at batch:[02000]: 0.371
+val_acc 0.890 val_loss  0.319
+Starting epoch:[2].
+training loss at batch:[00000]: 0.181
+training loss at batch:[01000]: 0.327
+training loss at batch:[02000]: 0.328
+val_acc 0.888 val_loss  0.310
+Starting epoch:[3].
+training loss at batch:[00000]: 0.199
+training loss at batch:[01000]: 0.309
+training loss at batch:[02000]: 0.311
+val_acc 0.900 val_loss  0.285
+Starting epoch:[4].
+training loss at batch:[00000]: 0.224
+training loss at batch:[01000]: 0.297
+training loss at batch:[02000]: 0.292
+val_acc 0.904 val_loss  0.273
+test_acc 0.702 test_loss  1.146
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.9 beta2:0.999 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.368
+training loss at batch:[01000]: 0.785
+training loss at batch:[02000]: 0.614
+val_acc 0.883 val_loss  0.345
+Starting epoch:[1].
+training loss at batch:[00000]: 0.391
+training loss at batch:[01000]: 0.364
+training loss at batch:[02000]: 0.356
+val_acc 0.892 val_loss  0.310
+Starting epoch:[2].
+training loss at batch:[00000]: 0.252
+training loss at batch:[01000]: 0.315
+training loss at batch:[02000]: 0.322
+val_acc 0.898 val_loss  0.288
+Starting epoch:[3].
+training loss at batch:[00000]: 0.349
+training loss at batch:[01000]: 0.299
+training loss at batch:[02000]: 0.295
+val_acc 0.898 val_loss  0.288
+Starting epoch:[4].
+training loss at batch:[00000]: 0.865
+training loss at batch:[01000]: 0.274
+training loss at batch:[02000]: 0.281
+val_acc 0.905 val_loss  0.267
+test_acc 0.428 test_loss  1.749
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.9 beta2:0.999 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.306
+training loss at batch:[01000]: 0.777
+training loss at batch:[02000]: 0.614
+val_acc 0.870 val_loss  0.371
+Starting epoch:[1].
+training loss at batch:[00000]: 0.824
+training loss at batch:[01000]: 0.355
+training loss at batch:[02000]: 0.354
+val_acc 0.884 val_loss  0.325
+Starting epoch:[2].
+training loss at batch:[00000]: 0.179
+training loss at batch:[01000]: 0.315
+training loss at batch:[02000]: 0.315
+val_acc 0.902 val_loss  0.284
+Starting epoch:[3].
+training loss at batch:[00000]: 0.087
+training loss at batch:[01000]: 0.288
+training loss at batch:[02000]: 0.292
+val_acc 0.898 val_loss  0.285
+Starting epoch:[4].
+training loss at batch:[00000]: 0.145
+training loss at batch:[01000]: 0.275
+training loss at batch:[02000]: 0.276
+val_acc 0.909 val_loss  0.269
+test_acc 0.568 test_loss  1.361
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.9 beta2:0.999 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.295
+training loss at batch:[01000]: 0.783
+training loss at batch:[02000]: 0.620
+val_acc 0.876 val_loss  0.359
+Starting epoch:[1].
+training loss at batch:[00000]: 0.195
+training loss at batch:[01000]: 0.363
+training loss at batch:[02000]: 0.355
+val_acc 0.894 val_loss  0.310
+Starting epoch:[2].
+training loss at batch:[00000]: 0.239
+training loss at batch:[01000]: 0.316
+training loss at batch:[02000]: 0.317
+val_acc 0.895 val_loss  0.300
+Starting epoch:[3].
+training loss at batch:[00000]: 0.127
+training loss at batch:[01000]: 0.308
+training loss at batch:[02000]: 0.301
+val_acc 0.897 val_loss  0.294
+Starting epoch:[4].
+training loss at batch:[00000]: 0.144
+training loss at batch:[01000]: 0.286
+training loss at batch:[02000]: 0.286
+val_acc 0.908 val_loss  0.264
+test_acc 0.306 test_loss  1.914
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.9 beta2:0.9995 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.357
+training loss at batch:[01000]: 0.767
+training loss at batch:[02000]: 0.607
+val_acc 0.862 val_loss  0.385
+Starting epoch:[1].
+training loss at batch:[00000]: 0.565
+training loss at batch:[01000]: 0.358
+training loss at batch:[02000]: 0.352
+val_acc 0.888 val_loss  0.327
+Starting epoch:[2].
+training loss at batch:[00000]: 1.085
+training loss at batch:[01000]: 0.316
+training loss at batch:[02000]: 0.316
+val_acc 0.898 val_loss  0.292
+Starting epoch:[3].
+training loss at batch:[00000]: 0.138
+training loss at batch:[01000]: 0.291
+training loss at batch:[02000]: 0.294
+val_acc 0.897 val_loss  0.289
+Starting epoch:[4].
+training loss at batch:[00000]: 0.091
+training loss at batch:[01000]: 0.276
+training loss at batch:[02000]: 0.279
+val_acc 0.904 val_loss  0.269
+test_acc 0.473 test_loss  1.646
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.9 beta2:0.9995 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.292
+training loss at batch:[01000]: 0.795
+training loss at batch:[02000]: 0.623
+val_acc 0.872 val_loss  0.369
+Starting epoch:[1].
+training loss at batch:[00000]: 0.459
+training loss at batch:[01000]: 0.359
+training loss at batch:[02000]: 0.361
+val_acc 0.891 val_loss  0.311
+Starting epoch:[2].
+training loss at batch:[00000]: 0.187
+training loss at batch:[01000]: 0.318
+training loss at batch:[02000]: 0.319
+val_acc 0.901 val_loss  0.286
+Starting epoch:[3].
+training loss at batch:[00000]: 0.638
+training loss at batch:[01000]: 0.300
+training loss at batch:[02000]: 0.296
+val_acc 0.906 val_loss  0.271
+Starting epoch:[4].
+training loss at batch:[00000]: 0.160
+training loss at batch:[01000]: 0.279
+training loss at batch:[02000]: 0.278
+val_acc 0.905 val_loss  0.273
+test_acc 0.583 test_loss  1.302
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.9 beta2:0.9995 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.319
+training loss at batch:[01000]: 0.788
+training loss at batch:[02000]: 0.632
+val_acc 0.876 val_loss  0.364
+Starting epoch:[1].
+training loss at batch:[00000]: 0.335
+training loss at batch:[01000]: 0.366
+training loss at batch:[02000]: 0.364
+val_acc 0.890 val_loss  0.317
+Starting epoch:[2].
+training loss at batch:[00000]: 0.471
+training loss at batch:[01000]: 0.323
+training loss at batch:[02000]: 0.322
+val_acc 0.899 val_loss  0.292
+Starting epoch:[3].
+training loss at batch:[00000]: 0.441
+training loss at batch:[01000]: 0.296
+training loss at batch:[02000]: 0.302
+val_acc 0.903 val_loss  0.278
+Starting epoch:[4].
+training loss at batch:[00000]: 0.266
+training loss at batch:[01000]: 0.279
+training loss at batch:[02000]: 0.279
+val_acc 0.900 val_loss  0.288
+test_acc 0.651 test_loss  1.042
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.95 beta2:0.9985 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.411
+training loss at batch:[01000]: 0.774
+training loss at batch:[02000]: 0.614
+val_acc 0.884 val_loss  0.349
+Starting epoch:[1].
+training loss at batch:[00000]: 0.367
+training loss at batch:[01000]: 0.369
+training loss at batch:[02000]: 0.356
+val_acc 0.895 val_loss  0.307
+Starting epoch:[2].
+training loss at batch:[00000]: 0.563
+training loss at batch:[01000]: 0.309
+training loss at batch:[02000]: 0.314
+val_acc 0.898 val_loss  0.292
+Starting epoch:[3].
+training loss at batch:[00000]: 0.168
+training loss at batch:[01000]: 0.291
+training loss at batch:[02000]: 0.293
+val_acc 0.901 val_loss  0.282
+Starting epoch:[4].
+training loss at batch:[00000]: 0.356
+training loss at batch:[01000]: 0.279
+training loss at batch:[02000]: 0.278
+val_acc 0.908 val_loss  0.264
+test_acc 0.396 test_loss  1.770
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.95 beta2:0.9985 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.297
+training loss at batch:[01000]: 0.791
+training loss at batch:[02000]: 0.620
+val_acc 0.876 val_loss  0.359
+Starting epoch:[1].
+training loss at batch:[00000]: 0.133
+training loss at batch:[01000]: 0.363
+training loss at batch:[02000]: 0.358
+val_acc 0.890 val_loss  0.315
+Starting epoch:[2].
+training loss at batch:[00000]: 0.353
+training loss at batch:[01000]: 0.325
+training loss at batch:[02000]: 0.322
+val_acc 0.900 val_loss  0.287
+Starting epoch:[3].
+training loss at batch:[00000]: 0.065
+training loss at batch:[01000]: 0.301
+training loss at batch:[02000]: 0.300
+val_acc 0.903 val_loss  0.277
+Starting epoch:[4].
+training loss at batch:[00000]: 0.411
+training loss at batch:[01000]: 0.284
+training loss at batch:[02000]: 0.282
+val_acc 0.899 val_loss  0.283
+test_acc 0.362 test_loss  1.685
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.95 beta2:0.9985 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.325
+training loss at batch:[01000]: 0.827
+training loss at batch:[02000]: 0.645
+val_acc 0.874 val_loss  0.365
+Starting epoch:[1].
+training loss at batch:[00000]: 0.300
+training loss at batch:[01000]: 0.376
+training loss at batch:[02000]: 0.372
+val_acc 0.889 val_loss  0.321
+Starting epoch:[2].
+training loss at batch:[00000]: 0.252
+training loss at batch:[01000]: 0.328
+training loss at batch:[02000]: 0.326
+val_acc 0.895 val_loss  0.301
+Starting epoch:[3].
+training loss at batch:[00000]: 0.199
+training loss at batch:[01000]: 0.304
+training loss at batch:[02000]: 0.308
+val_acc 0.898 val_loss  0.289
+Starting epoch:[4].
+training loss at batch:[00000]: 0.123
+training loss at batch:[01000]: 0.287
+training loss at batch:[02000]: 0.293
+val_acc 0.901 val_loss  0.279
+test_acc 0.467 test_loss  1.738
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.95 beta2:0.999 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.337
+training loss at batch:[01000]: 0.827
+training loss at batch:[02000]: 0.648
+val_acc 0.873 val_loss  0.366
+Starting epoch:[1].
+training loss at batch:[00000]: 0.316
+training loss at batch:[01000]: 0.375
+training loss at batch:[02000]: 0.369
+val_acc 0.889 val_loss  0.320
+Starting epoch:[2].
+training loss at batch:[00000]: 0.323
+training loss at batch:[01000]: 0.339
+training loss at batch:[02000]: 0.328
+val_acc 0.898 val_loss  0.290
+Starting epoch:[3].
+training loss at batch:[00000]: 0.439
+training loss at batch:[01000]: 0.306
+training loss at batch:[02000]: 0.303
+val_acc 0.890 val_loss  0.309
+Starting epoch:[4].
+training loss at batch:[00000]: 0.385
+training loss at batch:[01000]: 0.292
+training loss at batch:[02000]: 0.288
+val_acc 0.895 val_loss  0.302
+test_acc 0.238 test_loss  1.900
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.95 beta2:0.999 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.278
+training loss at batch:[01000]: 0.817
+training loss at batch:[02000]: 0.635
+val_acc 0.873 val_loss  0.367
+Starting epoch:[1].
+training loss at batch:[00000]: 0.549
+training loss at batch:[01000]: 0.363
+training loss at batch:[02000]: 0.365
+val_acc 0.880 val_loss  0.341
+Starting epoch:[2].
+training loss at batch:[00000]: 0.282
+training loss at batch:[01000]: 0.331
+training loss at batch:[02000]: 0.326
+val_acc 0.897 val_loss  0.290
+Starting epoch:[3].
+training loss at batch:[00000]: 0.174
+training loss at batch:[01000]: 0.294
+training loss at batch:[02000]: 0.305
+val_acc 0.904 val_loss  0.277
+Starting epoch:[4].
+training loss at batch:[00000]: 0.529
+training loss at batch:[01000]: 0.283
+training loss at batch:[02000]: 0.285
+val_acc 0.900 val_loss  0.282
+test_acc 0.370 test_loss  1.779
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.95 beta2:0.999 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.275
+training loss at batch:[01000]: 0.765
+training loss at batch:[02000]: 0.607
+val_acc 0.880 val_loss  0.353
+Starting epoch:[1].
+training loss at batch:[00000]: 0.426
+training loss at batch:[01000]: 0.369
+training loss at batch:[02000]: 0.362
+val_acc 0.884 val_loss  0.328
+Starting epoch:[2].
+training loss at batch:[00000]: 0.383
+training loss at batch:[01000]: 0.314
+training loss at batch:[02000]: 0.319
+val_acc 0.900 val_loss  0.287
+Starting epoch:[3].
+training loss at batch:[00000]: 0.300
+training loss at batch:[01000]: 0.307
+training loss at batch:[02000]: 0.302
+val_acc 0.901 val_loss  0.278
+Starting epoch:[4].
+training loss at batch:[00000]: 0.470
+training loss at batch:[01000]: 0.285
+training loss at batch:[02000]: 0.284
+val_acc 0.907 val_loss  0.266
+test_acc 0.663 test_loss  1.076
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.95 beta2:0.9995 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.317
+training loss at batch:[01000]: 0.780
+training loss at batch:[02000]: 0.619
+val_acc 0.866 val_loss  0.377
+Starting epoch:[1].
+training loss at batch:[00000]: 0.459
+training loss at batch:[01000]: 0.376
+training loss at batch:[02000]: 0.367
+val_acc 0.890 val_loss  0.312
+Starting epoch:[2].
+training loss at batch:[00000]: 0.354
+training loss at batch:[01000]: 0.321
+training loss at batch:[02000]: 0.320
+val_acc 0.899 val_loss  0.289
+Starting epoch:[3].
+training loss at batch:[00000]: 0.149
+training loss at batch:[01000]: 0.306
+training loss at batch:[02000]: 0.301
+val_acc 0.899 val_loss  0.282
+Starting epoch:[4].
+training loss at batch:[00000]: 0.556
+training loss at batch:[01000]: 0.285
+training loss at batch:[02000]: 0.287
+val_acc 0.908 val_loss  0.263
+test_acc 0.390 test_loss  1.734
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.95 beta2:0.9995 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.294
+training loss at batch:[01000]: 0.800
+training loss at batch:[02000]: 0.620
+val_acc 0.876 val_loss  0.368
+Starting epoch:[1].
+training loss at batch:[00000]: 0.290
+training loss at batch:[01000]: 0.363
+training loss at batch:[02000]: 0.356
+val_acc 0.897 val_loss  0.309
+Starting epoch:[2].
+training loss at batch:[00000]: 0.490
+training loss at batch:[01000]: 0.331
+training loss at batch:[02000]: 0.325
+val_acc 0.899 val_loss  0.294
+Starting epoch:[3].
+training loss at batch:[00000]: 0.241
+training loss at batch:[01000]: 0.304
+training loss at batch:[02000]: 0.304
+val_acc 0.905 val_loss  0.278
+Starting epoch:[4].
+training loss at batch:[00000]: 0.489
+training loss at batch:[01000]: 0.290
+training loss at batch:[02000]: 0.285
+val_acc 0.907 val_loss  0.270
+test_acc 0.412 test_loss  1.752
+
+--------------------------------------------------------------------------------
+lr:0.0001 beat1:0.95 beta2:0.9995 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.295
+training loss at batch:[01000]: 0.784
+training loss at batch:[02000]: 0.623
+val_acc 0.860 val_loss  0.392
+Starting epoch:[1].
+training loss at batch:[00000]: 0.900
+training loss at batch:[01000]: 0.365
+training loss at batch:[02000]: 0.364
+val_acc 0.892 val_loss  0.314
+Starting epoch:[2].
+training loss at batch:[00000]: 0.202
+training loss at batch:[01000]: 0.325
+training loss at batch:[02000]: 0.322
+val_acc 0.900 val_loss  0.295
+Starting epoch:[3].
+training loss at batch:[00000]: 0.338
+training loss at batch:[01000]: 0.308
+training loss at batch:[02000]: 0.300
+val_acc 0.903 val_loss  0.280
+Starting epoch:[4].
+training loss at batch:[00000]: 0.570
+training loss at batch:[01000]: 0.282
+training loss at batch:[02000]: 0.282
+val_acc 0.899 val_loss  0.287
+test_acc 0.356 test_loss  1.462
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.85 beta2:0.9985 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.304
+training loss at batch:[01000]: 1.847
+training loss at batch:[02000]: 1.495
+val_acc 0.774 val_loss  0.726
+Starting epoch:[1].
+training loss at batch:[00000]: 0.518
+training loss at batch:[01000]: 0.691
+training loss at batch:[02000]: 0.652
+val_acc 0.813 val_loss  0.544
+Starting epoch:[2].
+training loss at batch:[00000]: 0.325
+training loss at batch:[01000]: 0.539
+training loss at batch:[02000]: 0.531
+val_acc 0.835 val_loss  0.473
+Starting epoch:[3].
+training loss at batch:[00000]: 0.743
+training loss at batch:[01000]: 0.484
+training loss at batch:[02000]: 0.475
+val_acc 0.849 val_loss  0.436
+Starting epoch:[4].
+training loss at batch:[00000]: 0.479
+training loss at batch:[01000]: 0.448
+training loss at batch:[02000]: 0.439
+val_acc 0.864 val_loss  0.402
+test_acc 0.633 test_loss  1.332
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.85 beta2:0.9985 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.270
+training loss at batch:[01000]: 1.757
+training loss at batch:[02000]: 1.366
+val_acc 0.794 val_loss  0.670
+Starting epoch:[1].
+training loss at batch:[00000]: 0.889
+training loss at batch:[01000]: 0.646
+training loss at batch:[02000]: 0.615
+val_acc 0.825 val_loss  0.516
+Starting epoch:[2].
+training loss at batch:[00000]: 0.608
+training loss at batch:[01000]: 0.521
+training loss at batch:[02000]: 0.511
+val_acc 0.846 val_loss  0.458
+Starting epoch:[3].
+training loss at batch:[00000]: 0.877
+training loss at batch:[01000]: 0.462
+training loss at batch:[02000]: 0.460
+val_acc 0.858 val_loss  0.422
+Starting epoch:[4].
+training loss at batch:[00000]: 0.438
+training loss at batch:[01000]: 0.436
+training loss at batch:[02000]: 0.434
+val_acc 0.864 val_loss  0.401
+test_acc 0.645 test_loss  1.415
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.85 beta2:0.9985 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.357
+training loss at batch:[01000]: 1.912
+training loss at batch:[02000]: 1.540
+val_acc 0.779 val_loss  0.733
+Starting epoch:[1].
+training loss at batch:[00000]: 0.637
+training loss at batch:[01000]: 0.693
+training loss at batch:[02000]: 0.663
+val_acc 0.811 val_loss  0.549
+Starting epoch:[2].
+training loss at batch:[00000]: 0.450
+training loss at batch:[01000]: 0.550
+training loss at batch:[02000]: 0.542
+val_acc 0.833 val_loss  0.484
+Starting epoch:[3].
+training loss at batch:[00000]: 0.356
+training loss at batch:[01000]: 0.487
+training loss at batch:[02000]: 0.481
+val_acc 0.846 val_loss  0.445
+Starting epoch:[4].
+training loss at batch:[00000]: 0.359
+training loss at batch:[01000]: 0.451
+training loss at batch:[02000]: 0.449
+val_acc 0.856 val_loss  0.416
+test_acc 0.264 test_loss  1.889
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.85 beta2:0.999 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.356
+training loss at batch:[01000]: 1.842
+training loss at batch:[02000]: 1.484
+val_acc 0.780 val_loss  0.716
+Starting epoch:[1].
+training loss at batch:[00000]: 0.583
+training loss at batch:[01000]: 0.675
+training loss at batch:[02000]: 0.646
+val_acc 0.814 val_loss  0.540
+Starting epoch:[2].
+training loss at batch:[00000]: 0.546
+training loss at batch:[01000]: 0.536
+training loss at batch:[02000]: 0.532
+val_acc 0.830 val_loss  0.480
+Starting epoch:[3].
+training loss at batch:[00000]: 0.603
+training loss at batch:[01000]: 0.488
+training loss at batch:[02000]: 0.481
+val_acc 0.846 val_loss  0.443
+Starting epoch:[4].
+training loss at batch:[00000]: 0.706
+training loss at batch:[01000]: 0.448
+training loss at batch:[02000]: 0.449
+val_acc 0.857 val_loss  0.415
+test_acc 0.429 test_loss  1.731
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.85 beta2:0.999 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.337
+training loss at batch:[01000]: 1.780
+training loss at batch:[02000]: 1.433
+val_acc 0.784 val_loss  0.709
+Starting epoch:[1].
+training loss at batch:[00000]: 0.500
+training loss at batch:[01000]: 0.692
+training loss at batch:[02000]: 0.653
+val_acc 0.819 val_loss  0.538
+Starting epoch:[2].
+training loss at batch:[00000]: 0.790
+training loss at batch:[01000]: 0.537
+training loss at batch:[02000]: 0.529
+val_acc 0.838 val_loss  0.474
+Starting epoch:[3].
+training loss at batch:[00000]: 0.351
+training loss at batch:[01000]: 0.486
+training loss at batch:[02000]: 0.480
+val_acc 0.854 val_loss  0.434
+Starting epoch:[4].
+training loss at batch:[00000]: 0.512
+training loss at batch:[01000]: 0.443
+training loss at batch:[02000]: 0.441
+val_acc 0.861 val_loss  0.411
+test_acc 0.634 test_loss  1.388
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.85 beta2:0.999 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.298
+training loss at batch:[01000]: 1.828
+training loss at batch:[02000]: 1.474
+val_acc 0.769 val_loss  0.738
+Starting epoch:[1].
+training loss at batch:[00000]: 0.832
+training loss at batch:[01000]: 0.702
+training loss at batch:[02000]: 0.671
+val_acc 0.806 val_loss  0.567
+Starting epoch:[2].
+training loss at batch:[00000]: 0.594
+training loss at batch:[01000]: 0.565
+training loss at batch:[02000]: 0.554
+val_acc 0.830 val_loss  0.498
+Starting epoch:[3].
+training loss at batch:[00000]: 0.605
+training loss at batch:[01000]: 0.507
+training loss at batch:[02000]: 0.499
+val_acc 0.845 val_loss  0.461
+Starting epoch:[4].
+training loss at batch:[00000]: 0.298
+training loss at batch:[01000]: 0.468
+training loss at batch:[02000]: 0.463
+val_acc 0.857 val_loss  0.428
+test_acc 0.730 test_loss  1.240
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.85 beta2:0.9995 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.293
+training loss at batch:[01000]: 1.808
+training loss at batch:[02000]: 1.432
+val_acc 0.781 val_loss  0.694
+Starting epoch:[1].
+training loss at batch:[00000]: 0.845
+training loss at batch:[01000]: 0.662
+training loss at batch:[02000]: 0.635
+val_acc 0.816 val_loss  0.529
+Starting epoch:[2].
+training loss at batch:[00000]: 0.671
+training loss at batch:[01000]: 0.529
+training loss at batch:[02000]: 0.521
+val_acc 0.838 val_loss  0.468
+Starting epoch:[3].
+training loss at batch:[00000]: 0.454
+training loss at batch:[01000]: 0.470
+training loss at batch:[02000]: 0.470
+val_acc 0.855 val_loss  0.429
+Starting epoch:[4].
+training loss at batch:[00000]: 0.273
+training loss at batch:[01000]: 0.436
+training loss at batch:[02000]: 0.436
+val_acc 0.864 val_loss  0.403
+test_acc 0.410 test_loss  1.942
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.85 beta2:0.9995 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.179
+training loss at batch:[01000]: 1.848
+training loss at batch:[02000]: 1.466
+val_acc 0.782 val_loss  0.692
+Starting epoch:[1].
+training loss at batch:[00000]: 1.054
+training loss at batch:[01000]: 0.661
+training loss at batch:[02000]: 0.638
+val_acc 0.820 val_loss  0.534
+Starting epoch:[2].
+training loss at batch:[00000]: 0.464
+training loss at batch:[01000]: 0.535
+training loss at batch:[02000]: 0.526
+val_acc 0.836 val_loss  0.474
+Starting epoch:[3].
+training loss at batch:[00000]: 0.510
+training loss at batch:[01000]: 0.487
+training loss at batch:[02000]: 0.478
+val_acc 0.851 val_loss  0.438
+Starting epoch:[4].
+training loss at batch:[00000]: 0.497
+training loss at batch:[01000]: 0.449
+training loss at batch:[02000]: 0.440
+val_acc 0.860 val_loss  0.411
+test_acc 0.653 test_loss  1.345
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.85 beta2:0.9995 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.247
+training loss at batch:[01000]: 1.837
+training loss at batch:[02000]: 1.528
+val_acc 0.774 val_loss  0.790
+Starting epoch:[1].
+training loss at batch:[00000]: 0.645
+training loss at batch:[01000]: 0.749
+training loss at batch:[02000]: 0.699
+val_acc 0.823 val_loss  0.549
+Starting epoch:[2].
+training loss at batch:[00000]: 0.691
+training loss at batch:[01000]: 0.552
+training loss at batch:[02000]: 0.533
+val_acc 0.844 val_loss  0.474
+Starting epoch:[3].
+training loss at batch:[00000]: 0.416
+training loss at batch:[01000]: 0.486
+training loss at batch:[02000]: 0.479
+val_acc 0.859 val_loss  0.427
+Starting epoch:[4].
+training loss at batch:[00000]: 0.294
+training loss at batch:[01000]: 0.444
+training loss at batch:[02000]: 0.438
+val_acc 0.869 val_loss  0.403
+test_acc 0.700 test_loss  1.385
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.9 beta2:0.9985 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.346
+training loss at batch:[01000]: 1.722
+training loss at batch:[02000]: 1.363
+val_acc 0.774 val_loss  0.693
+Starting epoch:[1].
+training loss at batch:[00000]: 0.487
+training loss at batch:[01000]: 0.669
+training loss at batch:[02000]: 0.639
+val_acc 0.812 val_loss  0.542
+Starting epoch:[2].
+training loss at batch:[00000]: 0.746
+training loss at batch:[01000]: 0.533
+training loss at batch:[02000]: 0.526
+val_acc 0.835 val_loss  0.477
+Starting epoch:[3].
+training loss at batch:[00000]: 0.176
+training loss at batch:[01000]: 0.484
+training loss at batch:[02000]: 0.475
+val_acc 0.850 val_loss  0.436
+Starting epoch:[4].
+training loss at batch:[00000]: 0.498
+training loss at batch:[01000]: 0.452
+training loss at batch:[02000]: 0.443
+val_acc 0.859 val_loss  0.411
+test_acc 0.343 test_loss  2.175
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.9 beta2:0.9985 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.347
+training loss at batch:[01000]: 1.752
+training loss at batch:[02000]: 1.380
+val_acc 0.784 val_loss  0.680
+Starting epoch:[1].
+training loss at batch:[00000]: 0.675
+training loss at batch:[01000]: 0.651
+training loss at batch:[02000]: 0.623
+val_acc 0.816 val_loss  0.531
+Starting epoch:[2].
+training loss at batch:[00000]: 0.515
+training loss at batch:[01000]: 0.529
+training loss at batch:[02000]: 0.517
+val_acc 0.840 val_loss  0.465
+Starting epoch:[3].
+training loss at batch:[00000]: 0.305
+training loss at batch:[01000]: 0.473
+training loss at batch:[02000]: 0.464
+val_acc 0.857 val_loss  0.432
+Starting epoch:[4].
+training loss at batch:[00000]: 0.471
+training loss at batch:[01000]: 0.437
+training loss at batch:[02000]: 0.434
+val_acc 0.862 val_loss  0.406
+test_acc 0.562 test_loss  1.511
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.9 beta2:0.9985 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.281
+training loss at batch:[01000]: 1.779
+training loss at batch:[02000]: 1.467
+val_acc 0.780 val_loss  0.754
+Starting epoch:[1].
+training loss at batch:[00000]: 0.692
+training loss at batch:[01000]: 0.715
+training loss at batch:[02000]: 0.676
+val_acc 0.814 val_loss  0.554
+Starting epoch:[2].
+training loss at batch:[00000]: 0.459
+training loss at batch:[01000]: 0.557
+training loss at batch:[02000]: 0.548
+val_acc 0.837 val_loss  0.486
+Starting epoch:[3].
+training loss at batch:[00000]: 0.309
+training loss at batch:[01000]: 0.500
+training loss at batch:[02000]: 0.488
+val_acc 0.848 val_loss  0.447
+Starting epoch:[4].
+training loss at batch:[00000]: 0.851
+training loss at batch:[01000]: 0.463
+training loss at batch:[02000]: 0.455
+val_acc 0.857 val_loss  0.419
+test_acc 0.451 test_loss  1.657
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.9 beta2:0.999 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.257
+training loss at batch:[01000]: 1.660
+training loss at batch:[02000]: 1.306
+val_acc 0.783 val_loss  0.667
+Starting epoch:[1].
+training loss at batch:[00000]: 1.051
+training loss at batch:[01000]: 0.645
+training loss at batch:[02000]: 0.619
+val_acc 0.816 val_loss  0.524
+Starting epoch:[2].
+training loss at batch:[00000]: 0.412
+training loss at batch:[01000]: 0.537
+training loss at batch:[02000]: 0.518
+val_acc 0.839 val_loss  0.469
+Starting epoch:[3].
+training loss at batch:[00000]: 0.282
+training loss at batch:[01000]: 0.476
+training loss at batch:[02000]: 0.467
+val_acc 0.852 val_loss  0.430
+Starting epoch:[4].
+training loss at batch:[00000]: 0.316
+training loss at batch:[01000]: 0.439
+training loss at batch:[02000]: 0.434
+val_acc 0.863 val_loss  0.407
+test_acc 0.463 test_loss  1.734
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.9 beta2:0.999 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.210
+training loss at batch:[01000]: 1.806
+training loss at batch:[02000]: 1.463
+val_acc 0.778 val_loss  0.719
+Starting epoch:[1].
+training loss at batch:[00000]: 0.709
+training loss at batch:[01000]: 0.690
+training loss at batch:[02000]: 0.652
+val_acc 0.816 val_loss  0.545
+Starting epoch:[2].
+training loss at batch:[00000]: 0.331
+training loss at batch:[01000]: 0.545
+training loss at batch:[02000]: 0.531
+val_acc 0.838 val_loss  0.481
+Starting epoch:[3].
+training loss at batch:[00000]: 0.428
+training loss at batch:[01000]: 0.479
+training loss at batch:[02000]: 0.473
+val_acc 0.852 val_loss  0.436
+Starting epoch:[4].
+training loss at batch:[00000]: 0.255
+training loss at batch:[01000]: 0.452
+training loss at batch:[02000]: 0.440
+val_acc 0.863 val_loss  0.411
+test_acc 0.573 test_loss  1.484
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.9 beta2:0.999 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.255
+training loss at batch:[01000]: 1.754
+training loss at batch:[02000]: 1.416
+val_acc 0.775 val_loss  0.705
+Starting epoch:[1].
+training loss at batch:[00000]: 0.354
+training loss at batch:[01000]: 0.669
+training loss at batch:[02000]: 0.635
+val_acc 0.815 val_loss  0.526
+Starting epoch:[2].
+training loss at batch:[00000]: 0.665
+training loss at batch:[01000]: 0.524
+training loss at batch:[02000]: 0.514
+val_acc 0.841 val_loss  0.458
+Starting epoch:[3].
+training loss at batch:[00000]: 0.488
+training loss at batch:[01000]: 0.481
+training loss at batch:[02000]: 0.461
+val_acc 0.858 val_loss  0.417
+Starting epoch:[4].
+training loss at batch:[00000]: 0.263
+training loss at batch:[01000]: 0.433
+training loss at batch:[02000]: 0.428
+val_acc 0.869 val_loss  0.392
+test_acc 0.408 test_loss  1.758
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.9 beta2:0.9995 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.365
+training loss at batch:[01000]: 1.846
+training loss at batch:[02000]: 1.469
+val_acc 0.781 val_loss  0.696
+Starting epoch:[1].
+training loss at batch:[00000]: 0.669
+training loss at batch:[01000]: 0.673
+training loss at batch:[02000]: 0.638
+val_acc 0.818 val_loss  0.538
+Starting epoch:[2].
+training loss at batch:[00000]: 0.289
+training loss at batch:[01000]: 0.539
+training loss at batch:[02000]: 0.529
+val_acc 0.837 val_loss  0.473
+Starting epoch:[3].
+training loss at batch:[00000]: 0.623
+training loss at batch:[01000]: 0.482
+training loss at batch:[02000]: 0.479
+val_acc 0.849 val_loss  0.439
+Starting epoch:[4].
+training loss at batch:[00000]: 0.388
+training loss at batch:[01000]: 0.452
+training loss at batch:[02000]: 0.448
+val_acc 0.858 val_loss  0.416
+test_acc 0.447 test_loss  1.875
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.9 beta2:0.9995 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.312
+training loss at batch:[01000]: 1.762
+training loss at batch:[02000]: 1.390
+val_acc 0.782 val_loss  0.690
+Starting epoch:[1].
+training loss at batch:[00000]: 0.892
+training loss at batch:[01000]: 0.673
+training loss at batch:[02000]: 0.637
+val_acc 0.824 val_loss  0.537
+Starting epoch:[2].
+training loss at batch:[00000]: 0.768
+training loss at batch:[01000]: 0.541
+training loss at batch:[02000]: 0.524
+val_acc 0.845 val_loss  0.471
+Starting epoch:[3].
+training loss at batch:[00000]: 0.711
+training loss at batch:[01000]: 0.481
+training loss at batch:[02000]: 0.474
+val_acc 0.857 val_loss  0.433
+Starting epoch:[4].
+training loss at batch:[00000]: 0.227
+training loss at batch:[01000]: 0.444
+training loss at batch:[02000]: 0.438
+val_acc 0.864 val_loss  0.406
+test_acc 0.451 test_loss  1.552
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.9 beta2:0.9995 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.251
+training loss at batch:[01000]: 1.737
+training loss at batch:[02000]: 1.373
+val_acc 0.782 val_loss  0.671
+Starting epoch:[1].
+training loss at batch:[00000]: 1.010
+training loss at batch:[01000]: 0.653
+training loss at batch:[02000]: 0.624
+val_acc 0.818 val_loss  0.526
+Starting epoch:[2].
+training loss at batch:[00000]: 0.347
+training loss at batch:[01000]: 0.524
+training loss at batch:[02000]: 0.519
+val_acc 0.841 val_loss  0.458
+Starting epoch:[3].
+training loss at batch:[00000]: 0.253
+training loss at batch:[01000]: 0.467
+training loss at batch:[02000]: 0.460
+val_acc 0.858 val_loss  0.424
+Starting epoch:[4].
+training loss at batch:[00000]: 0.604
+training loss at batch:[01000]: 0.442
+training loss at batch:[02000]: 0.438
+val_acc 0.864 val_loss  0.401
+test_acc 0.329 test_loss  1.831
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.95 beta2:0.9985 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.267
+training loss at batch:[01000]: 1.693
+training loss at batch:[02000]: 1.360
+val_acc 0.789 val_loss  0.682
+Starting epoch:[1].
+training loss at batch:[00000]: 0.539
+training loss at batch:[01000]: 0.658
+training loss at batch:[02000]: 0.626
+val_acc 0.821 val_loss  0.528
+Starting epoch:[2].
+training loss at batch:[00000]: 0.936
+training loss at batch:[01000]: 0.527
+training loss at batch:[02000]: 0.522
+val_acc 0.840 val_loss  0.469
+Starting epoch:[3].
+training loss at batch:[00000]: 0.649
+training loss at batch:[01000]: 0.482
+training loss at batch:[02000]: 0.474
+val_acc 0.854 val_loss  0.432
+Starting epoch:[4].
+training loss at batch:[00000]: 0.378
+training loss at batch:[01000]: 0.446
+training loss at batch:[02000]: 0.442
+val_acc 0.861 val_loss  0.408
+test_acc 0.535 test_loss  1.494
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.95 beta2:0.9985 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.249
+training loss at batch:[01000]: 1.857
+training loss at batch:[02000]: 1.523
+val_acc 0.786 val_loss  0.745
+Starting epoch:[1].
+training loss at batch:[00000]: 0.753
+training loss at batch:[01000]: 0.697
+training loss at batch:[02000]: 0.659
+val_acc 0.823 val_loss  0.540
+Starting epoch:[2].
+training loss at batch:[00000]: 0.814
+training loss at batch:[01000]: 0.540
+training loss at batch:[02000]: 0.528
+val_acc 0.844 val_loss  0.474
+Starting epoch:[3].
+training loss at batch:[00000]: 0.660
+training loss at batch:[01000]: 0.473
+training loss at batch:[02000]: 0.468
+val_acc 0.859 val_loss  0.429
+Starting epoch:[4].
+training loss at batch:[00000]: 0.613
+training loss at batch:[01000]: 0.439
+training loss at batch:[02000]: 0.436
+val_acc 0.866 val_loss  0.403
+test_acc 0.400 test_loss  1.760
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.95 beta2:0.9985 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.335
+training loss at batch:[01000]: 1.804
+training loss at batch:[02000]: 1.451
+val_acc 0.779 val_loss  0.715
+Starting epoch:[1].
+training loss at batch:[00000]: 0.419
+training loss at batch:[01000]: 0.681
+training loss at batch:[02000]: 0.650
+val_acc 0.817 val_loss  0.541
+Starting epoch:[2].
+training loss at batch:[00000]: 0.552
+training loss at batch:[01000]: 0.545
+training loss at batch:[02000]: 0.526
+val_acc 0.840 val_loss  0.467
+Starting epoch:[3].
+training loss at batch:[00000]: 0.499
+training loss at batch:[01000]: 0.477
+training loss at batch:[02000]: 0.466
+val_acc 0.857 val_loss  0.426
+Starting epoch:[4].
+training loss at batch:[00000]: 0.644
+training loss at batch:[01000]: 0.439
+training loss at batch:[02000]: 0.435
+val_acc 0.866 val_loss  0.400
+test_acc 0.507 test_loss  1.660
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.95 beta2:0.999 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.297
+training loss at batch:[01000]: 1.812
+training loss at batch:[02000]: 1.436
+val_acc 0.778 val_loss  0.710
+Starting epoch:[1].
+training loss at batch:[00000]: 0.487
+training loss at batch:[01000]: 0.680
+training loss at batch:[02000]: 0.653
+val_acc 0.807 val_loss  0.553
+Starting epoch:[2].
+training loss at batch:[00000]: 0.441
+training loss at batch:[01000]: 0.555
+training loss at batch:[02000]: 0.541
+val_acc 0.829 val_loss  0.493
+Starting epoch:[3].
+training loss at batch:[00000]: 0.461
+training loss at batch:[01000]: 0.493
+training loss at batch:[02000]: 0.485
+val_acc 0.844 val_loss  0.447
+Starting epoch:[4].
+training loss at batch:[00000]: 0.338
+training loss at batch:[01000]: 0.450
+training loss at batch:[02000]: 0.452
+val_acc 0.855 val_loss  0.422
+test_acc 0.435 test_loss  1.682
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.95 beta2:0.999 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.300
+training loss at batch:[01000]: 1.838
+training loss at batch:[02000]: 1.526
+val_acc 0.782 val_loss  0.743
+Starting epoch:[1].
+training loss at batch:[00000]: 0.782
+training loss at batch:[01000]: 0.703
+training loss at batch:[02000]: 0.655
+val_acc 0.819 val_loss  0.530
+Starting epoch:[2].
+training loss at batch:[00000]: 0.447
+training loss at batch:[01000]: 0.531
+training loss at batch:[02000]: 0.518
+val_acc 0.844 val_loss  0.457
+Starting epoch:[3].
+training loss at batch:[00000]: 0.705
+training loss at batch:[01000]: 0.474
+training loss at batch:[02000]: 0.460
+val_acc 0.857 val_loss  0.421
+Starting epoch:[4].
+training loss at batch:[00000]: 0.325
+training loss at batch:[01000]: 0.438
+training loss at batch:[02000]: 0.428
+val_acc 0.867 val_loss  0.393
+test_acc 0.396 test_loss  1.787
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.95 beta2:0.999 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.240
+training loss at batch:[01000]: 1.777
+training loss at batch:[02000]: 1.417
+val_acc 0.777 val_loss  0.705
+Starting epoch:[1].
+training loss at batch:[00000]: 0.990
+training loss at batch:[01000]: 0.684
+training loss at batch:[02000]: 0.648
+val_acc 0.814 val_loss  0.545
+Starting epoch:[2].
+training loss at batch:[00000]: 0.430
+training loss at batch:[01000]: 0.552
+training loss at batch:[02000]: 0.536
+val_acc 0.834 val_loss  0.477
+Starting epoch:[3].
+training loss at batch:[00000]: 0.384
+training loss at batch:[01000]: 0.485
+training loss at batch:[02000]: 0.482
+val_acc 0.848 val_loss  0.441
+Starting epoch:[4].
+training loss at batch:[00000]: 0.474
+training loss at batch:[01000]: 0.454
+training loss at batch:[02000]: 0.442
+val_acc 0.857 val_loss  0.416
+test_acc 0.757 test_loss  1.372
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.95 beta2:0.9995 decay:0.005
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.295
+training loss at batch:[01000]: 1.825
+training loss at batch:[02000]: 1.458
+val_acc 0.781 val_loss  0.697
+Starting epoch:[1].
+training loss at batch:[00000]: 0.548
+training loss at batch:[01000]: 0.664
+training loss at batch:[02000]: 0.640
+val_acc 0.814 val_loss  0.541
+Starting epoch:[2].
+training loss at batch:[00000]: 0.259
+training loss at batch:[01000]: 0.543
+training loss at batch:[02000]: 0.534
+val_acc 0.832 val_loss  0.481
+Starting epoch:[3].
+training loss at batch:[00000]: 0.536
+training loss at batch:[01000]: 0.487
+training loss at batch:[02000]: 0.477
+val_acc 0.849 val_loss  0.442
+Starting epoch:[4].
+training loss at batch:[00000]: 0.414
+training loss at batch:[01000]: 0.445
+training loss at batch:[02000]: 0.445
+val_acc 0.859 val_loss  0.412
+test_acc 0.271 test_loss  1.820
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.95 beta2:0.9995 decay:0.01
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.320
+training loss at batch:[01000]: 1.696
+training loss at batch:[02000]: 1.351
+val_acc 0.781 val_loss  0.690
+Starting epoch:[1].
+training loss at batch:[00000]: 1.110
+training loss at batch:[01000]: 0.669
+training loss at batch:[02000]: 0.639
+val_acc 0.820 val_loss  0.539
+Starting epoch:[2].
+training loss at batch:[00000]: 0.620
+training loss at batch:[01000]: 0.535
+training loss at batch:[02000]: 0.525
+val_acc 0.838 val_loss  0.473
+Starting epoch:[3].
+training loss at batch:[00000]: 0.789
+training loss at batch:[01000]: 0.485
+training loss at batch:[02000]: 0.476
+val_acc 0.854 val_loss  0.438
+Starting epoch:[4].
+training loss at batch:[00000]: 0.467
+training loss at batch:[01000]: 0.448
+training loss at batch:[02000]: 0.446
+val_acc 0.862 val_loss  0.410
+test_acc 0.329 test_loss  1.841
+
+--------------------------------------------------------------------------------
+lr:1e-05 beat1:0.95 beta2:0.9995 decay:0.015
+--------------------------------------------------------------------------------
+Starting epoch:[0].
+training loss at batch:[00000]: 2.330
+training loss at batch:[01000]: 1.779
+training loss at batch:[02000]: 1.443
+val_acc 0.773 val_loss  0.711
+Starting epoch:[1].
+training loss at batch:[00000]: 1.063
+training loss at batch:[01000]: 0.687
+training loss at batch:[02000]: 0.651
+val_acc 0.816 val_loss  0.539
+Starting epoch:[2].
+training loss at batch:[00000]: 0.576
+training loss at batch:[01000]: 0.543
+training loss at batch:[02000]: 0.532
+val_acc 0.837 val_loss  0.478
+Starting epoch:[3].
+training loss at batch:[00000]: 0.517
+training loss at batch:[01000]: 0.486
+training loss at batch:[02000]: 0.477
+val_acc 0.853 val_loss  0.435
+Starting epoch:[4].
+training loss at batch:[00000]: 0.281
+training loss at batch:[01000]: 0.443
+training loss at batch:[02000]: 0.439
+val_acc 0.860 val_loss  0.409
+test_acc 0.348 test_loss  1.666
