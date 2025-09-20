@@ -12,3 +12,12 @@ books/Deep-Learning-with-TensorFlow-2-and-Keras/Chapter_7/data/*
 books/Deep-Learning-with-TensorFlow-2-and-Keras/Chapter_7/datasets/*
 /pytorch/training/data/
 /pytorch/tensorboard/FashionMNIST/
+/pytorch/model/model.pth
+/pytorch/model/FashionMNIST/raw/t10k-images-idx3-ubyte
+/pytorch/model/FashionMNIST/raw/t10k-images-idx3-ubyte.gz
+/pytorch/model/FashionMNIST/raw/t10k-labels-idx1-ubyte
+/pytorch/model/FashionMNIST/raw/t10k-labels-idx1-ubyte.gz
+/pytorch/model/FashionMNIST/raw/train-images-idx3-ubyte
+/pytorch/model/FashionMNIST/raw/train-images-idx3-ubyte.gz
+/pytorch/model/FashionMNIST/raw/train-labels-idx1-ubyte
+/pytorch/model/FashionMNIST/raw/train-labels-idx1-ubyte.gz
