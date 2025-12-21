@@ -18,7 +18,7 @@ from torch import (
     nn
 )
 
-from transformer.v1.constant import (
+from .constant import (
     TYPE_FLOAT,
     NUM_CLASSES,
     DIM_MODEL,

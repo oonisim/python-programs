@@ -5,7 +5,7 @@ from torch import (
     nn
 )
 
-from transformer.v1.constant import (
+from .constant import (
     TYPE_FLOAT,
     NUM_ENCODER_TOKENS,
     NUM_DECODER_TOKENS,
