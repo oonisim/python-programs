@@ -153,23 +153,27 @@ def calculate_dot_product_similarities(
 ) -> Tensor:
     """
     Calculate similarity scores between queries and keys using dot product.
+    Note that the sequence length from Encoder  can be different from that of Decoder
+    in Cross Attention in the Decoder. Tq may not be equal with Tk.
+
+    Q@K^T = (B, h, Tq, d_k) @ (B, h, d_k, Tk) -> (B, h, Tq, Tk)
 
     Args:
-        query: embedding vector of query of shape (B, h, T, d_k)
-        key: embedding vector of key of shape (B, h, T, d_k)
+        query: embedding vector of query of shape (B, h, Tq, d_k)
+        key: embedding vector of key of shape (B, h, Tk, d_k)
 
-    Returns: Similarities (closeness) between q and k of shape (B, h, T, T) where
-        last (T, T) represents relations between all query elements in T sequence
-        against all key elements in T sequence. If T is people in an organization,
+    Returns: Similarities (closeness) between q and k of shape (B, h, Tq, Tk) where
+        last (Tq, Tk) represents relations between all query elements in Tq sequence
+        against all key elements in Tk sequence. If T is people in an organization,
         (T,T) represents all (cartesian product) social connections among them.
         The relation considers d_k number of features.
     """
     # --------------------------------------------------------------------------------
     # Relationship between k and q as the first MatMul using dot product similarity:
-    # (B, h, T, d_k) @ (B, h, d_k, T) ---> (B, h, T, T)
+    # (B, h, Tq, d_k) @ (B, h, d_k, Tk) ---> (B, h, Tq, Tk)
     # --------------------------------------------------------------------------------
     similarities = query @ key.transpose(-2, -1)            # dot product
-    return similarities                                     # shape:(B, h, T, T)
+    return similarities                                     # shape:(B, h, Tq, Tk)
 
 
 def scale(
@@ -230,8 +234,8 @@ def mask(
 ) -> Tensor:
     """Mask the future tokens to prevent future leak.
     Args:
-        similarities: similarity (q to k) matrix to mask of shape (B,H,T,T)
-        mask_matrix: boolean matrix of which elements in (T,T) to mask fill.
+        similarities: similarity (q to k) matrix to mask of shape (B,H,Tq,Tk)
+        mask_matrix: boolean matrix of which elements in (Tk,Tk) to mask fill.
 
     Returns: masked similarity matrix
     """
@@ -240,17 +244,30 @@ def mask(
     # Skip masking for bi-directional e.g .BERT,
     # --------------------------------------------------------------------------------
     # exp(-inf) = 0 masks the similarities so that it will be uni-directional.
-    assert (
-        similarities.ndim == 4 and                              # (B,H,T,T)
-        similarities.shape[-2] == similarities.shape[-1] and    # (..., T,T)
-        similarities.shape[-1] == mask_matrix.shape[-1]
-    )
-    # softmax will make the similarity value to 0 when -inf is filled.
-    # Mask the similarities (from q to k) matrix:(T,T) to prevent the communications
-    # with future time steps by replacing the similarity values with the -inf,
-    # meaning there is no relationship from q to k.
+    assert similarities.ndim == 4   # (B,H,Tq,Tk)
+
+    # --------------------------------------------------------------------------------
+    # Adjust the Future Mask shape to match the actual sequence length _Tk.
+    # If the mask is larger than the actual sequence length _Tk, cut to _Tk x _Tk.
+    # Otherwise, shape mismatch in masked_fill and (_T, _T) mask can’t be broadcast
+    # to (B, H, _Tk, _Tk).
+    #
+    # In causal self-attention of the Decoder, each query in Q only see the past keys
+    # in K and must not see future keys. Because LM predicts next from the past only.
+    # --------------------------------------------------------------------------------
+    _Tk = similarities.shape[-1]
+    if mask_matrix.shape[-1] != _Tk:
+        mask_matrix = mask_matrix[:_Tk, :_Tk]
+
+    # --------------------------------------------------------------------------------
+    # Mask the similarities (from q to k) matrix:(Tk,Tk) to prevent q looking into
+    # the future time steps in the sequence. This is to prevent the future leak in
+    # the uni-directional attention such as GPT.
+    # By replacing similarity values of the future time steps with the -inf,
+    # there is no relationship from q to k in the similarity matrix.
     # Then, softmax will make the contribution to zero due to exp(-inf) = 0.
     # This is the same with blocking relations between q and k.
+    # --------------------------------------------------------------------------------
     masked = similarities.masked_fill(mask=mask_matrix, value=float('-inf'))
     return masked
 
@@ -264,27 +281,33 @@ def calculate_attention_values(
     other elements (including itself) in T, using (q,k) relationship value as the
     strength of the relationships.
 
+    Note that in the Cross Attention in the Decoder, sequence length of Q (Tq) may
+    be different from that from Encoder (Tk = T_v).
+
+    The similarities matrix has the shape (B, h, Tq, Tk). V has (B, h, Tk, d_v).
+    (B, h, Tq, Tk) @ (B, h, Tk, d_v) -> (B, h, Tq, d_v)
+
     Citation:
     > On each of these projected versions of queries, keys and values we then perform
     > the attention function in parallel, yielding d_v-dimensional output values.
 
     ```
     bows = []
-    for row in similarities:                    # similarity matrix of shape (T,T)
+    for row in similarities:                    # similarity matrix of shape (Tq,Tk)
         bow = sum([                             # bow:shape(d_v,)
             # each column in row is (q,k) similarity score s
             s*v for (s,v) in zip(row,values)    # k:shape(), v:shape(d_v,)
 =        ])
-        bows.append(bow)                        # bows:shape(T,d_v)
+        bows.append(bow)                        # bows:shape(Tq,d_v)
     ```
 
     Args:
-        similarities: q to k relationship strength matrix of shape (B, h, T, T)
-        values: elements of sequence with length T of shape (B, h, T, d_v)
+        similarities: q to k relationship strength matrix of shape (B, h, Tq, Tk)
+        values: elements of sequence with length Tk of shape (B, h, Tk, d_v) where Tk = T_v.
 
-    Returns: Bag of Words for every q element of shape (B, h, T, d_v)
+    Returns: Bag of Words for every q element of shape (B, h, Tq, d_v)
     """
-    return similarities @ values     # (B,h,T,T) @ (B,h,T,d_v) -> (B,h,T,d_v)
+    return similarities @ values     # (B,h,Tq,Tk) @ (B,h,Tk,d_v) -> (B,h,Tq,d_v)
 
 
 class LayerNormalization(nn.Module):
@@ -359,14 +382,18 @@ class ScaledDotProductAttention(nn.Module):
             return_similarities: bool = False
     ):
         """Calculate the scaled dot product attention.
+        Note that in the Cross Attention in Encoder, the sequence length may be different
+        from that from the Encoder. Hence, be specific with (Tk = T_v), and Tq
+
         Args:
-            q: query of shape (B,h,T,d_k)
-            k: key of shape (B,h,T,d_k)
-            v: value of shape (B,h,T,d_v)
+            q: query of shape (B,h,Tq,d_k)
+            k: key of shape (B,h,Tk,d_k)
+            v: value of shape (B,h,Tk,d_v)
             return_similarities: flag to return similarity (q to k) scores too.
         """
         assert q.ndim == 4
-        _B, _H, _T, _ = q.shape
+        _B, _H, _Tq, _ = q.shape
+        _Tk = k.shape[-2]
 
         # --------------------------------------------------------------------------------
         # First MatMul in the Scaled Dot Product Attention to calculate the similarities
@@ -380,7 +407,7 @@ class ScaledDotProductAttention(nn.Module):
             query=q,
             key=k,
         )   # (B, h, T, T)
-        assert similarities.shape == (_B, _H, _T, _T)
+        assert similarities.shape == (_B, _H, _Tq, _Tk)
         assert torch.all(torch.isfinite(similarities))
 
         # --------------------------------------------------------------------------------
@@ -388,18 +415,26 @@ class ScaledDotProductAttention(nn.Module):
         # --------------------------------------------------------------------------------
         d_k = k.shape[-1]  # head size
         similarities = scale(similarities=similarities, d_k=d_k)
-        assert similarities.shape == (_B, _H, _T, _T)
+        assert similarities.shape == (_B, _H, _Tq, _Tk)
         assert torch.all(torch.isfinite(similarities))
 
         # --------------------------------------------------------------------------------
-        # Mask if required
+        # When Mask if required for causal attention, mask the similarities matrix to
+        # prevent the attention to future time steps. Masking fills the similarity value
+        # with -inf so that the softmax will make the contribution to zero as exp(-inf) = 0.
+        # This is the same as blocking relations between q and k.
         # --------------------------------------------------------------------------------
         if self.mask_matrix is not None:
+            # In the causal attention, the sequence length of q and k should be the same
+            # because the attention is only within the same sequence.
+            # In the cross attention, the sequence length of Tq and Tk can be different
+            # because the attention is between different sequences.
+            assert _Tq == _Tk, "causal mask requires equal query/key lengths"
             similarities = mask(
                 similarities=similarities,      # shape:(B,h,T,T)
                 mask_matrix=self.mask_matrix    # shape:(T,T)
             )
-            assert similarities.shape == (_B, _H, _T, _T)
+            assert similarities.shape == (_B, _H, _Tq, _Tk)
             # mask() set -inf
             # assert torch.all(torch.isfinite(similarities))
 
@@ -415,7 +450,7 @@ class ScaledDotProductAttention(nn.Module):
             similarities=similarities,
             values=v
         )   # shape: (B,H,T,d_k)
-        assert attentions.shape == (_B, _H, _T, d_k)
+        assert attentions.shape == (_B, _H, _Tq, d_k)
 
         if return_similarities:
             return attentions, similarities
@@ -546,10 +581,26 @@ class MultiHeadAttention(nn.Module):
             v: Tensor
     ):
         """Run multi head attention
+        Note: the sequence lengths of Encoder and Decoder can be different Cross Attention.
+        Q: (B, Tq, D) from decoder
+        K, V: (B, Tk, D) from encoder
+
+        After projections:
+        Q: (B, H, Tq, d_k)
+        K: (B, H, Tk, d_k)
+        V: (B, H, Tk, d_v)
+
+        In this implementation, d_k == d_v == D / H.
+
+        Then:
+        (B, H, Tq, d_k) @ (B, H, d_k, Tk) -> (B, H, Tq, Tk)
+        (B, H, Tq, Tk) @ (B, H, Tk, d_v) -> (B, H, Tq, d_v)
+
         Args:
-            q: input embedding vectors of shape (B,T,D)
-            k: input embedding vectors of shape (B,T,D)
-            v: input embedding vectors of shape (B,T,D)
+            q: input embedding vectors of shape (B,Tq,D)
+            k: input embedding vectors of shape (B,Tk,D)
+            v: input embedding vectors of shape (B,Tk,D)
+
 
         Returns: Attention values of shape (B,T,D)
         """
@@ -557,11 +608,13 @@ class MultiHeadAttention(nn.Module):
         assert q.ndim == 3 and k.ndim == 3 and v.ndim == 3, \
             "expected q.ndim == 3 and k.ndim == 3 and v.ndim == 3, " \
             f"got {q.ndim}, {k.ndim}, {v.ndim}"
-        assert q.shape == k.shape == v.shape, \
-            "expected q.shape == k.shape == v.shape, " \
-            f"got {q.shape}, {k.shape}, {v.shape}."
+        assert q.shape[0] == k.shape[0] == v.shape[0], \
+            "expected same batch size for q, k, v."
+        assert q.shape[2] == k.shape[2] == v.shape[2], \
+            "expected same feature dimension for q, k, v."
 
-        _B, _T, _D = q.shape      # Batch, Tokens (or sequence length), Dimension
+        _B, _Tq, _D = q.shape      # Batch, Tokens (or sequence length), Dimension
+        _Tk = k.shape[1]
         assert _D == self.D, \
             f"input vector dimension is invalid, expected [{self.D}], got [{_D}]."
 
@@ -574,9 +627,9 @@ class MultiHeadAttention(nn.Module):
         q: Tensor = self.Wq(q)   # Transfer to Q space. Shape=(B, T, D)
         k: Tensor = self.Wk(k)   # Transfer to K space. Shape=(B, T, D)
         v: Tensor = self.Wv(v)   # Transfer to V space. Shape=(B, T, D)
-        assert q.shape == (_B, _T, self.D)
-        assert k.shape == (_B, _T, self.D)
-        assert v.shape == (_B, _T, self.D)
+        assert q.shape == (_B, _Tq, self.D)
+        assert k.shape == (_B, _Tk, self.D)
+        assert v.shape == (_B, _Tk, self.D)
 
         # --------------------------------------------------------------------------------
         # Split into H segments for multiple heads to attend.
@@ -589,7 +642,7 @@ class MultiHeadAttention(nn.Module):
         # Calculate self attention values
         # --------------------------------------------------------------------------------
         attentions: Tensor = self.scaled_dot_product_attention(q=q, k=k, v=v)
-        assert attentions.shape == (_B, self.H, _T, self.d_k)
+        assert attentions.shape == (_B, self.H, _Tq, self.d_k)
 
         # --------------------------------------------------------------------------------
         # Concatenate outputs from heads into the model output with reshape.
@@ -598,15 +651,15 @@ class MultiHeadAttention(nn.Module):
         # memory. Otherwise:
         # "RuntimeError: view size is not compatible with input tensor's size and strid"
         # --------------------------------------------------------------------------------
-        attentions = attentions.transpose(2, 1).contiguous().view(_B, _T, -1)
-        assert attentions.shape == (_B, _T, self.D)
+        attentions = attentions.transpose(2, 1).contiguous().view(_B, _Tq, -1)
+        assert attentions.shape == (_B, _Tq, self.D)
 
         # --------------------------------------------------------------------------------
         # Last Wo Linear projection
         # --------------------------------------------------------------------------------
         attentions = self.Wo(attentions)    # (B,T,D)@(D,D) -> (B,T,D)
-        assert attentions.shape == (_B, _T, self.D), \
-            f"expected attention shape {(_B, _T, self.D)}, got {attentions.shape}."
+        assert attentions.shape == (_B, _Tq, self.D), \
+            f"expected attention shape {(_B, _Tq, self.D)}, got {attentions.shape}."
         assert torch.all(torch.isfinite(attentions))
 
         return attentions
