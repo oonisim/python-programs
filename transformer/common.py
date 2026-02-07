@@ -7,6 +7,7 @@ D: Dimensions of the token embedding vector, which is d_model in the paper.
 H: Number of heads in Multi-head attention\
 V: Vocabulary size
 """
+import logging
 import math
 from typing import (
     Optional
@@ -32,7 +33,8 @@ from torch.nn.functional import (
 )
 
 
-torch.manual_seed(42)
+#torch.manual_seed(42)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 def initialize_weights_xavier(
@@ -109,7 +111,9 @@ def initialize_weights(
             std=1/math.sqrt(2 * d_model * layer_level)  # x 2 is empirical to get close to 0.02 used in GPT/BERT.
         )
     else:
-        assert False, "invalid module type"
+        msg: str = f"Expected Linear module for weight initialization, got:{type(module)}"
+        logger.error(msg)
+        raise RuntimeError(msg)
 
 
 def initialize_embedding_weights(
@@ -119,7 +123,9 @@ def initialize_embedding_weights(
     if isinstance(module, nn.Embedding):
         torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
     else:
-        assert False, "invalid module type"
+        msg: str = f"Expected Embedding module for embedding initialization, got:{type(module)}"
+        logger.error(msg)
+        raise RuntimeError(msg)
 
 
 def split(
@@ -392,7 +398,11 @@ class ScaledDotProductAttention(nn.Module):
             v: value of shape (B,h,Tk,d_v)
             return_similarities: flag to return similarity (q to k) scores too.
         """
-        assert q.ndim == 4
+        if q.ndim != 4:
+            msg: str = "Expected query of shape (B,h,Tq,d_k), got {q.shape}"
+            logger.error(msg)
+            raise RuntimeError(msg)
+
         _B, _H, _Tq, _ = q.shape
         _Tk = k.shape[-2]
 
@@ -409,6 +419,7 @@ class ScaledDotProductAttention(nn.Module):
             key=k,
         )   # (B, h, T, T)
         assert similarities.shape == (_B, _H, _Tq, _Tk)
+        # TODO:This is an expensive operation. Consider conditional switch.
         assert torch.all(torch.isfinite(similarities))
 
         # --------------------------------------------------------------------------------
@@ -823,7 +834,10 @@ class PositionalEncoding(nn.Module):
 
 class Projection(nn.Module):
     """Class to project the predictions of shape (B, T, D) to class probabilities of shape (B, T).
-     """
+    Projection returns log-probabilities. Do NOT pass the Projection output to CrossEntropyLoss.
+    CrossEntropyLoss expects raw logits and internally applies log-softmax + NLLLoss.
+    Use a loss function that expects log-probs, e.g. torch.nn.NLLLoss (negative log-likelihood).
+    """
     def __init__(
             self,
             d_model: int = DIM_MODEL,

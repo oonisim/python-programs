@@ -1,0 +1,594 @@
+"""Language Model Training Director.
+
+This module orchestrates the language model training pipeline using the
+Director pattern (GoF). It coordinates the components without knowing
+their internal details.
+
+Architecture
+------------
+The training system follows clean separation of concerns:
+
+    common.py          # Transformer components (MHA, FFN, etc.)
+    encoder.py         # Encoder stack
+    decoder.py         # Decoder stack (memory optional for LM)
+    model.py           # Encoder-Decoder Transformer
+    lm.py              # LanguageModel (decoder-only, GPT-style)
+    loader.py          # Data loading with tokenizer dependency injection
+    trainer.py         # Trainer + LanguageModelTrainer
+    train_lm.py        # Training Director (this file)
+    app.py             # TransformerAPI wrapper
+    utility.py         # File/checkpoint utilities
+
+Pipeline Flow
+-------------
+The Director orchestrates the following pipeline:
+
+    CLI args -> Director -> Tokenizer (GPT2)
+                         -> DataLoaderFactory (loader.py)
+                         -> LanguageModel (lm.py)
+                         -> LanguageModelTrainer (trainer.py)
+                         -> Training execution
+                         -> Model saving
+
+Director Steps:
+    1. _build_tokenizer()    - Create GPT-2 BPE tokenizer
+    2. _build_data_loaders() - Ingest dataset, tokenize, create DataLoaders
+    3. _build_model()        - Create LanguageModel (decoder-only Transformer)
+    4. _build_trainer()      - Create optimizer, scheduler, LanguageModelTrainer
+    5. _execute_training()   - Run training loop with checkpointing
+
+Usage
+-----
+Basic training:
+    python train_lm.py --dataset wikitext --epochs 10
+
+Quick test with fewer samples:
+    python train_lm.py --dataset wikitext --max_samples 1000
+
+Resume from checkpoint:
+    python train_lm.py --resume
+
+Show this documentation:
+    python train_lm.py --info
+
+Available Datasets
+------------------
+    - wikitext: WikiText-2 (~2M tokens) - Wikipedia articles
+    - wikitext-103: WikiText-103 (~100M tokens) - Larger Wikipedia
+"""
+import argparse
+import sys
+from dataclasses import dataclass
+from typing import Optional
+
+import torch
+from torch import nn
+from torch.optim import AdamW
+from torch.optim.lr_scheduler import CosineAnnealingLR
+from transformers import GPT2Tokenizer
+
+# Local imports
+try:
+    from .lm import LanguageModel
+    from .loader import LanguageModelDataLoaderFactory, DataLoaderConfig
+    from .trainer import LanguageModelTrainer, TrainerConfig
+except ImportError:
+    from lm import LanguageModel
+    from loader import LanguageModelDataLoaderFactory, DataLoaderConfig
+    from trainer import LanguageModelTrainer, TrainerConfig
+
+
+# --------------------------------------------------------------------------------
+# Configuration
+# --------------------------------------------------------------------------------
+@dataclass
+class ModelConfig:
+    """Language model architecture configuration."""
+    d_model: int = 256
+    num_heads: int = 4
+    num_layers: int = 4
+    d_ff: int = 512
+    max_seq_len: int = 256
+    dropout: float = 0.1
+
+
+@dataclass
+class TrainingConfig:
+    """Training hyperparameters."""
+    epochs: int = 20
+    batch_size: int = 32
+    learning_rate: float = 3e-4
+    weight_decay: float = 0.1
+    gradient_clip: float = 1.0
+    log_interval: int = 100
+
+
+DATASET_CONFIGS = {
+    "wikitext": ("wikitext", "wikitext-2-raw-v1"),
+    "wikitext-103": ("wikitext", "wikitext-103-raw-v1"),
+}
+
+
+# --------------------------------------------------------------------------------
+# Director
+# --------------------------------------------------------------------------------
+class LanguageModelTrainingDirector:
+    """Director class orchestrating the LM training pipeline.
+
+    Coordinates the training process without knowing internal details
+    of the components. Each step in the pipeline is clearly defined.
+    """
+
+    def __init__(
+            self,
+            dataset_key: str,
+            model_config: ModelConfig,
+            training_config: TrainingConfig,
+            max_samples: Optional[int] = None,
+            resume: bool = False
+    ):
+        """Initialize the director.
+
+        Args:
+            dataset_key: Dataset identifier (e.g., "wikitext").
+            model_config: Model architecture configuration.
+            training_config: Training hyperparameters.
+            max_samples: Limit training samples (for quick testing).
+            resume: Whether to resume from checkpoint.
+        """
+        self.dataset_key = dataset_key
+        self.model_config = model_config
+        self.training_config = training_config
+        self.max_samples = max_samples
+        self.resume = resume
+
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        # Components (built during pipeline execution)
+        self.tokenizer = None
+        self.data_factory = None
+        self.model = None
+        self.trainer = None
+
+    def run(self) -> dict:
+        """Execute the complete training pipeline.
+
+        Returns:
+            Dictionary with training results.
+        """
+        self._print_header()
+        self._build_tokenizer()
+        self._build_data_loaders()
+        self._build_model()
+        self._build_trainer()
+        return self._execute_training()
+
+    def _print_header(self) -> None:
+        """Print training session header."""
+        print("=" * 60)
+        print("Language Model Training")
+        print("=" * 60)
+        print(f"Dataset: {self.dataset_key}")
+        print(f"Device: {self.device}")
+        print(f"Model: d={self.model_config.d_model}, "
+              f"h={self.model_config.num_heads}, "
+              f"L={self.model_config.num_layers}")
+        print(f"Training: epochs={self.training_config.epochs}, "
+              f"batch={self.training_config.batch_size}, "
+              f"lr={self.training_config.learning_rate}")
+        print()
+
+    def _build_tokenizer(self) -> None:
+        """Step 1: Create tokenizer."""
+        print("Building tokenizer...")
+        self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+
+        # GPT-2 uses EOS as PAD
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+
+        print(f"  Vocabulary size: {self.tokenizer.vocab_size}")
+
+    def _build_data_loaders(self) -> None:
+        """Step 2: Create data loaders."""
+        print("\nBuilding data loaders...")
+
+        dataset_name, dataset_config = DATASET_CONFIGS[self.dataset_key]
+
+        loader_config = DataLoaderConfig(
+            seq_len=self.model_config.max_seq_len,
+            batch_size=self.training_config.batch_size,
+            max_train_samples=self.max_samples
+        )
+
+        self.data_factory = LanguageModelDataLoaderFactory(
+            dataset_name=dataset_name,
+            dataset_config=dataset_config,
+            tokenizer=self.tokenizer,
+            config=loader_config
+        )
+
+        # Trigger data loading to show stats
+        _ = self.data_factory.get_train_loader()
+        _ = self.data_factory.get_val_loader()
+
+        stats = self.data_factory.get_stats()
+        print(f"  Train tokens: {stats.get('train_tokens', 'N/A'):,}")
+        print(f"  Val tokens: {stats.get('val_tokens', 'N/A'):,}")
+        print(f"  Train sequences: {stats.get('train_sequences', 'N/A'):,}")
+
+    def _build_model(self) -> None:
+        """Step 3: Create model."""
+        print("\nBuilding model...")
+
+        self.model = LanguageModel(
+            vocab_size=self.tokenizer.vocab_size,
+            d_model=self.model_config.d_model,
+            num_heads=self.model_config.num_heads,
+            num_layers=self.model_config.num_layers,
+            d_ff=self.model_config.d_ff,
+            max_seq_len=self.model_config.max_seq_len,
+            dropout=self.model_config.dropout
+        )
+
+        self.model.end_token = self.tokenizer.eos_token_id
+
+        num_params = sum(p.numel() for p in self.model.parameters())
+        print(f"  Parameters: {num_params:,}")
+
+    def _build_trainer(self) -> None:
+        """Step 4: Create trainer with optimizer and scheduler."""
+        print("\nBuilding trainer...")
+
+        optimizer = AdamW(
+            self.model.parameters(),
+            lr=self.training_config.learning_rate,
+            betas=(0.9, 0.95),
+            weight_decay=self.training_config.weight_decay
+        )
+
+        scheduler = CosineAnnealingLR(
+            optimizer,
+            T_max=self.training_config.epochs
+        )
+
+        # Model returns log-probabilities. Do NOT use CrossEntropyLoss as
+        # it expects logits and internally applies log-softmax + NLLLoss.
+        criterion = nn.NLLLoss(ignore_index=self.tokenizer.pad_token_id)
+
+        trainer_config = TrainerConfig(
+            model_name=f"lm_{self.dataset_key}",
+            gradient_clip=self.training_config.gradient_clip,
+            log_interval=self.training_config.log_interval,
+            snapshot_per_epoch=True,
+            keep_last_n_snapshots=3,
+            delete_snapshots_after_training=True
+        )
+
+        self.trainer = LanguageModelTrainer(
+            model=self.model,
+            optimizer=optimizer,
+            criterion=criterion,
+            config=trainer_config,
+            device=self.device,
+            scheduler=scheduler
+        )
+
+    def _execute_training(self) -> dict:
+        """Step 5: Execute training loop.
+
+        Returns:
+            Dictionary with training results.
+        """
+        train_loader = self.data_factory.get_train_loader()
+        val_loader = self.data_factory.get_val_loader()
+
+        # Handle resume
+        start_epoch = 0
+        if self.resume:
+            latest = self.trainer.find_latest_snapshot()
+            if latest:
+                print(f"\nResuming from: {latest}")
+                checkpoint = self.trainer.load_snapshot(latest.name)
+                start_epoch = checkpoint["epoch"] + 1
+            else:
+                print("\nNo checkpoint found, starting fresh.")
+
+        print("\n" + "=" * 60)
+        print("Training...")
+        print("=" * 60)
+
+        # Training loop
+        result = self.trainer.train(
+            train_loader=train_loader,
+            val_loader=val_loader,
+            num_epochs=self.training_config.epochs,
+            start_epoch=start_epoch
+        )
+
+        # Print summary
+        self._print_summary(result)
+
+        return result
+
+    def _print_summary(self, result: dict) -> None:
+        """Print training summary."""
+        print("\n" + "=" * 60)
+        print("Training Complete!")
+        print("=" * 60)
+        print(f"Best validation loss: {result['best_val_loss']:.4f}")
+
+        perplexity = torch.exp(torch.tensor(result['best_val_loss'])).item()
+        print(f"Best perplexity: {perplexity:.2f}")
+        print(f"Model saved: {result['model_path']}")
+
+
+# --------------------------------------------------------------------------------
+# CLI
+# --------------------------------------------------------------------------------
+HELP_TEXT = """
+Language Model Training Script
+==============================
+
+This script trains a decoder-only Transformer (GPT-style) language model.
+The model learns to predict the next token given previous tokens using
+causal self-attention.
+
+WHAT IS A LANGUAGE MODEL?
+-------------------------
+A language model predicts the probability of the next word given previous words.
+For example, given "The cat sat on the", it predicts "mat" has high probability.
+
+This is the architecture behind GPT-2, GPT-3, GPT-4, LLaMA, and Mistral.
+
+HOW IT WORKS
+------------
+1. Text is tokenized into subword tokens using GPT-2's BPE tokenizer
+2. The model processes tokens through multiple decoder layers
+3. Each layer uses causal (masked) attention - tokens can only see past tokens
+4. The model outputs probability distribution over vocabulary for next token
+5. Training minimizes negative log-likelihood (cross-entropy) loss
+
+QUICK START
+-----------
+# Train with default settings (small model, WikiText-2)
+python train_lm.py
+
+# Quick test with fewer samples
+python train_lm.py --max_samples 1000
+
+# Train larger model for more epochs
+python train_lm.py --d_model 512 --num_layers 6 --epochs 50
+
+# Resume interrupted training
+python train_lm.py --resume
+
+OUTPUT
+------
+After training, the model is saved to:
+    lm_<dataset>/models/model_<timestamp>.pt
+
+Use it for text generation:
+    from lm import LanguageModel
+    model = LanguageModel(vocab_size=50257)
+    model.load_state_dict(torch.load("path/to/model.pt")["model_state_dict"])
+
+    with model:
+        output = model.generate(prompt_ids, max_length=100)
+
+PERPLEXITY
+----------
+Perplexity measures how "surprised" the model is by test data.
+- Lower is better
+- Perplexity of 100 = model is as confused as picking from 100 random tokens
+- Good LMs achieve perplexity < 30 on WikiText-2
+"""
+
+
+def parse_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Train a GPT-style language model on text datasets.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Use --info for detailed documentation, --help for argument help."
+    )
+
+    # --------------------------------------------------------------------------------
+    # Data Arguments
+    # --------------------------------------------------------------------------------
+    data_group = parser.add_argument_group(
+        "Data",
+        "Dataset selection and preprocessing options."
+    )
+    data_group.add_argument(
+        "--dataset", type=str, default="wikitext",
+        choices=list(DATASET_CONFIGS.keys()),
+        help=(
+            "Dataset to train on. "
+            "'wikitext' uses WikiText-2 (~2M tokens, good for testing). "
+            "'wikitext-103' uses WikiText-103 (~100M tokens, for serious training). "
+            "Default: wikitext"
+        )
+    )
+    data_group.add_argument(
+        "--max_samples", type=int, default=None,
+        metavar="N",
+        help=(
+            "Limit the number of training samples. Useful for quick testing "
+            "or debugging. For example, --max_samples 1000 trains on only "
+            "1000 text samples. Default: None (use all samples)"
+        )
+    )
+
+    # --------------------------------------------------------------------------------
+    # Training Arguments
+    # --------------------------------------------------------------------------------
+    train_group = parser.add_argument_group(
+        "Training",
+        "Training hyperparameters controlling the optimization process."
+    )
+    train_group.add_argument(
+        "--epochs", type=int, default=20,
+        metavar="N",
+        help=(
+            "Number of training epochs. One epoch = one pass through entire "
+            "training dataset. More epochs generally improve performance but "
+            "risk overfitting. Default: 20"
+        )
+    )
+    train_group.add_argument(
+        "--batch_size", type=int, default=32,
+        metavar="N",
+        help=(
+            "Number of sequences per gradient update. Larger batches provide "
+            "more stable gradients but require more GPU memory. Reduce if "
+            "you encounter OOM errors. Default: 32"
+        )
+    )
+    train_group.add_argument(
+        "--lr", type=float, default=3e-4,
+        metavar="RATE",
+        help=(
+            "Learning rate for AdamW optimizer. Controls step size during "
+            "gradient descent. Typical range: 1e-5 to 1e-3. Higher values "
+            "train faster but may be unstable. Default: 3e-4"
+        )
+    )
+    train_group.add_argument(
+        "--resume", action="store_true",
+        help=(
+            "Resume training from the latest checkpoint. Useful when training "
+            "is interrupted. The script automatically finds the most recent "
+            "snapshot in the model directory."
+        )
+    )
+
+    # --------------------------------------------------------------------------------
+    # Model Architecture Arguments
+    # --------------------------------------------------------------------------------
+    model_group = parser.add_argument_group(
+        "Model Architecture",
+        "Transformer architecture hyperparameters. Larger values = more capacity "
+        "but slower training and more memory."
+    )
+    model_group.add_argument(
+        "--d_model", type=int, default=256,
+        metavar="DIM",
+        help=(
+            "Model embedding dimension. Size of token representations. "
+            "GPT-2 small uses 768, GPT-2 medium uses 1024. "
+            "Must be divisible by num_heads. Default: 256"
+        )
+    )
+    model_group.add_argument(
+        "--num_heads", type=int, default=4,
+        metavar="N",
+        help=(
+            "Number of attention heads. Each head learns different attention "
+            "patterns. GPT-2 small uses 12 heads. "
+            "d_model must be divisible by num_heads. Default: 4"
+        )
+    )
+    model_group.add_argument(
+        "--num_layers", type=int, default=4,
+        metavar="N",
+        help=(
+            "Number of decoder layers (depth). Each layer has self-attention "
+            "and feed-forward sublayers. GPT-2 small uses 12 layers. "
+            "More layers = more capacity but slower. Default: 4"
+        )
+    )
+    model_group.add_argument(
+        "--d_ff", type=int, default=512,
+        metavar="DIM",
+        help=(
+            "Feed-forward hidden dimension. Size of the intermediate layer "
+            "in position-wise FFN. Typically 4x d_model. "
+            "GPT-2 small uses 3072. Default: 512"
+        )
+    )
+    model_group.add_argument(
+        "--max_seq_len", type=int, default=256,
+        metavar="LEN",
+        help=(
+            "Maximum sequence length (context window). How many tokens the "
+            "model can see at once. Longer = more context but more memory. "
+            "GPT-2 uses 1024. Default: 256"
+        )
+    )
+    model_group.add_argument(
+        "--dropout", type=float, default=0.1,
+        metavar="RATE",
+        help=(
+            "Dropout probability for regularization. Randomly zeros elements "
+            "during training to prevent overfitting. "
+            "Typical range: 0.0 to 0.3. Default: 0.1"
+        )
+    )
+
+    # --------------------------------------------------------------------------------
+    # Information Arguments
+    # --------------------------------------------------------------------------------
+    info_group = parser.add_argument_group(
+        "Information",
+        "Help and documentation options."
+    )
+    info_group.add_argument(
+        "--info", action="store_true",
+        help=(
+            "Show detailed documentation about what this script does, "
+            "how language models work, and usage examples. "
+            "More comprehensive than --help."
+        )
+    )
+    info_group.add_argument(
+        "--explain", action="store_true",
+        help=(
+            "Show explanation of what a language model is and how to use "
+            "this training script with examples."
+        )
+    )
+
+    return parser.parse_args()
+
+
+def main():
+    """Main entry point."""
+    args = parse_args()
+
+    if args.info:
+        print(__doc__)
+        sys.exit(0)
+
+    if args.explain:
+        print(HELP_TEXT)
+        sys.exit(0)
+
+    model_config = ModelConfig(
+        d_model=args.d_model,
+        num_heads=args.num_heads,
+        num_layers=args.num_layers,
+        d_ff=args.d_ff,
+        max_seq_len=args.max_seq_len,
+        dropout=args.dropout
+    )
+
+    training_config = TrainingConfig(
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        learning_rate=args.lr
+    )
+
+    director = LanguageModelTrainingDirector(
+        dataset_key=args.dataset,
+        model_config=model_config,
+        training_config=training_config,
+        max_samples=args.max_samples,
+        resume=args.resume
+    )
+
+    director.run()
+
+
+if __name__ == "__main__":
+    main()

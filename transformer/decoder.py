@@ -36,10 +36,17 @@ from .common import (
 
 
 class DecodeLayer(nn.Module):
-    """Class to implement Decoder Layer
-    This implements two attention blocks:
-    1. Decoder Masked Self Attention
-    2. Decoder to Encoder Cross Attention
+    """Decoder Layer supporting both encoder-decoder and decoder-only modes.
+
+    Supports two modes:
+    1. Encoder-Decoder mode (memory provided): Uses causal self-attention AND
+       cross-attention. Used by: Original Transformer, T5, BART.
+    2. Decoder-only mode (memory=None): Uses only causal self-attention.
+       Used by: GPT-2, GPT-3, LLaMA, Mistral.
+
+    Attention blocks:
+    1. Decoder Masked Self Attention (always applied)
+    2. Decoder to Encoder Cross Attention (skipped when memory=None)
 
     > We employ a residual connection around each of the two sub-layers, followed
     > by layer normalization. That is, the output of each sub-layer is
@@ -158,12 +165,13 @@ class DecodeLayer(nn.Module):
     def forward(
             self,
             x: Tensor,
-            memory: Tensor
+            memory: Tensor = None
     ) -> Tensor:
-        """Decode.
+        """Decode with optional cross-attention.
         Args:
             x: embedding vector from the decoder layer of shape (B,T,D)
-            memory: encoder embedding vector of shape (B, T, D)
+            memory: encoder embedding vector of shape (B, T, D). If None,
+                    cross-attention is skipped (decoder-only mode for GPT-style LM).
         """
         # > 3.2.3
         # > In "encoder-decoder attention" layers, the queries come from the previous decoder
@@ -184,18 +192,19 @@ class DecodeLayer(nn.Module):
         x = x + self.dropout_causal(self.causal_self_attention(q=_q, k=_k, v=_v))
 
         #--------------------------------------------------------------------------------
-        # 2. Decoder Q to Encoder K Cross Attention.
+        # 2. Decoder Q to Encoder K Cross Attention (skipped for decoder-only mode).
         # x = x + attention is Skip connection.
         # Q = Decoder query to identify the relevance of keys in the Encoder memory.
         # K/V = encoder memory (source sequence context)
         #
         # In AlphaFold, each amino acid is a token and a protein is a token sequence.
-        # A query token q finds how strongly it is ‘gravitated’ to each token in K,
+        # A query token q finds how strongly it is 'gravitated' to each token in K,
         # with larger weights indicating stronger influence
         #--------------------------------------------------------------------------------
-        _q = self.layer_norm_causal(x)
-        _k = _v = self.layer_norm_memory(memory)
-        x = x + self.dropout_cross(self.cross_attention(q=_q, k=_k, v=_v))
+        if memory is not None:
+            _q = self.layer_norm_causal(x)
+            _k = _v = self.layer_norm_memory(memory)
+            x = x + self.dropout_cross(self.cross_attention(q=_q, k=_k, v=_v))
 
         #--------------------------------------------------------------------------------
         # Point-Wise Feed Forward Network (FFN)
@@ -296,7 +305,7 @@ class Decoder(nn.Module):
     def forward(
             self,
             y: Tensor,
-            memory: Tensor,
+            memory: Tensor = None,
     ) -> Tensor:
         """Decode the input embeddings.
         The memory (embeddings of the source sequence) is regarded as a prompt or context
@@ -308,7 +317,7 @@ class Decoder(nn.Module):
 
         Args:
             y: indices to target sequence tokens of shape (B, T)
-            memory: encoder embeddings
+            memory: encoder embeddings. If None, decoder-only mode (GPT-style LM).
 
         Returns: Decoder next token predictions of shape (B, T, D)
         """
@@ -335,7 +344,7 @@ class Decoder(nn.Module):
         assert torch.all(torch.isfinite(y))
 
         # --------------------------------------------------------------------------------
-        # N x Encode Layers
+        # N x Decode Layers
         # --------------------------------------------------------------------------------
         for _layer in self.layers:
             y = _layer(x=y, memory=memory)

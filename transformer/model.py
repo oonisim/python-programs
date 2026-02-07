@@ -2,7 +2,8 @@
 
 For a ChatGPT-like experience with automatic tokenization, see TransformerAPI in app.py.
 """
-from typing import Optional, Union
+import logging
+from typing import Optional
 
 import torch
 from torch import (
@@ -31,6 +32,9 @@ from .encoder import (
 from .decoder import (
     Decoder
 )
+
+
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 class Transformer(nn.Module):
@@ -132,34 +136,36 @@ class Transformer(nn.Module):
         self.train()
         return False
 
-    def __call__(
-            self,
-            x: Tensor,
-            start_token: Optional[int] = None,
-            end_token: Optional[int] = None,
-            max_length: int = MAX_TIME_STEPS
-    ) -> Tensor:
-        """Generate output sequence from source x (inference mode).
-        For training, use forward() directly.
-
-        Args:
-            x: Source sequence of shape (B, Te)
-            start_token: Token index to start generation (uses self.start_token if None)
-            end_token: Token index to stop generation (uses self.end_token if None)
-            max_length: Maximum number of tokens to generate
-
-        Returns: Generated token indices of shape (B, Td)
-        """
-        start = start_token if start_token is not None else self.start_token
-        end = end_token if end_token is not None else self.end_token
-
-        if start is None or end is None:
-            raise ValueError(
-                "start_token and end_token must be provided either as arguments "
-                "or set via model.start_token and model.end_token"
-            )
-
-        return self.generate(x=x, start_token=start, end_token=end, max_length=max_length)
+    # DO NOT override nn.Module.__call__ as it breaks expected PyTorch behavior
+    # (hooks, device handling, and normal forward invocation).
+    #def __call__(
+    #        self,
+    #        x: Tensor,
+    #        start_token: Optional[int] = None,
+    #        end_token: Optional[int] = None,
+    #        max_length: int = MAX_TIME_STEPS
+    #) -> Tensor:
+    #    """Generate output sequence from source x (inference mode).
+    #    For training, use forward() directly.
+    #
+    #    Args:
+    #        x: Source sequence of shape (B, Te)
+    #        start_token: Token index to start generation (uses self.start_token if None)
+    #        end_token: Token index to stop generation (uses self.end_token if None)
+    #        max_length: Maximum number of tokens to generate
+    #
+    #    Returns: Generated token indices of shape (B, Td)
+    #    """
+    #    start = start_token if start_token is not None else self.start_token
+    #    end = end_token if end_token is not None else self.end_token
+    #
+    #    if start is None or end is None:
+    #        raise ValueError(
+    #            "start_token and end_token must be provided either as arguments "
+    #            "or set via model.start_token and model.end_token"
+    #        )
+    #
+    #    return self.generate(x=x, start_token=start, end_token=end, max_length=max_length)
 
     def forward(
             self,
@@ -168,16 +174,26 @@ class Transformer(nn.Module):
     ) -> Tensor:
         """Run Transformer encoder/decoder
         DO NOT place non-differentiable functions e.g, argmax in forward.
+        This returns log-probabilities. Do NOT pass the Projection output to CrossEntropyLoss
+        as it expects logits and internally applies log-softmax + NLLLoss.
 
         Args:
             x: Encoder source sequences as token indices of shape (B, Te).
             y: Decoder target sequences as token indices of shape (B, Td).
 
         Returns: Log probabilities of shape (B, T, V) for training with NLLLoss.
+                 DO NOT pass to CrossEntropyLoss as it expects logits.
         """
-        assert x.ndim == 2, f"expected x.shape (B, T), got {x.shape}."
-        assert y.ndim == 2, f"expected y.shape (B, T), got {y.shape}."
+        # assert x.ndim == 2, f"expected x.shape (B, T), got {x.shape}."
+        # assert y.ndim == 2, f"expected y.shape (B, T), got {y.shape}."
+        if x.ndim != 2:
+            raise ValueError(f"expected y.shape (B, T), got {y.shape}.")
+        if y.ndim != 2:
 
+            raise ValueError(f"expected x.shape (B, T), got {x.shape}.")
+
+        # Projection returns log-probabilities. Do NOT pass the Projection output to
+        # CrossEntropyLoss as it expects logits and internally applies log-softmax + NLLLoss.
         log_probs: Tensor = self.projection(y=self.decoder(y=y, memory=self.encoder(x=x)))
         return log_probs
 
@@ -219,7 +235,11 @@ class Transformer(nn.Module):
 
         Returns: Generated token indices of shape (B, Td) where Td <= max_length
         """
-        assert x.ndim == 2, f"expected x.shape (B, T), got {x.shape}."
+        if x.ndim != 2:
+            msg: str = f"expected x.shape (B, T), got {x.shape}."
+            logger.error(msg)
+            raise ValueError(msg )
+
         _B = x.shape[0]
 
         # Encode source sequence once
