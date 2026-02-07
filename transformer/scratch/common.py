@@ -40,7 +40,10 @@ def initialize_weights_xavier(
 ):
     """Xavier weight initialization"""
     if isinstance(module, nn.Linear):
-        torch.nn.init.zeros_(module.bias)
+        if module.bias is not None:
+            # When a Torch Module is created with bias=False, there is no bias parameter.
+            # Nothing needs to be set to 0.
+            torch.nn.init.zeros_(module.bias)
         torch.nn.init.xavier_normal_(module.weight)
 
     elif isinstance(module, nn.Embedding):
@@ -204,7 +207,9 @@ def scale(
     # of two zero centered normal distributions q, k. The variance of the product
     # is head_size d_k. See https://stats.stackexchange.com/a/52699/105137.
     # --------------------------------------------------------------------------------
-    std = torch.sqrt(torch.tensor(d_k, dtype=TYPE_FLOAT))   # standard deviation
+    # similarities.new_tensor assures std and similarities will be on the same device.
+    # The similarities / std will not cause calculation between mismatched devices.
+    std = torch.sqrt(similarities.new_tensor(d_k, dtype=TYPE_FLOAT))   # standard deviation
 
     # --------------------------------------------------------------------------------
     # Scale similarities of each head by std so that the variance is approx 1.
@@ -223,7 +228,7 @@ def mask(
     similarities: Tensor,
     mask_matrix: Tensor
 ) -> Tensor:
-    """
+    """Mask the future tokens to prevent future leak.
     Args:
         similarities: similarity (q to k) matrix to mask of shape (B,H,T,T)
         mask_matrix: boolean matrix of which elements in (T,T) to mask fill.
@@ -291,8 +296,15 @@ class LayerNormalization(nn.Module):
         self.gamma = nn.Parameter(torch.ones(features))     # alpha is a learnable parameter
         self.beta = nn.Parameter(torch.zeros(features))     # bias is a learnable parameter
 
-    def forward(self, x):
+    def forward(self, x: Tensor):
         """Run Layer Normalization
+        https://docs.pytorch.org/docs/stable/generated/torch.nn.LayerNorm.html
+        $$ y = \gamma \frac{x - \mathbb{E}[x]}{\sqrt{\mathrm{Var}[x] + \epsilon}} + \beta $$
+
+        Torch.var() or std() uses Bessel's correction by default, which divides by (N-1).
+        Layer Normalization must use the population N because we need Var(Xnormalized)=1
+        that is the objective of Layer Normalization.
+
         Args:
             x: input
 
@@ -300,14 +312,11 @@ class LayerNormalization(nn.Module):
         """
         # x: (batch, seq_len, hidden_size)
         # Keep the dimension for broadcasting
-        mean = x.mean(dim=-1, keepdim=True)     # (B, T, 1)
+        mean = x.mean(dim=-1, keepdim=True)                     # (B, T, 1)
         # Keep the dimension for broadcasting
-        std = x.std(dim=-1, keepdim=True)       # (B, T, 1)
-        # eps is to prevent dividing by zero or when std is very small
-        y = self.gamma * (x - mean) / (std + self.eps) + self.beta
-
-        # The variance of y is gamma**2. Divide it by
-        y = y / self.gamma
+        variance = x.var(dim=-1, keepdim=True, correction=0)    # (B, T, 1)
+        # eps is added inside sqrt for numerical stability when variance is near zero
+        y = self.gamma * (x - mean) / torch.sqrt(variance + self.eps) + self.beta
         return y
 
 
@@ -565,9 +574,9 @@ class MultiHeadAttention(nn.Module):
         q: Tensor = self.Wq(q)   # Transfer to Q space. Shape=(B, T, D)
         k: Tensor = self.Wk(k)   # Transfer to K space. Shape=(B, T, D)
         v: Tensor = self.Wv(v)   # Transfer to V space. Shape=(B, T, D)
-        assert q.shape == (_B, self.T, self.D)
-        assert k.shape == (_B, self.T, self.D)
-        assert v.shape == (_B, self.T, self.D)
+        assert q.shape == (_B, _T, self.D)
+        assert k.shape == (_B, _T, self.D)
+        assert v.shape == (_B, _T, self.D)
 
         # --------------------------------------------------------------------------------
         # Split into H segments for multiple heads to attend.
@@ -768,6 +777,13 @@ class Projection(nn.Module):
             dtype: Tensor.dtype = TYPE_FLOAT,
             bias: bool = True,
     ):
+        """
+        Args:
+            d_model: dimension of the model embedding vector
+            num_classes: number of classes to predict
+            dtype: data type of the projection layer weight
+            bias: True to learn additive bias in the projection layer.
+        """
         super().__init__()
         self.projection: nn.Linear = nn.Linear(
             in_features=d_model,

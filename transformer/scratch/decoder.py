@@ -1,4 +1,15 @@
 """Module of the Decoder stack in the Transformers Model
+
+Note that there TWO Decoder Blocks each of which has its attention layer.
+
+1. Masked self‑attention (causal)
+Q, K, V all come from the decoder’s current sequence (x)
+This is what enforces autoregression.
+
+2. Encoder‑Decoder (cross attention)
+Q comes from the decoder, K/V come from encoder memory
+This is what the paper’s 3.2.3 quote refers to.
+
 """
 import torch
 from torch import (
@@ -6,7 +17,7 @@ from torch import (
     nn
 )
 
-from transformer.v1.constant import (
+from .constant import (
     TYPE_FLOAT,
     DIM_MODEL,
     DIM_PWFF_HIDDEN,
@@ -16,7 +27,7 @@ from transformer.v1.constant import (
     DROPOUT_RATIO,
     EPSILON,
 )
-from transformer.v1.common import (
+from .common import (
     PositionalEncoding,
     InputEmbedding,
     MultiHeadAttention,
@@ -26,6 +37,10 @@ from transformer.v1.common import (
 
 class DecodeLayer(nn.Module):
     """Class to implement Decoder Layer
+    This implements two attention blocks:
+    1. Decoder Masked Self Attention
+    2. Decoder to Encoder Cross Attention
+
     > We employ a residual connection around each of the two sub-layers, followed
     > by layer normalization. That is, the output of each sub-layer is
     > LayerNorm(x + Sublayer(x)), where Sublayer(x) is the function implemented
@@ -77,14 +92,14 @@ class DecodeLayer(nn.Module):
         super().__init__()
 
         # --------------------------------------------------------------------------------
-        # Causal masked attention
+        # Masked Causal Self Attention
         # --------------------------------------------------------------------------------
         self.layer_norm_input: nn.LayerNorm = nn.LayerNorm(     # Normalize decoder input
             normalized_shape=d_model,
             eps=eps,
             dtype=dtype
         )
-        # Attention to historic time sequence, not future
+        # Self attention to historic time sequence, but not future by masking it
         self.causal_self_attention: MultiHeadAttention = MultiHeadAttention(
             i_layer=i_layer,
             num_heads=num_heads,
@@ -97,7 +112,7 @@ class DecodeLayer(nn.Module):
         self.dropout_causal: nn.Module = nn.Dropout(p=p_drop)
 
         # --------------------------------------------------------------------------------
-        # Cross attention
+        # Decoder Q (memory) to Encoder K Cross Attention
         # Layer normalization on both from encoder memory and from decoder causal attention.
         # --------------------------------------------------------------------------------
         self.layer_norm_memory: nn.LayerNorm = nn.LayerNorm(    # Normalize encoder memory
@@ -160,10 +175,35 @@ class DecodeLayer(nn.Module):
         # Token q from the target sequence identifies the relationship strengths
         # with each token v in the source sequence. This mimics the original attention
         # mechanism (cursor) in the sequence to sequence model.
-        _q = self.layer_norm_input(x)
-        _k = _v = self.layer_norm_memory(memory)
+
+        #--------------------------------------------------------------------------------
+        # 1. Masked Self-Attention (causal): Q, K, V come from Decoder Sequence (x).
+        # x = x + attention is Skip connection.
+        #--------------------------------------------------------------------------------
+        _q = _k = _v = self.layer_norm_input(x)
         x = x + self.dropout_causal(self.causal_self_attention(q=_q, k=_k, v=_v))
-        x = x + self.dropout_cross(self.cross_attention(self.layer_norm_causal(x)))
+
+        #--------------------------------------------------------------------------------
+        # 2. Decoder Q to Encoder K Cross Attention.
+        # x = x + attention is Skip connection.
+        # Q = Decoder query to identify the relevance of keys in the Encoder memory.
+        # K/V = encoder memory (source sequence context)
+        #
+        # In AlphaFold, each amino acid is a token and a protein is a token sequence.
+        # A query token q finds how strongly it is ‘gravitated’ to each token in K,
+        # with larger weights indicating stronger influence
+        #--------------------------------------------------------------------------------
+        _q = self.layer_norm_causal(x)
+        _k = _v = self.layer_norm_memory(memory)
+        x = x + self.dropout_cross(self.cross_attention(q=_q, k=_k, v=_v))
+
+        #--------------------------------------------------------------------------------
+        # Point-Wise Feed Forward Network (FFN)
+        # x = x + attention is Skip connection.
+        # Point-Wise means the linear projection is applied independently to each token
+        # without mixing information across tokens. Point = Position = Token.
+        # Where as Attention is communication among tokens, FFN is token independent.
+        #--------------------------------------------------------------------------------
         x = x + self.dropout_feedforward(self.feedforward(self.layer_norm_cross(x)))
         assert torch.all(torch.isfinite(x))
         return x
@@ -302,5 +342,3 @@ class Decoder(nn.Module):
 
         assert y.shape == (_B, _T, self.D)
         return y
-
-

@@ -6,7 +6,7 @@ from torch import (
     nn
 )
 
-from transformer.v1.constant import (
+from .constant import (
     TYPE_FLOAT,
     DIM_MODEL,
     DIM_PWFF_HIDDEN,
@@ -16,7 +16,7 @@ from transformer.v1.constant import (
     DROPOUT_RATIO,
     EPSILON,
 )
-from transformer.v1.common import (
+from .common import (
     PositionalEncoding,
     InputEmbedding,
     MultiHeadAttention,

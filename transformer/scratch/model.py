@@ -17,13 +17,13 @@ from .constant import (
     NUM_HEADS,
     DROPOUT_RATIO,
 )
-from common import (
+from .common import (
     Projection,
 )
-from encoder import (
+from .encoder import (
     Encoder
 )
-from decoder import (
+from .decoder import (
     Decoder
 )
 
@@ -59,7 +59,7 @@ class Transformer(nn.Module):
         )
 
         self.projection: nn.Module = Projection(
-            d_model=NUM_HEADS,
+            d_model=DIM_MODEL,
             num_classes=NUM_CLASSES,
             dtype=TYPE_FLOAT,
             bias=True
@@ -81,7 +81,7 @@ class Transformer(nn.Module):
         assert y.ndim == 2, f"expected y.shape (B, T), got {y.shape}."
 
         predictions: Tensor = self.projection(y=self.decoder(y=y, memory=self.encoder(x=x)))
-        predictions = torch.argmax(predictions)
+        predictions = torch.argmax(predictions, dim=-1)
         assert predictions.shape == x.shape
 
         return predictions
