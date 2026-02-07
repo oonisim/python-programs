@@ -18,6 +18,9 @@ from torch import (
     Tensor,
     nn
 )
+from torch.nn.functional import (
+    softmax,
+)
 
 from .constant import (
     TYPE_FLOAT,
@@ -27,9 +30,6 @@ from .constant import (
     NUM_HEADS,
     MAX_TIME_STEPS,
     POSITION_ENCODE_DENOMINATOR_BASE,
-)
-from torch.nn.functional import (
-    softmax,
 )
 
 
@@ -262,7 +262,7 @@ def mask(
     # In causal self-attention of the Decoder, each query in Q only see the past keys
     # in K and must not see future keys. Because LM predicts next from the past only.
     # --------------------------------------------------------------------------------
-    _Tk = similarities.shape[-1]
+    _Tk = similarities.shape[-1]    # pylint: disable=invalid-name
     if mask_matrix.shape[-1] != _Tk:
         mask_matrix = mask_matrix[:_Tk, :_Tk]
 
@@ -403,8 +403,8 @@ class ScaledDotProductAttention(nn.Module):
             logger.error(msg)
             raise RuntimeError(msg)
 
-        _B, _H, _Tq, _ = q.shape
-        _Tk = k.shape[-2]
+        _B, _H, _Tq, _ = q.shape    # pylint: disable=invalid-name
+        _Tk = k.shape[-2]           # pylint: disable=invalid-name
 
         # --------------------------------------------------------------------------------
         # First MatMul in the Scaled Dot Product Attention to calculate the similarities
@@ -466,8 +466,8 @@ class ScaledDotProductAttention(nn.Module):
 
         if return_similarities:
             return attentions, similarities
-        else:
-            return attentions
+
+        return attentions
 
 
 class MultiHeadAttention(nn.Module):
