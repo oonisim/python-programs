@@ -97,7 +97,8 @@ def initialize_weights(
     layer_level: int = i_layer + 1      # to avoid div by 0 at sqrt
 
     if isinstance(module, nn.Linear):
-        torch.nn.init.zeros_(module.bias)
+        if module.bias is not None:
+            torch.nn.init.zeros_(module.bias)
         # if output_projection:
         #     torch.nn.init.normal_(module.weight, mean=0.0, std=0.02/math.sqrt(2 * num_layers))
         # else:
@@ -700,7 +701,7 @@ class PositionwiseFeedForward(nn.Module):
         self.W2: nn.Module = nn.Linear(     # pylint: disable=invalid-name
             in_features=d_ff, out_features=d_model, bias=bias, dtype=dtype
         )
-        initialize_weights(module=self.W2, i_layer=i_layer, output_projection=True)
+        initialize_weights(module=self.W2, i_layer=i_layer, d_model=d_model, output_projection=True)
 
     def forward(self, x):
         """Feed-forward neural network forward propagation
