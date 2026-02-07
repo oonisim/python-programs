@@ -1,21 +1,85 @@
 """Training script for English to Spanish Transformer translator.
 
-Dataset: Tatoeba (Helsinki-NLP/tatoeba_mt)
+Dataset
+-------
+Tatoeba (Helsinki-NLP/tatoeba_mt)
 - Simple community-contributed sentence pairs
 - ~100K English-Spanish pairs
 - Good for learning and small models
 
-Requirements:
+Other available EN-ES datasets:
+- Multi30k (~30K pairs) - Image captions
+- OPUS-Books (~50K pairs) - Book translations
+- News Commentary (~300K pairs) - News articles
+
+Model
+-----
+Encoder-Decoder Transformer (original "Attention Is All You Need" architecture)
+- Encoder: Processes source sentence (English)
+- Decoder: Generates target sentence (Spanish) autoregressively
+- Cross-attention: Decoder attends to encoder outputs
+
+Configuration (smaller for faster training):
+- d_model: 256 (original: 512)
+- num_heads: 4 (original: 8)
+- num_layers: 4 (original: 6)
+- d_ff: 512 (original: 2048)
+
+Requirements
+------------
     pip install datasets transformers torch
 
-Usage:
+Usage
+-----
+Basic training:
     python -m scratch.trainer_tatoeba_en_es
 
-    # With custom parameters:
-    python -m scratch.trainer_tatoeba_en_es --epochs 10 --batch_size 32
+With custom parameters:
+    python -m scratch.trainer_tatoeba_en_es --epochs 10 --batch_size 32 --lr 1e-4
 
-    # Resume from checkpoint:
+Quick test with fewer samples:
+    python -m scratch.trainer_tatoeba_en_es --max_samples 1000
+
+Resume from checkpoint:
     python -m scratch.trainer_tatoeba_en_es --resume checkpoints/epoch_5.pt
+
+Expected Output
+---------------
+    Epoch 1/20
+      Batch 100/500 | Loss: 4.2315
+      Train Loss: 4.1234 | Val Loss: 3.8721
+
+      Sample translations:
+        EN: Hello, how are you?
+        ES: Hola, ¿cómo estás?
+
+After Training
+--------------
+Use the trained model for translation:
+
+    import torch
+    from scratch.model import Transformer
+    from scratch.app import TransformerAPI
+    from transformers import AutoTokenizer
+
+    # Load trained model
+    tokenizer = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-en-es")
+    model = Transformer()
+    checkpoint = torch.load("checkpoints/best_model.pt")
+    model.load_state_dict(checkpoint["model_state_dict"])
+
+    # Option 1: Using TransformerAPI (recommended)
+    api = TransformerAPI(model, tokenizer)
+    translation = api("Hello, how are you?")
+    print(translation)  # "Hola, ¿cómo estás?"
+
+    # Option 2: Using model directly
+    model.start_token = tokenizer.pad_token_id
+    model.end_token = tokenizer.eos_token_id
+    with model:
+        source_ids = tokenizer.encode("Hello", return_tensors="pt")
+        output_ids = model(source_ids)
+        translation = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 """
 import argparse
 import os
@@ -305,7 +369,12 @@ def load_checkpoint(path: str, model: nn.Module, optimizer: torch.optim.Optimize
 # Main Training Loop
 # --------------------------------------------------------------------------------
 def main():
-    parser = argparse.ArgumentParser(description="Train EN-ES Transformer translator")
+    parser = argparse.ArgumentParser(
+        description="Train EN-ES Transformer translator",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Use --info to show detailed documentation and usage examples."
+    )
+    parser.add_argument("--info", action="store_true", help="Show detailed documentation")
     parser.add_argument("--epochs", type=int, default=20, help="Number of epochs")
     parser.add_argument("--batch_size", type=int, default=64, help="Batch size")
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
@@ -511,4 +580,10 @@ def main():
 
 
 if __name__ == "__main__":
+    import sys
+    if len(sys.argv) == 1 or "--info" in sys.argv:
+        # Print documentation if no arguments or --info flag
+        if "--info" in sys.argv:
+            print(__doc__)
+            sys.exit(0)
     main()

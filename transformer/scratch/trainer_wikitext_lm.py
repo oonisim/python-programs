@@ -1,28 +1,105 @@
 """Training script for a small Language Model (mini LLM) on WikiText-2.
 
-Dataset: WikiText-2 (wikitext-2-raw-v1)
+Dataset
+-------
+WikiText-2 (wikitext-2-raw-v1)
 - Wikipedia articles
 - ~2M tokens, ~12MB
 - Good for learning and small models
 
-Model: Decoder-only Transformer (GPT-style)
+Other available datasets for language modeling:
+- TinyStories (~500MB) - Microsoft's synthetic stories for small LMs
+- WikiText-103 (~500MB) - Larger Wikipedia dataset
+- OpenWebText-small (~40MB) - Web text similar to GPT-2 training
+
+Model
+-----
+Decoder-only Transformer (GPT-style)
 - Uses causal (masked) self-attention
+- Each token can only attend to previous tokens (no future peeking)
 - Predicts next token given previous tokens
 
-Requirements:
+This is the architecture used by:
+- GPT-2, GPT-3, GPT-4
+- LLaMA, Mistral, etc.
+
+Configuration (smaller for faster training):
+- d_model: 256 (GPT-2 small: 768)
+- num_heads: 4 (GPT-2 small: 12)
+- num_layers: 4 (GPT-2 small: 12)
+- d_ff: 512 (GPT-2 small: 3072)
+
+Requirements
+------------
     pip install datasets transformers torch
 
-Usage:
+Usage
+-----
+Basic training:
     python -m scratch.trainer_wikitext_lm
 
-    # With custom parameters:
-    python -m scratch.trainer_wikitext_lm --epochs 10 --batch_size 32
+With custom parameters:
+    python -m scratch.trainer_wikitext_lm --epochs 10 --batch_size 32 --lr 3e-4
 
-    # Quick test:
+Quick test with fewer samples:
     python -m scratch.trainer_wikitext_lm --max_samples 1000
 
-    # Resume from checkpoint:
+Resume from checkpoint:
     python -m scratch.trainer_wikitext_lm --resume checkpoints/lm_epoch_5.pt
+
+Show this documentation:
+    python -m scratch.trainer_wikitext_lm --info
+
+Expected Output
+---------------
+    Epoch 1/20
+      Batch 100/500 | Loss: 5.2315 | Perplexity: 187.42
+      Train Loss: 5.1234 | Perplexity: 168.21
+      Val Loss: 4.8721 | Perplexity: 130.58
+
+      Sample generations:
+        Prompt: "The meaning of life is"
+        Generated: "The meaning of life is to find happiness in..."
+
+Perplexity
+----------
+Perplexity measures how "surprised" the model is by the test data.
+- Lower is better
+- Perplexity of 100 means the model is as confused as randomly picking
+  from 100 equally likely tokens
+- Good language models achieve perplexity < 30 on WikiText-2
+
+After Training
+--------------
+Use the trained model for text generation:
+
+    import torch
+    from transformers import GPT2Tokenizer
+
+    # Load the LanguageModel class from trainer script
+    from scratch.trainer_wikitext_lm import LanguageModel
+
+    # Load trained model
+    tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+    model = LanguageModel(vocab_size=tokenizer.vocab_size)
+    checkpoint = torch.load("checkpoints/lm_best_model.pt")
+    model.load_state_dict(checkpoint["model_state_dict"])
+
+    # Generate text
+    prompt = "The meaning of life is"
+    prompt_ids = tokenizer.encode(prompt, return_tensors="pt")
+
+    with model:
+        output_ids = model.generate(
+            prompt_ids,
+            max_length=100,
+            temperature=0.8,  # Lower = more deterministic
+            top_k=50,         # Keep top 50 tokens
+            top_p=0.9         # Nucleus sampling
+        )
+
+    generated_text = tokenizer.decode(output_ids[0])
+    print(generated_text)
 """
 import argparse
 import os
@@ -498,7 +575,12 @@ def load_checkpoint(path: str, model: nn.Module, optimizer: torch.optim.Optimize
 # Main Training Loop
 # --------------------------------------------------------------------------------
 def main():
-    parser = argparse.ArgumentParser(description="Train Language Model on WikiText-2")
+    parser = argparse.ArgumentParser(
+        description="Train Language Model on WikiText-2",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Use --info to show detailed documentation and usage examples."
+    )
+    parser.add_argument("--info", action="store_true", help="Show detailed documentation")
     parser.add_argument("--epochs", type=int, default=20, help="Number of epochs")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
     parser.add_argument("--lr", type=float, default=3e-4, help="Learning rate")
@@ -687,4 +769,9 @@ def main():
 
 
 if __name__ == "__main__":
+    import sys
+    if "--info" in sys.argv:
+        # Print documentation
+        print(__doc__)
+        sys.exit(0)
     main()
