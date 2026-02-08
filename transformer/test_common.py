@@ -52,9 +52,9 @@ def test_mask_future_keys_zero_after_softmax():
 
     # Expected: masked similarity becomes -inf and softmax probability is 0.
     masked = mask(similarities, future_mask)
-    probs = torch.softmax(masked, dim=-1)
+    probabilities = torch.softmax(masked, dim=-1)
     assert masked[0, 0, 0, 1] == float("-inf")
-    assert probs[0, 0, 0, 1] == 0.0
+    assert probabilities[0, 0, 0, 1] == 0.0
 
 
 def test_scaled_dot_product_attention_invalid_shape():
@@ -78,17 +78,17 @@ def test_scaled_dot_product_attention_applies_mask():
     k = torch.ones(1, 1, 5, 1)
     v = torch.ones(1, 1, 5, 1)
 
-    # Output: probs has shape (B, H, Tq, Tk). Index [0,0,0,4] means:
+    # Output: probabilities has shape (B, H, Tq, Tk). Index [0,0,0,4] means:
     # batch=0, head=0, query_pos=0 attending to key_pos=4 (a future key).
     # Expected: for each query position t, only keys [0..t] are allowed.
     # Because q/k are all ones, unmasked similarities are equal, so softmax
     # yields a uniform distribution over allowed keys: 1 / (t + 1).
-    _, probs = attention(q=q, k=k, v=v, return_similarities=True)
-    print(f"ScaledDotProductAttention probs: {probs.tolist()}")
+    _, probabilities = attention(q=q, k=k, v=v, return_similarities=True)
+    print(f"ScaledDotProductAttention probabilities: {probabilities.tolist()}")
     for t in range(5):
         expected = torch.full((t + 1,), 1.0 / (t + 1))
-        actual_allowed = probs[0, 0, t, : t + 1]
-        actual_future = probs[0, 0, t, t + 1 :]
+        actual_allowed = probabilities[0, 0, t, : t + 1]
+        actual_future = probabilities[0, 0, t, t + 1 :]
         assert torch.allclose(actual_allowed, expected, atol=1e-6)
         assert torch.allclose(actual_future, torch.zeros(5 - t - 1), atol=0.0)
 

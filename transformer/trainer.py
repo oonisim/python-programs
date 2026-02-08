@@ -224,27 +224,27 @@ class Trainer:
         decoder_target = target_ids[:, 1:]
 
         self.optimizer.zero_grad()
-        log_probs = self.model.forward(x=source_ids, y=decoder_input)
+        log_probabilities = self.model.forward(x=source_ids, y=decoder_input)
 
-        loss = self._compute_loss(log_probs, decoder_target)
+        loss = self._compute_loss(log_probabilities, decoder_target)
         loss.backward()
         self._clip_gradients()
         self.optimizer.step()
 
         return loss.item()
 
-    def _compute_loss(self, log_probs: Tensor, targets: Tensor) -> Tensor:
+    def _compute_loss(self, log_probabilities: Tensor, targets: Tensor) -> Tensor:
         """Compute loss between predictions and targets.
 
         Args:
-            log_probs: Log probabilities of shape (B, T, V).
+            log_probabilities: Log probabilities of shape (B, T, V).
             targets: Target token indices of shape (B, T).
 
         Returns:
             Scalar loss tensor.
         """
         # Flatten for loss computation: (B, T, V) -> (B*T, V), (B, T) -> (B*T)
-        log_probs_flat = log_probs.reshape(-1, log_probs.size(-1))
+        log_probs_flat = log_probabilities.reshape(-1, log_probabilities.size(-1))
         targets_flat = targets.reshape(-1)
         return self.criterion(log_probs_flat, targets_flat)
 
@@ -284,8 +284,8 @@ class Trainer:
             decoder_input = target_ids[:, :-1]
             decoder_target = target_ids[:, 1:]
 
-            log_probs = self.model.forward(x=source_ids, y=decoder_input)
-            loss = self._compute_loss(log_probs, decoder_target)
+            log_probabilities = self.model.forward(x=source_ids, y=decoder_input)
+            loss = self._compute_loss(log_probabilities, decoder_target)
             total_loss += loss.item()
 
         return total_loss / len(val_loader)
@@ -575,9 +575,9 @@ class LanguageModelTrainer(Trainer):
         target_ids = target_ids.to(self.device)
 
         self.optimizer.zero_grad()
-        log_probs = self.model.forward(input_ids)
+        log_probabilities = self.model.forward(input_ids)
 
-        loss = self._compute_loss(log_probs, target_ids)
+        loss = self._compute_loss(log_probabilities, target_ids)
         loss.backward()
         self._clip_gradients()
         self.optimizer.step()
@@ -602,8 +602,8 @@ class LanguageModelTrainer(Trainer):
             input_ids = input_ids.to(self.device)
             target_ids = target_ids.to(self.device)
 
-            log_probs = self.model.forward(input_ids)
-            loss = self._compute_loss(log_probs, target_ids)
+            log_probabilities = self.model.forward(input_ids)
+            loss = self._compute_loss(log_probabilities, target_ids)
             total_loss += loss.item()
 
         return total_loss / len(val_loader)

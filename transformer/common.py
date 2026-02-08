@@ -348,7 +348,7 @@ class LayerNormalization(nn.Module):
 
         Returns: y as normalized x
         """
-        # x: (batch, seq_len, hidden_size)
+        # x: (batch, seq_len, hidden_size) = (B, T, D)
         # Keep the dimension for broadcasting
         mean = x.mean(dim=-1, keepdim=True)                     # (B, T, 1)
         # Keep the dimension for broadcasting
@@ -861,7 +861,7 @@ class Projection(nn.Module):
     """Class to project the predictions of shape (B, T, D) to class probabilities of shape (B, T).
     Projection returns log-probabilities. Do NOT pass the Projection output to CrossEntropyLoss.
     CrossEntropyLoss expects raw logits and internally applies log-softmax + NLLLoss.
-    Use a loss function that expects log-probs, e.g. torch.nn.NLLLoss (negative log-likelihood).
+    Use a loss function that expects log-probabilities, e.g. torch.nn.NLLLoss (negative log-likelihood).
     """
     def __init__(
             self,

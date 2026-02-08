@@ -197,8 +197,8 @@ class Transformer(nn.Module):
 
         # Projection returns log-probabilities. Do NOT pass the Projection output to
         # CrossEntropyLoss as it expects logits and internally applies log-softmax + NLLLoss.
-        log_probs: Tensor = self.projection(y=self.decoder(y=y, memory=self.encoder(x=x)))
-        return log_probs
+        log_probabilities: Tensor = self.projection(y=self.decoder(y=y, memory=self.encoder(x=x)))
+        return log_probabilities
 
     @torch.no_grad()
     def evaluate(
@@ -220,8 +220,8 @@ class Transformer(nn.Module):
         if x.device != y.device:
             raise RuntimeError(f"Source (x) is on {x.device} but Target (y) is on {y.device}")
 
-        log_probs = self.forward(x=x, y=y)
-        predictions = torch.argmax(log_probs, dim=-1)
+        log_probabilities = self.forward(x=x, y=y)
+        predictions = torch.argmax(log_probabilities, dim=-1)
         return predictions
 
     @torch.no_grad()
@@ -264,8 +264,8 @@ class Transformer(nn.Module):
 
         for _ in range(max_length - 1):
             # Get prediction for the next token
-            log_probs = self.projection(y=self.decoder(y=y, memory=memory))
-            next_token = torch.argmax(log_probs[:, -1, :], dim=-1, keepdim=True)
+            log_probabilities = self.projection(y=self.decoder(y=y, memory=memory))
+            next_token = torch.argmax(log_probabilities[:, -1, :], dim=-1, keepdim=True)
 
             # Append predicted token to sequence
             y = torch.cat([y, next_token], dim=1)
