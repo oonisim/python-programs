@@ -39,6 +39,27 @@ def get_device() -> torch.device:
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
+def verify_device_consistency(module: torch.nn.Module) -> torch.device:
+    """
+    Verifies all parameters and buffers are on the same device.
+
+    Returns:
+        The common torch.device.
+    Raises:
+        RuntimeError: If tensors are discovered on multiple devices.
+    """
+    devices = {param.device for param in module.parameters()}
+    devices.update({buffer.device for buffer in module.buffers()})
+
+    if len(devices) > 1:
+        raise RuntimeError(
+            f"Device Inconsistency Detected in {module.__class__.__name__}: "
+            f"Found multiple devices: {devices}. "
+            f"Ensure model.to(device) was called correctly."
+        )
+
+    return next(iter(devices)) if devices else torch.device("cpu")
+
 # ================================================================================
 # File and Directory Utilities
 # ================================================================================

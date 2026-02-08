@@ -42,6 +42,8 @@ class Transformer(nn.Module):
     def __init__(self):
         super().__init__()
 
+        self.device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
         self.encoder: nn.Module = Encoder(
             vocabulary_size=NUM_ENCODER_TOKENS,
             num_layers=NUM_LAYERS,
@@ -189,8 +191,9 @@ class Transformer(nn.Module):
         if x.ndim != 2:
             raise ValueError(f"expected y.shape (B, T), got {y.shape}.")
         if y.ndim != 2:
-
             raise ValueError(f"expected x.shape (B, T), got {x.shape}.")
+        if x.device != y.device:
+            raise RuntimeError(f"Source (x) is on {x.device} but Target (y) is on {y.device}")
 
         # Projection returns log-probabilities. Do NOT pass the Projection output to
         # CrossEntropyLoss as it expects logits and internally applies log-softmax + NLLLoss.
@@ -212,8 +215,11 @@ class Transformer(nn.Module):
                Typically shifted right: [<START>, tok1, tok2, ...]
 
         Returns: Predicted token indices of shape (B, Td).
-                 Typically shifted left: [tok1, tok2, ..., <END>]
+                 Typically, shifted left: [tok1, tok2, ..., <END>]
         """
+        if x.device != y.device:
+            raise RuntimeError(f"Source (x) is on {x.device} but Target (y) is on {y.device}")
+
         log_probs = self.forward(x=x, y=y)
         predictions = torch.argmax(log_probs, dim=-1)
         return predictions
@@ -239,6 +245,14 @@ class Transformer(nn.Module):
             msg: str = f"expected x.shape (B, T), got {x.shape}."
             logger.error(msg)
             raise ValueError(msg )
+
+        # Warn the user about device/dtype mismatches instead of moving/casting.
+        if x.device != self._device():
+            logger.warning(
+                "Input tensor x device %s does not match model device %s. "
+                "Move your inputs explicitly to the desired device.",
+                x.device, self._device()
+            )
 
         _B = x.shape[0]
 

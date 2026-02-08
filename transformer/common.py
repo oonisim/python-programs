@@ -251,7 +251,11 @@ def mask(
     # Skip masking for bi-directional e.g .BERT,
     # --------------------------------------------------------------------------------
     # exp(-inf) = 0 masks the similarities so that it will be uni-directional.
-    assert similarities.ndim == 4   # (B,H,Tq,Tk)
+    if similarities.ndim != 4:   # (B,H,Tq,Tk)
+        raise RuntimeError(f"Expected similarities of shape (B,H,Tq,Tk), got {similarities.shape}")
+    if similarities.device != mask_matrix.device:
+        raise RuntimeError(f"similarities on {similarities.device} but mask_matrix on {mask_matrix.device}")
+
 
     # --------------------------------------------------------------------------------
     # Adjust the Future Mask shape to match the actual sequence length _Tk.
@@ -280,8 +284,8 @@ def mask(
 
 
 def calculate_attention_values(
-        similarities,
-        values
+        similarities: Tensor,
+        values: Tensor
 ):
     """
     For every q element, create a Bag of Words that encodes the relationships with
@@ -314,6 +318,9 @@ def calculate_attention_values(
 
     Returns: Bag of Words for every q element of shape (B, h, Tq, d_v)
     """
+    if similarities.device != values.device:
+        raise RuntimeError(f"similarities on {similarities.device} but values on {values.device}")
+
     return similarities @ values     # (B,h,Tq,Tk) @ (B,h,Tk,d_v) -> (B,h,Tq,d_v)
 
 
@@ -326,6 +333,7 @@ class LayerNormalization(nn.Module):
         self.gamma = nn.Parameter(torch.ones(features))     # alpha is a learnable parameter
         self.beta = nn.Parameter(torch.zeros(features))     # bias is a learnable parameter
 
+    # pylint: disable=anomalous-backslash-in-string
     def forward(self, x: Tensor):
         """Run Layer Normalization
         https://docs.pytorch.org/docs/stable/generated/torch.nn.LayerNorm.html
@@ -399,9 +407,9 @@ class ScaledDotProductAttention(nn.Module):
             return_similarities: flag to return similarity (q to k) scores too.
         """
         if q.ndim != 4:
-            msg: str = "Expected query of shape (B,h,Tq,d_k), got {q.shape}"
-            logger.error(msg)
-            raise RuntimeError(msg)
+            raise RuntimeError(f"Expected query of shape (B,h,Tq,d_k), got {q.shape}")
+        if not q.device == k.device == v.device:
+            raise RuntimeError(f"Inconsistent devices: Q on {q.device}, K on {k.device}, V on {v.device}.")
 
         _B, _H, _Tq, _ = q.shape    # pylint: disable=invalid-name
         _Tk = k.shape[-2]           # pylint: disable=invalid-name
@@ -617,13 +625,20 @@ class MultiHeadAttention(nn.Module):
         Returns: Attention values of shape (B,T,D)
         """
         # pylint: disable=invalid-name
-        assert q.ndim == 3 and k.ndim == 3 and v.ndim == 3, \
-            "expected q.ndim == 3 and k.ndim == 3 and v.ndim == 3, " \
-            f"got {q.ndim}, {k.ndim}, {v.ndim}"
-        assert q.shape[0] == k.shape[0] == v.shape[0], \
-            "expected same batch size for q, k, v."
-        assert q.shape[2] == k.shape[2] == v.shape[2], \
-            "expected same feature dimension for q, k, v."
+        if not (q.ndim == 3 and k.ndim == 3 and v.ndim == 3):
+            raise ValueError(
+                f"expected q.ndim == 3 and k.ndim == 3 and v.ndim == 3, got {q.ndim}, {k.ndim}, {v.ndim}."
+            )
+        if not q.shape[0] == k.shape[0] == v.shape[0]:
+            raise ValueError(
+                f"expected same batch size for q:[{q.shape[0]}], k:[{k.shape[0]}], v:[{v.shape[0]}]."
+            )
+        if not q.shape[2] == k.shape[2] == v.shape[2]:
+            raise ValueError(
+                f"expected same feature dimension for q:[{q.shape[2]}], k:[{k.shape[2]}], v:[{v.shape[2]}]."
+            )
+        if not q.device == k.device == v.device:
+            raise RuntimeError(f"Inconsistent devices: Q on {q.device}, K on {k.device}, V on {v.device}.")
 
         _B, _Tq, _D = q.shape      # Batch, Tokens (or sequence length), Dimension
         _Tk = k.shape[1]
@@ -730,6 +745,11 @@ class PositionwiseFeedForward(nn.Module):
 
         Returns: output embedding vector of shape (B,T,D)
         """
+        if not x.device == self.W1.weight.device == self.W2.weight.device:
+            raise RuntimeError(
+                f"x is on {x.device} but W1 on {self.W1.weight.device} W2 on {self.W2.weight.device}."
+            )
+
         y = self.W2(self.relu(self.W1(x)))
         assert torch.all(torch.isfinite(y))
 
@@ -825,6 +845,11 @@ class PositionalEncoding(nn.Module):
         assert x.ndim == 3, f"expected x.shape as (B, T, D), got {x.shape}."
         _, _T, _D = x.shape       # pylint: disable=invalid-name
         assert self.D == _D, f"expected the dimension of x element is [{self.D}], got [{_D}]."
+
+        if self.position_encodings.device != x.device:
+            raise RuntimeError(
+                f"position_encodings is on {self.position_encodings.device} but x on {x.device}."
+            )
 
         y = self.position_encodings[:, :_T].requires_grad_(False)
         assert torch.all(torch.isfinite(y))

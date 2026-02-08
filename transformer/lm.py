@@ -26,6 +26,7 @@ Usage:
 """
 from typing import Optional
 
+import logging
 import torch
 from torch import Tensor, nn
 
@@ -40,6 +41,9 @@ from .constant import (
 )
 from .common import Projection
 from .decoder import Decoder
+
+
+logger = logging.getLogger(__name__)
 
 
 class LanguageModel(nn.Module):
@@ -109,6 +113,9 @@ class LanguageModel(nn.Module):
 
         # Token for stopping generation
         self.end_token: Optional[int] = None
+        # Detect CUDA at initialization and move model to that device
+        # This makes the model ready to accept inputs on GPU by default.
+        self.device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def __enter__(self) -> 'LanguageModel':
         """Context manager: set model to eval mode for inference."""
@@ -132,6 +139,14 @@ class LanguageModel(nn.Module):
         Returns:
             Log probabilities of shape (B, T, V).
         """
+        # Check device/dtype and warn the user instead of implicitly converting.
+        if x.device != self._device():
+            logger.warning(
+                "Input tensor device %s does not match model device %s. "
+                "Do not move inputs implicitly; move them explicitly to avoid surprises.",
+                x.device, self._device()
+            )
+
         assert x.ndim == 2, f"Expected (B, T), got {x.shape}"
 
         # Decoder without memory (decoder-only mode)
@@ -165,6 +180,14 @@ class LanguageModel(nn.Module):
         """
         if prompt.ndim == 1:
             prompt = prompt.unsqueeze(0)
+
+        # Warn the user about device/dtype mismatches instead of moving/casting.
+        if prompt.device != self._device():
+            logger.warning(
+                "Prompt tensor device %s does not match model device %s. "
+                "Move your inputs explicitly to the desired device.",
+                prompt.device, self._device()
+            )
 
         batch_size = prompt.shape[0]
         generated = prompt.clone()
@@ -224,6 +247,23 @@ class LanguageModel(nn.Module):
             logits[b, indices_to_remove] = float('-inf')
 
         return logits
+
+    def _device(self) -> torch.device:
+        """Return the device where the model parameters or buffers live.
+
+        Falls back to CPU if no parameters/buffers are present.
+        """
+        # Prefer explicit self.device if set
+        if hasattr(self, "device") and isinstance(self.device, torch.device):
+            return self.device
+        # Otherwise fall back to parameters/buffers
+        try:
+            return next(self.parameters()).device
+        except StopIteration:
+            try:
+                return next(self.buffers()).device
+            except StopIteration:
+                return torch.device("cpu")
 
 
 if __name__ == "__main__":
