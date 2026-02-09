@@ -39,10 +39,12 @@ Usage:
     trainer.load_snapshot("snapshot_epoch_0005_step_001000_20240115_143052.pt")
     trainer.train(train_loader, val_loader, num_epochs=10)
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import (
+    List, Dict, Any, Optional
+)
 
 import torch
 from torch import nn, Tensor
@@ -50,7 +52,6 @@ from torch.utils.data import DataLoader
 
 from utility import (
     ensure_directory_exists,
-    generate_timestamp,
     build_snapshot_filename,
     build_model_filename,
     resolve_file_path,
@@ -129,6 +130,12 @@ class Trainer:
         self._initialize_training_state()
         self.model.to(self.device)
 
+        self.current_epoch: int = -1
+        self.current_step: int = -1
+        self.global_step: int = -1
+        self.best_val_loss: float = float("inf")
+        self.training_history: list = []
+
     def _setup_directories(self) -> None:
         """Create directory structure for snapshots and models."""
         base = Path(self.config.base_dir)
@@ -142,7 +149,7 @@ class Trainer:
         self.current_step: int = 0
         self.global_step: int = 0
         self.best_val_loss: float = float("inf")
-        self.training_history: list = []
+        self.training_history: List[Dict[str, Any]] = []
 
     # ================================================================================
     # Training Methods
