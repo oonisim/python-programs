@@ -128,6 +128,21 @@ class Transformer(nn.Module):
         self.start_token: Optional[int] = None
         self.end_token: Optional[int] = None
 
+    def _device(self) -> torch.device:
+        """Return the device where the model parameters or buffers live.
+
+        Falls back to CPU if no parameters/buffers are present.
+        """
+        if hasattr(self, "device") and isinstance(self.device, torch.device):
+            return self.device
+        try:
+            return next(self.parameters()).device
+        except StopIteration:
+            try:
+                return next(self.buffers()).device
+            except StopIteration:
+                return torch.device("cpu")
+
     def __enter__(self) -> 'Transformer':
         """Enter context manager: set model to eval mode for inference."""
         self.eval()
@@ -189,11 +204,11 @@ class Transformer(nn.Module):
         # assert x.ndim == 2, f"expected x.shape (B, T), got {x.shape}."
         # assert y.ndim == 2, f"expected y.shape (B, T), got {y.shape}."
         if x.ndim != 2:
-            raise ValueError(f"expected y.shape (B, T), got {y.shape}.")
-        if y.ndim != 2:
             raise ValueError(f"expected x.shape (B, T), got {x.shape}.")
+        if y.ndim != 2:
+            raise ValueError(f"expected y.shape (B, T), got {y.shape}.")
         if x.device != y.device:
-            raise RuntimeError(f"Source (x) is on {x.device} but Target (y) is on {y.device}")
+            raise RuntimeError(f"x is on device {x.device} but y is on {y.device}")
 
         # Projection returns log-probabilities. Do NOT pass the Projection output to
         # CrossEntropyLoss as it expects logits and internally applies log-softmax + NLLLoss.

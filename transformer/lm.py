@@ -42,7 +42,7 @@ from common import Projection
 from decoder import Decoder
 
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 class LanguageModel(nn.Module):
@@ -82,12 +82,12 @@ class LanguageModel(nn.Module):
             dtype: Data type for weights.
         """
         super().__init__()
-        self.d_model = d_model
-        self.max_seq_len = max_seq_len
-        self.vocab_size = vocab_size
+        self.d_model: int = d_model
+        self.max_seq_len: int = max_seq_len
+        self.vocab_size: int = vocab_size
 
         # Decoder with causal self-attention only (no cross-attention)
-        self.decoder = Decoder(
+        self.decoder: Decoder = Decoder(
             vocabulary_size=vocab_size,
             num_layers=num_layers,
             num_heads=num_heads,
@@ -100,10 +100,12 @@ class LanguageModel(nn.Module):
         )
 
         # Final layer norm (Pre-LayerNorm architecture)
-        self.final_norm = nn.LayerNorm(d_model, dtype=dtype)
+        self.final_norm: nn.LayerNorm = nn.LayerNorm(
+            normalized_shape=d_model, dtype=dtype
+        )
 
         # Output projection to vocabulary
-        self.projection = Projection(
+        self.projection: Projection = Projection(
             d_model=d_model,
             num_classes=vocab_size,
             dtype=dtype,
@@ -146,11 +148,12 @@ class LanguageModel(nn.Module):
             )
 
         # Decoder without memory (decoder-only mode)
-        hidden = self.decoder(y=x, memory=None)
+        # hidden shape: (B, T, D)
+        hidden: Tensor = self.decoder(y=x, memory=None)
         hidden = self.final_norm(hidden)
 
-        # Project to vocabulary and return log probabilities
-        log_probabilities = self.projection(y=hidden)
+        # log_probabilities shape: (B, T, V)
+        log_probabilities: Tensor = self.projection(y=hidden)
         return log_probabilities
 
     @torch.no_grad()
@@ -241,18 +244,17 @@ class LanguageModel(nn.Module):
             # Output shape: (1, sequence_length)
             # Example: [[2045, 318, 257]] - batch of 1 sequence
 
-        # Extract batch size for managing parallel generation
-        # We may be generating multiple sequences simultaneously
-        batch_size = prompt.shape[0]
+        # batch_size: number of sequences to generate in parallel.
         # Example: If prompt.shape = (4, 10), batch_size = 4
         #          (generating 4 different sequences in parallel)
+        batch_size: int = prompt.shape[0]
 
         # Clone prompt to create working copy
         # We'll append generated tokens to this as we go
         # Clone ensures we don't modify the original prompt tensor
-        generated_sequence = prompt.clone()
-        # Shape: (batch_size, prompt_length)
-        # This will grow: (batch_size, prompt_length + 1), then (batch_size, prompt_length + 2), etc.
+        # generated_sequence shape: (batch_size, prompt_length)
+        # This will grow: (batch_size, prompt_length + 1), etc.
+        generated_sequence: Tensor = prompt.clone()
 
         # =========================================================================
         # STEP 2: AUTOREGRESSIVE GENERATION LOOP
@@ -260,8 +262,10 @@ class LanguageModel(nn.Module):
 
         # Generate tokens one at a time until we reach max_length
         # The range determines how many NEW tokens to generate
-        # If prompt has 10 tokens and max_length=100, we generate 90 more tokens
-        number_of_tokens_to_generate = max_length - prompt.shape[1]
+        # If prompt has 10 tokens and max_length=100, we generate 90 more
+        number_of_tokens_to_generate: int = (
+            max_length - prompt.shape[1]
+        )
 
         for generation_step in range(number_of_tokens_to_generate):
             # ---------------------------------------------------------------------
@@ -276,8 +280,11 @@ class LanguageModel(nn.Module):
             # Feeding 10,000 tokens would be computationally prohibitive
             # So we use a sliding window of the most recent context
 
-            model_input_sequence = generated_sequence[:, -self.max_seq_len:]
-            # Shape: (batch_size, min(current_length, max_seq_len))
+            # model_input_sequence
+            # Shape:(batch_size, min(current_length, max_seq_len))
+            model_input_sequence: Tensor = (
+                generated_sequence[:, -self.max_seq_len:]
+            )
 
             # Example progression:
             # Step 1: generated_sequence has 10 tokens → use all 10
@@ -293,8 +300,9 @@ class LanguageModel(nn.Module):
             # Input: Token sequence of shape (batch_size, sequence_length)
             # Output: Probability distribution over vocabulary for EACH position
 
-            log_probabilities_all_positions = self.forward(model_input_sequence)
+            # log_probabilities_all_positions
             # Shape: (batch_size, sequence_length, vocabulary_size)
+            log_probabilities_all_positions: Tensor = self.forward(x=model_input_sequence)
 
             # Example with vocabulary_size=50,000:
             # If input has 10 tokens, output is (batch_size, 10, 50000)
@@ -302,9 +310,9 @@ class LanguageModel(nn.Module):
 
             # We only care about the LAST position (the next token to generate)
             # All previous positions are already decided (they're in our prompt/generated text)
-            next_token_logits = log_probabilities_all_positions[:, -1, :]
+            # next_token_log_probabilities: the model's prediction for what comes next
             # Shape: (batch_size, vocabulary_size)
-            # This is the model's prediction for what token should come next
+            next_token_log_probabilities: Tensor = log_probabilities_all_positions[:, -1, :]
 
             # ---------------------------------------------------------------------
             # STEP 2C: APPLY TEMPERATURE SCALING
@@ -327,9 +335,11 @@ class LanguageModel(nn.Module):
             #   - Example: With τ=2.0, "Paris" might only have 40% probability,
             #              giving more chance to alternatives like "Lyon", "Marseille"
 
-            next_token_logits = next_token_logits / temperature
-            # Shape unchanged: (batch_size, vocabulary_size)
-            # But values are now scaled by temperature
+            # next_token_scores: after temperature scaling, values are no longer
+            # log-probabilities. They are unnormalized scores fed to softmax.
+            # softmax(log_probs / T) = softmax(logits / T) due to shift-invariance.
+            # Shape: (batch_size, vocabulary_size)
+            next_token_scores: Tensor = next_token_log_probabilities / temperature
 
             # ---------------------------------------------------------------------
             # STEP 2D: APPLY TOP-K FILTERING (OPTIONAL)
@@ -339,23 +349,26 @@ class LanguageModel(nn.Module):
             # This prevents sampling from the "long tail" of very unlikely tokens
 
             if top_k is not None:
-                # Find the K highest logit values for each sequence in batch
-                top_k_values, _ = torch.topk(next_token_logits, top_k)
-                # Shape: (batch_size, top_k)
+                # Find the K highest score values for each sequence in batch
+                # top_k_values Shape: (batch_size, top_k)
+                top_k_values: Tensor
+                top_k_values, _ = torch.topk(input=next_token_scores, k=top_k)
 
                 # Extract the K-th highest value (the threshold)
-                # Tokens with logits below this threshold will be masked out
-                threshold_value_per_sequence = top_k_values[:, -1, None]
-                # Shape: (batch_size, 1)
-                # Example: If top_k=50, this is the 50th highest logit
+                # Tokens with scores below this threshold will be masked out
+                # threshold_value_per_sequence Shape: (batch_size, 1)
+                # Example: If top_k=50, this is the 50th highest score
+                threshold_value_per_sequence: Tensor = top_k_values[:, -1, None]
 
                 # Mask out (set to -infinity) all tokens below the threshold
                 # Why -infinity? Because after softmax, exp(-∞) = 0 probability
-                next_token_logits[next_token_logits < threshold_value_per_sequence] = float('-inf')
+                next_token_scores[
+                    next_token_scores < threshold_value_per_sequence
+                ] = float('-inf')
 
                 # Result: Only top-k tokens remain as candidates
                 # Example: With vocabulary_size=50,000 and top_k=50,
-                #          49,950 tokens now have -∞ logits (zero probability)
+                #          49,950 tokens now have -∞ scores (zero probability)
 
             # ---------------------------------------------------------------------
             # STEP 2E: APPLY TOP-P (NUCLEUS) FILTERING (OPTIONAL)
@@ -378,34 +391,39 @@ class LanguageModel(nn.Module):
             #   - With top_p=0.9, we might keep 20 tokens to reach 90% mass
 
             if top_p is not None:
-                next_token_logits = self._apply_top_p(next_token_logits, top_p)
-                # This function (defined elsewhere) implements nucleus sampling
+                # This function implements nucleus sampling
                 # Masks out tokens outside the nucleus (cumulative probability < top_p)
+                next_token_scores: Tensor = self._apply_top_p(
+                    scores=next_token_scores, top_p=top_p
+                )
 
             # ---------------------------------------------------------------------
-            # STEP 2F: CONVERT LOGITS TO PROBABILITIES
+            # STEP 2F: CONVERT SCORES TO PROBABILITIES
             # ---------------------------------------------------------------------
 
-            # Softmax converts raw logits (unbounded real numbers) to probabilities
+            # Softmax converts unnormalized scores to probabilities
             #
             # Mathematical formula:
-            #   P(token_i) = exp(logit_i) / Σ_j exp(logit_j)
+            #   P(token_i) = exp(score_i) / Σ_j exp(score_j)
             #
             # Properties:
             #   - All probabilities are between 0 and 1
             #   - All probabilities sum to 1
-            #   - Higher logits → higher probabilities
+            #   - Higher scores → higher probabilities
 
-            probabilities_next_token = torch.softmax(next_token_logits, dim=-1)
+            # next_token_probabilities
             # Shape: (batch_size, vocabulary_size)
             # Each row is a probability distribution over the vocabulary
-
+            #
             # Example values after softmax:
             # [0.45, 0.23, 0.12, 0.08, 0.05, 0.03, 0.02, 0.01, 0.01, 0.00, ...]
             # (sums to 1.0, all values between 0 and 1)
-
+            #
             # Note: Tokens that were masked with -∞ now have probability 0
             # because exp(-∞) = 0
+            next_token_probabilities: Tensor = torch.softmax(
+                input=next_token_scores, dim=-1
+            )
 
             # ---------------------------------------------------------------------
             # STEP 2G: SAMPLE NEXT TOKEN
@@ -419,9 +437,11 @@ class LanguageModel(nn.Module):
             # - Sampling adds diversity: Can generate different texts from same prompt
             # - Allows model to explore creative/unexpected continuations
 
-            next_token = torch.multinomial(probabilities_next_token, num_samples=1)
-            # Shape: (batch_size, 1)
+            # next_token Shape: (batch_size, 1)
             # Each sequence in batch gets one sampled token
+            next_token: Tensor = torch.multinomial(
+                input=next_token_probabilities, num_samples=1
+            )
 
             # Example:
             # If probabilities = [0.45, 0.23, 0.12, 0.08, ...]
@@ -437,8 +457,10 @@ class LanguageModel(nn.Module):
             # Concatenate the newly sampled token to our growing sequence
             # This token becomes part of the context for the next generation step
 
-            generated_sequence = torch.cat([generated_sequence, next_token], dim=1)
-            # Shape increases: (batch_size, length) → (batch_size, length + 1)
+            # generated_sequence Shape: (batch_size, length + 1)
+            generated_sequence = torch.cat(
+                tensors=[generated_sequence, next_token], dim=1
+            )
 
             # Example progression:
             # Step 0: [2045, 318, 257]           (prompt: "This is a")
@@ -463,7 +485,7 @@ class LanguageModel(nn.Module):
                 # .all() ensures we only stop when every sequence is done
                 # (for batch processing, we continue until all are complete)
 
-                all_sequences_ended = (next_token == self.end_token).all()
+                all_sequences_ended: bool = (next_token == self.end_token).all()
 
                 if all_sequences_ended:
                     # All sequences have naturally concluded
@@ -478,14 +500,14 @@ class LanguageModel(nn.Module):
 
         # Return the complete generated sequence
         # This includes both the original prompt AND all generated tokens
-        return generated_sequence
-        # Shape: (batch_size, final_length)
+        # generated_sequence Shape: (batch_size, final_length)
         # where final_length ≤ max_length
+        return generated_sequence
 
 
     def _apply_top_p(
             self,
-            logits: torch.Tensor,
+            scores: torch.Tensor,
             top_p: float
     ) -> torch.Tensor:
         """
@@ -495,7 +517,7 @@ class LanguageModel(nn.Module):
         probability exceeds top_p, masking out the rest.
 
         Algorithm:
-            1. Convert logits to probabilities
+            1. Convert scores to probabilities
             2. Sort probabilities descending
             3. Compute cumulative sum
             4. Find cutoff where cumulative sum exceeds top_p
@@ -526,30 +548,34 @@ class LanguageModel(nn.Module):
             - This is unlike top-k which always keeps exactly k tokens
 
         Args:
-            logits: Raw model outputs, shape (batch_size, vocabulary_size)
+            scores: Unnormalized scores (e.g. temperature-scaled log-probabilities),
+                    shape (batch_size, vocabulary_size). softmax is shift-invariant,
+                    so these produce the same probabilities as raw logits.
             top_p: Probability threshold, typically 0.9 or 0.95
 
         Returns:
-            Masked logits where tokens outside nucleus are set to -inf
+            Masked scores where tokens outside nucleus are set to -inf
         """
 
-        # Convert logits to probabilities
-        # Need probabilities (not logits) to compute cumulative mass
-        probabilities = torch.softmax(logits, dim=-1)
-        # Shape: (batch_size, vocabulary_size)
+        # Convert scores to probabilities
+        # Need probabilities (not scores) to compute cumulative mass
+        # probabilities Shape: (batch_size, vocabulary_size)
+        probabilities: Tensor = torch.softmax(input=scores, dim=-1)
 
         # Sort probabilities in descending order (highest probability first)
         # This allows us to accumulate from most likely to least likely
+        # sorted_probabilities Shape: (batch_size, vocabulary_size) - sorted values
+        # sorted_indices Shape: (batch_size, vocabulary_size) - original positions
         sorted_probabilities, sorted_indices = torch.sort(
-            probabilities, descending=True, dim=-1
+            input=probabilities, descending=True, dim=-1
         )
-        # sorted_probabilities: (batch_size, vocabulary_size) - sorted values
-        # sorted_indices: (batch_size, vocabulary_size) - original positions
 
         # Compute cumulative sum of sorted probabilities
         # This tells us "what fraction of total probability mass have we seen so far"
-        cumulative_probabilities = torch.cumsum(sorted_probabilities, dim=-1)
-        # Shape: (batch_size, vocabulary_size)
+        # cumulative_probabilities Shape: (batch_size, vocabulary_size)
+        cumulative_probabilities: Tensor = torch.cumsum(
+            input=sorted_probabilities, dim=-1
+        )
 
         # Example:
         # sorted_probabilities = [0.45, 0.23, 0.12, 0.08, ...]
@@ -557,8 +583,8 @@ class LanguageModel(nn.Module):
 
         # Find positions where cumulative probability exceeds top_p threshold
         # These are tokens OUTSIDE the nucleus (to be masked)
-        tokens_to_remove = cumulative_probabilities > top_p
-        # Shape: (batch_size, vocabulary_size) - boolean mask
+        # tokens_to_remove Shape: (batch_size, vocabulary_size) - boolean mask
+        tokens_to_remove: Tensor = cumulative_probabilities > top_p
 
         # Shift mask right by one position
         # Why? We want to KEEP the token that pushes us over top_p
@@ -569,18 +595,22 @@ class LanguageModel(nn.Module):
 
         # Unsort the mask back to original vocabulary order
         # sorted_indices told us how to sort; now we reverse that sorting
-        # This is necessary because we need to mask the ORIGINAL logits
-        nucleus_mask = torch.zeros_like(logits, dtype=torch.bool)
-        nucleus_mask.scatter_(dim=-1, index=sorted_indices, src=tokens_to_remove)
-        # Shape: (batch_size, vocabulary_size)
+        # This is necessary because we need to mask the ORIGINAL scores
+        # nucleus_mask Shape: (batch_size, vocabulary_size)
+        nucleus_mask: Tensor = torch.zeros_like(
+            input=scores, dtype=torch.bool
+        )
+        nucleus_mask.scatter_(
+            dim=-1, index=sorted_indices, src=tokens_to_remove
+        )
 
         # Apply mask: Set tokens outside nucleus to -infinity
         # After softmax, exp(-∞) = 0, so these tokens have zero probability
-        logits[nucleus_mask] = float('-inf')
+        scores[nucleus_mask] = float('-inf')
 
         # Shape unchanged: (batch_size, vocabulary_size)
-        # But now only nucleus tokens have finite logits
-        return logits
+        # But now only nucleus tokens have finite scores
+        return scores
 
     def _device(self) -> torch.device:
         """Return the device where the model parameters or buffers live.
