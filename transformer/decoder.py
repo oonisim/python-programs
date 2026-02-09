@@ -19,7 +19,7 @@ from torch import (
     nn
 )
 
-from .constant import (
+from constant import (
     TYPE_FLOAT,
     DIM_MODEL,
     DIM_PWFF_HIDDEN,
@@ -29,7 +29,7 @@ from .constant import (
     DROPOUT_RATIO,
     EPSILON,
 )
-from .common import (
+from common import (
     PositionalEncoding,
     InputEmbedding,
     MultiHeadAttention,

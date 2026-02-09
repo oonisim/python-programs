@@ -48,7 +48,7 @@ import torch
 from torch import nn, Tensor
 from torch.utils.data import DataLoader
 
-from .utility import (
+from utility import (
     ensure_directory_exists,
     generate_timestamp,
     build_snapshot_filename,

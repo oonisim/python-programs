@@ -67,15 +67,9 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from transformers import GPT2Tokenizer
 
-# Local imports
-try:
-    from .lm import LanguageModel
-    from .loader import LanguageModelDataLoaderFactory, DataLoaderConfig
-    from .trainer import LanguageModelTrainer, TrainerConfig
-except ImportError:
-    from lm import LanguageModel
-    from loader import LanguageModelDataLoaderFactory, DataLoaderConfig
-    from trainer import LanguageModelTrainer, TrainerConfig
+from lm import LanguageModel
+from loader import LanguageModelDataLoaderFactory, DataLoaderConfig
+from trainer import LanguageModelTrainer, TrainerConfig
 
 
 # --------------------------------------------------------------------------------

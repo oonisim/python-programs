@@ -11,7 +11,7 @@ from torch import (
     nn
 )
 
-from .constant import (
+from constant import (
     TYPE_FLOAT,
     NUM_ENCODER_TOKENS,
     NUM_DECODER_TOKENS,
@@ -23,13 +23,13 @@ from .constant import (
     NUM_HEADS,
     DROPOUT_RATIO,
 )
-from .common import (
+from common import (
     Projection,
 )
-from .encoder import (
+from encoder import (
     Encoder
 )
-from .decoder import (
+from decoder import (
     Decoder
 )
 

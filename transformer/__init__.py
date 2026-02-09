@@ -22,3 +22,7 @@ from .encoder import (
     EncodeLayer,
     Encoder,
 )
+from .decoder import (
+    DecodeLayer,
+    Decoder
+)
