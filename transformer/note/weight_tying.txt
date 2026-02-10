@@ -1,0 +1,29 @@
+Weight tying (often spelled “tying”) in transformers is the practice of using the same weight matrix for both the token input embeddings and the final output projection (softmax) that produces vocabulary logits in a language model.
+
+Let E be the token embedding matrix of shape [vocab_size, hidden_dim].
+Input: a token id i is mapped to its embedding by taking the i-th row of E.
+Output: to predict the next token, the model multiplies the hidden state h by the same matrix E to get logits z = E · h + b (one logit per vocabulary item). In other words, the output weight matrix W_out is set equal to the embedding matrix E.
+Why it’s used
+
+Fewer parameters and memory: sharing E cuts out an extra [vocab_size × hidden_dim] matrix.
+Better generalization: empirically improves perplexity by coupling the input and output word spaces (words that are similar as inputs tend to get similar output scores).
+Regularization: constrains the model in a beneficial way, especially when vocabularies are large.
+Where it’s used
+
+Decoder-only LMs (e.g., GPT family) typically tie the token embedding matrix with the LM head.
+Encoder–decoder models often tie the decoder’s input embeddings with its output projection; some also share embeddings between encoder and decoder if they use the same vocabulary (e.g., T5 shares token embeddings across encoder, decoder, and output).
+BERT-style masked language modeling heads commonly tie the final classifier to the word embedding matrix.
+Implementation notes
+
+If hidden size differs from embedding size, add a small projection before the tied output (map hidden_dim → embed_dim, then use E).
+You still keep a separate output bias b.
+In frameworks like PyTorch, you can literally point lm_head.weight to the embedding weight so gradients update the same tensor.
+If source and target vocabularies differ (e.g., bilingual MT), you can only tie where vocabularies match.
+Not typically used with adaptive or factorized softmax unless designed to be compatible.
+Not to be confused with
+
+Parameter sharing across transformer layers (e.g., ALBERT), which reuses entire layer weights. That is a different form of sharing than input–output embedding tying.
+Background references
+
+Press & Wolf (2017), “Using the Output Embedding to Improve Language Models”
+Inan, Khosravi, & Socher (2016), “Tying Word Vectors and Word Classifiers”

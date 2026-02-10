@@ -1,0 +1,33 @@
+num_embeddings should be the size of the tokenizer’s token inventory (the number of unique token IDs it can produce/use), not the number of “English words” and not the maximum sequence length. In practice, set it to the tokenizer’s vocabulary size, including any special or added tokens.
+
+Key points
+
+“Vocabulary” in this context means the set of tokens defined by your tokenizer (BPE/WordPiece/SentencePiece), not natural-language words.
+The input embedding maps token IDs to vectors, so its num_embeddings must equal the number of distinct token IDs you will ever feed into the model.
+The decoder’s output projection (“LM head”) produces logits over the same token set that the target text is tokenized into, so its output dimension equals the target tokenizer’s vocabulary size.
+Common setups
+
+Decoder-only LM (e.g., GPT-2):
+Use the GPT-2 tokenizer’s size. For the standard GPT-2 tokenizer this is 50257 by default. If you add a pad token or other specials, the size becomes len(tokenizer) after you add them.
+Often the LM head is weight-tied to the token embedding, so both must have the same dimension: [vocab_size, d_model].
+Encoder–decoder (e.g., T5):
+T5 uses a single SentencePiece vocabulary shared by encoder and decoder; both the encoder and decoder token embeddings and the decoder output projection use that same vocab size, and weights are typically tied.
+If you choose different tokenizers for source and target, then:
+Encoder embedding num_embeddings = source tokenizer vocab size
+Decoder embedding num_embeddings = target tokenizer vocab size
+Decoder output projection out_features = target tokenizer vocab size
+You can only tie decoder input embeddings to the decoder output head if they use the same target vocabulary.
+How to get the right size
+
+Hugging Face tokenizers:
+Use len(tokenizer) to include added/special tokens.
+If you add tokens after model init, resize embeddings accordingly (e.g., model.resize_token_embeddings(len(tokenizer)) in HF Transformers).
+Tokenizers library (fast):
+tokenizer.get_vocab_size(with_added_tokens=True)
+Don’t confuse with sequence length
+
+num_embeddings is the count of token types (vocabulary size).
+Maximum sequence length affects positional encodings (e.g., max_position_embeddings), not num_embeddings.
+About the sqrt(d_model) factor
+
+The original Transformer scales token embeddings by sqrt(d_model) to keep embedding magnitudes on a similar scale to positional encodings and residual paths. Many modern implementations keep or drop it without major impact, but it’s faithful to Vaswani et al.

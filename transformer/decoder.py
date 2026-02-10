@@ -30,8 +30,6 @@ from constant import (
     EPSILON,
 )
 from common import (
-    PositionalEncoding,
-    InputEmbedding,
     MultiHeadAttention,
     PositionwiseFeedForward,
 )
@@ -257,45 +255,6 @@ class Decoder(nn.Module):
         super().__init__()
         self._D: int = d_model      # pylint: disable=invalid-name
         assert vocabulary_size > 0, f"invalid vocabulary size [{vocabulary_size}]."
-
-        # --------------------------------------------------------------------------------
-        # Token embeddings
-        # --------------------------------------------------------------------------------
-        # self.embedding: nn.Embedding = nn.Embedding(
-        #     num_embeddings=vocabulary_size,
-        #     embedding_dim=d_model
-        # )
-        # initialize_weights(module=self.embedding)
-        self.output_embedding: InputEmbedding = InputEmbedding(
-            d_model=d_model,
-            vocabulary_size=vocabulary_size,
-            dtype=dtype
-        )
-
-        # --------------------------------------------------------------------------------
-        # Position encoded vectors
-        # --------------------------------------------------------------------------------
-        self.positional_encoding: PositionalEncoding = PositionalEncoding(
-            d_model=d_model,
-            max_time_steps=max_time_steps,
-        )
-
-        # --------------------------------------------------------------------------------
-        # Dropout for the sums of the embeddings and the positional encodings
-        # 5.4 Regularization
-        # ...
-        # In addition, we apply dropout to the sums of the embeddings and the positional
-        # encodings in both the encoder and decoder stacks. For the base model, we use a
-        # rate of Pdrop = 0.1.
-        #
-        # Why apply Dropout to Position Encoded tokens removing 10% of tokens in the sequence?
-        # https://datascience.stackexchange.com/q/128328/68313
-        #
-        # TODO: Need to clarify Dropout implementation correctness.
-        # Dropout here may remove [CLS], [SEP], [MASK] tokens?
-        # https://stackoverflow.com/q/78173751/4281353
-        # --------------------------------------------------------------------------------
-        self.dropout: nn.Dropout = nn.Dropout(p=p_drop)
 
         # --------------------------------------------------------------------------------
         # Decoder layers

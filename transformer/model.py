@@ -24,6 +24,8 @@ from constant import (
     DROPOUT_RATIO,
 )
 from common import (
+    InputEmbedding,
+    PositionalEncoding,
     Projection,
 )
 from encoder import (
@@ -39,10 +41,55 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 class Transformer(nn.Module):
     """Class to implement the Google Transformer Model"""
-    def __init__(self):
+    def __init__(
+            self,
+            data_type = TYPE_FLOAT,
+            encoder_model_dimension: int = DIM_MODEL,
+            encoder_vocabulary_size: int = NUM_ENCODER_TOKENS,
+            decoder_model_dimension: int = DIM_MODEL,
+            decoder_vocabulary_size: int = NUM_DECODER_TOKENS,
+
+    ):
         super().__init__()
 
         self.device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        # ================================================================================
+        # Encoder
+        # ================================================================================
+        # --------------------------------------------------------------------------------
+        # Token embeddings
+        # --------------------------------------------------------------------------------
+        self.input_embedding: InputEmbedding = InputEmbedding(
+            d_model=encoder_model_dimension,
+            vocabulary_size=encoder_vocabulary_size,
+            dtype=data_type
+        )
+
+        # --------------------------------------------------------------------------------
+        # Position encoded vectors
+        # Citation:
+        # --------------------------------------------------------------------------------
+        self.positional_encoding: PositionalEncoding = PositionalEncoding(
+            d_model=d_model,
+            max_time_steps=max_time_steps,
+        )
+        # --------------------------------------------------------------------------------
+        # Dropout for the sums of the embeddings and the positional encodings
+        # 5.4 Regularization
+        # ...
+        # In addition, we apply dropout to the sums of the embeddings and the positional
+        # encodings in both the encoder and decoder stacks. For the base model, we use a
+        # rate of Pdrop = 0.1.
+        #
+        # Why apply Dropout to Position Encoded tokens removing 10% of tokens in the sequence?
+        # https://datascience.stackexchange.com/q/128328/68313
+        #
+        # TODO: Need to clarify Dropout implementation correctness.
+        # Dropout here may remove [CLS], [SEP], [MASK] tokens?
+        # https://stackoverflow.com/q/78173751/4281353
+        # --------------------------------------------------------------------------------
+        self.dropout: nn.Dropout = nn.Dropout(p=p_drop)
 
         self.encoder: nn.Module = Encoder(
             vocabulary_size=NUM_ENCODER_TOKENS,
@@ -56,6 +103,49 @@ class Transformer(nn.Module):
             bias=True,
             p_drop=DROPOUT_RATIO
         )
+
+        # --------------------------------------------------------------------------------
+        # Token embeddings
+        # The name output_embedding refers to the "output side" of the Transformer model
+        # as per the original paper. The input to the decoder is the target sequence
+        # shifted one position to the right by inserting the <START> token at the top.
+        # --------------------------------------------------------------------------------
+        # self.embedding: nn.Embedding = nn.Embedding(
+        #     num_embeddings=vocabulary_size,
+        #     embedding_dim=d_model
+        # )
+        # initialize_weights(module=self.embedding)
+        self.output_embedding: InputEmbedding = InputEmbedding(
+            d_model=d_model,
+            vocabulary_size=vocabulary_size,
+            dtype=dtype
+        )
+
+        # --------------------------------------------------------------------------------
+        # Position encoded vectors
+        # --------------------------------------------------------------------------------
+        self.positional_encoding: PositionalEncoding = PositionalEncoding(
+            d_model=d_model,
+            max_time_steps=max_time_steps,
+        )
+
+        # --------------------------------------------------------------------------------
+        # Dropout for the sums of the embeddings and the positional encodings
+        # 5.4 Regularization
+        # ...
+        # In addition, we apply dropout to the sums of the embeddings and the positional
+        # encodings in both the encoder and decoder stacks. For the base model, we use a
+        # rate of Pdrop = 0.1.
+        #
+        # Why apply Dropout to Position Encoded tokens removing 10% of tokens in the sequence?
+        # https://datascience.stackexchange.com/q/128328/68313
+        #
+        # TODO: Need to clarify Dropout implementation correctness.
+        # Dropout here may remove [CLS], [SEP], [MASK] tokens?
+        # https://stackoverflow.com/q/78173751/4281353
+        # --------------------------------------------------------------------------------
+        self.dropout: nn.Dropout = nn.Dropout(p=p_drop)
+
 
         self.decoder: nn.Module = Decoder(
             vocabulary_size=NUM_DECODER_TOKENS,
