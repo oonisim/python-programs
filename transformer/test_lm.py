@@ -61,6 +61,6 @@ def test_language_model_generate_invalid_prompt():
     )
     prompt = torch.zeros(1, 2, 3)
 
-    # Expected: assertion error because forward requires 2D input.
-    with pytest.raises(AssertionError):
+    # Expected: ValueError because forward requires 2D input.
+    with pytest.raises(ValueError):
         model.generate(prompt=prompt, max_length=5)

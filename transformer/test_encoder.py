@@ -26,8 +26,8 @@ def _load_tokenizer(name: str):
 
 
 def test_encoder_output_shape():
-    """Encoder should return (B, T, D) for valid input indices."""
-    # Input: token indices with batch=2, time=4, model_dim=8.
+    """Encoder should return (B, T, D) for valid embedded input."""
+    # Input: embedded vectors with batch=2, time=4, model_dim=8.
     batch = 2
     time_steps = 4
     d_model = 8
@@ -39,20 +39,20 @@ def test_encoder_output_shape():
         max_time_steps=8,
         d_ff=16,
     )
-    x = torch.zeros(batch, time_steps, dtype=torch.long)
+    x = torch.randn(batch, time_steps, d_model)
 
-    # Expected: embedding output shape (B, T, D) from encoder stack.
+    # Expected: output shape (B, T, D) from encoder stack.
     out = encoder(x)
     assert out.shape == (batch, time_steps, d_model)
 
 
 def test_encoder_invalid_input_shape():
-    """Encoder should assert when input tensor is not 2D."""
-    # Input: 3D tensor is invalid for encoder indices.
+    """Encoder should assert when input tensor is not 3D."""
+    # Input: 2D tensor is invalid for encoder (expects embedded (B, T, D)).
     encoder = Encoder(vocabulary_size=16, num_layers=1, num_heads=2, d_model=8)
-    x = torch.zeros(1, 2, 3)
+    x = torch.zeros(1, 2)
 
-    # Expected: assertion error because input must be 2D (B, T).
+    # Expected: assertion error because input must be 3D (B, T, D).
     with pytest.raises(AssertionError):
         encoder(x)
 
@@ -77,44 +77,49 @@ def test_encoder_output_shape_with_bert_tokens():
     # Input: BERT tokenizer with text "hello world" to generate token IDs.
     tokenizer = _load_tokenizer("bert-base-uncased")
     tokens = tokenizer.encode("hello world", add_special_tokens=True)
-    input_ids = torch.tensor(tokens, dtype=torch.long).unsqueeze(0)
     print(f"BERT tokens for 'hello world': {tokens}")
 
+    d_model = 8
     # Expected: encoder output shape (B, T, D) with variance ~1 at LayerNorm.
     encoder = Encoder(
         vocabulary_size=max(tokens) + 1,
         num_layers=1,
         num_heads=2,
-        d_model=8,
+        d_model=d_model,
         max_time_steps=16,
         d_ff=16,
     )
-    out = encoder(input_ids)
-    assert out.shape == (1, input_ids.shape[1], 8)
+    # Encoder now expects embedded (B, T, D) tensors
+    x = torch.randn(1, len(tokens), d_model)
+    out = encoder(x)
+    assert out.shape == (1, len(tokens), d_model)
     normed = encoder.layers[0].layer_norm_input(out)
     var = normed.var(dim=-1, correction=0)
     assert torch.allclose(var, torch.ones_like(var), atol=1e-4)
 
 
-def test_encoder_output_shape_with_gpt_tokens():
-    """Encoder output shape matches (B, T, D) with GPT token inputs."""
-    # Input: GPT-2 BPE tokenizer with text "hello world!" to generate token IDs.
-    tokenizer = _load_tokenizer("gpt2")
-    tokens = tokenizer.encode("hello world!", add_special_tokens=True)
-    input_ids = torch.tensor(tokens, dtype=torch.long).unsqueeze(0)
-    print(f"GPT-2 BPE tokens for 'hello world!': {tokens}")
+def test_encoder_output_shape_with_xlm_roberta_tokens():
+    """Encoder output shape matches (B, T, D) with XLM-RoBERTa SentencePiece tokens."""
+    # Input: XLM-RoBERTa (SentencePiece BPE) tokenizer used in multilingual
+    # Sentence Transformers (e.g., BGE-M3, multilingual-e5).
+    tokenizer = _load_tokenizer("xlm-roberta-base")
+    tokens = tokenizer.encode("hello world", add_special_tokens=True)
+    print(f"XLM-RoBERTa SentencePiece tokens for 'hello world': {tokens}")
 
+    d_model = 8
     # Expected: encoder output shape (B, T, D) with variance ~1 at LayerNorm.
     encoder = Encoder(
         vocabulary_size=max(tokens) + 1,
         num_layers=1,
         num_heads=2,
-        d_model=8,
+        d_model=d_model,
         max_time_steps=16,
         d_ff=16,
     )
-    out = encoder(input_ids)
-    assert out.shape == (1, input_ids.shape[1], 8)
+    # Encoder now expects embedded (B, T, D) tensors
+    x = torch.randn(1, len(tokens), d_model)
+    out = encoder(x)
+    assert out.shape == (1, len(tokens), d_model)
     normed = encoder.layers[0].layer_norm_input(out)
     var = normed.var(dim=-1, correction=0)
     assert torch.allclose(var, torch.ones_like(var), atol=1e-4)

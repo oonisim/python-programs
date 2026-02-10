@@ -38,7 +38,11 @@ from constant import (
     MAX_TIME_STEPS,
     DROPOUT_RATIO,
 )
-from common import Projection
+from common import (
+    InputEmbedding,
+    PositionalEncoding,
+    Projection,
+)
 from decoder import Decoder
 
 
@@ -86,6 +90,28 @@ class LanguageModel(nn.Module):
         self.max_seq_len: int = max_seq_len
         self.vocab_size: int = vocab_size
 
+        # --------------------------------------------------------------------------------
+        # Token embeddings
+        # --------------------------------------------------------------------------------
+        self.embedding: InputEmbedding = InputEmbedding(
+            d_model=d_model,
+            vocabulary_size=vocab_size,
+            dtype=dtype
+        )
+
+        # --------------------------------------------------------------------------------
+        # Position encoded vectors
+        # --------------------------------------------------------------------------------
+        self.positional_encoding: PositionalEncoding = PositionalEncoding(
+            d_model=d_model,
+            max_time_steps=max_seq_len,
+        )
+
+        # --------------------------------------------------------------------------------
+        # Dropout for the sums of the embeddings and the positional encodings
+        # --------------------------------------------------------------------------------
+        self.embedding_dropout: nn.Dropout = nn.Dropout(p=dropout)
+
         # Decoder with causal self-attention only (no cross-attention)
         self.decoder: Decoder = Decoder(
             vocabulary_size=vocab_size,
@@ -111,6 +137,16 @@ class LanguageModel(nn.Module):
             dtype=dtype,
             bias=True
         )
+
+        # --------------------------------------------------------------------------------
+        # Weight tying: share weights between input embedding and output projection.
+        # > 3.4 Embeddings and Softmax:
+        # > we also share the same weight matrix between the two embedding layers
+        # > and the pre-softmax linear transformation.
+        # nn.Embedding.weight shape: (vocab_size, d_model)
+        # nn.Linear.weight shape:    (vocab_size, d_model)
+        # --------------------------------------------------------------------------------
+        self.projection.projection.weight = self.embedding.embedding.weight
 
         # Token for stopping generation
         self.end_token: Optional[int] = None
@@ -146,6 +182,10 @@ class LanguageModel(nn.Module):
             raise RuntimeError(
                 f"Input tensor x on device {x.device} but model on {self._device()}."
             )
+
+        # Embedding + positional encoding + dropout
+        x = self.embedding(indices=x)
+        x = self.embedding_dropout(x + self.positional_encoding(x))
 
         # Decoder without memory (decoder-only mode)
         # hidden shape: (B, T, D)

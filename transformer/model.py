@@ -13,15 +13,21 @@ from torch import (
 
 from constant import (
     TYPE_FLOAT,
-    NUM_ENCODER_TOKENS,
-    NUM_DECODER_TOKENS,
-    NUM_CLASSES,
-    MAX_TIME_STEPS,
+    ENCODER_MAX_TIME_STEPS,
+    ENCODER_MAX_TOKENS,
+    ENCODER_LAYERS,
+    ENCODER_PWFF_DIM,
+    ENCODER_DROPOUT_RATIO,
+    DECODER_MAX_TIME_STEPS,
+    DECODER_MAX_TOKENS,
+    DECODER_LAYERS,
+    DECODER_PWFF_DIM,
+    DECODER_DROPOUT_RATIO,
     DIM_MODEL,
-    DIM_PWFF_HIDDEN,
-    NUM_LAYERS,
     NUM_HEADS,
-    DROPOUT_RATIO,
+    # Number of classes to predict at the decoder output.
+    # This is the same as the decoder vocabulary size.
+    # NUM_CLASSES,    # pylint: disable=unused-import
 )
 from common import (
     InputEmbedding,
@@ -44,12 +50,52 @@ class Transformer(nn.Module):
     def __init__(
             self,
             data_type = TYPE_FLOAT,
+            encoder_max_time_steps: int = ENCODER_MAX_TIME_STEPS,
+            encoder_vocabulary_size: int = ENCODER_MAX_TOKENS,
             encoder_model_dimension: int = DIM_MODEL,
-            encoder_vocabulary_size: int = NUM_ENCODER_TOKENS,
+            encoder_pwff_dimension: int = ENCODER_PWFF_DIM,
+            encoder_dropout_ratio: float = ENCODER_DROPOUT_RATIO,
+            encoder_layers: int = ENCODER_LAYERS,
+            decoder_max_time_steps: int = DECODER_MAX_TIME_STEPS,
+            decoder_vocabulary_size: int = DECODER_MAX_TOKENS,
             decoder_model_dimension: int = DIM_MODEL,
-            decoder_vocabulary_size: int = NUM_DECODER_TOKENS,
-
+            decoder_pwff_dimension: int = DECODER_PWFF_DIM,
+            decoder_dropout_ratio: float = DECODER_DROPOUT_RATIO,
+            decoder_layers: int = DECODER_LAYERS,
     ):
+        """
+        Note that encoder_model_dimension and decoder_model_dimension should match,
+        because at the cross attention in a decoder, K and V are from encoder layer
+        but Q is from decoder layer. The dimension d_model needs to match among Q,K,V.
+        However, make them separate for the potential future extension to use
+        separate dimensions (and adjust dimension of K,V to match Q in decoder).
+
+        Parameters that can differ between encoder and decoder layers are:
+          - d_ff (FFN hidden dimension)
+          - num_layers (encoder can have 6 layers, decoder can have 12)
+          - num_heads (as long as both divide d_model)
+          - max_time_steps (sequence lengths are independent)
+          - vocabulary_size (encoder/decoder can have different tokenizers)
+
+        The FFN is structured as:
+        x: (B, T, d_model) → W1: (d_model, d_ff) → ReLU → W2: (d_ff, d_model) → out: (B, T, d_model)
+        d_ff is purely internal to each FFN block.
+
+        Args:
+            data_type: embedding vector (signal) data type
+            encoder_vocabulary_size: max number of tokens in the encoder tokenizer
+            encoder_max_time_steps: max sequence length T of encoder layers
+            encoder_model_dimension: embedding vector dimension D in encoder layers.
+            encoder_pwff_dimension: point-wise feed forward internal dimension
+            encoder_dropout_ratio: dropout ratio to use in encoder layers
+            encoder_layers: number of encoder layers in the Encoder.
+            decoder_vocabulary_size: max number of tokens in the decoder tokenizer
+            decoder_max_time_steps: max sequence length T of decoder layers
+            decoder_model_dimension: embedding vector dimension D in decoder layers.
+            decoder_pwff_dimension: point-wise feed forward internal dimension
+            decoder_dropout_ratio: dropout ratio to use in decoder layers
+            decoder_layers: number of decoder layers in the Decoder.
+        """
         super().__init__()
 
         self.device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -70,9 +116,9 @@ class Transformer(nn.Module):
         # Position encoded vectors
         # Citation:
         # --------------------------------------------------------------------------------
-        self.positional_encoding: PositionalEncoding = PositionalEncoding(
-            d_model=d_model,
-            max_time_steps=max_time_steps,
+        self.encoder_positional_encoding: PositionalEncoding = PositionalEncoding(
+            d_model=encoder_model_dimension,
+            max_time_steps=encoder_max_time_steps,
         )
         # --------------------------------------------------------------------------------
         # Dropout for the sums of the embeddings and the positional encodings
@@ -89,21 +135,24 @@ class Transformer(nn.Module):
         # Dropout here may remove [CLS], [SEP], [MASK] tokens?
         # https://stackoverflow.com/q/78173751/4281353
         # --------------------------------------------------------------------------------
-        self.dropout: nn.Dropout = nn.Dropout(p=p_drop)
+        self.encoder_dropout: nn.Dropout = nn.Dropout(p=encoder_dropout_ratio)
 
         self.encoder: nn.Module = Encoder(
-            vocabulary_size=NUM_ENCODER_TOKENS,
-            num_layers=NUM_LAYERS,
+            vocabulary_size=encoder_vocabulary_size,
+            num_layers=encoder_layers,
             num_heads=NUM_HEADS,
-            d_model=DIM_MODEL,
-            dtype=TYPE_FLOAT,
-            d_ff=DIM_PWFF_HIDDEN,
+            d_model=encoder_model_dimension,
+            dtype=data_type,
+            d_ff=encoder_pwff_dimension,
             do_mask=False,
-            max_time_steps=MAX_TIME_STEPS,
+            max_time_steps=encoder_max_time_steps,
             bias=True,
-            p_drop=DROPOUT_RATIO
+            p_drop=encoder_dropout_ratio
         )
 
+        # ================================================================================
+        # Decoder
+        # ================================================================================
         # --------------------------------------------------------------------------------
         # Token embeddings
         # The name output_embedding refers to the "output side" of the Transformer model
@@ -116,17 +165,17 @@ class Transformer(nn.Module):
         # )
         # initialize_weights(module=self.embedding)
         self.output_embedding: InputEmbedding = InputEmbedding(
-            d_model=d_model,
-            vocabulary_size=vocabulary_size,
-            dtype=dtype
+            d_model=decoder_model_dimension,
+            vocabulary_size=decoder_vocabulary_size,
+            dtype=data_type
         )
 
         # --------------------------------------------------------------------------------
         # Position encoded vectors
         # --------------------------------------------------------------------------------
-        self.positional_encoding: PositionalEncoding = PositionalEncoding(
-            d_model=d_model,
-            max_time_steps=max_time_steps,
+        self.decoder_positional_encoding: PositionalEncoding = PositionalEncoding(
+            d_model=decoder_model_dimension,
+            max_time_steps=decoder_max_time_steps,
         )
 
         # --------------------------------------------------------------------------------
@@ -144,27 +193,37 @@ class Transformer(nn.Module):
         # Dropout here may remove [CLS], [SEP], [MASK] tokens?
         # https://stackoverflow.com/q/78173751/4281353
         # --------------------------------------------------------------------------------
-        self.dropout: nn.Dropout = nn.Dropout(p=p_drop)
-
+        self.decoder_dropout: nn.Dropout = nn.Dropout(p=decoder_dropout_ratio)
 
         self.decoder: nn.Module = Decoder(
-            vocabulary_size=NUM_DECODER_TOKENS,
-            num_layers=NUM_LAYERS,
+            vocabulary_size=decoder_vocabulary_size,
+            num_layers=decoder_layers,
             num_heads=NUM_HEADS,
-            d_model=DIM_MODEL,
-            dtype=TYPE_FLOAT,
-            d_ff=DIM_PWFF_HIDDEN,
-            max_time_steps=MAX_TIME_STEPS,
+            d_model=decoder_model_dimension,
+            dtype=data_type,
+            d_ff=decoder_pwff_dimension,
+            max_time_steps=decoder_max_time_steps,
             bias=True,
-            p_drop=DROPOUT_RATIO
+            p_drop=decoder_dropout_ratio
         )
 
         self.projection: nn.Module = Projection(
-            d_model=DIM_MODEL,
-            num_classes=NUM_CLASSES,
-            dtype=TYPE_FLOAT,
+            d_model=decoder_model_dimension,
+            # num_classes=NUM_CLASSES,
+            num_classes=decoder_vocabulary_size,
+            dtype=data_type,
             bias=True
         )
+
+        # --------------------------------------------------------------------------------
+        # Weight tying: share weights between decoder input embedding and output projection.
+        # > 3.4 Embeddings and Softmax:
+        # > we also share the same weight matrix between the two embedding layers
+        # > and the pre-softmax linear transformation.
+        # nn.Embedding.weight shape: (vocab_size, d_model)
+        # nn.Linear.weight shape:    (vocab_size, d_model)
+        # --------------------------------------------------------------------------------
+        self.projection.projection.weight = self.output_embedding.embedding.weight
 
         # --------------------------------------------------------------------------------
         # Default token IDs for autoregressive generation. They depend on your tokenizer/vocabulary.
@@ -300,9 +359,43 @@ class Transformer(nn.Module):
         if x.device != y.device:
             raise RuntimeError(f"x is on device {x.device} but y is on {y.device}")
 
+        # --------------------------------------------------------------------------------
+        # Input Embeddings multiplied by sqrt(d_model).
+        # --------------------------------------------------------------------------------
+        x = self.input_embedding(indices=x)
+
+        # --------------------------------------------------------------------------------
+        # Positional Encoding followed by dropout.
+        # > 3.4 Embeddings and Softmax
+        # > In addition, we apply dropout to the sums of the embeddings and the
+        # > positional encodings in both the encoder and decoder stacks.
+        # DO NOT use += as it is in-place operation that can cause back-prop issue.
+        # https://stackoverflow.com/a/68600205/4281353
+        # https://crazyoscarchang.github.io/2018/10/04/in-pytorch-not-the-same/
+        # --------------------------------------------------------------------------------
+        x = self.encoder_dropout(x + self.encoder_positional_encoding(x))
+
+        memory: Tensor = self.encoder(x=x)
+
+        # --------------------------------------------------------------------------------
+        # Input Embeddings multiplied by sqrt(d_model).
+        # --------------------------------------------------------------------------------
+        y = self.output_embedding(indices=y)
+
+        # --------------------------------------------------------------------------------
+        # Positional Encoding followed by dropout.
+        # > 3.4 Embeddings and Softmax
+        # > In addition, we apply dropout to the sums of the embeddings and the
+        # > positional encodings in both the encoder and decoder stacks.
+        # DO NOT use += as it is in-place operation that can cause back-prop issue.
+        # https://stackoverflow.com/a/68600205/4281353
+        # https://crazyoscarchang.github.io/2018/10/04/in-pytorch-not-the-same/
+        # --------------------------------------------------------------------------------
+        y = self.decoder_dropout(y + self.decoder_positional_encoding(y))
+
         # Projection returns log-probabilities. Do NOT pass the Projection output to
         # CrossEntropyLoss as it expects logits and internally applies log-softmax + NLLLoss.
-        log_probabilities: Tensor = self.projection(y=self.decoder(y=y, memory=self.encoder(x=x)))
+        log_probabilities: Tensor = self.projection(y=self.decoder(y=y, memory=memory))
         return log_probabilities
 
     @torch.no_grad()
@@ -335,7 +428,7 @@ class Transformer(nn.Module):
             x: Tensor,
             start_token: int,
             end_token: int,
-            max_length: int = MAX_TIME_STEPS
+            max_length: int = DECODER_MAX_TIME_STEPS
     ) -> Tensor:
         """Autoregressively generate output sequence from source x.
         Args:
@@ -359,9 +452,11 @@ class Transformer(nn.Module):
                 x.device, self._device()
             )
 
-        _B = x.shape[0]
+        _B = x.shape[0]     # pylint: disable=invalid-name
 
         # Encode source sequence once
+        x = self.input_embedding(indices=x)
+        x = self.encoder_dropout(x + self.encoder_positional_encoding(x))
         memory = self.encoder(x=x)
 
         # Start with <START> token for each sequence in batch
@@ -369,7 +464,9 @@ class Transformer(nn.Module):
 
         for _ in range(max_length - 1):
             # Get prediction for the next token
-            log_probabilities = self.projection(y=self.decoder(y=y, memory=memory))
+            y_emb = self.output_embedding(indices=y)
+            y_emb = self.decoder_dropout(y_emb + self.decoder_positional_encoding(y_emb))
+            log_probabilities = self.projection(y=self.decoder(y=y_emb, memory=memory))
             next_token = torch.argmax(log_probabilities[:, -1, :], dim=-1, keepdim=True)
 
             # Append predicted token to sequence

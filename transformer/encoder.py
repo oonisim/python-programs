@@ -169,6 +169,19 @@ class Encoder(nn.Module):
             p_drop: float = DROPOUT_RATIO,
             eps: float = EPSILON
     ):
+        """
+        Args:
+            vocabulary_size: size of the entire token vocabulary of tokenizer
+            num_layers: number of layers to stack in the Encoder
+            num_heads: number of heads in multi head attention
+            d_model: dimension D of the signal x: (B, T, D)
+            dtype: data type of the signal
+            d_ff: dimension of the point-wise feed forward layer signal
+            max_time_steps: max sequence size T
+            bias: flag to use bias in the linear layer
+            p_drop: dropout ratio at Dropout layers
+            eps: small number to prevent e.g. divide by zero.
+        """
         super().__init__()
         self._D: int = d_model      # pylint: disable=invalid-name
         assert vocabulary_size > 0, f"invalid vocabulary size [{vocabulary_size}]."
@@ -189,29 +202,16 @@ class Encoder(nn.Module):
     def forward(self, x: Tensor):
         """Encode
         Args:
-            x: indices to tokens
+            x: embedding vectors of shape (B, T, D).
+                Embedding and positional encoding are applied in model.py.
         """
-        assert torch.is_tensor(x) and x.ndim == 2   # shape (B, T)
-        _B, _T = x.shape        # pylint: disable=invalid-name
+        assert torch.is_tensor(x) and x.ndim == 3   # shape (B, T, D)
+        _B, _T, _D = x.shape        # pylint: disable=invalid-name
+        assert _D == self.D, (
+            f"Expected the dimension D: of input x:(B,T,D) as [{self.D}] "
+            f"defined at class instantiation, got [{_D}]]."
+        )
 
-        # --------------------------------------------------------------------------------
-        # Input Embeddings multiplied by sqrt(d_model).
-        # --------------------------------------------------------------------------------
-        x = self.input_embedding(indices=x)
-        assert x.shape == (_B, _T, self.D)
-
-        # --------------------------------------------------------------------------------
-        # Positional Encoding followed by dropout.
-        # > 3.4 Embeddings and Softmax
-        # > In addition, we apply dropout to the sums of the embeddings and the
-        # > positional encodings in both the encoder and decoder stacks.
-        # DO NOT use += as it is in-place operation that can cause back-prop issue.
-        # https://stackoverflow.com/a/68600205/4281353
-        # https://crazyoscarchang.github.io/2018/10/04/in-pytorch-not-the-same/
-        # --------------------------------------------------------------------------------
-        x = self.dropout(x + self.positional_encoding(x))   # (B,T,D) + (1,T,D)
-        assert x.shape == (_B, _T, self.D)
-        assert torch.all(torch.isfinite(x))
 
         # --------------------------------------------------------------------------------
         # N x Encode Layers

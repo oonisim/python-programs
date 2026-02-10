@@ -11,10 +11,12 @@ sys.path.insert(0, str(PROJECT_ROOT.parent))
 
 from transformer.decoder import DecodeLayer, Decoder  # noqa: E402
 
+tiktoken = pytest.importorskip("tiktoken")
+
 
 def test_decoder_output_shape_with_memory():
     """Decoder should return (B, T, D) when memory is provided."""
-    # Input: target indices y and encoder memory with matching D.
+    # Input: embedded target y and encoder memory with matching D.
     batch = 2
     time_steps = 4
     d_model = 8
@@ -26,7 +28,7 @@ def test_decoder_output_shape_with_memory():
         max_time_steps=8,
         d_ff=16,
     )
-    y = torch.zeros(batch, time_steps, dtype=torch.long)
+    y = torch.randn(batch, time_steps, d_model)
     memory = torch.zeros(batch, time_steps, d_model)
 
     # Expected: decoder output shape (B, T, D) with cross-attention.
@@ -36,7 +38,7 @@ def test_decoder_output_shape_with_memory():
 
 def test_decoder_output_shape_without_memory():
     """Decoder should return (B, T, D) without memory (decoder-only mode)."""
-    # Input: target indices y with no memory for decoder-only mode.
+    # Input: embedded target y with no memory for decoder-only mode.
     batch = 1
     time_steps = 3
     d_model = 8
@@ -48,7 +50,7 @@ def test_decoder_output_shape_without_memory():
         max_time_steps=8,
         d_ff=16,
     )
-    y = torch.zeros(batch, time_steps, dtype=torch.long)
+    y = torch.randn(batch, time_steps, d_model)
 
     # Expected: output shape (B, T, D) without cross-attention.
     out = decoder(y=y, memory=None)
@@ -68,12 +70,12 @@ def test_decode_layer_invalid_memory_shape():
 
 
 def test_decoder_invalid_input_shape():
-    """Decoder should assert when target indices are not 2D."""
-    # Input: 3D target indices are invalid for decoder input.
+    """Decoder should assert when target input is not 3D."""
+    # Input: 2D tensor is invalid for decoder (expects embedded (B, T, D)).
     decoder = Decoder(vocabulary_size=16, num_layers=1, num_heads=2, d_model=8)
-    y = torch.zeros(1, 2, 3)
+    y = torch.zeros(1, 2)
 
-    # Expected: assertion error because y must be 2D (B, T).
+    # Expected: assertion error because y must be 3D (B, T, D).
     with pytest.raises(AssertionError):
         decoder(y=y, memory=None)
 
@@ -90,4 +92,30 @@ def test_decode_layer_norm_variance_is_one():
     mean = y.mean(dim=-1)
     var = y.var(dim=-1, correction=0)
     assert torch.allclose(mean, torch.zeros_like(mean), atol=1e-5)
+    assert torch.allclose(var, torch.ones_like(var), atol=1e-4)
+
+
+def test_decoder_output_shape_with_tiktoken_cl100k():
+    """Decoder output shape matches (B, T, D) with tiktoken cl100k_base (GPT-4) tokens."""
+    # Input: tiktoken cl100k_base (GPT-4 tokenizer) with text "hello world".
+    enc = tiktoken.get_encoding("cl100k_base")
+    tokens = enc.encode("hello world")
+    print(f"tiktoken cl100k_base tokens for 'hello world': {tokens}")
+
+    d_model = 8
+    # Expected: decoder output shape (B, T, D) with variance ~1 at LayerNorm.
+    decoder = Decoder(
+        vocabulary_size=max(tokens) + 1,
+        num_layers=1,
+        num_heads=2,
+        d_model=d_model,
+        max_time_steps=16,
+        d_ff=16,
+    )
+    # Decoder expects embedded (B, T, D) tensors
+    y = torch.randn(1, len(tokens), d_model)
+    out = decoder(y=y, memory=None)
+    assert out.shape == (1, len(tokens), d_model)
+    normed = decoder.layers[0].layer_norm_input(out)
+    var = normed.var(dim=-1, correction=0)
     assert torch.allclose(var, torch.ones_like(var), atol=1e-4)
