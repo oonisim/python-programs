@@ -3,6 +3,7 @@
 This module contains:
 - Module cloning utilities
 - Device selection utilities
+- Parameter counting utilities (accounting for weight tying)
 - File and directory utilities for checkpoint management
 """
 import copy
@@ -59,6 +60,53 @@ def verify_device_consistency(module: torch.nn.Module) -> torch.device:
         )
 
     return next(iter(devices)) if devices else torch.device("cpu")
+
+
+# ================================================================================
+# Parameter Counting Utilities
+# ================================================================================
+def count_model_parameters(model: nn.Module) -> dict:
+    """Count model parameters accounting for weight tying.
+
+    When weight tying is used (e.g., sharing embedding weights with output projection),
+    the standard parameter counting approach will count the same tensor multiple times.
+    This function correctly counts each unique parameter tensor only once.
+
+    Args:
+        model: PyTorch model (e.g., Transformer or LanguageModel).
+
+    Returns:
+        Dictionary containing:
+        - 'total_parameters': Total unique parameters (accounts for weight tying)
+        - 'tied_parameters': Number of parameters that are shared/tied
+        - 'trainable_parameters': Number of trainable unique parameters
+
+    Example:
+        >>> model = Transformer(decoder_vocabulary_size=50000, decoder_model_dimension=512)
+        >>> stats = count_model_parameters(model)
+        >>> print(f"Total parameters: {stats['total_parameters']:,}")
+        Total parameters: 65,000,000
+        >>> print(f"Tied parameters: {stats['tied_parameters']:,}")
+        Tied parameters: 25,600,000
+
+    Note:
+        Standard counting (sum(p.numel() for p in model.parameters())) will
+        double-count tied weights, giving inflated parameter counts.
+    """
+    all_params = list(model.parameters())
+    unique_params = {id(p): p for p in all_params}
+
+    total_unique = sum(p.numel() for p in unique_params.values())
+    total_with_duplicates = sum(p.numel() for p in all_params)
+
+    return {
+        'total_parameters': total_unique,
+        'tied_parameters': total_with_duplicates - total_unique,
+        'trainable_parameters': sum(
+            p.numel() for p in unique_params.values() if p.requires_grad
+        ),
+    }
+
 
 # ================================================================================
 # File and Directory Utilities

@@ -40,6 +40,9 @@ from encoder import (
 from decoder import (
     Decoder
 )
+from utility import (
+    count_model_parameters,
+)
 
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -62,6 +65,7 @@ class Transformer(nn.Module):
             decoder_pwff_dimension: int = DECODER_PWFF_DIM,
             decoder_dropout_ratio: float = DECODER_DROPOUT_RATIO,
             decoder_layers: int = DECODER_LAYERS,
+            decoder_tie_weights: bool = True,
     ):
         """
         Note that encoder_model_dimension and decoder_model_dimension should match,
@@ -95,6 +99,7 @@ class Transformer(nn.Module):
             decoder_pwff_dimension: point-wise feed forward internal dimension
             decoder_dropout_ratio: dropout ratio to use in decoder layers
             decoder_layers: number of decoder layers in the Decoder.
+            decoder_tie_weights: whether to share weights between input embedding and output projection.
         """
         super().__init__()
 
@@ -195,6 +200,9 @@ class Transformer(nn.Module):
         # --------------------------------------------------------------------------------
         self.decoder_dropout: nn.Dropout = nn.Dropout(p=decoder_dropout_ratio)
 
+        # --------------------------------------------------------------------------------
+        # Decoder layers
+        # --------------------------------------------------------------------------------
         self.decoder: nn.Module = Decoder(
             vocabulary_size=decoder_vocabulary_size,
             num_layers=decoder_layers,
@@ -207,6 +215,37 @@ class Transformer(nn.Module):
             p_drop=decoder_dropout_ratio
         )
 
+        # --------------------------------------------------------------------------------
+        # Final Layer Norm before the projection for stability.
+        # Softmax is an amplifier that makes large logits larger and
+        # small logits smaller.
+        #
+        # A large input to softmax can cause gradient spikes or numerical
+        # instability (inf/Nan) because of exp/log operations.
+        # A small input can cause tiny gradients and slow learning.
+        #
+        # By applying a final layer normalization before the projection,
+        # the distribution of per-vector is well-behaved by centering it
+        # (mean ≈ 0) and scaling it (std ≈ 1). Then Softmax sees logits that
+        # are not arbitrarily large or tiny.
+        #
+        # However, PreLN based transformers already manages the distribution
+        # of the signal well, so the final layer norm is not strictly necessary.
+        # A final LN often can give small, consistent stability gains and
+        # sometimes a small metric bump, but it’s not a make‑or‑break component.
+        # Many modern models include it as it is not costly, but some models omit it.
+        # --------------------------------------------------------------------------------
+        self.final_decoder_norm = nn.LayerNorm(
+            # LayerNorm normalizes over the last dimension of tensor
+            # when normalized_shape is an int, then normalized_shape
+            # must specify the expected size of the last dimension D.
+            normalized_shape=decoder_model_dimension,
+            dtype=data_type
+        )
+
+        # LM projection head to map decoder output to vocabulary log probabilities.
+        # Beware Projection is NOT a linear layer that outputs logits.
+        # It applies log-softmax and outputs log-probabilities.
         self.projection: nn.Module = Projection(
             d_model=decoder_model_dimension,
             # num_classes=NUM_CLASSES,
@@ -223,7 +262,16 @@ class Transformer(nn.Module):
         # nn.Embedding.weight shape: (vocab_size, d_model)
         # nn.Linear.weight shape:    (vocab_size, d_model)
         # --------------------------------------------------------------------------------
-        self.projection.projection.weight = self.output_embedding.embedding.weight
+        if decoder_tie_weights:
+            assert (
+                self.projection.projection.weight.shape ==
+                self.output_embedding.embedding.weight.shape
+            ), (
+                "Shape mismatch for weight tying: projection "
+                f"{self.projection.projection.weight.shape} "
+                f"!= embedding {self.output_embedding.embedding.weight.shape}"
+            )
+            self.projection.projection.weight = self.output_embedding.embedding.weight
 
         # --------------------------------------------------------------------------------
         # Default token IDs for autoregressive generation. They depend on your tokenizer/vocabulary.
@@ -302,6 +350,19 @@ class Transformer(nn.Module):
         self.train()
         return False
 
+    def count_parameters(self) -> dict:
+        """Count parameters accounting for weight tying.
+
+        Returns:
+            Dictionary with 'total_parameters', 'tied_parameters', and 'trainable_parameters'.
+
+        Example:
+            >>> model = Transformer(decoder_vocabulary_size=50000, decoder_model_dimension=512)
+            >>> stats = model.count_parameters()
+            >>> print(f"Total unique parameters: {stats['total_parameters']:,}")
+        """
+        return count_model_parameters(self)
+
     # DO NOT override nn.Module.__call__ as it breaks expected PyTorch behavior
     # (hooks, device handling, and normal forward invocation).
     #def __call__(
@@ -362,7 +423,7 @@ class Transformer(nn.Module):
         # --------------------------------------------------------------------------------
         # Input Embeddings multiplied by sqrt(d_model).
         # --------------------------------------------------------------------------------
-        x = self.input_embedding(indices=x)
+        x: Tensor = self.input_embedding(indices=x)
 
         # --------------------------------------------------------------------------------
         # Positional Encoding followed by dropout.
@@ -373,14 +434,14 @@ class Transformer(nn.Module):
         # https://stackoverflow.com/a/68600205/4281353
         # https://crazyoscarchang.github.io/2018/10/04/in-pytorch-not-the-same/
         # --------------------------------------------------------------------------------
-        x = self.encoder_dropout(x + self.encoder_positional_encoding(x))
+        x: Tensor = self.encoder_dropout(x + self.encoder_positional_encoding(x))
 
         memory: Tensor = self.encoder(x=x)
 
         # --------------------------------------------------------------------------------
-        # Input Embeddings multiplied by sqrt(d_model).
+        # Output/Decoder Embeddings multiplied by sqrt(d_model).
         # --------------------------------------------------------------------------------
-        y = self.output_embedding(indices=y)
+        y: Tensor = self.output_embedding(indices=y)
 
         # --------------------------------------------------------------------------------
         # Positional Encoding followed by dropout.
@@ -393,9 +454,17 @@ class Transformer(nn.Module):
         # --------------------------------------------------------------------------------
         y = self.decoder_dropout(y + self.decoder_positional_encoding(y))
 
+        # --------------------------------------------------------------------------------
+        # Decoder layers with cross attention to encoder output (memory).
+        # --------------------------------------------------------------------------------
+        y = self.decoder(y=y, memory=memory)
+
+        # --------------------------------------------------------------------------------
+        # Projection to vocabulary log probabilities.
         # Projection returns log-probabilities. Do NOT pass the Projection output to
         # CrossEntropyLoss as it expects logits and internally applies log-softmax + NLLLoss.
-        log_probabilities: Tensor = self.projection(y=self.decoder(y=y, memory=memory))
+        # --------------------------------------------------------------------------------
+        log_probabilities: Tensor = self.projection(y=self.final_decoder_norm(y))
         return log_probabilities
 
     @torch.no_grad()

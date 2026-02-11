@@ -27,3 +27,13 @@ Background references
 
 Press & Wolf (2017), “Using the Output Embedding to Improve Language Models”
 Inan, Khosravi, & Socher (2016), “Tying Word Vectors and Word Classifiers”
+
+
+Encoders Usually Don't Need Weight Tying because:
+    Encoders don't predict tokens: They output contextualized representations
+    No vocabulary prediction layer: No need to map back to token space
+    Different objective: Understanding vs. generation
+
+However, some encoder–decoder models (e.g., T5) share embeddings across encoder and decoder, which can be seen as a form of weight tying that benefits both components.
+Encoder Models with MLM (Masked Language Modeling) heads often tie the MLM head to the input embeddings, since the MLM task involves predicting masked tokens from the same vocabulary. This is common in BERT-style models, where the MLM head shares weights with the token embedding matrix to improve performance on the masked token prediction task.
+
