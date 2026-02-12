@@ -75,6 +75,9 @@ class TrainerConfig:
         snapshot_per_epoch: Save snapshot at the end of each epoch.
         keep_last_n_snapshots: Number of recent snapshots to keep (0 to keep all).
         delete_snapshots_after_training: Delete all snapshots after training completes.
+        early_stop_patience: Stop training after N epochs without improvement (0 to disable).
+        early_stop_min_delta: Minimum change to qualify as improvement.
+        early_stop_restore_best: Restore best model weights when early stopping triggers.
     """
     model_name: str = "transformer"
     base_dir: str = "."
@@ -84,6 +87,80 @@ class TrainerConfig:
     snapshot_per_epoch: bool = True
     keep_last_n_snapshots: int = 5
     delete_snapshots_after_training: bool = True
+    early_stop_patience: int = 0
+    early_stop_min_delta: float = 0.001
+    early_stop_restore_best: bool = True
+
+
+class EarlyStopping:
+    """Early stopping handler to stop training when validation loss stops improving.
+
+    Attributes:
+        patience: Number of epochs to wait for improvement.
+        min_delta: Minimum change to qualify as improvement.
+        restore_best: Whether to restore best weights when stopping.
+        counter: Current count of epochs without improvement.
+        best_loss: Best loss seen so far.
+        best_epoch: Epoch where best loss was achieved.
+        best_weights: Stored best model weights (if restore_best=True).
+        should_stop: Flag indicating if training should stop.
+    """
+
+    def __init__(self, patience: int = 5, min_delta: float = 0.001, restore_best: bool = True):
+        """Initialize early stopping.
+
+        Args:
+            patience: Number of epochs without improvement before stopping.
+            min_delta: Minimum improvement to reset patience counter.
+            restore_best: Whether to save and restore best weights.
+        """
+        self.patience = patience
+        self.min_delta = min_delta
+        self.restore_best = restore_best
+        self.counter = 0
+        self.best_loss = float('inf')
+        self.best_epoch = 0
+        self.best_weights = None
+        self.should_stop = False
+
+    def __call__(self, current_loss: float, epoch: int, model: nn.Module) -> bool:
+        """Check if training should stop based on current loss.
+
+        Args:
+            current_loss: Current validation/training loss.
+            epoch: Current epoch number.
+            model: Model to potentially save weights from.
+
+        Returns:
+            True if training should stop, False otherwise.
+        """
+        # Check if this is an improvement
+        if current_loss < self.best_loss - self.min_delta:
+            # Improvement detected
+            self.best_loss = current_loss
+            self.best_epoch = epoch
+            self.counter = 0
+
+            # Save best weights if requested
+            if self.restore_best:
+                self.best_weights = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+
+            return False
+        else:
+            # No improvement
+            self.counter += 1
+
+            if self.counter >= self.patience:
+                self.should_stop = True
+                return True
+
+            return False
+
+    def restore_best_weights(self, model: nn.Module) -> None:
+        """Restore the best weights to the model."""
+        if self.best_weights is not None:
+            model.load_state_dict(self.best_weights)
+            print(f"  Restored best weights from epoch {self.best_epoch} (loss: {self.best_loss:.4f})")
 
 
 class Trainer:
@@ -139,6 +216,15 @@ class Trainer:
 
         self.writer = SummaryWriter(log_dir=self.model_root_dir / "runs")
 
+        # Initialize early stopping if enabled
+        self.early_stopping = None
+        if self.config.early_stop_patience > 0:
+            self.early_stopping = EarlyStopping(
+                patience=self.config.early_stop_patience,
+                min_delta=self.config.early_stop_min_delta,
+                restore_best=self.config.early_stop_restore_best
+            )
+
     def _setup_directories(self) -> None:
         """Create directory structure for snapshots and models."""
         base = Path(self.config.base_dir)
@@ -176,7 +262,10 @@ class Trainer:
             Dictionary with training history and final metrics.
         """
         self.current_epoch = start_epoch
-        print(f"Training on {self.device} for {num_epochs} epochs")
+        early_stop_msg = ""
+        if self.early_stopping:
+            early_stop_msg = f" (early stopping: patience={self.config.early_stop_patience}, min_delta={self.config.early_stop_min_delta})"
+        print(f"Training on {self.device} for {num_epochs} epochs{early_stop_msg}")
 
         for epoch in range(start_epoch, num_epochs):
             self.current_epoch = epoch
@@ -186,6 +275,22 @@ class Trainer:
             self._log_epoch_summary(epoch, train_loss, val_loss)
             self._save_epoch_checkpoint(epoch, train_loss, val_loss)
             self._update_scheduler()
+
+            # Check early stopping
+            if self.early_stopping:
+                # Use validation loss if available, otherwise training loss
+                monitor_loss = val_loss if val_loss is not None else train_loss
+                should_stop = self.early_stopping(monitor_loss, epoch, self.model)
+
+                if should_stop:
+                    print(f"\nEarly stopping triggered at epoch {epoch}")
+                    print(f"  No improvement for {self.config.early_stop_patience} epochs")
+                    print(f"  Best loss: {self.early_stopping.best_loss:.4f} at epoch {self.early_stopping.best_epoch}")
+
+                    if self.config.early_stop_restore_best:
+                        self.early_stopping.restore_best_weights(self.model)
+
+                    break
 
         return self._finalize_training()
 
@@ -303,6 +408,39 @@ class Trainer:
     # ================================================================================
     # Logging Methods
     # ================================================================================
+    def _check_weights_valid(self) -> tuple[bool, list[str]]:
+        """Check if any model weights contain NaN or Inf values.
+
+        Returns:
+            Tuple of (is_valid, list_of_invalid_params)
+        """
+        invalid_params = []
+
+        for name, param in self.model.named_parameters():
+            if torch.isnan(param.data).any():
+                invalid_params.append(f"{name} contains NaN")
+            if torch.isinf(param.data).any():
+                invalid_params.append(f"{name} contains Inf")
+
+        return len(invalid_params) == 0, invalid_params
+
+    def _check_gradients_valid(self) -> tuple[bool, list[str]]:
+        """Check if any gradients contain NaN or Inf values.
+
+        Returns:
+            Tuple of (is_valid, list_of_invalid_grads)
+        """
+        invalid_grads = []
+
+        for name, param in self.model.named_parameters():
+            if param.grad is not None:
+                if torch.isnan(param.grad).any():
+                    invalid_grads.append(f"{name}.grad contains NaN")
+                if torch.isinf(param.grad).any():
+                    invalid_grads.append(f"{name}.grad contains Inf")
+
+        return len(invalid_grads) == 0, invalid_grads
+
     def _log_step_progress(
             self,
             epoch: int,
@@ -312,6 +450,25 @@ class Trainer:
     ) -> None:
         """Log training progress at step level."""
         self.writer.add_scalar("train/step_loss", loss, self.global_step)
+
+        # Periodic weight and gradient validation every 1000 steps
+        if self.global_step % 1000 == 0 and self.global_step > 0:
+            is_valid_weights, invalid_params = self._check_weights_valid()
+            is_valid_grads, invalid_grads = self._check_gradients_valid()
+
+            if not is_valid_weights:
+                print(f"  WARNING at step {self.global_step}: Invalid weights detected")
+                for msg in invalid_params:
+                    print(f"    - {msg}")
+
+            if not is_valid_grads:
+                print(f"  WARNING at step {self.global_step}: Invalid gradients detected")
+                for msg in invalid_grads:
+                    print(f"    - {msg}")
+
+            if is_valid_weights and is_valid_grads:
+                print(f"  ✓ Validation at step {self.global_step}: All weights and gradients valid")
+
         if (step + 1) % self.config.log_interval == 0 or step == 0:
             print(f"  Epoch {epoch} | Step {step + 1}/{num_batches} | Loss: {loss:.4f}")
 
@@ -336,19 +493,120 @@ class Trainer:
         })
 
         self._log_weight_stats(epoch)
+        self._log_gradient_flow(epoch)
+        self._log_weight_updates(epoch)
 
     def _log_weight_stats(self, epoch: int) -> None:
-        """Log per-layer weight histograms and variance to TensorBoard."""
+        """Log per-layer weight histograms, variance, and validity to TensorBoard."""
+        nan_param_count = 0
+        inf_param_count = 0
+
         for name, param in self.model.named_parameters():
             if param.requires_grad:
                 self.writer.add_histogram(f"weights/{name}", param.data, epoch)
                 self.writer.add_scalar(
                     f"weights_variance/{name}", param.data.var().item(), epoch
                 )
+
+                # Check for NaN/Inf in weights
+                if torch.isnan(param.data).any():
+                    nan_param_count += 1
+                if torch.isinf(param.data).any():
+                    inf_param_count += 1
+
                 if param.grad is not None:
                     self.writer.add_histogram(
                         f"gradients/{name}", param.grad.data, epoch
                     )
+
+        # Log aggregate validity statistics
+        self.writer.add_scalar("debug/nan_param_count", nan_param_count, epoch)
+        self.writer.add_scalar("debug/inf_param_count", inf_param_count, epoch)
+
+    def _log_gradient_flow(self, epoch: int) -> None:
+        """Monitor gradient flow through the network to detect vanishing/exploding gradients."""
+        grad_stats = {
+            'min_grad': float('inf'),
+            'max_grad': float('-inf'),
+            'mean_grad': 0.0,
+            'total_params': 0
+        }
+
+        for name, param in self.model.named_parameters():
+            if param.grad is not None:
+                grad_abs = param.grad.abs()
+                grad_mean = grad_abs.mean().item()
+                grad_max = grad_abs.max().item()
+                grad_min = grad_abs.min().item()
+
+                # Track extremes
+                grad_stats['min_grad'] = min(grad_stats['min_grad'], grad_min)
+                grad_stats['max_grad'] = max(grad_stats['max_grad'], grad_max)
+                grad_stats['mean_grad'] += grad_mean
+                grad_stats['total_params'] += 1
+
+                # Detect dead neurons (zero gradients)
+                zero_ratio = (grad_abs < 1e-8).float().mean().item()
+                if zero_ratio > 0.9:  # More than 90% zeros
+                    print(f"  WARNING: {name} has {zero_ratio*100:.1f}% zero gradients")
+
+                # Log per-layer gradient norms
+                grad_norm = torch.norm(param.grad).item()
+                self.writer.add_scalar(f"gradient_norms/{name}", grad_norm, epoch)
+
+        # Log aggregate statistics
+        if grad_stats['total_params'] > 0:
+            grad_stats['mean_grad'] /= grad_stats['total_params']
+
+            self.writer.add_scalar("debug/min_gradient", grad_stats['min_grad'], epoch)
+            self.writer.add_scalar("debug/max_gradient", grad_stats['max_grad'], epoch)
+            self.writer.add_scalar("debug/mean_gradient", grad_stats['mean_grad'], epoch)
+
+            # Warning for vanishing gradients
+            if grad_stats['mean_grad'] < 1e-7:
+                print(f"  WARNING: Mean gradient is very small ({grad_stats['mean_grad']:.2e}) - possible vanishing gradients")
+
+            # Warning for exploding gradients
+            if grad_stats['max_grad'] > 100:
+                print(f"  WARNING: Max gradient is very large ({grad_stats['max_grad']:.2e}) - possible exploding gradients")
+
+    def _log_weight_updates(self, epoch: int) -> None:
+        """Monitor how much weights are changing to detect frozen layers."""
+        if not hasattr(self, '_prev_weights'):
+            # Store initial weights
+            self._prev_weights = {name: param.data.clone()
+                                 for name, param in self.model.named_parameters()}
+            return
+
+        total_change = 0.0
+        no_change_count = 0
+        param_count = 0
+
+        for name, param in self.model.named_parameters():
+            if name in self._prev_weights:
+                # Calculate relative change
+                diff = (param.data - self._prev_weights[name]).abs()
+                relative_change = (diff / (self._prev_weights[name].abs() + 1e-8)).mean().item()
+
+                # Log per-layer changes
+                self.writer.add_scalar(f"weight_updates/{name}", relative_change, epoch)
+                total_change += relative_change
+                param_count += 1
+
+                # Detect frozen layers
+                if relative_change < 1e-6:
+                    no_change_count += 1
+                    print(f"  WARNING: {name} weights barely changed ({relative_change:.2e})")
+
+                # Update stored weights
+                self._prev_weights[name] = param.data.clone()
+
+        if param_count > 0:
+            avg_change = total_change / param_count
+            self.writer.add_scalar("debug/avg_weight_change", avg_change, epoch)
+
+            if no_change_count > param_count * 0.5:
+                print(f"  WARNING: {no_change_count}/{param_count} layers have minimal weight updates - check learning rate")
 
     # ================================================================================
     # Checkpoint Methods
