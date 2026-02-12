@@ -102,8 +102,9 @@ class Transformer(nn.Module):
             decoder_tie_weights: whether to share weights between input embedding and output projection.
         """
         super().__init__()
-
-        self.device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self._cached_device: Optional[torch.device] = None
+        self.encoder_max_time_steps: int = encoder_max_time_steps
+        self.decoder_max_time_steps: int = decoder_max_time_steps
 
         # ================================================================================
         # Encoder
@@ -243,17 +244,10 @@ class Transformer(nn.Module):
             dtype=data_type
         )
 
+        # --------------------------------------------------------------------------------
         # LM projection head to map decoder output to vocabulary log probabilities.
-        # Beware Projection is NOT a linear layer that outputs logits.
-        # It applies log-softmax and outputs log-probabilities.
-        self.projection: nn.Module = Projection(
-            d_model=decoder_model_dimension,
-            # num_classes=NUM_CLASSES,
-            num_classes=decoder_vocabulary_size,
-            dtype=data_type,
-            bias=True
-        )
-
+        # Beware Projection outputs log-probabilities by default with log-softmax.
+        # Do NOT pass the Projection output to CrossEntropyLoss unless return-logits=True.
         # --------------------------------------------------------------------------------
         # Weight tying: share weights between decoder input embedding and output projection.
         # > 3.4 Embeddings and Softmax:
@@ -261,7 +255,35 @@ class Transformer(nn.Module):
         # > and the pre-softmax linear transformation.
         # nn.Embedding.weight shape: (vocab_size, d_model)
         # nn.Linear.weight shape:    (vocab_size, d_model)
+        #
+        # When tying, Projection(bias=False) to assures symmetry with Embedding that has
+        # no bias by design. Keeping bias on the projection would break the symmetry that
+        # tying is meant to enforce (embedding is a pure row lookup into W, so the
+        # projection should be y @ W^T without an additive bias term).
+        #
+        # Embedding weight E ∈ R^(V × D) meaning shape:(V, D) where V is vocabulary size.
+        # Projection weight W ∈ R^(D × V). Hence, W = Eᵀ.
+
+        # Then if bias=False, Embedding space alone determines Prediction.
+        # Embedding(index) = E[index] -> token embedding vector d.
+        # Projection(bias=False)(d) = softmax(d@Eᵀ) --argmax--> index.
+        # This gives symmetry (index -> d at Embedding) and (d --> index at Projection).
+        #
+        # Projection(bias=True)(d) = softmax(d@Eᵀ + b) breaks symmetry by the bias b.
+        # Now Prediction depends on something outside embedding space.
+        # Therefore, No more "Embedding space alone determines Prediction".
+        #
+        # Mathematical elegance of weight-tying is treating the embedding and the projection
+        # as inverse operations of each other, which is symmetry.
         # --------------------------------------------------------------------------------
+        self.projection: nn.Module = Projection(
+            d_model=decoder_model_dimension,
+            # num_classes=NUM_CLASSES,
+            num_classes=decoder_vocabulary_size,
+            dtype=data_type,
+            bias=False if decoder_tie_weights else True
+        )
+
         if decoder_tie_weights:
             assert (
                 self.projection.projection.weight.shape ==
@@ -326,19 +348,41 @@ class Transformer(nn.Module):
         self.end_token: Optional[int] = None
 
     def _device(self) -> torch.device:
-        """Return the device where the model parameters or buffers live.
+        """Return the single device where all model parameters and buffers live.
+
+        The result is cached and invalidated when the model is moved via
+        .to() / .cuda() / .cpu() (all of which funnel through _apply).
+
+        Raises:
+            RuntimeError: If parameters/buffers are spread across multiple devices.
 
         Falls back to CPU if no parameters/buffers are present.
         """
-        if hasattr(self, "device") and isinstance(self.device, torch.device):
-            return self.device
-        try:
-            return next(self.parameters()).device
-        except StopIteration:
-            try:
-                return next(self.buffers()).device
-            except StopIteration:
-                return torch.device("cpu")
+        if self._cached_device is not None:
+            return self._cached_device
+
+        devices = {p.device for p in self.parameters()}
+        devices |= {b.device for b in self.buffers()}
+        if len(devices) > 1:
+            raise RuntimeError(
+                f"Model parameters/buffers are on multiple devices: {devices}. "
+                "Move the entire model to a single device with model.to(device)."
+            )
+
+        # next(devices) can be cpu, cuda:0, cuda:1, mps
+        self._cached_device = torch.device("cpu") if len(devices) == 0 else next(iter(devices))
+        return self._cached_device
+
+    def _apply(self, fn):
+        """Override to invalidate cached device when model is moved.
+        _apply(self, fn) hooks .to(), .cuda(), .cpu(), .float(), .half().
+        It recursively walks every parameter and buffer to apply fn to each.
+        This is where device/dtype changes actually happen.
+        Whereas, apply(self, fn) is used for custom weight initialization
+        (model.apply(init_weights)). It has nothing to do with device moves.
+        """
+        self._cached_device = None
+        return super()._apply(fn)
 
     def __enter__(self) -> 'Transformer':
         """Enter context manager: set model to eval mode for inference."""
@@ -420,6 +464,31 @@ class Transformer(nn.Module):
         if x.device != y.device:
             raise RuntimeError(f"x is on device {x.device} but y is on {y.device}")
 
+        model_device = self._device()
+        if x.device != model_device:
+            raise RuntimeError(
+                f"Input x is on {x.device} but model is on {model_device}. "
+                "Move your inputs explicitly with tensor.to(device)."
+            )
+        if y.device != model_device:
+            raise RuntimeError(
+                f"Input y is on {y.device} but model is on {model_device}. "
+                "Move your inputs explicitly with tensor.to(device)."
+            )
+
+        if x.shape[1] > self.encoder_max_time_steps:
+            raise ValueError(
+                f"Encoder input sequence length {x.shape[1]} exceeds "
+                f"model max_time_steps {self.encoder_max_time_steps}; "
+                "consider increasing max_time_steps or truncating inputs."
+            )
+        if y.shape[1] > self.decoder_max_time_steps:
+            raise ValueError(
+                f"Decoder input sequence length {y.shape[1]} exceeds "
+                f"model max_time_steps {self.decoder_max_time_steps}; "
+                "consider increasing max_time_steps or truncating inputs."
+            )
+
         # --------------------------------------------------------------------------------
         # Input Embeddings multiplied by sqrt(d_model).
         # --------------------------------------------------------------------------------
@@ -487,6 +556,13 @@ class Transformer(nn.Module):
         if x.device != y.device:
             raise RuntimeError(f"Source (x) is on {x.device} but Target (y) is on {y.device}")
 
+        model_device = self._device()
+        if x.device != model_device:
+            raise RuntimeError(
+                f"Input x is on {x.device} but model is on {model_device}. "
+                "Move your inputs explicitly with tensor.to(device)."
+            )
+
         log_probabilities = self.forward(x=x, y=y)
         predictions = torch.argmax(log_probabilities, dim=-1)
         return predictions
@@ -515,10 +591,16 @@ class Transformer(nn.Module):
 
         # Warn the user about device/dtype mismatches instead of moving/casting.
         if x.device != self._device():
-            logger.warning(
-                "Input tensor x device %s does not match model device %s. "
-                "Move your inputs explicitly to the desired device.",
-                x.device, self._device()
+            raise RuntimeError(
+                f"Input tensor x is on {x.device} but model on {self._device()}."
+                "Move your inputs explicitly to the desired device."
+            )
+
+        if x.shape[1] > self.encoder_max_time_steps:
+            raise ValueError(
+                f"Encoder input sequence length {x.shape[1]} exceeds "
+                f"model max_time_steps {self.encoder_max_time_steps}; "
+                "consider increasing max_time_steps or truncating inputs."
             )
 
         _B = x.shape[0]     # pylint: disable=invalid-name

@@ -1,0 +1,12 @@
+Compared with recent LLM research and engineering innovations (through July 2024).
+
+[P2] Absolute sinusoidal positional encoding limits long‑context extrapolation compared to modern relative/rotary methods. Your PositionalEncoding is fixed, absolute, and tied to a max length, which makes long‑context generalization harder than approaches like RoPE or ALiBi. See common.py (class PositionalEncoding). (arxiv.org)
+[P2] Full multi‑head attention (distinct K/V per head) is kept everywhere; modern inference‑optimized models commonly adopt MQA/GQA to reduce KV cache size and speed decoding. This code uses standard MHA only, which is expected to be slower and more memory‑heavy at inference scale. See common.py (class MultiHeadAttention). (arxiv.org)
+[P3] FFN uses ReLU rather than GLU variants (e.g., SwiGLU/GEGLU) that show quality improvements in Transformer feed‑forward blocks. Consider this a quality/performance gap vs modern baselines. See common.py (class PositionwiseFeedForward). (arxiv.org)
+[P3] Attention kernel is the standard quadratic implementation; no FlashAttention‑style kernel is used. This will be notably slower and more memory‑intensive for long sequences on GPU than FlashAttention‑2/3. See common.py (classes ScaledDotProductAttention, MultiHeadAttention). (arxiv.org)
+Positive Alignment With Research
+
+The encoder/decoder layers are implemented in a Pre‑LayerNorm style (LayerNorm before sublayers). This is consistent with findings that Pre‑LN stabilizes training and can reduce the need for warm‑up. See encoder.py and decoder.py. (arxiv.org)
+Research‑Driven Opportunities (Optional, Strategic)
+
+If long‑context throughput or scalability is a core goal, consider exploring SSM‑based alternatives (e.g., Mamba) rather than just incremental attention optimizations. This is a larger architectural shift but is a major current research direction. (arxiv.org)

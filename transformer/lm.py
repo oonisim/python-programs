@@ -86,6 +86,7 @@ class LanguageModel(nn.Module):
             dtype: Data type for weights.
         """
         super().__init__()
+        self._cached_device: Optional[torch.device] = None
         self.d_model: int = d_model
         self.max_seq_len: int = max_seq_len
         self.vocab_size: int = vocab_size
@@ -130,14 +131,6 @@ class LanguageModel(nn.Module):
             normalized_shape=d_model, dtype=dtype
         )
 
-        # Output projection to vocabulary
-        self.projection: Projection = Projection(
-            d_model=d_model,
-            num_classes=vocab_size,
-            dtype=dtype,
-            bias=True
-        )
-
         # --------------------------------------------------------------------------------
         # Weight tying: share weights between input embedding and output projection.
         # > 3.4 Embeddings and Softmax:
@@ -145,14 +138,22 @@ class LanguageModel(nn.Module):
         # > and the pre-softmax linear transformation.
         # nn.Embedding.weight shape: (vocab_size, d_model)
         # nn.Linear.weight shape:    (vocab_size, d_model)
+        #
+        # bias=False because nn.Embedding has no bias by design.
+        # Keeping bias on the projection would break the symmetry that tying
+        # is meant to enforce (embedding is a pure row lookup into W, so the
+        # projection should be y @ W^T without an additive bias term).
         # --------------------------------------------------------------------------------
+        self.projection: Projection = Projection(
+            d_model=d_model,
+            num_classes=vocab_size,
+            dtype=dtype,
+            bias=False
+        )
         self.projection.projection.weight = self.embedding.embedding.weight
 
         # Token for stopping generation
         self.end_token: Optional[int] = None
-        # Detect CUDA at initialization and move model to that device
-        # This makes the model ready to accept inputs on GPU by default.
-        self.device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def __enter__(self) -> 'LanguageModel':
         """Context manager: set model to eval mode for inference."""
@@ -181,6 +182,12 @@ class LanguageModel(nn.Module):
         if x.device != self._device():
             raise RuntimeError(
                 f"Input tensor x on device {x.device} but model on {self._device()}."
+            )
+        if x.shape[1] > self.max_seq_len:
+            raise ValueError(
+                f"Input sequence length {x.shape[1]} exceeds "
+                f"model max_seq_len {self.max_seq_len}; "
+                "consider increasing max_seq_len or truncating inputs."
             )
 
         # Embedding + positional encoding + dropout
@@ -268,6 +275,14 @@ class LanguageModel(nn.Module):
         if prompt.device != self._device():
             raise RuntimeError(
                 f"Prompt tensor is on device {prompt.device} but model on {self._device()}."
+            )
+
+        prompt_len = prompt.shape[-1]  # works for both 1-D and 2-D
+        if prompt_len > self.max_seq_len:
+            raise ValueError(
+                f"Prompt length {prompt_len} exceeds "
+                f"model max_seq_len {self.max_seq_len}; "
+                "consider increasing max_seq_len or truncating inputs."
             )
 
         # =========================================================================
@@ -653,21 +668,37 @@ class LanguageModel(nn.Module):
         return scores
 
     def _device(self) -> torch.device:
-        """Return the device where the model parameters or buffers live.
+        """Return the single device where all model parameters and buffers live.
+
+        The result is cached and invalidated when the model is moved via
+        .to() / .cuda() / .cpu() (all of which funnel through _apply).
+
+        Raises:
+            RuntimeError: If parameters/buffers are spread across multiple devices.
 
         Falls back to CPU if no parameters/buffers are present.
         """
-        # Prefer explicit self.device if set
-        if hasattr(self, "device") and isinstance(self.device, torch.device):
-            return self.device
-        # Otherwise fall back to parameters/buffers
-        try:
-            return next(self.parameters()).device
-        except StopIteration:
-            try:
-                return next(self.buffers()).device
-            except StopIteration:
-                return torch.device("cpu")
+        if self._cached_device is not None:
+            return self._cached_device
+
+        devices = {p.device for p in self.parameters()}
+        devices |= {b.device for b in self.buffers()}
+
+        if len(devices) == 0:
+            self._cached_device = torch.device("cpu")
+        elif len(devices) > 1:
+            raise RuntimeError(
+                f"Model parameters/buffers are on multiple devices: {devices}. "
+                "Move the entire model to a single device with model.to(device)."
+            )
+        else:
+            self._cached_device = next(iter(devices))
+        return self._cached_device
+
+    def _apply(self, fn):
+        """Override to invalidate cached device when model is moved."""
+        self._cached_device = None
+        return super()._apply(fn)
 
 
 if __name__ == "__main__":

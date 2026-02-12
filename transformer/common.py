@@ -119,7 +119,45 @@ def initialize_weights(
 def initialize_embedding_weights(
         module: nn.Module,
 ):
-    """Initialize embedding module weights"""
+    """Initialize embedding module weights
+    The variance of the embedding vector of d_model dimension has the variance of d_model.
+    To keep the variance of the embedding vector output to be 1.0, the standard deviation
+    of the weight needs to be 1/sqrt(d_model) = 0.044.
+    However, BERT and most modern models use a fixed small standard deviation of 0.02.
+
+    Why 0.02? (The Empirical "Sweet Spot"):
+    In the original Transformer, the variance was tied to d_model to keep the signal stable.
+    However, as models got deeper (like BERT-Large or GPT), researchers found that
+    - Vanishing/Exploding Gradients:
+    Deep Transformers are incredibly sensitive during the first few steps of training.
+    A smaller standard deviation (0.02) acts as a "cold start" mechanism, keeping the
+    initial activations very small.
+    - LayerNorm Stability:
+    Since BERT applies LayerNorm immediately after the embedding and residual sum,
+    the exact variance of the input matters less than the relative scale.
+    A smaller initial scale allows the LayerNorm to "take control" of the distribution
+    more effectively.
+    - Weight Tying Harmony:
+    When sharing weights with the output projection, 0.02 keeps the initial logits
+    (before training) very flat. This prevents the model from starting with a strong,
+    random bias toward specific tokens.
+
+    The Disconnect from d_model:
+    If we used 1/sqrt(d) for a tiny model (d=128), the std would be 0.088.
+    For a huge model (d=4096), it would be 0.015. BERT's creators found that 0.02 works
+    robustly across different sizes (Base and Large), making it a "hyperparameter" rather
+    than a "calculated parameter."
+
+    SoTA Choice: Fixed Small Standard Deviation (0.02)
+    Most modern models use a fixed range, regardless of d_model. This is because modern
+    architectures rely on LayerNorm (specifically Pre-LayerNorm) to handle the scaling.
+
+    Impact on Weight Tying:
+    Even though the variance is 0.02^2 instead of 1/d_model, the Weight Tying logic
+    still holds. By using bias=False in your projection head and tying it to an embedding
+    initialized at std=0.02, the model starts "humble" (low variance, flat probabilities).
+    The Embedding and Projection remain symmetry of each other in the vector space.
+    """
     if isinstance(module, nn.Embedding):
         torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
     else:
@@ -795,6 +833,11 @@ class InputEmbedding(nn.Module):
         Returns: Token embeddings of shape (B, T, D)
         """
         # Why multipy by sqrt(D) and increase the variance?
+        # Section 3.4 of "Attention is All You Need":
+        # "In the embedding layers, we multiply those weights by √d_model."
+        # In the original paper, √d_model scaling stabilized the first attention
+        # layer as it was Post-LayerNorm Transformers. Pre-LayerNorm normalization
+        # removed the need for this scaling.
         x = self.embedding(indices) * math.sqrt(self._D)     # x.shape=(B,T,D)
         assert torch.all(torch.isfinite(x))
         return x
@@ -858,10 +901,13 @@ class PositionalEncoding(nn.Module):
 
 
 class Projection(nn.Module):
-    """Class to project the predictions of shape (B, T, D) to class probabilities of shape (B, T).
-    Projection returns log-probabilities. Do NOT pass the Projection output to CrossEntropyLoss.
-    CrossEntropyLoss expects raw logits and internally applies log-softmax + NLLLoss.
+    """
+    Class to project the predictions of shape (B, T, D) to vocabulary probabilities of shape (B, T).
+
+    Returns log-probabilities by default. Then Do NOT pass the Projection output to CrossEntropyLoss,
+    as CrossEntropyLoss expects raw logits and internally applies log-softmax + NLLLoss.
     Use a loss function that expects log-probabilities, e.g. torch.nn.NLLLoss (negative log-likelihood).
+    Or, use return_logits=True to return raw logits and pass the output to CrossEntropyLoss.
     """
     def __init__(
             self,
@@ -888,14 +934,22 @@ class Projection(nn.Module):
 
     def forward(
             self,
-            y: Tensor
+            y: Tensor,
+            return_logits: bool = False
     ):
-        """Project the prediction embedding to probabilities of vocabularies.
+        """
+        Project the prediction embedding to probabilities or logits of vocabularies.
+
         Args:
             y: prediction of shape (B, T, D)
+            return_logits: If True, return raw logits suitable for CrossEntropyLoss.
+                           If False (default), return log-probabilities suitable for NLLLoss.
 
-        Returns: probabilities of shape (B, T, V)
+        Returns: Tensor of shape (B, T, V) — logits or log-probabilities depending on return_logits.
         """
+        logits: Tensor = self.projection(y)
+        if return_logits:
+            return logits
         # Use log_softmax for numerical stability as it prevents overflow issues
         # by avoiding direct computation of exponential.
-        return torch.log_softmax(self.projection(y), dim=-1, dtype=TYPE_FLOAT)
+        return torch.log_softmax(logits, dim=-1, dtype=TYPE_FLOAT)

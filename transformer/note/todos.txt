@@ -27,53 +27,7 @@
   Note: The paper is ambiguous about whether the output projection should also be scaled. Current implementation matches standard practice (no scaling at output).
 
   ---
-  📝 Minor Issues / Best Practices
-
-  Issue 8: Missing Bias in Embedding (Correct but Worth Noting)
-
-  nn.Embedding has no bias parameter (by design), but nn.Linear for projection has bias=True by default. With weight tying, the projection still has bias even though the embedding doesn't.
-
-  Current:
-  self.projection = Projection(..., bias=True)  # Has bias
-  self.output_embedding = InputEmbedding(...)  # No bias (Embedding never has bias)
-
-  This is correct - the tied weights share the weight matrix, but projection has an additional bias term.
-
-  ---
-  Issue 9: Encoder Input Embedding Not Tied (Correct)
-
-  Your code correctly does NOT tie the encoder input embedding:
-
-  # model.py
-  self.input_embedding  # Encoder input - NOT tied
-  self.output_embedding  # Decoder input - TIED with projection
-
-  This matches the paper's Section 3.4:
-  "we share the same weight matrix between the two embedding layers and the pre-softmax linear transformation"
-
-  The "two embedding layers" are:
-  1. Decoder input embedding
-  2. Decoder output (projection)
-
-  The encoder input embedding is separate, which is correct.
-
-  ---
   🔧 Recommendations Summary
-  ┌──────────┬─────────────────────────────────────────────────────────────────┬───────────────────────────────────────────────────┐
-  │ Priority │                              Issue                              │                        Fix                        │
-  ├──────────┼─────────────────────────────────────────────────────────────────┼───────────────────────────────────────────────────┤
-  │ High     │ Initialization waste                                            │ Don't initialize projection weights               │
-  ├──────────┼─────────────────────────────────────────────────────────────────┼───────────────────────────────────────────────────┤
-  │ High     │ Architectural inconsistency (no final LayerNorm in Transformer) │ Add final LayerNorm before projection in model.py │
-  ├──────────┼─────────────────────────────────────────────────────────────────┼───────────────────────────────────────────────────┤
-  │ Medium   │ No weight tying configuration                                   │ Add tie_weights parameter                         │
-  ├──────────┼─────────────────────────────────────────────────────────────────┼───────────────────────────────────────────────────┤
-  │ Medium   │ No shape validation                                             │ Add assertion after weight tying                  │
-  ├──────────┼─────────────────────────────────────────────────────────────────┼───────────────────────────────────────────────────┤
-  │ Low      │ Parameter counting misleading                                   │ Document or provide helper function               │
-  ├──────────┼─────────────────────────────────────────────────────────────────┼───────────────────────────────────────────────────┤
-  │ Low      │ Device placement documentation                                  │ Add comment about model.to() usage                │
-  └──────────┴─────────────────────────────────────────────────────────────────┴───────────────────────────────────────────────────┘
   ---
   ✅ Testing Recommendations
 
@@ -96,14 +50,3 @@
       # Test 3: Shape compatibility
       assert model.projection.projection.weight.shape == \
              model.output_embedding.embedding.weight.shape
-
-  ---
-  🎯 Overall Assessment
-
-  Your weight tying implementation is functionally correct and follows the Transformer paper properly. The issues found are mostly about:
-  - Efficiency (initialization waste)
-  - Flexibility (no config to disable)
-  - Consistency (architectural difference between models)
-  - Maintainability (missing validations)
-
-  The code will work correctly in production, but the recommendations above will make it more robust and maintainable.
