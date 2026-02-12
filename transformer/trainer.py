@@ -337,6 +337,8 @@ class Trainer:
         interval = self.config.snapshot_interval
         if interval > 0 and (step + 1) % interval == 0:
             self.save_snapshot(epoch, step)
+            if self.config.keep_last_n_snapshots > 0:
+                self.cleanup_old_snapshots(self.config.keep_last_n_snapshots)
 
     def _save_epoch_checkpoint(
             self,
