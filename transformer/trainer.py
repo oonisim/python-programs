@@ -335,6 +335,21 @@ class Trainer:
             "val_loss": val_loss,
         })
 
+        self._log_weight_stats(epoch)
+
+    def _log_weight_stats(self, epoch: int) -> None:
+        """Log per-layer weight histograms and variance to TensorBoard."""
+        for name, param in self.model.named_parameters():
+            if param.requires_grad:
+                self.writer.add_histogram(f"weights/{name}", param.data, epoch)
+                self.writer.add_scalar(
+                    f"weights_variance/{name}", param.data.var().item(), epoch
+                )
+                if param.grad is not None:
+                    self.writer.add_histogram(
+                        f"gradients/{name}", param.grad.data, epoch
+                    )
+
     # ================================================================================
     # Checkpoint Methods
     # ================================================================================
