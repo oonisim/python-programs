@@ -57,8 +57,10 @@ Available Datasets
     - wikitext-103: WikiText-103 (~100M tokens) - Larger Wikipedia
 """
 import argparse
+import json
 import sys
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import Optional
 
 import torch
@@ -189,12 +191,47 @@ class LanguageModelTrainingDirector:
         Returns:
             Dictionary with training results.
         """
+        if self.resume:
+            self._load_run_config()
         self._print_header()
         self._build_tokenizer()
         self._build_data_loaders()
         self._build_model()
         self._build_trainer()
+        if not self.resume:
+            self._save_run_config()
         return self._execute_training()
+
+    def _run_config_path(self) -> Path:
+        """Path to the saved run configuration file."""
+        return Path(f"lm_{self.dataset_key}") / "snapshots" / "run_config.json"
+
+    def _save_run_config(self) -> None:
+        """Save run configuration to disk for safe resume."""
+        config_path = self._run_config_path()
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config = {
+            "dataset_key": self.dataset_key,
+            "tokenizer_name": self.tokenizer_name,
+            "max_samples": self.max_samples,
+            "model_config": asdict(self.model_config),
+            "training_config": asdict(self.training_config),
+        }
+        config_path.write_text(json.dumps(config, indent=2))
+        print(f"  Run config saved: {config_path}")
+
+    def _load_run_config(self) -> None:
+        """Load saved run configuration, overriding CLI args."""
+        config_path = self._run_config_path()
+        if not config_path.exists():
+            print(f"WARNING: No saved run config at {config_path}, using CLI args.")
+            return
+        config = json.loads(config_path.read_text())
+        self.tokenizer_name = config["tokenizer_name"]
+        self.max_samples = config["max_samples"]
+        self.model_config = ModelConfig(**config["model_config"])
+        self.training_config = TrainingConfig(**config["training_config"])
+        print(f"Loaded run config from {config_path}, ignoring CLI args.")
 
     def _print_header(self) -> None:
         """Print training session header."""
