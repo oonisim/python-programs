@@ -95,12 +95,48 @@ class TrainingConfig:
     weight_decay: float = 0.1
     gradient_clip: float = 1.0
     log_interval: int = 100
+    snapshot_interval: int = 0
+    keep_last_n_snapshots: int = 3
+    delete_snapshots_after_training: bool = True
 
 
 DATASET_CONFIGS = {
     "wikitext": ("wikitext", "wikitext-2-raw-v1"),
     "wikitext-103": ("wikitext", "wikitext-103-raw-v1"),
 }
+
+TOKENIZER_CONFIGS = {
+    "gpt2": None,           # Uses HuggingFace GPT2Tokenizer
+    "gpt4": "cl100k_base",  # tiktoken encoding for GPT-4
+    "gpt4o": "o200k_base",  # tiktoken encoding for GPT-4o
+}
+
+
+# --------------------------------------------------------------------------------
+# Tiktoken Adapter
+# --------------------------------------------------------------------------------
+class TiktokenAdapter:
+    """Adapter for tiktoken to match the Tokenizer protocol in loader.py."""
+
+    def __init__(self, encoding_name: str):
+        import tiktoken
+        self._enc = tiktoken.get_encoding(encoding_name)
+        self._eot_id = self._enc.eot_token
+
+    @property
+    def vocab_size(self) -> int:
+        return self._enc.n_vocab
+
+    @property
+    def eos_token_id(self) -> int:
+        return self._eot_id
+
+    @property
+    def pad_token_id(self) -> int:
+        return self._eot_id  # Same convention as GPT-2: use EOS as PAD
+
+    def encode(self, text: str) -> list[int]:
+        return self._enc.encode(text)
 
 
 # --------------------------------------------------------------------------------
@@ -119,7 +155,8 @@ class LanguageModelTrainingDirector:
             model_config: ModelConfig,
             training_config: TrainingConfig,
             max_samples: Optional[int] = None,
-            resume: bool = False
+            resume: bool = False,
+            tokenizer_name: str = "gpt2"
     ):
         """Initialize the director.
 
@@ -129,12 +166,14 @@ class LanguageModelTrainingDirector:
             training_config: Training hyperparameters.
             max_samples: Limit training samples (for quick testing).
             resume: Whether to resume from checkpoint.
+            tokenizer_name: Tokenizer to use (key in TOKENIZER_CONFIGS).
         """
         self.dataset_key = dataset_key
         self.model_config = model_config
         self.training_config = training_config
         self.max_samples = max_samples
         self.resume = resume
+        self.tokenizer_name = tokenizer_name
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -174,12 +213,17 @@ class LanguageModelTrainingDirector:
 
     def _build_tokenizer(self) -> None:
         """Step 1: Create tokenizer."""
-        print("Building tokenizer...")
-        self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+        print(f"Building tokenizer ({self.tokenizer_name})...")
+        encoding_name = TOKENIZER_CONFIGS[self.tokenizer_name]
 
-        # GPT-2 uses EOS as PAD
-        if self.tokenizer.pad_token is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
+        if encoding_name is None:
+            # HuggingFace GPT-2 tokenizer
+            self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+            if self.tokenizer.pad_token is None:
+                self.tokenizer.pad_token = self.tokenizer.eos_token
+        else:
+            # tiktoken-based tokenizer
+            self.tokenizer = TiktokenAdapter(encoding_name)
 
         print(f"  Vocabulary size: {self.tokenizer.vocab_size}")
 
@@ -254,9 +298,10 @@ class LanguageModelTrainingDirector:
             model_name=f"lm_{self.dataset_key}",
             gradient_clip=self.training_config.gradient_clip,
             log_interval=self.training_config.log_interval,
+            snapshot_interval=self.training_config.snapshot_interval,
             snapshot_per_epoch=True,
-            keep_last_n_snapshots=3,
-            delete_snapshots_after_training=True
+            keep_last_n_snapshots=self.training_config.keep_last_n_snapshots,
+            delete_snapshots_after_training=self.training_config.delete_snapshots_after_training
         )
 
         self.trainer = LanguageModelTrainer(
@@ -405,6 +450,17 @@ def parse_args():
         )
     )
     data_group.add_argument(
+        "--tokenizer", type=str, default="gpt2",
+        choices=list(TOKENIZER_CONFIGS.keys()),
+        help=(
+            "Tokenizer to use. "
+            "'gpt2' uses GPT-2 BPE (50257 tokens). "
+            "'gpt4' uses tiktoken cl100k_base (100256 tokens). "
+            "'gpt4o' uses tiktoken o200k_base (200019 tokens). "
+            "Default: gpt2"
+        )
+    )
+    data_group.add_argument(
         "--max_samples", type=int, default=None,
         metavar="N",
         help=(
@@ -454,6 +510,39 @@ def parse_args():
             "Resume training from the latest checkpoint. Useful when training "
             "is interrupted. The script automatically finds the most recent "
             "snapshot in the model directory."
+        )
+    )
+    train_group.add_argument(
+        "--snapshot_interval", type=int, default=0,
+        metavar="N",
+        help=(
+            "Save a snapshot every N training steps. Useful for long epochs "
+            "where per-epoch snapshots are too infrequent. "
+            "0 disables step-based snapshots. Default: 0"
+        )
+    )
+    train_group.add_argument(
+        "--keep_last_n_snapshots", type=int, default=3,
+        metavar="N",
+        help=(
+            "Number of recent snapshots to keep on disk. Older snapshots are "
+            "deleted automatically. 0 keeps all snapshots. Default: 3"
+        )
+    )
+    train_group.add_argument(
+        "--delete_snapshots_after_training", action="store_true",
+        default=True,
+        help=(
+            "Delete all snapshots after training completes. The final model "
+            "is saved separately. Enabled by default."
+        )
+    )
+    train_group.add_argument(
+        "--no_delete_snapshots_after_training", action="store_false",
+        dest="delete_snapshots_after_training",
+        help=(
+            "Keep snapshots after training completes. Useful for post-hoc "
+            "analysis or resuming from intermediate checkpoints."
         )
     )
 
@@ -570,7 +659,10 @@ def main():
     training_config = TrainingConfig(
         epochs=args.epochs,
         batch_size=args.batch_size,
-        learning_rate=args.lr
+        learning_rate=args.lr,
+        snapshot_interval=args.snapshot_interval,
+        keep_last_n_snapshots=args.keep_last_n_snapshots,
+        delete_snapshots_after_training=args.delete_snapshots_after_training
     )
 
     director = LanguageModelTrainingDirector(
@@ -578,7 +670,8 @@ def main():
         model_config=model_config,
         training_config=training_config,
         max_samples=args.max_samples,
-        resume=args.resume
+        resume=args.resume,
+        tokenizer_name=args.tokenizer
     )
 
     director.run()
