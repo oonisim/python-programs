@@ -1,0 +1,7 @@
+#!/bin/bash
+ python generate_lm.py \
+      --checkpoint lm_wikitext/snapshots/snapshot_epoch_0000_step_070999_20260212_095134.pt \
+      --interactive \
+      --temperature 0.8 \
+      --top_p 0.9 \
+      --max_length 100
