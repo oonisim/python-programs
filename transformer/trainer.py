@@ -49,6 +49,7 @@ from typing import (
 import torch
 from torch import nn, Tensor
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 
 from utility import (
     ensure_directory_exists,
@@ -135,6 +136,8 @@ class Trainer:
         self.global_step: int = -1
         self.best_val_loss: float = float("inf")
         self.training_history: list = []
+
+        self.writer = SummaryWriter(log_dir=self.model_root_dir / "runs")
 
     def _setup_directories(self) -> None:
         """Create directory structure for snapshots and models."""
@@ -308,6 +311,7 @@ class Trainer:
             loss: float
     ) -> None:
         """Log training progress at step level."""
+        self.writer.add_scalar("train/step_loss", loss, self.global_step)
         if (step + 1) % self.config.log_interval == 0 or step == 0:
             print(f"  Epoch {epoch} | Step {step + 1}/{num_batches} | Loss: {loss:.4f}")
 
@@ -319,8 +323,10 @@ class Trainer:
     ) -> None:
         """Log summary at end of epoch."""
         msg = f"Epoch {epoch} | Train Loss: {train_loss:.4f}"
+        self.writer.add_scalar("train/epoch_loss", train_loss, epoch)
         if val_loss is not None:
             msg += f" | Val Loss: {val_loss:.4f}"
+            self.writer.add_scalar("val/epoch_loss", val_loss, epoch)
         print(msg)
 
         self.training_history.append({
@@ -479,6 +485,8 @@ class Trainer:
 
         if self.config.delete_snapshots_after_training:
             self._delete_all_snapshots()
+
+        self.writer.close()
 
         return {
             "model_path": model_path,
