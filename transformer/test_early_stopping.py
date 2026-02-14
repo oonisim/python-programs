@@ -1,8 +1,9 @@
-"""Test script to verify early stopping mechanism works correctly."""
+"""Test script to verify early stopping callback works correctly."""
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 from trainer import Trainer, TrainerConfig
+from trainer_early_stopping import EarlyStoppingCallback
 
 
 class DummyModel(nn.Module):
@@ -47,24 +48,29 @@ def test_early_stopping_triggers():
     train_loader = DataLoader(train_data, batch_size=16, shuffle=True)
     val_loader = DataLoader(val_data, batch_size=16)
 
-    # Configure with early stopping
+    # Configure trainer
     config = TrainerConfig(
         model_name="test_early_stop",
         base_dir="/tmp",
-        early_stop_patience=3,
-        early_stop_min_delta=0.01,
-        early_stop_restore_best=True,
         log_interval=10,
         snapshot_per_epoch=False,
         delete_snapshots_after_training=True
     )
 
-    # Create trainer
+    # Create early stopping callback
+    early_stop_callback = EarlyStoppingCallback(
+        patience=3,
+        min_delta=0.01,
+        restore_best=True
+    )
+
+    # Create trainer with callback
     trainer = Trainer(
         model=model,
         optimizer=optimizer,
         criterion=criterion,
-        config=config
+        config=config,
+        callbacks=[early_stop_callback]
     )
 
     # Monkey-patch the _train_one_step to use our dummy data format
@@ -114,7 +120,7 @@ def test_early_stopping_triggers():
     print(f"✓ Best validation loss: {trainer.best_val_loss:.4f}")
 
     assert actual_epochs < 50, "Early stopping should have triggered before 50 epochs"
-    assert trainer.early_stopping.counter >= config.early_stop_patience, "Counter should reach patience"
+    assert early_stop_callback.counter >= early_stop_callback.patience, "Counter should reach patience"
 
     print("\n✅ TEST 1 PASSED: Early stopping triggered correctly\n")
 
@@ -136,19 +142,29 @@ def test_early_stopping_restores_best_weights():
     train_loader = DataLoader(train_data, batch_size=16, shuffle=True)
     val_loader = DataLoader(val_data, batch_size=16)
 
-    # Configure with early stopping and restore best
+    # Configure trainer
     config = TrainerConfig(
         model_name="test_restore",
         base_dir="/tmp",
-        early_stop_patience=2,
-        early_stop_min_delta=0.001,
-        early_stop_restore_best=True,
         log_interval=10,
         snapshot_per_epoch=False,
         delete_snapshots_after_training=True
     )
 
-    trainer = Trainer(model=model, optimizer=optimizer, criterion=criterion, config=config)
+    # Create early stopping callback
+    early_stop_callback = EarlyStoppingCallback(
+        patience=2,
+        min_delta=0.001,
+        restore_best=True
+    )
+
+    trainer = Trainer(
+        model=model,
+        optimizer=optimizer,
+        criterion=criterion,
+        config=config,
+        callbacks=[early_stop_callback]
+    )
 
     # Patch methods like before
     def patched_train_step(batch):
@@ -182,11 +198,11 @@ def test_early_stopping_restores_best_weights():
     # Train
     result = trainer.train(train_loader=train_loader, val_loader=val_loader, num_epochs=20)
 
-    print(f"\n✓ Best epoch was: {trainer.early_stopping.best_epoch}")
+    print(f"\n✓ Best epoch was: {early_stop_callback.best_epoch}")
     print(f"✓ Stopped at epoch: {result['total_epochs']}")
-    print(f"✓ Best weights were restored: {config.early_stop_restore_best}")
+    print(f"✓ Best weights were restored: {early_stop_callback.restore_best}")
 
-    assert trainer.early_stopping.best_weights is not None, "Best weights should be saved"
+    assert early_stop_callback.best_weights is not None, "Best weights should be saved"
     print("\n✅ TEST 2 PASSED: Best weights restoration works\n")
 
 
@@ -205,17 +221,23 @@ def test_no_early_stopping_when_disabled():
     train_loader = DataLoader(train_data, batch_size=16)
     val_loader = DataLoader(val_data, batch_size=16)
 
-    # Configure WITHOUT early stopping (patience=0)
+    # Configure WITHOUT early stopping callback
     config = TrainerConfig(
         model_name="test_no_early_stop",
         base_dir="/tmp",
-        early_stop_patience=0,  # Disabled
         log_interval=10,
         snapshot_per_epoch=False,
         delete_snapshots_after_training=True
     )
 
-    trainer = Trainer(model=model, optimizer=optimizer, criterion=criterion, config=config)
+    # Create trainer without early stopping callback
+    trainer = Trainer(
+        model=model,
+        optimizer=optimizer,
+        criterion=criterion,
+        config=config,
+        callbacks=[]  # No callbacks
+    )
 
     # Patch methods
     def patched_train_step(batch):
@@ -254,7 +276,7 @@ def test_no_early_stopping_when_disabled():
     print(f"✓ Completed {actual_epochs} epochs")
 
     assert actual_epochs == num_epochs, f"Should complete all {num_epochs} epochs when early stopping is disabled"
-    assert trainer.early_stopping is None, "Early stopping should not be initialized"
+    assert len(trainer.callbacks.callbacks) == 0, "No callbacks should be registered"
 
     print("\n✅ TEST 3 PASSED: Full training without early stopping\n")
 
