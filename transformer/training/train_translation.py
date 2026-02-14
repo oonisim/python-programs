@@ -67,10 +67,10 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from transformers import GPT2Tokenizer
 
-from model import Transformer
-from loader_translation import TranslationDataLoaderFactory, DataLoaderConfig
-from trainer import Trainer, TrainerConfig
-from train_lm import TiktokenAdapter, TOKENIZER_CONFIGS
+from model.model import Transformer
+from training.loader_translation import TranslationDataLoaderFactory, DataLoaderConfig
+from training.trainer import Trainer, TrainerConfig
+from training.train_lm import TiktokenAdapter, TOKENIZER_CONFIGS
 
 
 # --------------------------------------------------------------------------------

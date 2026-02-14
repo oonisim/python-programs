@@ -19,11 +19,11 @@ from typing import TYPE_CHECKING, Dict, Any, Optional
 
 from torch import nn
 
-from trainer_callback import TrainerCallback
-from gradient_monitor import GradientGainMonitor
+from training.trainer_callback import TrainerCallback
+from training.gradient_monitor import GradientGainMonitor
 
 if TYPE_CHECKING:
-    from trainer import Trainer
+    from training.trainer import Trainer
 
 
 class GradientMonitorCallback(TrainerCallback):

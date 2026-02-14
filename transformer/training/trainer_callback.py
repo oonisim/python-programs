@@ -14,7 +14,7 @@ Usage:
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
 if TYPE_CHECKING:
-    from trainer import Trainer
+    from training.trainer import Trainer
 
 
 class TrainerCallback:

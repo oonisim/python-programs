@@ -9,7 +9,7 @@ import torch
 PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT.parent))
 
-from transformer.encoder import Encoder, EncodeLayer  # noqa: E402
+from model.encoder import Encoder, EncodeLayer  # noqa: E402
 
 transformers = pytest.importorskip("transformers")
 

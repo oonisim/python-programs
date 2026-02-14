@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import pytest
 import math
-from gradient_monitor import GradientGainMonitor
+from training.gradient_monitor import GradientGainMonitor
 
 
 class SimpleBlock(nn.Module):

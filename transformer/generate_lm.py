@@ -18,7 +18,7 @@ import torch
 from pathlib import Path
 from transformers import GPT2Tokenizer
 
-from lm import LanguageModel
+from model.lm import LanguageModel
 
 
 def load_model(checkpoint_path: str, device: str = "cuda") -> tuple[LanguageModel, dict]:

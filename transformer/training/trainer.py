@@ -51,7 +51,7 @@ from torch import nn, Tensor
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from utility import (
+from training.utility import (
     ensure_directory_exists,
     build_snapshot_filename,
     build_model_filename,
@@ -60,7 +60,7 @@ from utility import (
     delete_files_by_pattern,
     cleanup_old_files,
 )
-from trainer_callback import CallbackList
+from training.trainer_callback import CallbackList
 
 
 @dataclass

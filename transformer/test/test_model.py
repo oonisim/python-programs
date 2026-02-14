@@ -9,8 +9,8 @@ import torch
 PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT.parent))
 
-from transformer.constant import NUM_CLASSES  # noqa: E402
-from transformer.model import Transformer  # noqa: E402
+from model.constant import NUM_CLASSES  # noqa: E402
+from model.model import Transformer  # noqa: E402
 
 
 def test_transformer_forward_shape():

@@ -9,7 +9,7 @@ import torch
 PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT.parent))
 
-from transformer.common import (  # noqa: E402
+from model.common import (  # noqa: E402
     LayerNormalization,
     PositionalEncoding,
     ScaledDotProductAttention,

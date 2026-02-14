@@ -4,7 +4,7 @@ This is a minimal example showing the core steps to use a trained language model
 """
 import torch
 from transformers import GPT2Tokenizer
-from lm import LanguageModel
+from model.lm import LanguageModel
 
 
 def main():

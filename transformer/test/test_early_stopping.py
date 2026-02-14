@@ -2,8 +2,8 @@
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
-from trainer import Trainer, TrainerConfig
-from trainer_early_stopping import EarlyStoppingCallback
+from training.trainer import Trainer, TrainerConfig
+from training.trainer_early_stopping import EarlyStoppingCallback
 
 
 class DummyModel(nn.Module):

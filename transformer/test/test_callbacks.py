@@ -6,10 +6,10 @@ and specific callback implementations.
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
-from trainer import Trainer, TrainerConfig
-from trainer_callback import TrainerCallback, CallbackList
-from trainer_early_stopping import EarlyStoppingCallback
-from trainer_gradient_monitor import GradientMonitorCallback
+from training.trainer import Trainer, TrainerConfig
+from training.trainer_callback import TrainerCallback, CallbackList
+from training.trainer_early_stopping import EarlyStoppingCallback
+from training.trainer_gradient_monitor import GradientMonitorCallback
 
 
 class DummyModel(nn.Module):

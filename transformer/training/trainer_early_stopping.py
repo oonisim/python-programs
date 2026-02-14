@@ -20,10 +20,10 @@ from typing import TYPE_CHECKING, Dict, Any, Optional
 import torch
 from torch import nn
 
-from trainer_callback import TrainerCallback
+from training.trainer_callback import TrainerCallback
 
 if TYPE_CHECKING:
-    from trainer import Trainer
+    from training.trainer import Trainer
 
 
 class EarlyStoppingCallback(TrainerCallback):

@@ -9,7 +9,7 @@ import torch
 PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT.parent))
 
-from transformer.lm import LanguageModel  # noqa: E402
+from model.lm import LanguageModel  # noqa: E402
 
 
 def test_language_model_forward_shape():

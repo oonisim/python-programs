@@ -29,7 +29,7 @@ import logging
 import torch
 from torch import Tensor, nn
 
-from constant import (
+from model.constant import (
     TYPE_FLOAT,
     DIM_MODEL,
     DIM_PWFF_HIDDEN,
@@ -38,12 +38,12 @@ from constant import (
     MAX_TIME_STEPS,
     DROPOUT_RATIO,
 )
-from common import (
+from model.common import (
     InputEmbedding,
     PositionalEncoding,
     Projection,
 )
-from decoder import Decoder
+from model.decoder import Decoder
 
 
 logger: logging.Logger = logging.getLogger(__name__)

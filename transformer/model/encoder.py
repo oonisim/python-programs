@@ -6,7 +6,7 @@ from torch import (
     nn
 )
 
-from constant import (
+from model.constant import (
     TYPE_FLOAT,
     DIM_MODEL,
     DIM_PWFF_HIDDEN,
@@ -16,7 +16,7 @@ from constant import (
     DROPOUT_RATIO,
     EPSILON,
 )
-from common import (
+from model.common import (
     MultiHeadAttention,
     PositionwiseFeedForward,
 )

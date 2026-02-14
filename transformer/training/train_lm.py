@@ -69,11 +69,11 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from transformers import GPT2Tokenizer
 
-from lm import LanguageModel
-from loader import LanguageModelDataLoaderFactory, DataLoaderConfig
-from trainer import LanguageModelTrainer, TrainerConfig
-from trainer_early_stopping import EarlyStoppingCallback
-from trainer_gradient_monitor import GradientMonitorCallback
+from model.lm import LanguageModel
+from training.loader import LanguageModelDataLoaderFactory, DataLoaderConfig
+from training.trainer import LanguageModelTrainer, TrainerConfig
+from training.trainer_early_stopping import EarlyStoppingCallback
+from training.trainer_gradient_monitor import GradientMonitorCallback
 
 
 # --------------------------------------------------------------------------------

@@ -9,7 +9,7 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT.parent))
 
-from transformer.utility import (  # noqa: E402
+from training.utility import (  # noqa: E402
     build_snapshot_filename,
     cleanup_old_files,
     resolve_file_path,

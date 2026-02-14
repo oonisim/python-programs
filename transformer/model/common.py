@@ -22,7 +22,7 @@ from torch.nn.functional import (
     softmax,
 )
 
-from constant import (
+from model.constant import (
     TYPE_FLOAT,
     NUM_CLASSES,
     DIM_MODEL,

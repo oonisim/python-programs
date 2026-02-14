@@ -6,7 +6,7 @@ Run with: python example_gradient_monitor.py
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from gradient_monitor import GradientGainMonitor
+from training.gradient_monitor import GradientGainMonitor
 
 
 # =============================================================================
