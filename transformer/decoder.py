@@ -310,6 +310,41 @@ class Decoder(nn.Module):
         # --------------------------------------------------------------------------------
         # N x Decode Layers
         # --------------------------------------------------------------------------------
+        # How encoder output (memory) flows to decoder layers:
+        #
+        # 1. Encoder runs once and produces the final encoder output from the top layer.
+        #
+        # 2. Same memory goes to ALL decoder layers:
+        #    Each decoder layer receives the SAME encoder output.
+        #
+        # 3. Each decoder layer uses it for cross-attention where:
+        #    Q comes from the decoder (current layer's causal self-attention output)
+        #    K, V come from encoder memory (shared across all decoder layers)
+        #
+        # Architecture Flow:
+        #
+        # Encoder Stack:
+        #   Layer 1 → Layer 2 → ... → Layer N → [memory output]
+        #                                             ↓
+        #                                     (shared by all decoder layers)
+        #                                             ↓
+        # Decoder Stack:                              ↓
+        #   Layer 1: Self-Attn → Cross-Attn ← ────────┘
+        #               ↓              ↑
+        #   Layer 2: Self-Attn → Cross-Attn ← ────────┘
+        #               ↓              ↑
+        #   Layer N: Self-Attn → Cross-Attn ← ────────┘
+        #
+        # Why This Is Correct:
+        #
+        # According to the "Attention is All You Need" paper (Section 3.2.3):
+        # "In encoder-decoder attention layers, the queries come from the previous
+        # decoder layer, and the memory keys and values come from the output of
+        # the encoder."
+        #
+        # Note: "the output of the encoder" (singular) - meaning the final encoder
+        # output, not layer-by-layer correspondence.
+        # --------------------------------------------------------------------------------
         for _layer in self.layers:
             y = _layer(x=y, memory=memory)
 
