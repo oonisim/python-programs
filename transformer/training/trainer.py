@@ -196,6 +196,11 @@ class Trainer:
             self.callbacks.on_epoch_start(self, epoch)
 
             train_loss = self._train_one_epoch(train_loader, epoch)
+
+            # Check if max_steps was reached during the epoch
+            if self.config.max_steps is not None and self.global_step >= self.config.max_steps:
+                break
+
             val_loss = self._validate(val_loader) if val_loader else None
 
             self._log_epoch_summary(epoch, train_loss, val_loss)
