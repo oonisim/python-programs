@@ -167,7 +167,9 @@ class LanguageModelTrainingDirector:
             training_config: TrainingConfig,
             max_samples: Optional[int] = None,
             resume: bool = False,
-            tokenizer_name: str = "gpt2"
+            tokenizer_name: str = "gpt2",
+            checkpoint_file: Optional[str] = None,
+            auto_confirm: bool = False
     ):
         """Initialize the director.
 
@@ -178,6 +180,8 @@ class LanguageModelTrainingDirector:
             max_samples: Limit training samples (for quick testing).
             resume: Whether to resume from checkpoint.
             tokenizer_name: Tokenizer to use (key in TOKENIZER_CONFIGS).
+            checkpoint_file: Path to specific checkpoint file to load.
+            auto_confirm: Skip confirmation prompts for checkpoint loading.
         """
         self.dataset_key = dataset_key
         self.model_config = model_config
@@ -185,6 +189,8 @@ class LanguageModelTrainingDirector:
         self.max_samples = max_samples
         self.resume = resume
         self.tokenizer_name = tokenizer_name
+        self.checkpoint_file = checkpoint_file
+        self.auto_confirm = auto_confirm
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -393,6 +399,95 @@ class LanguageModelTrainingDirector:
             callbacks=callbacks
         )
 
+    def _find_latest_model(self) -> Optional[Path]:
+        """Find the most recent model file in models directory.
+
+        Returns:
+            Path to latest model, or None if none exist.
+        """
+        models_dir = Path(f"lm_{self.dataset_key}") / "models"
+        if not models_dir.exists():
+            return None
+
+        model_files = sorted(models_dir.glob("model_*.pt"),
+                           key=lambda p: p.stat().st_mtime,
+                           reverse=True)
+        return model_files[0] if model_files else None
+
+    def _confirm_checkpoint(self, checkpoint_path: Path, source: str) -> bool:
+        """Ask user to confirm loading a checkpoint.
+
+        Args:
+            checkpoint_path: Path to the checkpoint file.
+            source: Description of where checkpoint was found (e.g., "snapshots", "models").
+
+        Returns:
+            True if user confirms, False otherwise.
+        """
+        print(f"\nFound checkpoint in {source}: {checkpoint_path}")
+
+        # Try to load and show info
+        try:
+            ckpt = torch.load(checkpoint_path, map_location="cpu")
+            if "epoch" in ckpt:
+                print(f"  Epoch: {ckpt['epoch']}")
+            if "training_history" in ckpt:
+                epochs_trained = len(ckpt["training_history"])
+                print(f"  Epochs trained: {epochs_trained}")
+                if ckpt["training_history"]:
+                    last = ckpt["training_history"][-1]
+                    print(f"  Last train loss: {last.get('train_loss', 'N/A'):.4f}")
+                    print(f"  Last val loss: {last.get('val_loss', 'N/A'):.4f}")
+            if "best_val_loss" in ckpt:
+                print(f"  Best val loss: {ckpt['best_val_loss']:.4f}")
+        except Exception as e:
+            print(f"  (Could not read checkpoint info: {e})")
+
+        # Auto-confirm if flag is set
+        if self.auto_confirm:
+            print("Auto-confirming (--yes flag set)")
+            return True
+
+        response = input("\nLoad this checkpoint? [Y/n]: ").strip().lower()
+        return response in ["", "y", "yes"]
+
+    def _load_checkpoint_file(self, checkpoint_path: Path) -> int:
+        """Load a checkpoint file and return starting epoch.
+
+        Args:
+            checkpoint_path: Path to checkpoint file.
+
+        Returns:
+            Starting epoch number.
+        """
+        print(f"\nLoading checkpoint from: {checkpoint_path}")
+        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+
+        # Load model weights
+        self.model.load_state_dict(checkpoint["model_state_dict"])
+
+        # Determine starting epoch
+        start_epoch = 0
+        if "epoch" in checkpoint:
+            # Snapshot format: has epoch field
+            start_epoch = checkpoint["epoch"] + 1
+            print(f"Loaded snapshot from epoch {checkpoint['epoch']}")
+        elif "training_history" in checkpoint:
+            # Final model format: has training_history
+            start_epoch = len(checkpoint["training_history"])
+            print(f"Loaded model trained for {start_epoch} epochs")
+
+        # Try to restore optimizer and scheduler if available
+        if "optimizer_state_dict" in checkpoint:
+            self.trainer.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+            print("Restored optimizer state")
+
+        if "scheduler_state_dict" in checkpoint and self.trainer.scheduler is not None:
+            self.trainer.scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+            print("Restored scheduler state")
+
+        return start_epoch
+
     def _execute_training(self) -> dict:
         """Step 5: Execute training loop.
 
@@ -404,14 +499,51 @@ class LanguageModelTrainingDirector:
 
         # Handle resume
         start_epoch = 0
-        if self.resume:
-            latest = self.trainer.find_latest_snapshot()
-            if latest:
-                print(f"\nResuming from: {latest}")
-                checkpoint = self.trainer.load_snapshot(latest.name)
-                start_epoch = checkpoint["epoch"] + 1
-            else:
-                print("\nNo checkpoint found, starting fresh.")
+        if self.resume or self.checkpoint_file:
+            checkpoint_path = None
+
+            # If specific checkpoint file is provided, use it
+            if self.checkpoint_file:
+                checkpoint_path = Path(self.checkpoint_file)
+                if not checkpoint_path.exists():
+                    print(f"ERROR: Checkpoint file not found: {checkpoint_path}")
+                    print("Starting fresh training instead.")
+                else:
+                    if self._confirm_checkpoint(checkpoint_path, "specified file"):
+                        start_epoch = self._load_checkpoint_file(checkpoint_path)
+                    else:
+                        print("Checkpoint loading cancelled. Starting fresh.")
+
+            # Otherwise, search for latest checkpoint
+            elif self.resume:
+                # First, try to find snapshot
+                latest_snapshot = self.trainer.find_latest_snapshot()
+                if latest_snapshot:
+                    if self._confirm_checkpoint(latest_snapshot, "snapshots"):
+                        checkpoint = self.trainer.load_snapshot(latest_snapshot.name)
+                        start_epoch = checkpoint["epoch"] + 1
+                    else:
+                        print("Snapshot loading cancelled.")
+                        # Try models directory instead
+                        latest_model = self._find_latest_model()
+                        if latest_model:
+                            if self._confirm_checkpoint(latest_model, "models"):
+                                start_epoch = self._load_checkpoint_file(latest_model)
+                            else:
+                                print("Starting fresh training.")
+                        else:
+                            print("No models found. Starting fresh.")
+                else:
+                    # No snapshot, try models directory
+                    print("No snapshot found in snapshots directory.")
+                    latest_model = self._find_latest_model()
+                    if latest_model:
+                        if self._confirm_checkpoint(latest_model, "models"):
+                            start_epoch = self._load_checkpoint_file(latest_model)
+                        else:
+                            print("Starting fresh training.")
+                    else:
+                        print("No checkpoints found. Starting fresh.")
 
         print("\n" + "=" * 60)
         print("Training...")
@@ -590,6 +722,22 @@ def parse_args():
             "Resume training from the latest checkpoint. Useful when training "
             "is interrupted. The script automatically finds the most recent "
             "snapshot in the model directory."
+        )
+    )
+    train_group.add_argument(
+        "--checkpoint_file", type=str, default=None,
+        metavar="PATH",
+        help=(
+            "Path to a specific checkpoint file (.pt) to load and continue training. "
+            "Can be a snapshot or a final model. If not specified with --resume, "
+            "the script will search for the latest checkpoint automatically."
+        )
+    )
+    train_group.add_argument(
+        "--yes", "-y", action="store_true",
+        help=(
+            "Auto-confirm checkpoint loading without prompting. "
+            "Useful for non-interactive/background execution."
         )
     )
     train_group.add_argument(
@@ -805,7 +953,9 @@ def main():
         training_config=training_config,
         max_samples=args.max_samples,
         resume=args.resume,
-        tokenizer_name=args.tokenizer
+        tokenizer_name=args.tokenizer,
+        checkpoint_file=args.checkpoint_file,
+        auto_confirm=args.yes
     )
 
     director.run()
