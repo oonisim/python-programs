@@ -14,11 +14,14 @@ Architecture:
     - app.py: Inference/application layer
 
 Directory Structure:
-    {base_dir}/{model_name}/
+    {result_dir}/{model_name}/
     ├── snapshots/    # Training checkpoints (deleted after training)
     │   └── snapshot_epoch_0005_step_001000_20240115_143052.pt
-    └── models/       # Completed models
-        └── model_20240115_150030.pt
+    ├── models/       # Completed models
+    │   └── model_20240115_150030.pt
+    ├── runs/         # TensorBoard event files
+    │   └── events.out.tfevents...
+    └── logs/         # Training logs
 
 Usage:
     from scratch.trainer import Trainer
@@ -60,7 +63,8 @@ from training.utility import (
     delete_files_by_pattern,
     cleanup_old_files,
 )
-from training.trainer_callback import CallbackList
+from training.trainer_callback import CallbackList, TrainerCallback
+from training.weight_update_monitor import WeightUpdateMonitor
 
 
 @dataclass
@@ -72,7 +76,7 @@ class TrainerConfig:
 
     Attributes:
         model_name: Name for this training run, used as root directory.
-        base_dir: Base directory for all output files.
+        result_dir: Root directory for all output files (default: "result").
         gradient_clip: Maximum gradient norm for clipping (None to disable).
         log_interval: Log training progress every N steps.
         snapshot_interval: Save snapshot every N steps (0 to disable step snapshots).
@@ -81,7 +85,7 @@ class TrainerConfig:
         delete_snapshots_after_training: Delete all snapshots after training completes.
     """
     model_name: str = "transformer"
-    base_dir: str = "."
+    result_dir: str = "result"
     gradient_clip: Optional[float] = 1.0
     log_interval: int = 100
     snapshot_interval: int = 0
@@ -89,6 +93,23 @@ class TrainerConfig:
     keep_last_n_snapshots: int = 5
     delete_snapshots_after_training: bool = True
     max_steps: Optional[int] = None  # Stop training after N steps (None = no limit)
+
+    # Weight update monitoring (defensive, aggregate only, ~4MB memory)
+    # Monitors: 1) gradient health (after clipping), 2) actual Δw after step
+    # Uses sampled elements (sample_size per param) instead of full clones
+    enable_weight_monitor: bool = True  # Enabled by default (adds ~1-2% overhead)
+    weight_monitor_interval: int = 100   # Check every N steps (>=1, reduces overhead)
+    weight_monitor_sample_size: int = 1024  # Elements sampled per param (~4KB each)
+    monitor_topk: int = 5  # Log top-K worst params (avoids TensorBoard tag explosion)
+
+    # Gradient health thresholds (applied to ||grad||_2 after clipping)
+    vanishing_grad_threshold: float = 1e-7  # Flag if ||grad|| <= this (too small)
+    exploding_grad_threshold: float = 1e2   # Flag if ||grad|| >= this (too large)
+
+    # Frozen weight detection (decisive: measures actual Δw after optimizer.step)
+    # update_ratio = ||Δw||/(||w||+ε) where Δw = w_new - w_old
+    frozen_update_ratio_threshold: float = 1e-12  # Flag if ratio <= this
+    frozen_patience_steps: int = 3  # Require N consecutive tiny updates to flag frozen
 
 
 class Trainer:
@@ -114,7 +135,7 @@ class Trainer:
             config: Optional[TrainerConfig] = None,
             device: Optional[str] = None,
             scheduler: Optional[Any] = None,
-            callbacks: Optional[List] = None
+            callbacks: Optional[List['TrainerCallback']] = None
     ):
         """Initialize the Trainer.
 
@@ -147,12 +168,27 @@ class Trainer:
 
         self.writer = SummaryWriter(log_dir=self.model_root_dir / "runs")
 
+        # Initialize weight update monitor if enabled
+        self.weight_monitor: Optional[WeightUpdateMonitor] = None
+        if self.config.enable_weight_monitor:
+            self.weight_monitor = WeightUpdateMonitor(
+                sample_size=self.config.weight_monitor_sample_size,
+                vanishing_grad_threshold=self.config.vanishing_grad_threshold,
+                exploding_grad_threshold=self.config.exploding_grad_threshold,
+                frozen_update_ratio_threshold=self.config.frozen_update_ratio_threshold,
+                frozen_patience_steps=self.config.frozen_patience_steps,
+            )
+            print(f"Weight update monitoring enabled "
+                  f"(sample_size={self.config.weight_monitor_sample_size}, "
+                  f"interval={self.config.weight_monitor_interval} steps)")
+
     def _setup_directories(self) -> None:
-        """Create directory structure for snapshots and models."""
-        base = Path(self.config.base_dir)
+        """Create directory structure for snapshots, models, and logs."""
+        base = Path(self.config.result_dir)
         self.model_root_dir = base / self.config.model_name
         self.snapshots_dir = self.model_root_dir / "snapshots"
         self.models_dir = self.model_root_dir / "models"
+        self.logs_dir = self.model_root_dir / "logs"
 
     def _initialize_training_state(self) -> None:
         """Initialize training state tracking variables."""
@@ -287,6 +323,10 @@ class Trainer:
         self._clip_gradients()
         self.optimizer.step()
 
+        # Monitor actual weight updates AFTER step (frozen weight detection only)
+        if self.weight_monitor and (self.global_step % self.config.weight_monitor_interval == 0):
+            self._log_weight_monitor_updates(self.global_step)
+
         # Callback: on_step_end
         self.callbacks.on_step_end(self)
 
@@ -416,6 +456,47 @@ class Trainer:
         if (step + 1) % self.config.log_interval == 0 or step == 0:
             print(f"  Epoch {epoch} | Step {step + 1}/{num_batches} | Loss: {loss:.4f}")
 
+    # ========================================================================
+    # Weight Monitoring Methods (aggregate only, no per-parameter tags)
+    # ========================================================================
+
+    def _log_weight_monitor_updates(self, step: int) -> None:
+        """Log aggregate update diagnostics (decisive frozen detection)."""
+        assert self.weight_monitor is not None
+        upd_diag = self.weight_monitor.check_updates(self.model, self.optimizer)
+        stats = WeightUpdateMonitor.aggregate_update_stats(upd_diag)
+
+        if stats.get("count", 0.0) == 0.0:
+            return
+
+        self.writer.add_scalar("monitor/update_ratio_median", stats["median"], step)
+        self.writer.add_scalar("monitor/update_ratio_p95", stats["p95"], step)
+        self.writer.add_scalar("monitor/update_ratio_min", stats["min"], step)
+        self.writer.add_scalar("monitor/update_ratio_max", stats["max"], step)
+        self.writer.add_scalar("monitor/frozen_count", stats["frozen_count"], step)
+
+        # Optional: top-K per param (adds K tags)
+        for name, val in WeightUpdateMonitor.top_k_smallest_updates(
+            upd_diag, k=self.config.monitor_topk
+        ):
+            self.writer.add_scalar(f"monitor/topk_frozen/{name}", val, step)
+
+        # Console warnings for frozen weights (only if detected)
+        if stats["frozen_count"] > 0:
+            frozen_params = [
+                (name, diag.update_ratio)
+                for name, diag in upd_diag.items()
+                if diag.is_frozen
+            ]
+            frozen_params.sort(key=lambda x: x[1])
+
+            print(f"  ⚠️  Step {step}: {stats['frozen_count']:.0f} frozen params "
+                  f"(update_ratio <= {self.config.frozen_update_ratio_threshold:.0e} "
+                  f"for {self.config.frozen_patience_steps} consecutive steps)")
+
+            for name, ratio in frozen_params[:self.config.monitor_topk]:
+                print(f"      {name}: {ratio:.2e}")
+
     def _log_epoch_summary(
             self,
             epoch: int,
@@ -437,120 +518,25 @@ class Trainer:
         })
 
         self._log_weight_stats(epoch)
-        self._log_gradient_flow(epoch)
-        self._log_weight_updates(epoch)
 
     def _log_weight_stats(self, epoch: int) -> None:
-        """Log per-layer weight histograms, variance, and validity to TensorBoard."""
+        """Check for NaN/Inf in weights (aggregate only, no per-param histograms)."""
         nan_param_count = 0
         inf_param_count = 0
 
         for name, param in self.model.named_parameters():
-            if param.requires_grad:
-                self.writer.add_histogram(f"weights/{name}", param.data, epoch)
-                self.writer.add_scalar(
-                    f"weights_variance/{name}", param.data.var().item(), epoch
-                )
+            # Check for NaN/Inf in weights
+            if torch.isnan(param.data).any():
+                nan_param_count += 1
+            if torch.isinf(param.data).any():
+                inf_param_count += 1
 
-                # Check for NaN/Inf in weights
-                if torch.isnan(param.data).any():
-                    nan_param_count += 1
-                if torch.isinf(param.data).any():
-                    inf_param_count += 1
-
-                if param.grad is not None:
-                    self.writer.add_histogram(
-                        f"gradients/{name}", param.grad.data, epoch
-                    )
-
-        # Log aggregate validity statistics
+        # Log aggregate validity statistics only
         self.writer.add_scalar("debug/nan_param_count", nan_param_count, epoch)
         self.writer.add_scalar("debug/inf_param_count", inf_param_count, epoch)
 
-    def _log_gradient_flow(self, epoch: int) -> None:
-        """Monitor gradient flow through the network to detect vanishing/exploding gradients."""
-        grad_stats = {
-            'min_grad': float('inf'),
-            'max_grad': float('-inf'),
-            'mean_grad': 0.0,
-            'total_params': 0
-        }
-
-        for name, param in self.model.named_parameters():
-            if param.grad is not None:
-                grad_abs = param.grad.abs()
-                grad_mean = grad_abs.mean().item()
-                grad_max = grad_abs.max().item()
-                grad_min = grad_abs.min().item()
-
-                # Track extremes
-                grad_stats['min_grad'] = min(grad_stats['min_grad'], grad_min)
-                grad_stats['max_grad'] = max(grad_stats['max_grad'], grad_max)
-                grad_stats['mean_grad'] += grad_mean
-                grad_stats['total_params'] += 1
-
-                # Detect dead neurons (zero gradients)
-                zero_ratio = (grad_abs < 1e-8).float().mean().item()
-                if zero_ratio > 0.9:  # More than 90% zeros
-                    print(f"  WARNING: {name} has {zero_ratio*100:.1f}% zero gradients")
-
-                # Log per-layer gradient norms
-                grad_norm = torch.norm(param.grad).item()
-                self.writer.add_scalar(f"gradient_norms/{name}", grad_norm, epoch)
-
-        # Log aggregate statistics
-        if grad_stats['total_params'] > 0:
-            grad_stats['mean_grad'] /= grad_stats['total_params']
-
-            self.writer.add_scalar("debug/min_gradient", grad_stats['min_grad'], epoch)
-            self.writer.add_scalar("debug/max_gradient", grad_stats['max_grad'], epoch)
-            self.writer.add_scalar("debug/mean_gradient", grad_stats['mean_grad'], epoch)
-
-            # Warning for vanishing gradients
-            if grad_stats['mean_grad'] < 1e-7:
-                print(f"  WARNING: Mean gradient is very small ({grad_stats['mean_grad']:.2e}) - possible vanishing gradients")
-
-            # Warning for exploding gradients
-            if grad_stats['max_grad'] > 100:
-                print(f"  WARNING: Max gradient is very large ({grad_stats['max_grad']:.2e}) - possible exploding gradients")
-
-    def _log_weight_updates(self, epoch: int) -> None:
-        """Monitor how much weights are changing to detect frozen layers."""
-        if not hasattr(self, '_prev_weights'):
-            # Store initial weights
-            self._prev_weights = {name: param.data.clone()
-                                 for name, param in self.model.named_parameters()}
-            return
-
-        total_change = 0.0
-        no_change_count = 0
-        param_count = 0
-
-        for name, param in self.model.named_parameters():
-            if name in self._prev_weights:
-                # Calculate relative change
-                diff = (param.data - self._prev_weights[name]).abs()
-                relative_change = (diff / (self._prev_weights[name].abs() + 1e-8)).mean().item()
-
-                # Log per-layer changes
-                self.writer.add_scalar(f"weight_updates/{name}", relative_change, epoch)
-                total_change += relative_change
-                param_count += 1
-
-                # Detect frozen layers
-                if relative_change < 1e-6:
-                    no_change_count += 1
-                    print(f"  WARNING: {name} weights barely changed ({relative_change:.2e})")
-
-                # Update stored weights
-                self._prev_weights[name] = param.data.clone()
-
-        if param_count > 0:
-            avg_change = total_change / param_count
-            self.writer.add_scalar("debug/avg_weight_change", avg_change, epoch)
-
-            if no_change_count > param_count * 0.5:
-                print(f"  WARNING: {no_change_count}/{param_count} layers have minimal weight updates - check learning rate")
+        if nan_param_count > 0 or inf_param_count > 0:
+            print(f"  🔴 Epoch {epoch}: {nan_param_count} params with NaN, {inf_param_count} with Inf")
 
     # ================================================================================
     # Checkpoint Methods
@@ -841,6 +827,10 @@ class LanguageModelTrainer(Trainer):
 
         self._clip_gradients()
         self.optimizer.step()
+
+        # Monitor actual weight updates AFTER step (frozen weight detection only)
+        if self.weight_monitor and (self.global_step % self.config.weight_monitor_interval == 0):
+            self._log_weight_monitor_updates(self.global_step)
 
         # Callback: on_step_end
         self.callbacks.on_step_end(self)

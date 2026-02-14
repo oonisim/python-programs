@@ -109,6 +109,18 @@ class TrainingConfig:
     early_stop_patience: int = 5
     early_stop_min_delta: float = 0.001
     early_stop_restore_best: bool = True
+    early_stop_overfit_patience: int = 0  # Stop if val-train gap grows for N epochs (0 = disabled)
+    early_stop_overfit_min_delta: float = 0.01  # Minimum gap increase to count
+
+    # Weight update monitoring (frozen weight detection)
+    enable_weight_monitor: bool = True  # Enabled by default (adds ~1-2% overhead)
+    weight_monitor_interval: int = 100
+    weight_monitor_sample_size: int = 1024
+    monitor_topk: int = 5
+    vanishing_grad_threshold: float = 1e-7
+    exploding_grad_threshold: float = 1e2
+    frozen_update_ratio_threshold: float = 1e-12
+    frozen_patience_steps: int = 3
 
 
 DATASET_CONFIGS = {
@@ -339,10 +351,14 @@ class LanguageModelTrainingDirector:
             early_stop = EarlyStoppingCallback(
                 patience=self.training_config.early_stop_patience,
                 min_delta=self.training_config.early_stop_min_delta,
-                restore_best=self.training_config.early_stop_restore_best
+                restore_best=self.training_config.early_stop_restore_best,
+                overfit_patience=self.training_config.early_stop_overfit_patience,
+                overfit_min_delta=self.training_config.early_stop_overfit_min_delta
             )
             callbacks.append(early_stop)
-            print(f"  Early stopping enabled (patience={self.training_config.early_stop_patience})")
+            overfit_msg = f", overfit_patience={self.training_config.early_stop_overfit_patience}" \
+                if self.training_config.early_stop_overfit_patience > 0 else ""
+            print(f"  Early stopping enabled (patience={self.training_config.early_stop_patience}{overfit_msg})")
 
         # Gradient monitor callback
         if self.training_config.enable_gradient_monitor:
@@ -383,7 +399,15 @@ class LanguageModelTrainingDirector:
             snapshot_interval=self.training_config.snapshot_interval,
             snapshot_per_epoch=True,
             keep_last_n_snapshots=self.training_config.keep_last_n_snapshots,
-            delete_snapshots_after_training=self.training_config.delete_snapshots_after_training
+            delete_snapshots_after_training=self.training_config.delete_snapshots_after_training,
+            enable_weight_monitor=self.training_config.enable_weight_monitor,
+            weight_monitor_interval=self.training_config.weight_monitor_interval,
+            weight_monitor_sample_size=self.training_config.weight_monitor_sample_size,
+            monitor_topk=self.training_config.monitor_topk,
+            vanishing_grad_threshold=self.training_config.vanishing_grad_threshold,
+            exploding_grad_threshold=self.training_config.exploding_grad_threshold,
+            frozen_update_ratio_threshold=self.training_config.frozen_update_ratio_threshold,
+            frozen_patience_steps=self.training_config.frozen_patience_steps,
         )
 
         # Build callbacks
@@ -821,6 +845,48 @@ def parse_args():
             "By default, best weights are restored."
         )
     )
+    train_group.add_argument(
+        "--early_stop_overfit_patience", type=int, default=0,
+        metavar="N",
+        help=(
+            "Stop training if val_loss - train_loss keeps growing for N consecutive epochs. "
+            "This detects overfitting. Set to 0 to disable (default). "
+            "Requires --early_stopping and validation data."
+        )
+    )
+    train_group.add_argument(
+        "--early_stop_overfit_min_delta", type=float, default=0.01,
+        metavar="DELTA",
+        help=(
+            "Minimum increase in val-train gap to count as overfitting trend. "
+            "Requires --early_stop_overfit_patience > 0. Default: 0.01"
+        )
+    )
+    train_group.add_argument(
+        "--weight_monitor", action="store_true",
+        help=(
+            "Enable weight update monitoring to detect frozen weights. "
+            "Uses a few MB of GPU memory (sample_size × num_params). "
+            "Monitors actual Δw after optimizer.step() (works correctly "
+            "with AdamW, weight decay, and gradient clipping)."
+        )
+    )
+    train_group.add_argument(
+        "--weight_monitor_interval", type=int, default=100,
+        metavar="N",
+        help=(
+            "Monitor weight updates every N steps (must be >= 1). "
+            "Default: 100"
+        )
+    )
+    train_group.add_argument(
+        "--weight_monitor_sample_size", type=int, default=1024,
+        metavar="SIZE",
+        help=(
+            "Number of sampled elements per parameter for update monitoring. "
+            "Default: 1024"
+        )
+    )
 
     # --------------------------------------------------------------------------------
     # Model Architecture Arguments
@@ -944,7 +1010,12 @@ def main():
         enable_early_stopping=args.early_stopping,
         early_stop_patience=args.early_stop_patience,
         early_stop_min_delta=args.early_stop_min_delta,
-        early_stop_restore_best=args.early_stop_restore_best
+        early_stop_restore_best=args.early_stop_restore_best,
+        early_stop_overfit_patience=args.early_stop_overfit_patience,
+        early_stop_overfit_min_delta=args.early_stop_overfit_min_delta,
+        enable_weight_monitor=args.weight_monitor,
+        weight_monitor_interval=args.weight_monitor_interval,
+        weight_monitor_sample_size=args.weight_monitor_sample_size,
     )
 
     director = LanguageModelTrainingDirector(

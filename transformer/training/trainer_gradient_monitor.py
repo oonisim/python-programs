@@ -88,7 +88,8 @@ class GradientMonitorCallback(TrainerCallback):
             return
 
         # Use the first available block group
-        # TODO: Support monitoring multiple block groups
+        # Note: Currently monitors only the first block group found.
+        # Future enhancement: Support monitoring multiple block groups simultaneously.
         self.block_name, blocks = next(iter(self.monitorable_blocks.items()))
 
         # Initialize monitor
