@@ -1,0 +1,87 @@
+Overfitting in language‑model (LM) training happens when the model gets better at predicting the **training text** but does not generalize to **new text** (validation/test). Concretely:
+
+- **Train loss keeps going down**
+- **Validation loss stops improving and starts going up** (or plateaus while train keeps dropping)
+
+## Why it happens (mechanism)
+An LM is trained to maximize likelihood of the next token:
+\[
+\min_\theta \; \mathbb{E}_{(x)}[-\log p_\theta(x_t \mid x_{<t})]
+\]
+If the model has enough capacity relative to the dataset, it can start learning:
+- rare quirks of the training corpus,
+- exact phrases and local sequences,
+- document-specific statistics,
+
+instead of learning broadly useful language patterns.
+
+This is especially easy because next-token prediction rewards memorizing frequent n-grams and even whole passages.
+
+## When it’s likely (practical conditions)
+1) **Too many training steps for the dataset size**
+If you do many epochs over a small corpus, the model sees the same sequences repeatedly and can memorize them.
+
+2) **Model too large for the data**
+More parameters → more capacity to store training text.
+
+3) **Low noise / weak regularization**
+- low dropout
+- low/no weight decay
+- no data augmentation (for LM, augmentation is limited)
+
+4) **Data leakage / duplication**
+If your training set contains duplicated lines/docs, memorization accelerates.
+
+## How it shows up in LMs (symptoms)
+- **Val perplexity rises** while train perplexity keeps dropping.
+- Generated text may:
+  - regurgitate near-exact training passages (especially with long prompts),
+  - produce memorized proper nouns, numbers, and templates,
+  - be fluent but “training-corpus-specific.”
+
+## How to detect it (what to monitor)
+- Track both:
+  - `train_loss` (or train ppl)
+  - `val_loss` (or val ppl)
+- Overfitting signal: the **generalization gap** grows:
+\[
+\text{gap} = \text{val\_loss} - \text{train\_loss}
+\]
+
+## How to reduce overfitting (most effective levers)
+- **More data** (best fix)
+- **Early stopping** on validation loss
+- **Increase regularization**
+  - dropout (common: 0.1–0.2)
+  - weight decay (AdamW: 0.05–0.1 typical)
+- **Reduce model size** if data is small
+- **Reduce number of epochs** / training steps
+
+If you tell me your dataset size (tokens), model params, and your observed train/val losses across epochs, I can tell you whether you’re overfitting and what knob to turn first.
+
+
+
+
+or a d=256, L=4 decoder-only LM (~16M params in your log), the better fit depends on your goal:
+
+If you want a quick, small-scale sanity check (fast iteration)
+WikiText-2 is the right choice.
+
+Pros: trains quickly, easy to debug data pipeline/masking/token shift/generation.
+Cons: very small (~2–3M tokens) → a 16M-param model can overfit and generalization will be limited. Generated text quality will plateau quickly.
+Use WikiText-2 when: you’re validating that training works and loss decreases, not aiming for strong generation.
+
+If you want meaningful LM quality for that model size
+WikiText-103 is the better choice.
+
+Pros: ~100M tokens → enough data for a 16M-param model to learn real language patterns and generalize.
+Cons: slower training, more compute.
+Use WikiText-103 when: you want the model to actually become a decent LM and not just memorize.
+
+Rule of thumb
+Your model: ~16M params
+WikiText-2: ~2.4M tokens (from your log) → tokens << params (high overfitting risk)
+WikiText-103: ~100M tokens → tokens >> params (much healthier)
+Recommendation
+Debug on WikiText-2 for a few epochs.
+For “real” training, switch to WikiText-103 (or a larger corpus) and use early stopping on validation loss.
