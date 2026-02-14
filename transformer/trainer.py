@@ -60,11 +60,15 @@ from utility import (
     delete_files_by_pattern,
     cleanup_old_files,
 )
+from trainer_callback import CallbackList
 
 
 @dataclass
 class TrainerConfig:
     """Configuration for Trainer.
+
+    Note: Early stopping and gradient monitoring are now handled by callbacks.
+    See trainer_early_stopping.py and trainer_gradient_monitor.py.
 
     Attributes:
         model_name: Name for this training run, used as root directory.
@@ -75,9 +79,6 @@ class TrainerConfig:
         snapshot_per_epoch: Save snapshot at the end of each epoch.
         keep_last_n_snapshots: Number of recent snapshots to keep (0 to keep all).
         delete_snapshots_after_training: Delete all snapshots after training completes.
-        early_stop_patience: Stop training after N epochs without improvement (0 to disable).
-        early_stop_min_delta: Minimum change to qualify as improvement.
-        early_stop_restore_best: Restore best model weights when early stopping triggers.
     """
     model_name: str = "transformer"
     base_dir: str = "."
@@ -87,80 +88,6 @@ class TrainerConfig:
     snapshot_per_epoch: bool = True
     keep_last_n_snapshots: int = 5
     delete_snapshots_after_training: bool = True
-    early_stop_patience: int = 0
-    early_stop_min_delta: float = 0.001
-    early_stop_restore_best: bool = True
-
-
-class EarlyStopping:
-    """Early stopping handler to stop training when validation loss stops improving.
-
-    Attributes:
-        patience: Number of epochs to wait for improvement.
-        min_delta: Minimum change to qualify as improvement.
-        restore_best: Whether to restore best weights when stopping.
-        counter: Current count of epochs without improvement.
-        best_loss: Best loss seen so far.
-        best_epoch: Epoch where best loss was achieved.
-        best_weights: Stored best model weights (if restore_best=True).
-        should_stop: Flag indicating if training should stop.
-    """
-
-    def __init__(self, patience: int = 5, min_delta: float = 0.001, restore_best: bool = True):
-        """Initialize early stopping.
-
-        Args:
-            patience: Number of epochs without improvement before stopping.
-            min_delta: Minimum improvement to reset patience counter.
-            restore_best: Whether to save and restore best weights.
-        """
-        self.patience = patience
-        self.min_delta = min_delta
-        self.restore_best = restore_best
-        self.counter = 0
-        self.best_loss = float('inf')
-        self.best_epoch = 0
-        self.best_weights = None
-        self.should_stop = False
-
-    def __call__(self, current_loss: float, epoch: int, model: nn.Module) -> bool:
-        """Check if training should stop based on current loss.
-
-        Args:
-            current_loss: Current validation/training loss.
-            epoch: Current epoch number.
-            model: Model to potentially save weights from.
-
-        Returns:
-            True if training should stop, False otherwise.
-        """
-        # Check if this is an improvement
-        if current_loss < self.best_loss - self.min_delta:
-            # Improvement detected
-            self.best_loss = current_loss
-            self.best_epoch = epoch
-            self.counter = 0
-
-            # Save best weights if requested
-            if self.restore_best:
-                self.best_weights = {k: v.cpu().clone() for k, v in model.state_dict().items()}
-
-            return False
-        else:
-            # No improvement
-            self.counter += 1
-
-            if self.counter >= self.patience:
-                self.should_stop = True
-                return True
-
-            return False
-
-    def restore_best_weights(self, model: nn.Module) -> None:
-        """Restore the best weights to the model."""
-        if self.best_weights is not None:
-            model.load_state_dict(self.best_weights)
-            print(f"  Restored best weights from epoch {self.best_epoch} (loss: {self.best_loss:.4f})")
 
 
 class Trainer:
@@ -185,7 +112,8 @@ class Trainer:
             criterion: nn.Module,
             config: Optional[TrainerConfig] = None,
             device: Optional[str] = None,
-            scheduler: Optional[Any] = None
+            scheduler: Optional[Any] = None,
+            callbacks: Optional[List] = None
     ):
         """Initialize the Trainer.
 
@@ -196,6 +124,7 @@ class Trainer:
             config: Training configuration (uses defaults if None).
             device: Device string like "cuda" or "cpu" (auto-detect if None).
             scheduler: Optional learning rate scheduler.
+            callbacks: List of TrainerCallback instances for extensibility.
         """
         self.model = model
         self.optimizer = optimizer
@@ -203,6 +132,7 @@ class Trainer:
         self.scheduler = scheduler
         self.config = config or TrainerConfig()
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
+        self.callbacks = CallbackList(callbacks or [])
 
         self._setup_directories()
         self._initialize_training_state()
@@ -215,15 +145,6 @@ class Trainer:
         self.training_history: list = []
 
         self.writer = SummaryWriter(log_dir=self.model_root_dir / "runs")
-
-        # Initialize early stopping if enabled
-        self.early_stopping = None
-        if self.config.early_stop_patience > 0:
-            self.early_stopping = EarlyStopping(
-                patience=self.config.early_stop_patience,
-                min_delta=self.config.early_stop_min_delta,
-                restore_best=self.config.early_stop_restore_best
-            )
 
     def _setup_directories(self) -> None:
         """Create directory structure for snapshots and models."""
@@ -262,13 +183,17 @@ class Trainer:
             Dictionary with training history and final metrics.
         """
         self.current_epoch = start_epoch
-        early_stop_msg = ""
-        if self.early_stopping:
-            early_stop_msg = f" (early stopping: patience={self.config.early_stop_patience}, min_delta={self.config.early_stop_min_delta})"
-        print(f"Training on {self.device} for {num_epochs} epochs{early_stop_msg}")
+        print(f"Training on {self.device} for {num_epochs} epochs")
+
+        # Callback: on_train_start
+        self.callbacks.on_train_start(self)
 
         for epoch in range(start_epoch, num_epochs):
             self.current_epoch = epoch
+
+            # Callback: on_epoch_start
+            self.callbacks.on_epoch_start(self, epoch)
+
             train_loss = self._train_one_epoch(train_loader, epoch)
             val_loss = self._validate(val_loader) if val_loader else None
 
@@ -276,21 +201,12 @@ class Trainer:
             self._save_epoch_checkpoint(epoch, train_loss, val_loss)
             self._update_scheduler()
 
-            # Check early stopping
-            if self.early_stopping:
-                # Use validation loss if available, otherwise training loss
-                monitor_loss = val_loss if val_loss is not None else train_loss
-                should_stop = self.early_stopping(monitor_loss, epoch, self.model)
+            # Callback: on_epoch_end
+            self.callbacks.on_epoch_end(self, epoch, train_loss, val_loss)
 
-                if should_stop:
-                    print(f"\nEarly stopping triggered at epoch {epoch}")
-                    print(f"  No improvement for {self.config.early_stop_patience} epochs")
-                    print(f"  Best loss: {self.early_stopping.best_loss:.4f} at epoch {self.early_stopping.best_epoch}")
-
-                    if self.config.early_stop_restore_best:
-                        self.early_stopping.restore_best_weights(self.model)
-
-                    break
+            # Callback: should_stop_training
+            if self.callbacks.should_stop_training(self):
+                break
 
         return self._finalize_training()
 
@@ -309,6 +225,9 @@ class Trainer:
         num_batches = len(train_loader)
 
         for step, batch in enumerate(train_loader):
+            # Callback: on_batch_start
+            self.callbacks.on_batch_start(self, step)
+
             loss = self._train_one_step(batch)
             total_loss += loss
             self.current_step = step
@@ -316,6 +235,9 @@ class Trainer:
 
             self._log_step_progress(epoch, step, num_batches, loss)
             self._save_step_checkpoint(epoch, step)
+
+            # Callback: on_batch_end
+            self.callbacks.on_batch_end(self, step, loss)
 
         return total_loss / num_batches
 
@@ -342,9 +264,20 @@ class Trainer:
         log_probabilities = self.model.forward(x=source_ids, y=decoder_input)
 
         loss = self._compute_loss(log_probabilities, decoder_target)
+
+        # Callback: on_forward_end
+        self.callbacks.on_forward_end(self, loss)
+
         loss.backward()
+
+        # Callback: on_backward_end (gradients computed, not yet clipped)
+        self.callbacks.on_backward_end(self)
+
         self._clip_gradients()
         self.optimizer.step()
+
+        # Callback: on_step_end
+        self.callbacks.on_step_end(self)
 
         return loss.item()
 
@@ -660,6 +593,15 @@ class Trainer:
         """
         ensure_directory_exists(self.snapshots_dir)
 
+        # Callback: collect extra state from callbacks
+        callback_state = self.callbacks.on_snapshot_save(self, epoch, step)
+
+        # Merge callback state with extra_state
+        if extra_state is None:
+            extra_state = {}
+        if callback_state:
+            extra_state['callback_state'] = callback_state
+
         checkpoint = self._build_checkpoint_dict(epoch, step, loss, extra_state)
         filename = build_snapshot_filename(epoch, step)
         filepath = self.snapshots_dir / filename
@@ -711,6 +653,10 @@ class Trainer:
         checkpoint = torch.load(filepath, map_location=map_location)
 
         self._restore_from_checkpoint(checkpoint)
+
+        # Callback: restore callback state
+        self.callbacks.on_snapshot_load(self, checkpoint)
+
         print(f"Snapshot loaded: {filepath} (epoch {self.current_epoch})")
         return checkpoint
 
@@ -761,12 +707,17 @@ class Trainer:
 
         self.writer.close()
 
-        return {
+        result = {
             "model_path": model_path,
             "best_val_loss": self.best_val_loss,
             "training_history": self.training_history,
             "total_epochs": self.current_epoch + 1,
         }
+
+        # Callback: on_train_end
+        self.callbacks.on_train_end(self, result)
+
+        return result
 
     def save_model(self, filename: Optional[str] = None) -> Path:
         """Save completed model for inference.
@@ -868,9 +819,20 @@ class LanguageModelTrainer(Trainer):
         log_probabilities = self.model.forward(input_ids)
 
         loss = self._compute_loss(log_probabilities, target_ids)
+
+        # Callback: on_forward_end
+        self.callbacks.on_forward_end(self, loss)
+
         loss.backward()
+
+        # Callback: on_backward_end (gradients computed, not yet clipped)
+        self.callbacks.on_backward_end(self)
+
         self._clip_gradients()
         self.optimizer.step()
+
+        # Callback: on_step_end
+        self.callbacks.on_step_end(self)
 
         return loss.item()
 

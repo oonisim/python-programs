@@ -72,6 +72,8 @@ from transformers import GPT2Tokenizer
 from lm import LanguageModel
 from loader import LanguageModelDataLoaderFactory, DataLoaderConfig
 from trainer import LanguageModelTrainer, TrainerConfig
+from trainer_early_stopping import EarlyStoppingCallback
+from trainer_gradient_monitor import GradientMonitorCallback
 
 
 # --------------------------------------------------------------------------------
@@ -100,6 +102,13 @@ class TrainingConfig:
     snapshot_interval: int = 0
     keep_last_n_snapshots: int = 3
     delete_snapshots_after_training: bool = True
+    # Callback options
+    enable_gradient_monitor: bool = False
+    gradient_monitor_interval: int = 0  # Monitor every N steps (0 = at snapshots only)
+    enable_early_stopping: bool = False
+    early_stop_patience: int = 5
+    early_stop_min_delta: float = 0.001
+    early_stop_restore_best: bool = True
 
 
 DATASET_CONFIGS = {
@@ -311,6 +320,36 @@ class LanguageModelTrainingDirector:
         num_params = sum(p.numel() for p in self.model.parameters())
         print(f"  Parameters: {num_params:,}")
 
+    def _build_callbacks(self) -> list:
+        """Build training callbacks based on config.
+
+        Returns:
+            List of callback instances.
+        """
+        callbacks = []
+
+        # Early stopping callback
+        if self.training_config.enable_early_stopping:
+            early_stop = EarlyStoppingCallback(
+                patience=self.training_config.early_stop_patience,
+                min_delta=self.training_config.early_stop_min_delta,
+                restore_best=self.training_config.early_stop_restore_best
+            )
+            callbacks.append(early_stop)
+            print(f"  Early stopping enabled (patience={self.training_config.early_stop_patience})")
+
+        # Gradient monitor callback
+        if self.training_config.enable_gradient_monitor:
+            gradient_monitor = GradientMonitorCallback(
+                monitor_at_snapshots=self.training_config.snapshot_interval > 0,
+                monitor_interval=self.training_config.gradient_monitor_interval,
+                monitor_at_epochs=False
+            )
+            callbacks.append(gradient_monitor)
+            print(f"  Gradient monitoring enabled")
+
+        return callbacks
+
     def _build_trainer(self) -> None:
         """Step 4: Create trainer with optimizer and scheduler."""
         print("\nBuilding trainer...")
@@ -341,13 +380,17 @@ class LanguageModelTrainingDirector:
             delete_snapshots_after_training=self.training_config.delete_snapshots_after_training
         )
 
+        # Build callbacks
+        callbacks = self._build_callbacks()
+
         self.trainer = LanguageModelTrainer(
             model=self.model,
             optimizer=optimizer,
             criterion=criterion,
             config=trainer_config,
             device=self.device,
-            scheduler=scheduler
+            scheduler=scheduler,
+            callbacks=callbacks
         )
 
     def _execute_training(self) -> dict:
@@ -582,6 +625,54 @@ def parse_args():
             "analysis or resuming from intermediate checkpoints."
         )
     )
+    train_group.add_argument(
+        "--gradient_monitor", action="store_true",
+        help=(
+            "Enable gradient flow monitoring to detect vanishing/exploding "
+            "gradients. Monitors at snapshot intervals by default. "
+            "Use --gradient_monitor_interval for custom frequency."
+        )
+    )
+    train_group.add_argument(
+        "--gradient_monitor_interval", type=int, default=0,
+        metavar="N",
+        help=(
+            "Monitor gradient flow every N steps (in addition to snapshots). "
+            "0 monitors only at snapshot intervals. Requires --gradient_monitor. "
+            "Default: 0"
+        )
+    )
+    train_group.add_argument(
+        "--early_stopping", action="store_true",
+        help=(
+            "Enable early stopping to halt training when validation loss stops "
+            "improving. Use --early_stop_patience to control patience."
+        )
+    )
+    train_group.add_argument(
+        "--early_stop_patience", type=int, default=5,
+        metavar="N",
+        help=(
+            "Number of epochs without improvement before early stopping triggers. "
+            "Requires --early_stopping. Default: 5"
+        )
+    )
+    train_group.add_argument(
+        "--early_stop_min_delta", type=float, default=0.001,
+        metavar="DELTA",
+        help=(
+            "Minimum change in loss to qualify as improvement for early stopping. "
+            "Requires --early_stopping. Default: 0.001"
+        )
+    )
+    train_group.add_argument(
+        "--no_early_stop_restore_best", action="store_false",
+        dest="early_stop_restore_best",
+        help=(
+            "Do not restore best weights when early stopping triggers. "
+            "By default, best weights are restored."
+        )
+    )
 
     # --------------------------------------------------------------------------------
     # Model Architecture Arguments
@@ -699,7 +790,13 @@ def main():
         learning_rate=args.lr,
         snapshot_interval=args.snapshot_interval,
         keep_last_n_snapshots=args.keep_last_n_snapshots,
-        delete_snapshots_after_training=args.delete_snapshots_after_training
+        delete_snapshots_after_training=args.delete_snapshots_after_training,
+        enable_gradient_monitor=args.gradient_monitor,
+        gradient_monitor_interval=args.gradient_monitor_interval,
+        enable_early_stopping=args.early_stopping,
+        early_stop_patience=args.early_stop_patience,
+        early_stop_min_delta=args.early_stop_min_delta,
+        early_stop_restore_best=args.early_stop_restore_best
     )
 
     director = LanguageModelTrainingDirector(
