@@ -102,6 +102,7 @@ class TrainingConfig:
     snapshot_interval: int = 0
     keep_last_n_snapshots: int = 3
     delete_snapshots_after_training: bool = True
+    max_steps: Optional[int] = None
 
 
 DATASET_CONFIGS = {
@@ -367,6 +368,7 @@ class TranslationTrainingDirector:
             snapshot_per_epoch=True,
             keep_last_n_snapshots=self.training_config.keep_last_n_snapshots,
             delete_snapshots_after_training=self.training_config.delete_snapshots_after_training,
+            max_steps=self.training_config.max_steps,
         )
 
         self.trainer = Trainer(
@@ -579,6 +581,14 @@ def parse_args():
         ),
     )
     train_group.add_argument(
+        "--max_steps", type=int, default=None,
+        metavar="N",
+        help=(
+            "Maximum number of training steps. Training stops after N steps "
+            "regardless of epochs. Default: None (no limit)"
+        ),
+    )
+    train_group.add_argument(
         "--snapshot_interval", type=int, default=0,
         metavar="N",
         help=(
@@ -708,6 +718,7 @@ def main():
         snapshot_interval=args.snapshot_interval,
         keep_last_n_snapshots=args.keep_last_n_snapshots,
         delete_snapshots_after_training=args.delete_snapshots_after_training,
+        max_steps=args.max_steps,
     )
 
     director = TranslationTrainingDirector(

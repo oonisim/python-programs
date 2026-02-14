@@ -88,6 +88,7 @@ class TrainerConfig:
     snapshot_per_epoch: bool = True
     keep_last_n_snapshots: int = 5
     delete_snapshots_after_training: bool = True
+    max_steps: Optional[int] = None  # Stop training after N steps (None = no limit)
 
 
 class Trainer:
@@ -238,6 +239,11 @@ class Trainer:
 
             # Callback: on_batch_end
             self.callbacks.on_batch_end(self, step, loss)
+
+            # Check if max_steps reached
+            if self.config.max_steps is not None and self.global_step >= self.config.max_steps:
+                print(f"\nReached max_steps={self.config.max_steps}. Stopping training.")
+                return total_loss / (step + 1)
 
         return total_loss / num_batches
 
