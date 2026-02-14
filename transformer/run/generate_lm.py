@@ -5,13 +5,13 @@ from user-provided prompts.
 
 Usage Examples:
     # Generate from a prompt
-    python generate_lm.py --checkpoint lm_wikitext/snapshots/snapshot_epoch_0000_step_070999_20260212_095134.pt --prompt "The capital of France is"
+    python generate_lm.py --checkpoint_file lm_wikitext/snapshots/snapshot_epoch_0000_step_070999_20260212_095134.pt --prompt "The capital of France is"
 
     # Interactive mode
-    python generate_lm.py --checkpoint lm_wikitext/snapshots/snapshot_epoch_0000_step_070999_20260212_095134.pt --interactive
+    python generate_lm.py --checkpoint_file lm_wikitext/snapshots/snapshot_epoch_0000_step_070999_20260212_095134.pt --interactive
 
     # Control generation parameters
-    python generate_lm.py --checkpoint path/to/model.pt --prompt "Once upon a time" --max_length 100 --temperature 0.8 --top_p 0.9
+    python generate_lm.py --checkpoint_file path/to/model.pt --prompt "Once upon a time" --max_length 100 --temperature 0.8 --top_p 0.9
 """
 import argparse
 import torch
@@ -174,7 +174,7 @@ def main():
     )
 
     parser.add_argument(
-        "--checkpoint", type=str, required=True,
+        "--checkpoint_file", type=str, required=True,
         help="Path to model checkpoint (.pt file)"
     )
     parser.add_argument(
@@ -225,7 +225,7 @@ def main():
     print(f"  Vocabulary size: {tokenizer.vocab_size}")
 
     # Load model
-    model, checkpoint = load_model(args.checkpoint, args.device)
+    model, checkpoint = load_model(args.checkpoint_file, args.device)
 
     # Run generation
     if args.interactive:

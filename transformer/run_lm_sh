@@ -1,7 +1,0 @@
-#!/bin/bash
-python generate_lm.py \
-      --checkpoint lm_wikitext/models/model_20260212_163711.pt \
-      --interactive \
-      --temperature 0.8 \
-      --top_p 0.9 \
-      --max_length 100
