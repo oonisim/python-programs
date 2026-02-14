@@ -60,7 +60,11 @@ def load_model(checkpoint_path: str, device: str = "cuda") -> tuple[LanguageMode
     print(f"Model loaded successfully!")
     print(f"  Epoch: {checkpoint.get('epoch', 'N/A')}")
     print(f"  Step: {checkpoint.get('step', 'N/A')}")
-    print(f"  Validation Loss: {checkpoint.get('val_loss', 'N/A'):.4f}")
+    val_loss = checkpoint.get('val_loss', 'N/A')
+    if isinstance(val_loss, (int, float)):
+        print(f"  Validation Loss: {val_loss:.4f}")
+    else:
+        print(f"  Validation Loss: {val_loss}")
     print(f"  Parameters: {sum(p.numel() for p in model.parameters()):,}")
 
     return model, checkpoint
