@@ -46,13 +46,13 @@ early_stop_overfit_min_delta: float = 0.01
 
 ```bash
 # Standard early stopping
-python train_lm.py --dataset wikitext \
+python training/train_lm.py --dataset wikitext \
     --early_stopping \
     --early_stop_patience 5 \
     --early_stop_min_delta 0.001
 
 # With overfitting detection
-python train_lm.py --dataset wikitext \
+python training/train_lm.py --dataset wikitext \
     --early_stopping \
     --early_stop_patience 5 \
     --early_stop_overfit_patience 3 \
@@ -91,7 +91,7 @@ callback = EarlyStoppingCallback(
 
 ### Example 1: Conservative Detection (Default)
 ```bash
-python train_lm.py --dataset wikitext \
+python training/train_lm.py --dataset wikitext \
     --early_stopping \
     --early_stop_patience 10
 # Only stops when val loss stops improving
@@ -100,7 +100,7 @@ python train_lm.py --dataset wikitext \
 
 ### Example 2: Aggressive Overfitting Detection
 ```bash
-python train_lm.py --dataset wikitext \
+python training/train_lm.py --dataset wikitext \
     --early_stopping \
     --early_stop_patience 10 \
     --early_stop_overfit_patience 3 \
@@ -110,7 +110,7 @@ python train_lm.py --dataset wikitext \
 
 ### Example 3: Balanced Approach
 ```bash
-python train_lm.py --dataset wikitext \
+python training/train_lm.py --dataset wikitext \
     --early_stopping \
     --early_stop_patience 7 \
     --early_stop_overfit_patience 5 \
@@ -190,7 +190,7 @@ state = {
 
 Run the test suite:
 ```bash
-python3 test/test_overfit_detection.py
+python -m pytest test/test_overfit_detection.py
 ```
 
 Tests cover:
@@ -272,7 +272,7 @@ Potential improvements:
 **How To Use:**
 ```bash
 # Enable with recommended defaults
-python train_lm.py --dataset wikitext \
+python training/train_lm.py --dataset wikitext \
     --early_stopping \
     --early_stop_overfit_patience 3
 ```

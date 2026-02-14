@@ -72,24 +72,24 @@ trainer_config = TrainerConfig(
 
 ### Default (no monitoring)
 ```bash
-python train_lm.py --dataset wikitext --epochs 20
+python training/train_lm.py --dataset wikitext --epochs 20
 ```
 
 ### Enable frozen weight detection
 ```bash
-python train_lm.py --dataset wikitext --epochs 20 --weight_monitor
+python training/train_lm.py --dataset wikitext --epochs 20 --weight_monitor
 ```
 
 ### Custom settings
 ```bash
-python train_lm.py --dataset wikitext --weight_monitor \
+python training/train_lm.py --dataset wikitext --weight_monitor \
     --weight_monitor_interval 50 \
     --weight_monitor_sample_size 2048
 ```
 
 ### Combined with gradient monitoring
 ```bash
-python train_lm.py --dataset wikitext \
+python training/train_lm.py --dataset wikitext \
     --weight_monitor --weight_monitor_interval 100 \
     --gradient_monitor --gradient_monitor_interval 100
 ```
@@ -154,7 +154,7 @@ To test the integration:
 
 ```bash
 # Quick test (1000 samples, monitor every 10 steps)
-python train_lm.py --dataset wikitext --max_samples 1000 \
+python training/train_lm.py --dataset wikitext --max_samples 1000 \
     --weight_monitor --weight_monitor_interval 10 \
     --epochs 3
 
@@ -185,7 +185,7 @@ Expected behavior:
 
 1. **Test the integration**:
    ```bash
-   python train_lm.py --dataset wikitext --max_samples 1000 --weight_monitor --epochs 3
+   python training/train_lm.py --dataset wikitext --max_samples 1000 --weight_monitor --epochs 3
    ```
 
 2. **Monitor TensorBoard**:

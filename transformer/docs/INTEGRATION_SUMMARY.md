@@ -116,19 +116,19 @@ Monitors **gradient flow** between layers to detect vanishing/exploding gradient
 
 ### Default (monitoring disabled)
 ```bash
-python train_lm.py --dataset wikitext --epochs 20
+python training/train_lm.py --dataset wikitext --epochs 20
 ```
 
 ### Enable frozen weight detection
 ```bash
-python train_lm.py --dataset wikitext --epochs 20 \
+python training/train_lm.py --dataset wikitext --epochs 20 \
     --weight_monitor \
     --weight_monitor_interval 100
 ```
 
 ### Custom settings
 ```bash
-python train_lm.py --dataset wikitext --weight_monitor \
+python training/train_lm.py --dataset wikitext --weight_monitor \
     --weight_monitor_interval 50 \
     --weight_monitor_sample_size 2048
 ```

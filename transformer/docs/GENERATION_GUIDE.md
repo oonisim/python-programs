@@ -51,7 +51,7 @@ See `example_generate.py` for a complete working example, or use this minimal co
 ```python
 import torch
 from transformers import GPT2Tokenizer
-from lm import LanguageModel
+from model.lm import LanguageModel
 
 # Load tokenizer
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
@@ -162,7 +162,7 @@ python generate_lm.py \
 import torch
 from pathlib import Path
 from transformers import GPT2Tokenizer
-from lm import LanguageModel
+from model.lm import LanguageModel
 
 
 def load_model(checkpoint_path: str, device: str = "cuda"):
@@ -247,7 +247,7 @@ Generate multiple sequences in parallel:
 ```python
 import torch
 from transformers import GPT2Tokenizer
-from lm import LanguageModel
+from model.lm import LanguageModel
 
 # ... (load model as above)
 
@@ -559,5 +559,5 @@ output = model.generate(prompt, max_length=100, temperature=0.8)
 
 For more help, see:
 - `python generate_lm.py --help`
-- `python train_lm.py --explain`
+- `python training/train_lm.py --explain`
 - `example_generate.py` for code examples

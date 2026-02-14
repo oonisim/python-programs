@@ -20,7 +20,7 @@ Stops training when validation loss stops improving.
 
 **CLI Usage:**
 ```bash
-python train_lm.py \
+python training/train_lm.py \
   --early_stopping \
   --early_stop_patience 5 \
   --early_stop_min_delta 0.001
@@ -28,7 +28,7 @@ python train_lm.py \
 
 **Programmatic Usage:**
 ```python
-from trainer_early_stopping import EarlyStoppingCallback
+from training.trainer_early_stopping import EarlyStoppingCallback
 
 callback = EarlyStoppingCallback(
     patience=5,
@@ -45,7 +45,7 @@ Monitors gradient flow through model layers, synced with snapshot saving.
 
 **CLI Usage:**
 ```bash
-python train_lm.py \
+python training/train_lm.py \
   --gradient_monitor \
   --snapshot_interval 1000 \
   --gradient_monitor_interval 500  # Optional: monitor every 500 steps
@@ -53,7 +53,7 @@ python train_lm.py \
 
 **Programmatic Usage:**
 ```python
-from trainer_gradient_monitor import GradientMonitorCallback
+from training.trainer_gradient_monitor import GradientMonitorCallback
 
 callback = GradientMonitorCallback(
     monitor_at_snapshots=True,  # Monitor when snapshots are saved
@@ -69,7 +69,7 @@ trainer = Trainer(..., callbacks=[callback])
 Create a new file `trainer_my_callback.py`:
 
 ```python
-from trainer_callback import TrainerCallback
+from training.trainer_callback import TrainerCallback
 
 class MyCallback(TrainerCallback):
     def __init__(self, my_param):
@@ -115,7 +115,7 @@ should_stop_training(trainer) -> bool                    # Check if should stop
 
 ```bash
 # Full-featured training with all callbacks
-python train_lm.py \
+python training/train_lm.py \
   --dataset wikitext \
   --epochs 50 \
   --batch_size 32 \
@@ -174,7 +174,7 @@ config = TrainerConfig(
 
 ### New Code (Callback-based)
 ```python
-from trainer_gradient_monitor import GradientMonitorCallback
+from training.trainer_gradient_monitor import GradientMonitorCallback
 
 callback = GradientMonitorCallback(
     monitor_at_snapshots=True

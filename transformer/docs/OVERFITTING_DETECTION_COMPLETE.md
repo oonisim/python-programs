@@ -70,14 +70,14 @@ Tests:
 
 ### Minimal (Use Defaults)
 ```bash
-python train_lm.py --dataset wikitext \
+python training/train_lm.py --dataset wikitext \
     --early_stopping \
     --early_stop_overfit_patience 3
 ```
 
 ### Full Configuration
 ```bash
-python train_lm.py --dataset wikitext \
+python training/train_lm.py --dataset wikitext \
     --early_stopping \
     --early_stop_patience 7 \
     --early_stop_min_delta 0.001 \
@@ -111,7 +111,7 @@ Early stopping triggered at epoch 5
 
 Run tests:
 ```bash
-python3 test/test_overfit_detection.py
+python -m pytest test/test_overfit_detection.py
 ```
 
 Expected output:

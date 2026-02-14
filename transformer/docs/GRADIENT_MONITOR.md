@@ -26,7 +26,7 @@ pip install torch
 ```python
 import torch
 import torch.nn as nn
-from gradient_monitor import GradientGainMonitor
+from training.gradient_monitor import GradientGainMonitor
 
 # Create your model with blocks
 model_blocks = nn.ModuleList([
