@@ -41,8 +41,8 @@ def create_dummy_data(num_samples=100, input_size=10, output_size=5):
     return TensorDataset(x, y)
 
 
-class TestCallback(TrainerCallback):
-    """Test callback that records when hooks are called."""
+class MockCallback(TrainerCallback):
+    """Mock callback that records when hooks are called."""
 
     def __init__(self):
         self.calls = {
@@ -118,7 +118,7 @@ def test_callback_hooks_are_called():
     train_loader = DataLoader(train_data, batch_size=8)
 
     # Create test callback
-    test_callback = TestCallback()
+    test_callback = MockCallback()
 
     # Configure trainer
     config = TrainerConfig(
@@ -195,8 +195,8 @@ def test_multiple_callbacks():
     train_loader = DataLoader(train_data, batch_size=16)
 
     # Create multiple callbacks
-    callback1 = TestCallback()
-    callback2 = TestCallback()
+    callback1 = MockCallback()
+    callback2 = MockCallback()
 
     config = TrainerConfig(
         model_name="test_multi_callbacks",
@@ -355,8 +355,8 @@ def test_callback_list():
     print("TEST 5: CallbackList functionality")
     print("=" * 70)
 
-    callback1 = TestCallback()
-    callback2 = TestCallback()
+    callback1 = MockCallback()
+    callback2 = MockCallback()
 
     callback_list = CallbackList([callback1, callback2])
 

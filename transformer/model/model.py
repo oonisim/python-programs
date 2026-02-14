@@ -40,9 +40,6 @@ from model.encoder import (
 from model.decoder import (
     Decoder
 )
-from training.utility import (
-    count_model_parameters,
-)
 
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -394,18 +391,6 @@ class Transformer(nn.Module):
         self.train()
         return False
 
-    def count_parameters(self) -> dict:
-        """Count parameters accounting for weight tying.
-
-        Returns:
-            Dictionary with 'total_parameters', 'tied_parameters', and 'trainable_parameters'.
-
-        Example:
-            >>> model = Transformer(decoder_vocabulary_size=50000, decoder_model_dimension=512)
-            >>> stats = model.count_parameters()
-            >>> print(f"Total unique parameters: {stats['total_parameters']:,}")
-        """
-        return count_model_parameters(self)
 
     # DO NOT override nn.Module.__call__ as it breaks expected PyTorch behavior
     # (hooks, device handling, and normal forward invocation).

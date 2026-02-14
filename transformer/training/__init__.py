@@ -11,33 +11,12 @@ This module contains the training system:
 - loader_translation.py: Data loader for translation
 - gradient_monitor.py: Gradient flow monitoring utilities
 - utility.py: Training utilities (checkpointing, file management)
+
+Note: This module does not eagerly import heavy dependencies.
+Import explicitly what you need, e.g.:
+    from training.trainer import Trainer
+    from training.loader import LanguageModelDataLoaderFactory
 """
-
-# Main trainer classes
-from training.trainer import Trainer, LanguageModelTrainer, TrainerConfig
-
-# Callback system
-from training.trainer_callback import TrainerCallback, CallbackList
-from training.trainer_early_stopping import EarlyStoppingCallback
-from training.trainer_gradient_monitor import GradientMonitorCallback
-
-# Data loaders
-from training.loader import LanguageModelDataLoaderFactory, DataLoaderConfig
-from training.loader_translation import TranslationDataLoaderFactory
-
-# Monitoring
-from training.gradient_monitor import GradientGainMonitor
-
-# Utilities
-from training.utility import (
-    ensure_directory_exists,
-    build_snapshot_filename,
-    build_model_filename,
-    resolve_file_path,
-    find_latest_file,
-    delete_files_by_pattern,
-    cleanup_old_files,
-)
 
 __all__ = [
     # Trainers

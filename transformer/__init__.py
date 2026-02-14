@@ -37,5 +37,6 @@ from model.decoder import (
 from model.model import Transformer
 from model.lm import LanguageModel
 
-from training.trainer import Trainer, LanguageModelTrainer, TrainerConfig
-from training.loader import LanguageModelDataLoaderFactory, DataLoaderConfig
+# Note: Training classes are not imported here to avoid loading heavy dependencies
+# like TensorBoard when only model components are needed.
+# Import them explicitly: from training.trainer import Trainer, etc.
