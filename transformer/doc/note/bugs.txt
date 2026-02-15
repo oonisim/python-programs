@@ -1,52 +1,6 @@
-  CRITICAL (3 bugs)
-
-  1. model/model.py:146,207 — NUM_HEADS hardcoded, CLI args silently ignored
-
-  The Transformer.__init__ has no num_heads parameter. Both encoder and decoder are created with the constant NUM_HEADS = 8 from constant.py:
-  - Line 146: num_heads=NUM_HEADS (encoder)
-  - Line 207: num_heads=NUM_HEADS (decoder)
-
-  Meanwhile, train_translation.py exposes --encoder_num_heads and --decoder_num_heads CLI args and stores them in ModelConfig, but _build_model() (line 320-333) never passes them to Transformer — so they
-  are silently ignored. Users think they're configuring 4 heads but always get 8.
-
-  2. model/model.py:605 — generate() missing final_decoder_norm before projection
-
-  In forward() (line 521):
-  log_probabilities = self.projection(y=self.final_decoder_norm(y))
-
-  But in generate() (line 605):
-  log_probabilities = self.projection(y=self.decoder(y=y_emb, memory=memory))
-
-  The final_decoder_norm is skipped. This means generate() produces different (degraded) outputs compared to forward() — the decoder output goes unnormalized into the projection layer.
-
-  3. model/common.py:490 — Causal mask assertion breaks cross-attention
-
-  assert _Tq == _Tk, "causal mask requires equal query/key lengths"
-
-  This assert fires whenever mask_matrix is not None and query/key lengths differ. While currently the decoder uses causal masking only in self-attention (where Tq == Tk), this is fragile — any future use
-  of masked cross-attention would crash. The comment on line 488 even acknowledges this: "In the cross attention, the sequence length of Tq and Tk can be different."
-
-  HIGH (2 issues)
-
-  4. TensorBoard writer not closed on exception
-
-  self.writer.close() is only called in _finalize_training() (line 705), which runs after the normal training loop completes. If training crashes mid-epoch (OOM, NaN explosion, keyboard interrupt), the
-  writer is never closed, potentially losing buffered TensorBoard events.
-
-  5. No num_heads parameter in Transformer constructor
-
-  The constructor (lines 50-65) accepts encoder_layers, decoder_layers, encoder_pwff_dimension, decoder_pwff_dimension, etc., but has no encoder_num_heads / decoder_num_heads parameters. The docstring (line
-   77) even says "num_heads (as long as both divide d_model)" is a parameter that can differ — but it's not actually exposed.
-
-  MEDIUM (3 issues)
-
-  6. train_translation.py builds model with d_model=256 but NUM_HEADS=8 — 256/8=32 (works), but the CLI defaults encoder_num_heads=4 which the user expects but never takes effect. The actual head count is
-  always 8.
-
-  7. Division by zero if dataloader is empty — _validate() (line 390) does total_loss / len(val_loader). If val_loader is empty, this crashes with ZeroDivisionError.
-
-  8. train_translation.py uses NLLLoss but train_lm.py could have inconsistency — Both trainers should use the same loss function since Projection returns log-probabilities. Worth verifying consistency.
-
-  ---
-  Would you like me to fix any of these? The top priority would be bugs #1, #2, and #5 (add num_heads params to Transformer, wire them through train_translation.py, and add final_decoder_norm to
-  generate()).
+[P2] generate() does not validate max_length <= decoder_max_time_steps, which can blow up inside positional encoding mid‑generation. File: model.py
+[P2] LanguageModelDataset.__len__ is off by one and discards a valid last sample, including the len(tokens) == seq_len + 1 case. File: loader.py 
+[P2] LanguageModel.generate doesn’t validate temperature (<=0 → NaN/inf scores). File: lm.py 
+[P2] top_k is unvalidated, so invalid values crash torch.topk. File: lm.py 
+[P2] top_p is unvalidated; out‑of‑range values can mask all tokens and yield NaNs. File: lm.py.
+[P3] max_length < prompt_len silently returns the prompt unchanged. File: lm.py.
