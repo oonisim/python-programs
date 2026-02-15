@@ -23,30 +23,14 @@ Usage:
     val_loader = factory.get_val_loader()
 """
 from dataclasses import dataclass
-from typing import Optional, Protocol
+from typing import Optional
 
 import torch
 from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
 from datasets import load_dataset
 
-
-class Tokenizer(Protocol):
-    """Protocol for tokenizer interface (duck typing)."""
-
-    def encode(self, text: str) -> list[int]:
-        """Encode text to token IDs."""
-        ...
-
-    @property
-    def pad_token_id(self) -> Optional[int]:
-        """Padding token ID."""
-        ...
-
-    @property
-    def eos_token_id(self) -> Optional[int]:
-        """End of sequence token ID."""
-        ...
+from tokenization import Tokenizer
 
 
 class LanguageModelDataset(Dataset):

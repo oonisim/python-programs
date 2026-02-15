@@ -65,13 +65,24 @@ import torch
 from torch import nn
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from transformers import GPT2Tokenizer
 
 from model.model import Transformer
-from model.constant import LABEL_IGNORE_VALUE
-from training.loader_translation import TranslationDataLoaderFactory, DataLoaderConfig
-from training.trainer import Trainer, TrainerConfig
-from training.train_lm import TiktokenAdapter, TOKENIZER_CONFIGS
+from model.constant import (
+    LABEL_IGNORE_VALUE,
+    DECODER_TOKENIZER_DEFAULT_MODEL,
+)
+from training.loader_translation import (
+    TranslationDataLoaderFactory,
+    DataLoaderConfig,
+)
+from training.trainer import (
+    Trainer,
+    TrainerConfig,
+)
+from tokenization import (
+    TiktokenAdapter,
+    TOKENIZER_CONFIGS,
+)
 
 
 # --------------------------------------------------------------------------------
@@ -260,13 +271,9 @@ class TranslationTrainingDirector:
             Tokenizer instance conforming to the Tokenizer protocol.
         """
         encoding_name = TOKENIZER_CONFIGS[tokenizer_name]
-        if encoding_name is None:
-            tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-            if tokenizer.pad_token is None:
-                tokenizer.pad_token = tokenizer.eos_token
-            return tokenizer
-        else:
-            return TiktokenAdapter(encoding_name)
+        return TiktokenAdapter(
+            encoding_name=encoding_name if encoding_name else DECODER_TOKENIZER_DEFAULT_MODEL
+        )
 
     def _build_tokenizers(self) -> None:
         """Step 1: Create source and target tokenizers."""
@@ -375,8 +382,10 @@ class TranslationTrainingDirector:
             # NOTE: ignore_index is not an index into labels but a target label value that
             # the loss treats as “masked out”.
             # Ensure pad_token_id != eos_token_id in tokenizer to avoid unlearnable EOS tokens
+            #--------------------------------------------------------------------------------
             # ignore_index=self.target_tokenizer.pad_token_id
             ignore_index=LABEL_IGNORE_VALUE
+            # --------------------------------------------------------------------------------
         )
 
         trainer_config = TrainerConfig(

@@ -58,6 +58,7 @@ Available Datasets
 """
 import argparse
 import json
+import logging
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -67,15 +68,26 @@ import torch
 from torch import nn
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from transformers import GPT2Tokenizer
-import tiktoken
 
+from tokenization import (
+    TiktokenAdapter,
+    TOKENIZER_CONFIGS,
+)
+from model.constant import (
+    DECODER_TOKENIZER_DEFAULT_MODEL,
+)
 from model.lm import LanguageModel
 from model.constant import LABEL_IGNORE_VALUE
 from training.loader import LanguageModelDataLoaderFactory, DataLoaderConfig
 from training.trainer import LanguageModelTrainer, TrainerConfig
 from training.trainer_early_stopping import EarlyStoppingCallback
 from training.trainer_gradient_monitor import GradientMonitorCallback
+
+
+# --------------------------------------------------------------------------------
+# Logging
+# --------------------------------------------------------------------------------
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 # --------------------------------------------------------------------------------
@@ -129,39 +141,6 @@ DATASET_CONFIGS = {
     "wikitext": ("wikitext", "wikitext-2-raw-v1"),
     "wikitext-103": ("wikitext", "wikitext-103-raw-v1"),
 }
-
-TOKENIZER_CONFIGS = {
-    "gpt2": None,           # Uses HuggingFace GPT2Tokenizer
-    "gpt4": "cl100k_base",  # tiktoken encoding for GPT-4
-    "gpt4o": "o200k_base",  # tiktoken encoding for GPT-4o
-}
-
-
-# --------------------------------------------------------------------------------
-# Tiktoken Adapter
-# --------------------------------------------------------------------------------
-class TiktokenAdapter:
-    """Adapter for tiktoken to match the Tokenizer protocol in loader.py."""
-
-    def __init__(self, encoding_name: str):
-        self._enc = tiktoken.get_encoding(encoding_name)
-        self._eot_id = self._enc.eot_token
-
-    @property
-    def vocab_size(self) -> int:
-        return self._enc.n_vocab
-
-    @property
-    def eos_token_id(self) -> int:
-        return self._eot_id
-
-    @property
-    def pad_token_id(self) -> int:
-        return self._eot_id  # Same convention as GPT-2: use EOS as PAD
-
-    def encode(self, text: str) -> list[int]:
-        return self._enc.encode(text)
-
 
 # --------------------------------------------------------------------------------
 # Director
@@ -251,20 +230,22 @@ class LanguageModelTrainingDirector:
             "training_config": asdict(self.training_config),
         }
         config_path.write_text(json.dumps(config, indent=2))
-        print(f"  Run config saved for training run [lm_{self.dataset_key}]: {config_path}")
+        logging.info(
+            "  Run config saved for training run [lm_%s]: %s", self.dataset_key, config_path
+        )
 
     def _load_run_config(self) -> None:
         """Load saved run configuration, overriding CLI args."""
         config_path = self._run_config_path()
         if not config_path.exists():
-            print(f"WARNING: No saved run config at {config_path}, using CLI args.")
+            logger.warning("WARNING: No saved run config at %s, using CLI args.", config_path)
             return
         config = json.loads(config_path.read_text())
         self.tokenizer_name = config["tokenizer_name"]
         self.max_samples = config["max_samples"]
         self.model_config = ModelConfig(**config["model_config"])
         self.training_config = TrainingConfig(**config["training_config"])
-        print(f"Loaded run config from {config_path}, ignoring CLI args.")
+        logger.info("Loaded run config from %s, ignoring CLI args.", config_path)
 
     def _print_header(self) -> None:
         """Print training session header."""
@@ -281,26 +262,25 @@ class LanguageModelTrainingDirector:
               f"lr={self.training_config.learning_rate}")
         print()
 
-    def _build_tokenizer(self) -> None:
-        """Step 1: Create tokenizer."""
-        print(f"Building tokenizer ({self.tokenizer_name})...")
+    def _build_tokenizer(self):
+        """Build a single tokenizer by name.
+
+        Args:
+            tokenizer_name: Key in TOKENIZER_CONFIGS.
+
+        Returns:
+            Tokenizer instance conforming to the Tokenizer protocol.
+        """
         encoding_name = TOKENIZER_CONFIGS[self.tokenizer_name]
+        self.tokenizer = TiktokenAdapter(
+            encoding_name=encoding_name if encoding_name else DECODER_TOKENIZER_DEFAULT_MODEL
+        )
+        logger.info("Tokenizer Vocabulary size: [%s]", self.tokenizer.vocab_size)
 
-        if encoding_name is None:
-            # HuggingFace GPT-2 tokenizer
-            self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-            if self.tokenizer.pad_token is None:
-                self.tokenizer.pad_token = self.tokenizer.eos_token
-        else:
-            # tiktoken-based tokenizer
-            self.tokenizer = TiktokenAdapter(encoding_name)
-
-        print(f"  Vocabulary size: {self.tokenizer.vocab_size}")
 
     def _build_data_loaders(self) -> None:
         """Step 2: Create data loaders."""
-        print("\nBuilding data loaders...")
-
+        logger.info("\nBuilding data loaders...")
         dataset_name, dataset_config = DATASET_CONFIGS[self.dataset_key]
 
         loader_config = DataLoaderConfig(
@@ -327,7 +307,7 @@ class LanguageModelTrainingDirector:
 
     def _build_model(self) -> None:
         """Step 3: Create model."""
-        print("\nBuilding model...")
+        logger.info("\nBuilding model...")
 
         self.model = LanguageModel(
             vocab_size=self.tokenizer.vocab_size,
@@ -342,7 +322,7 @@ class LanguageModelTrainingDirector:
         self.model.end_token = self.tokenizer.eos_token_id
 
         num_params = sum(p.numel() for p in self.model.parameters())
-        print(f"  Parameters: {num_params:,}")
+        logger.info("  Number of Parameters: [%s]", format(num_params, ","))
 
     def _build_callbacks(self) -> list:
         """Build training callbacks based on config.
@@ -374,13 +354,13 @@ class LanguageModelTrainingDirector:
                 monitor_at_epochs=False
             )
             callbacks.append(gradient_monitor)
-            print(f"  Gradient monitoring enabled")
+            logger.info("  Gradient monitoring enabled")
 
         return callbacks
 
     def _build_trainer(self) -> None:
         """Step 4: Create trainer with optimizer and scheduler."""
-        print("\nBuilding trainer...")
+        logger.info("\nBuilding trainer...")
 
         optimizer = AdamW(
             self.model.parameters(),
@@ -406,8 +386,10 @@ class LanguageModelTrainingDirector:
             # NOTE: ignore_index is not an index into labels but a target label value that
             # the loss treats as “masked out”.
             # Ensure pad_token_id != eos_token_id in tokenizer to avoid unlearnable EOS tokens
+            #--------------------------------------------------------------------------------
             # ignore_index=self.tokenizer.pad_token_id
             ignore_index=LABEL_IGNORE_VALUE
+            # --------------------------------------------------------------------------------
         )
 
         trainer_config = TrainerConfig(

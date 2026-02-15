@@ -35,28 +35,7 @@ from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, Dataset
 from datasets import load_dataset
 
-
-class Tokenizer(Protocol):
-    """Protocol for tokenizer interface (duck typing)."""
-
-    def encode(self, text: str) -> list[int]:
-        """Encode text to token IDs."""
-        ...
-
-    @property
-    def pad_token_id(self) -> Optional[int]:
-        """Padding token ID."""
-        ...
-
-    @property
-    def eos_token_id(self) -> Optional[int]:
-        """End of sequence token ID."""
-        ...
-
-    @property
-    def vocab_size(self) -> int:
-        """Vocabulary size."""
-        ...
+from tokenization import Tokenizer
 
 
 @dataclass
