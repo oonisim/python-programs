@@ -1,6 +1,21 @@
-Findings (new, ordered by severity)
+P2: generate() cannot mask padded source tokens
+Transformer.generate() has no source_pad_mask parameter and never passes one to the encoder/decoder. If generation is called with padded source batches, the encoder and cross‑attention will still attend to padding tokens, which can corrupt outputs.
+/Users/oonisim/home/repository/git/oonisim/python-programs/transformer/src/model/model.py:568-623
 
-(No critical bugs currently identified)
+ evaluate() still has the same issue — self.eval() at line 562 without restoring training mode. The file on disk hasn't changed.
+
+  The remaining known issues from prior rounds are:
+  ┌──────────────────────────────────────────┬───────────────────┬──────────┐
+  │                  Issue                   │     File:Line     │ Severity │
+  ├──────────────────────────────────────────┼───────────────────┼──────────┤
+  │ evaluate() doesn't restore training mode │ model.py:562      │ MEDIUM   │
+  ├──────────────────────────────────────────┼───────────────────┼──────────┤
+  │ Missing space in error message           │ model.py:600-601  │ LOW      │
+  ├──────────────────────────────────────────┼───────────────────┼──────────┤
+  │ Invalid pylint directive (missing colon) │ lm.py:364         │ LOW      │
+  ├──────────────────────────────────────────┼───────────────────┼──────────┤
+  │ Off-by-one in get_stats()                │ loader.py:255,259 │ LOW      │
+  └──────────────────────────────────────────┴───────────────────┴──────────┘
 
 
 Root Cause Analysis
