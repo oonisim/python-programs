@@ -1,2 +1,48 @@
-[P2] Translation training skips learning the first target token because there is no BOS/START token in target_ids before shifting. File: trainer.py lines 317–319.
-[P2] Attention has no padding mask support; padded tokens will be attended to in variable‑length batches. File: common.py lines 399–519.
+Fixed Issues:
+
+✅ EOS Learning Fix (COMPLETE)
+   - Changed ignore_index=pad_token_id → ignore_index=LABEL_IGNORE_VALUE (-100)
+   - Implemented masking logic in translation_collate_fn() to replace padded
+     positions with LABEL_IGNORE_VALUE
+   - Model can now properly learn to generate EOS tokens
+   - Files: train_lm.py, train_translation.py, loader_translation.py, constant.py
+
+✅ Translation BOS Token (COMPLETE)
+   - Added BOS token (EOS as START) to target sequences
+   - Model now learns to predict first target token
+   - File: loader_translation.py
+
+✅ run_config.json Path (COMPLETE)
+   - Fixed to save in result/{model_name}/snapshots/ matching trainer location
+   - Resume no longer silently misses config
+   - Files: train_lm.py, train_translation.py
+
+✅ eval() Mode Missing (COMPLETE)
+   - Added self.eval() to evaluate() and generate() methods
+   - Disables dropout for deterministic evaluation/generation
+   - Files: model.py, lm.py
+
+Remaining Issues:
+
+[P2] Attention Padding Mask (NOT IMPLEMENTED)
+     Status: Documented but not implemented
+
+     What exists:
+     - Documentation in loader_translation.py (lines 122-129) explains why
+       padding masks are needed for attention
+
+     What's missing:
+     1. translation_collate_fn() doesn't create/return padding masks
+        Need: source_pad_mask = (source_padded == source_pad_id)
+
+     2. ScaledDotProductAttention.forward() has no padding_mask parameter
+        Current: forward(q, k, v, return_similarities=False)
+        Need: forward(q, k, v, padding_mask=None, return_similarities=False)
+
+     3. No mask application before softmax in attention computation
+        Need: similarities.masked_fill(padding_mask, float('-inf'))
+
+     Impact: Padded tokens are attended to in variable-length batches,
+     wasting attention mass and contaminating representations
+
+     File: common.py lines 399-519

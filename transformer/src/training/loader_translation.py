@@ -80,7 +80,6 @@ def translation_collate_fn(
         target_pad_id: int
 ) -> dict[str, Tensor]:
     """Collate function that pads source and target to max length in batch.
-
     Masks padded positions in targets with LABEL_IGNORE_VALUE to prevent them
     from contributing to loss when pad_token_id==eos_token_id.
 
@@ -93,20 +92,62 @@ def translation_collate_fn(
         Dict with padded "source_ids" (B, Ts) and "target_ids" (B, Tt).
         Padded positions in target_ids are set to LABEL_IGNORE_VALUE.
     """
+    # --------------------------------------------------------------------------------
+    # Padding:
+    # batch = [{"source_ids": <1D LongTensor>, "target_ids": <1D LongTensor>}].
+    # item["source_ids"] is a sequence (e.g. sentence) and
+    # item["target_ids"] is a sequence of next tokens for the source.
+    #
+    # source_seqs are list of tensors with different sequence length. e.g.
+    # (ts(0), ts(1), ...) -> [tensor([12, 99, 7]), tensor([12, 8]), ...].
+    # pad_sequence finds the max length Ts=max(ts(i)) in source_seqs and
+    # pads all sequences to that length.
+    #
+    # Note the max length of target sequences Tt can be different from Ts.
+    # Hence, we pad source and taget separately to their own max lengths.
+    # --------------------------------------------------------------------------------
     source_seqs = [item["source_ids"] for item in batch]
     target_seqs = [item["target_ids"] for item in batch]
-
-    source_padded = pad_sequence(
+    source_padded = pad_sequence(   # shape (B, Ts)
         source_seqs, batch_first=True, padding_value=source_pad_id
     )
-    target_padded = pad_sequence(
+    target_padded = pad_sequence(   # shape (B, Tt)
         target_seqs, batch_first=True, padding_value=target_pad_id
     )
 
-    # Mask padded positions in targets to prevent them from contributing to loss
-    # This is critical when pad_token_id==eos_token_id (GPT-2 default)
-    # Without this, EOS tokens would be ignored in loss calculation
+    # --------------------------------------------------------------------------------
+    # Mask targets labels with IGNORE_VALUE where the values are pad token id.
+    # Then, the loss function ignores those labels for loss calculation.
+    #
+    # Padding must be handled at the attention level (not just in the loss).
+    # If PAD tokens are included as keys/values (K,V) and not masked, queries (Q) from
+    # real tokens can attend to PAD positions. This wastes attention mass and can
+    # contaminate real-token representations as attention-weighted sum includes PAD.
+    #
+    # Another side effect: the same sentence padded to length 64 vs 128 can produce
+    # different attention distributions and different outputs, even when the real tokens
+    # are identical.
+    #
+    # Apply a key-padding mask (set attention logits to -inf for PAD key positions)
+    # to address the issue.
+    # --------------------------------------------------------------------------------
     pad_mask = (target_padded == target_pad_id)
+
+    # --------------------------------------------------------------------------------
+    # CRITICAL: Do NOT use pad_token_id as the target mask value for GPT like tokenizers.
+    # GPT like tokenizers has no PAD or EOS tokens. Hence, people will set up as
+    # pad_token_id = eos_token_id = eot_token_id.
+    #
+    # The Loss calculation will ignore the legitimate EOS label in targets.
+    # The source positions that have correct EOS tokens cannot contribute to the model
+    # training and the model will never learn to predict EOS (End of Sequence).
+    #
+    # EOS is the token that teaches the model where/how to end a sequence.
+    # In corpora for GPT like models, the EOS/EOT token is a document boundary.
+    # Without learning EOS, the model has no understanding of the idea of "End",
+    # or the concept of "Sequence" or "Boundary".
+    # Therefore, it can keep generating forever or only stop at max length.
+    # --------------------------------------------------------------------------------
     target_padded = target_padded.masked_fill(pad_mask, LABEL_IGNORE_VALUE)
 
     return {"source_ids": source_padded, "target_ids": target_padded}
