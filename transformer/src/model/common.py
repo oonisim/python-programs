@@ -504,7 +504,7 @@ class ScaledDotProductAttention(nn.Module):     # pylint: disable=too-few-public
                 # do_mask is False means Encoder self attention, and the sequence length T
                 # of Q and K should be the same.
                 raise RuntimeError(
-                    "Encoder Causal Attention (do_mask=False) requires the same sequence "
+                    "Encoder Self-Attention (do_mask=False) requires the same sequence "
                     f"length between Q and K, got Tq:[{_Tq}] and Tk:[{_Tk}]."
                 )
 

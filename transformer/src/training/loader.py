@@ -169,7 +169,16 @@ class LanguageModelDataLoaderFactory:
             text = item["text"]
             if text.strip():  # Skip empty lines
                 tokens = self.tokenizer.encode(text)
-                all_tokens.extend(tokens)
+                # Chunk long token sequences to avoid warnings/issues
+                # when individual articles produce very long sequences
+                # (e.g., 1063 tokens from a long WikiText article)
+                if len(tokens) > self.config.seq_len:
+                    # Split into chunks of seq_len to respect model limits
+                    for i in range(0, len(tokens), self.config.seq_len):
+                        chunk = tokens[i:i + self.config.seq_len]
+                        all_tokens.extend(chunk)
+                else:
+                    all_tokens.extend(tokens)
 
         return torch.tensor(all_tokens, dtype=torch.long)
 

@@ -277,6 +277,10 @@ class Trainer:
         total_loss = 0.0
         num_batches = len(train_loader)
 
+        if num_batches == 0:
+            print("Warning: Training dataloader is empty, returning 0.0 loss")
+            return 0.0
+
         for step, batch in enumerate(train_loader):
             # Callback: on_batch_start
             self.callbacks.on_batch_start(self, step)
@@ -872,6 +876,7 @@ class LanguageModelTrainer(Trainer):
         """
         self.model.eval()
         total_loss = 0.0
+        num_batches = 0
 
         for batch in val_loader:
             input_ids, target_ids = batch
@@ -881,8 +886,13 @@ class LanguageModelTrainer(Trainer):
             log_probabilities = self.model.forward(input_ids)
             loss = self._compute_loss(log_probabilities, target_ids)
             total_loss += loss.item()
+            num_batches += 1
 
-        return total_loss / len(val_loader)
+        if num_batches == 0:
+            print("Warning: Validation dataloader is empty, returning 0.0 loss")
+            return 0.0
+
+        return total_loss / num_batches
 
 
 if __name__ == "__main__":

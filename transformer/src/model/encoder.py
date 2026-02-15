@@ -209,7 +209,7 @@ class Encoder(nn.Module):
         _B, _T, _D = x.shape        # pylint: disable=invalid-name
         assert _D == self.D, (
             f"Expected the dimension D: of input x:(B,T,D) as [{self.D}] "
-            f"defined at class instantiation, got [{_D}]]."
+            f"defined at class instantiation, got [{_D}]."
         )
 
 

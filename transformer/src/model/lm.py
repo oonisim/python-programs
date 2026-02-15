@@ -150,6 +150,15 @@ class LanguageModel(nn.Module):
             dtype=dtype,
             bias=False
         )
+        # Verify shapes match before weight tying
+        assert (
+            self.projection.projection.weight.shape ==
+            self.embedding.embedding.weight.shape
+        ), (
+            "Shape mismatch for weight tying: projection "
+            f"{self.projection.projection.weight.shape} "
+            f"!= embedding {self.embedding.embedding.weight.shape}"
+        )
         self.projection.projection.weight = self.embedding.embedding.weight
 
         # Token for stopping generation
@@ -299,9 +308,9 @@ class LanguageModel(nn.Module):
                 "Zero or negative temperature causes NaN/inf in softmax."
             )
 
-        if top_k is not None and top_k <= 0:
+        if top_k is not None and (top_k <= 0 or top_k > self.vocab_size):
             raise ValueError(
-                f"top_k must be > 0 if specified, got {top_k}. "
+                f"top_k must be in range (0, vocab_size={self.vocab_size}], got {top_k}. "
                 "Invalid top_k crashes torch.topk."
             )
 

@@ -1,3 +1,4 @@
 # Training output directories
 lm_*/
 translation_*/
+push.sh
