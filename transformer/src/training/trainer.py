@@ -1247,10 +1247,10 @@ class LanguageModelTrainer(Trainer):
         input_ids = input_ids.to(self.device)
         target_ids = target_ids.to(self.device)
 
-        # DEBUG: Sanity check at step 100
-        if self.global_step == 100:
+        # DEBUG: Sanity check every 5000 steps
+        if self.global_step % 5000 == 0 and self.global_step > 0:
             print("\n" + "="*70)
-            print("SANITY CHECK AT STEP 100")
+            print(f"SANITY CHECK AT STEP {self.global_step}")
             print("="*70)
             print(f"Current LR: {self.optimizer.param_groups[0]['lr']:.2e}")
             print(f"Input shape: {input_ids.shape}")

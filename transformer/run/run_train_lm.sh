@@ -134,10 +134,10 @@ CMD=(
     --warmup_steps "${WARMUP}"
     --snapshot_interval "${SNAPSHOT_INTERVAL}"
     --gradient_monitor
-    --gradient_monitor_interval 500
+    --gradient_monitor_interval 5000
     --early_stopping
     --weight_monitor
-    --weight_monitor_interval 500
+    --weight_monitor_interval 5000
     --yes
 )
 
