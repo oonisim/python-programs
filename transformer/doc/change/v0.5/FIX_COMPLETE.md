@@ -58,3 +58,62 @@
    Tests: All model tests pass (4/4)
    Files: loader_translation.py, common.py, encoder.py, decoder.py, model.py, trainer.py
 
+✅ Padding Mask Creation Bug (FIXED)
+   - Status: Critical bug fixed
+
+   Problem:
+   - OLD: Created masks by comparing token IDs: source_pad_mask = (source_padded == pad_token_id)
+   - When pad_token_id == eos_token_id (true for tiktoken/GPT-2), this masked ALL EOS tokens
+   - Bug #1: All EOS/BOS tokens in target were masked → EOS/BOS unlearnable
+   - Bug #2: All EOS tokens in source were masked → Encoder didn't see sequence boundaries
+
+   Solution:
+   - NEW: Create masks based on actual sequence lengths, not token comparisons
+   - Track original lengths and mark positions BEYOND length as padding
+   - Only artificial padding is masked, real EOS/BOS tokens preserved
+
+   Implementation (loader_translation.py lines 120-149):
+   ```python
+   # Get original sequence lengths
+   source_lengths = torch.tensor([len(seq) for seq in source_seqs])
+   target_lengths = torch.tensor([len(seq) for seq in target_seqs])
+
+   # Create position indices
+   source_positions = torch.arange(source_padded.size(1)).unsqueeze(0).expand(...)
+   target_positions = torch.arange(target_padded.size(1)).unsqueeze(0).expand(...)
+
+   # Mask positions >= actual length (artificial padding only)
+   source_pad_mask = source_positions >= source_lengths.unsqueeze(1)
+   target_pad_mask = target_positions >= target_lengths.unsqueeze(1)
+   ```
+
+   Benefits:
+   - Real EOS tokens preserved in both source and target
+   - BOS tokens (set to EOS) preserved in target
+   - Works correctly regardless of pad_token_id == eos_token_id
+   - Model can now learn sequence boundaries
+
+   Tests: All model tests pass (4/4)
+   File: loader_translation.py
+
+✅ Decoder Input Corruption (FIXED)
+   - Problem: Premature masking in collate caused decoder_input to contain LABEL_IGNORE_VALUE (-100)
+   - Solution: Moved masking to trainer AFTER shifting sequences
+   - decoder_input gets clean token IDs (can be embedded)
+   - decoder_target gets masked PAD positions (loss ignores them)
+   - Files: loader_translation.py, trainer.py
+
+✅ Train Mode Preservation (FIXED)
+   - Problem: generate() called self.eval() but never restored training mode
+   - Solution: Save/restore training state with try-finally block
+   - Files: model.py (Transformer.generate), lm.py (LanguageModel.generate)
+
+✅ Option A Implementation (COMPLETE)
+   - Implemented 45-50M parameter model configuration for WikiText-103
+   - Model presets: tiny (~16M), small (~45-50M), medium (~117M)
+   - Learning rate warmup scheduler (1000 steps default)
+   - Fixed d_ff ratio: 2048 (4× d_model) instead of 512
+   - Increased max_seq_len: 512 instead of 256
+   - Updated training script with preset support
+   - Expected perplexity: ~50-60 on WikiText-103
+   - Files: train_lm.py, run_train_lm.sh, doc/note/option_a_training.md

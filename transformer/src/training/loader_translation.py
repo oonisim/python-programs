@@ -119,15 +119,36 @@ def translation_collate_fn(
     # --------------------------------------------------------------------------------
     # Create padding masks for attention and loss computation
     # --------------------------------------------------------------------------------
-    # Source padding mask: identifies padding positions in source sequences
-    # Shape: (B, Ts) where True indicates padding token
-    # This mask prevents attention mechanism from attending to padding tokens
-    source_pad_mask = (source_padded == source_pad_id)
+    # CRITICAL FIX: Create masks based on sequence lengths, NOT token values.
+    #
+    # BUG: If pad_token_id == eos_token_id (true for tiktoken/GPT-2), comparing
+    # with pad_token_id would mask ALL EOS tokens including:
+    #   - Real EOS at sequence end
+    #   - BOS token (which is set to EOS)
+    #   - Any legitimate EOS in text
+    # This makes EOS/BOS unlearnable even with ignore_index=-100 fix.
+    #
+    # SOLUTION: Track original sequence lengths and mask positions beyond them.
+    # pad_sequence adds padding at END of shorter sequences, so we mark those.
+    # --------------------------------------------------------------------------------
 
-    # Target padding mask: identifies padding positions in target sequences
-    # Shape: (B, Tt) where True indicates padding token
-    # This mask is used in trainer to mask loss calculation
-    target_pad_mask = (target_padded == target_pad_id)
+    # Get original lengths of each sequence in the batch
+    source_lengths = torch.tensor([len(seq) for seq in source_seqs], dtype=torch.long)
+    target_lengths = torch.tensor([len(seq) for seq in target_seqs], dtype=torch.long)
+
+    # Create position indices: [[0, 1, 2, ...], [0, 1, 2, ...], ...]
+    # Shape: (B, Ts) for source, (B, Tt) for target
+    source_positions = torch.arange(source_padded.size(1)).unsqueeze(0).expand(
+        source_padded.size(0), -1
+    )
+    target_positions = torch.arange(target_padded.size(1)).unsqueeze(0).expand(
+        target_padded.size(0), -1
+    )
+
+    # Create masks: True where position >= actual length (i.e., padding positions)
+    # Shape: (B, Ts) for source, (B, Tt) for target
+    source_pad_mask = source_positions >= source_lengths.unsqueeze(1)
+    target_pad_mask = target_positions >= target_lengths.unsqueeze(1)
 
     # --------------------------------------------------------------------------------
     # CRITICAL: Do NOT mask target_padded here with LABEL_IGNORE_VALUE

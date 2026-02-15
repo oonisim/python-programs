@@ -1,14 +1,6 @@
 Findings (new, ordered by severity)
 
-P2: EOS/BOS get masked when pad_token_id == eos_token_id
-translation_collate_fn builds target_pad_mask by comparing target_padded == target_pad_id, then masks those positions to LABEL_IGNORE_VALUE. If pad_token_id == eos_token_id (true for tiktoken adapter), this masks all EOS tokens, including the real EOS at sequence end and BOS (which is set to EOS). That makes EOS unlearnable even after the ignore_index fix.
-transformer/src/training/loader_translation.py:128-164
-
-P2: Source EOS can be treated as padding and masked out
-source_pad_mask is created with (source_padded == source_pad_id). If pad_token_id == eos_token_id, the appended EOS token (and any real EOS in text) is masked out in encoder attention. This effectively removes the end‑of‑sequence marker from the encoder context.
-transformer/src/training/loader_translation.py:123-127
-
-
+(No critical bugs currently identified)
 
 
 Root Cause Analysis
@@ -77,25 +69,33 @@ Root Cause Analysis
   ---
   Other improvements to apply:
 
-  1. Fix d_ff ratio: Change from 512 to 4 × d_model
-  2. Fix max_seq_len: Set to at least 512, ideally 1024
-  3. Add LR warmup: Warmup for 2000-4000 steps
-  4. Lower initial LR: 3e-4 → 6e-4 peak with warmup
-  5. Save model config in checkpoints: Currently missing
+  1. ✅ Fix d_ff ratio: Changed from 512 to 4 × d_model (2048) - IMPLEMENTED
+  2. ✅ Fix max_seq_len: Increased to 512 for Option A - IMPLEMENTED
+  3. ✅ Add LR warmup: Warmup for 1000-4000 steps - IMPLEMENTED
+  4. ✅ Proper LR: 3e-4 default, 6e-4 with warmup available - IMPLEMENTED
+  5. ❌ Save model config in checkpoints: Currently missing
 
     Your poor model performance (perplexity ~70, incoherent text) was likely caused by MULTIPLE issues:
 
-  1. ✅ Fixed bugs (EOS learning, eval mode, padding mask) - these are now resolved
-  2. ❌ Model too small (16M params for WikiText-103) - still needs fixing
-  3. ❌ Incorrect hyperparameters (d_ff=512 instead of 1024) - still needs fixing
-  4. ❌ Short context (max_seq_len=256) - still needs fixing
+  1. ✅ Fixed bugs (EOS learning, eval mode, padding mask, EOS masking) - RESOLVED
+  2. ✅ Model too small (16M params for WikiText-103) - Option A implemented (45-50M)
+  3. ✅ Incorrect hyperparameters (d_ff=512 instead of 1024) - Fixed in Option A
+  4. ✅ Short context (max_seq_len=256) - Fixed in Option A (512)
 
-  Recommended Next Steps:
+  Current Status (After All Fixes):
 
-  1. Start fresh training with bug fixes and proper model size
-  2. Use the improvements I outlined earlier:
-    - Scale up model (Option A or C from earlier analysis)
-    - Fix d_ff ratio (4× d_model)
-    - Increase max_seq_len to 512-1024
-    - Add LR warmup
+  Option A is now FULLY IMPLEMENTED and ready to use:
+    - Model preset: --model_preset small
+    - Parameters: ~45-50M (3× original)
+    - d_ff ratio: 2048 (4× d_model) ✓
+    - max_seq_len: 512 (2× original) ✓
+    - LR warmup: 1000 steps default ✓
+    - Expected perplexity: ~50-60 on WikiText-103
+
+  Usage:
+    ./run/run_train_lm.sh --preset small
+    ./run/run_train_lm.sh --preset small --warmup 4000 --lr 6e-4
+
+  See doc/note/option_a_training.md for complete guide.
+
 
