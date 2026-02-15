@@ -1,3 +1,8 @@
+Yes, both are still present.
+
+Transformer.generate() does not call self.eval() in model.py lines 559–612.
+val_loss or train_loss remains in trainer.py lines 573–584.
+
 [P2] Attention Padding Mask (NOT IMPLEMENTED)
      Status: Documented but not implemented
 
