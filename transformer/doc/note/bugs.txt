@@ -1,1 +1,5 @@
 [P2] Attention has no padding mask support; padded tokens will be attended to in variable‑length batches. File: common.py lines 399–519.
+[P2] run_config.json is saved/loaded outside the Trainer’s result_dir, so resume can silently miss the saved config. Files: train_translation.py lines 191–194, train_lm.py lines 232–234.
+[P3] evaluate() and LanguageModel.generate() do not switch to eval mode, so if called during training they keep dropout enabled and produce noisy metrics/outputs. Files: model.py lines 528–556, lm.py lines 215–224.
+[P2] Translation training skips learning the first target token because there is no BOS/START token in target_ids before shifting. File: trainer.py lines 317–319.
+[P2] EOS is effectively ignored during translation loss because pad_token is set to EOS and used as ignore_index, so the model never learns to end sequences. File: train_translation.py lines 255–263.
