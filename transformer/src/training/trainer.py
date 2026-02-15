@@ -148,39 +148,42 @@ class Trainer:
             scheduler: Optional learning rate scheduler.
             callbacks: List of TrainerCallback instances for extensibility.
         """
+        # Core training components
         self.model = model
         self.optimizer = optimizer
         self.criterion = criterion
         self.scheduler = scheduler
         self.config = config or TrainerConfig()
-        self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
+
+        # Setup device and callbacks
+        self.device = self._setup_device(device)
         self.callbacks = CallbackList(callbacks or [])
 
+        # Initialize directory structure and training state
         self._setup_directories()
         self._initialize_training_state()
+
+        # Setup model and monitoring systems
+        self._setup_model_and_logging()
+        self._initialize_weight_monitor()
+
+    def _setup_device(self, device: Optional[str]) -> torch.device:
+        """Setup and return the compute device.
+
+        Args:
+            device: Device string like "cuda" or "cpu" (auto-detect if None).
+
+        Returns:
+            torch.device object for training.
+        """
+        return torch.device(
+            device or ("cuda" if torch.cuda.is_available() else "cpu")
+        )
+
+    def _setup_model_and_logging(self) -> None:
+        """Move model to device and initialize TensorBoard logging."""
         self.model.to(self.device)
-
-        self.current_epoch: int = -1
-        self.current_step: int = -1
-        self.global_step: int = -1
-        self.best_val_loss: float = float("inf")
-        self.training_history: list = []
-
         self.writer = SummaryWriter(log_dir=self.model_root_dir / "runs")
-
-        # Initialize weight update monitor if enabled
-        self.weight_monitor: Optional[WeightUpdateMonitor] = None
-        if self.config.enable_weight_monitor:
-            self.weight_monitor = WeightUpdateMonitor(
-                sample_size=self.config.weight_monitor_sample_size,
-                vanishing_grad_threshold=self.config.vanishing_grad_threshold,
-                exploding_grad_threshold=self.config.exploding_grad_threshold,
-                frozen_update_ratio_threshold=self.config.frozen_update_ratio_threshold,
-                frozen_patience_steps=self.config.frozen_patience_steps,
-            )
-            print(f"Weight update monitoring enabled "
-                  f"(sample_size={self.config.weight_monitor_sample_size}, "
-                  f"interval={self.config.weight_monitor_interval} steps)")
 
     def _setup_directories(self) -> None:
         """Create directory structure for snapshots, models, and logs."""
@@ -197,6 +200,35 @@ class Trainer:
         self.global_step: int = 0
         self.best_val_loss: float = float("inf")
         self.training_history: List[Dict[str, Any]] = []
+
+    def _initialize_weight_monitor(self) -> None:
+        """Initialize weight update monitoring system if enabled in config.
+
+        The weight monitor tracks gradient statistics and parameter updates
+        to detect training issues like vanishing/exploding gradients and
+        frozen parameters.
+        """
+        self.weight_monitor: Optional[WeightUpdateMonitor] = None
+
+        if not self.config.enable_weight_monitor:
+            return
+
+        # Create monitor with configured thresholds
+        self.weight_monitor = WeightUpdateMonitor(
+            sample_size=self.config.weight_monitor_sample_size,
+            vanishing_grad_threshold=self.config.vanishing_grad_threshold,
+            exploding_grad_threshold=self.config.exploding_grad_threshold,
+            frozen_update_ratio_threshold=(
+                self.config.frozen_update_ratio_threshold
+            ),
+            frozen_patience_steps=self.config.frozen_patience_steps,
+        )
+
+        print(
+            f"Weight update monitoring enabled "
+            f"(sample_size={self.config.weight_monitor_sample_size}, "
+            f"interval={self.config.weight_monitor_interval} steps)"
+        )
 
     # ================================================================================
     # Training Methods
@@ -219,51 +251,139 @@ class Trainer:
         Returns:
             Dictionary with training history and final metrics.
         """
-        self.current_epoch = start_epoch
-        print(f"Training on {self.device} for {num_epochs} epochs")
-
-        # Callback: on_train_start
-        self.callbacks.on_train_start(self)
+        self._initialize_training_loop(start_epoch, num_epochs)
 
         try:
-            for epoch in range(start_epoch, num_epochs):
-                self.current_epoch = epoch
-
-                # Callback: on_epoch_start
-                self.callbacks.on_epoch_start(self, epoch)
-
-                train_loss = self._train_one_epoch(train_loader, epoch)
-
-                # Check if max_steps was reached during the epoch
-                if self.config.max_steps is not None and self.global_step >= self.config.max_steps:
-                    break
-
-                val_loss = self._validate(val_loader) if val_loader else None
-
-                self._log_epoch_summary(epoch, train_loss, val_loss)
-                self._update_scheduler()
-
-                # Callback: on_epoch_end (must be called before saving checkpoint so callback state is current)
-                self.callbacks.on_epoch_end(self, epoch, train_loss, val_loss)
-
-                # Save epoch checkpoint after callbacks have updated their state
-                self._save_epoch_checkpoint(epoch, train_loss, val_loss)
-
-                # Callback: should_stop_training
-                if self.callbacks.should_stop_training(self):
-                    break
-
+            self._run_epoch_loop(train_loader, val_loader, start_epoch, num_epochs)
             return self._finalize_training()
-
         finally:
-            # Ensure writer is always closed, even on exception
-            if hasattr(self, 'writer') and self.writer is not None:
-                try:
-                    self.writer.close()
-                except Exception as e:
-                    print(f"Warning: Failed to close TensorBoard writer: {e}")
+            self._close_tensorboard_writer()
 
-    def _train_one_epoch(self, train_loader: DataLoader, epoch: int) -> float:
+    def _initialize_training_loop(
+            self,
+            start_epoch: int,
+            num_epochs: int
+    ) -> None:
+        """Initialize training loop state and notify callbacks.
+
+        Args:
+            start_epoch: Epoch to start from (for resuming training).
+            num_epochs: Total number of epochs to train.
+        """
+        self.current_epoch = start_epoch
+        print(f"Training on {self.device} for {num_epochs} epochs")
+        self.callbacks.on_train_start(self)
+
+    def _run_epoch_loop(
+            self,
+            train_loader: DataLoader,
+            val_loader: Optional[DataLoader],
+            start_epoch: int,
+            num_epochs: int
+    ) -> None:
+        """Execute the main training loop across epochs.
+
+        Args:
+            train_loader: DataLoader for training data.
+            val_loader: DataLoader for validation data (optional).
+            start_epoch: Epoch to start from (for resuming training).
+            num_epochs: Total number of epochs to train.
+        """
+        for epoch in range(start_epoch, num_epochs):
+            self.current_epoch = epoch
+
+            # Notify callbacks that epoch is starting
+            self.callbacks.on_epoch_start(self, epoch)
+
+            # Train for one epoch
+            train_loss = self._train_one_epoch(
+                train_loader=train_loader,
+                epoch=epoch
+            )
+
+            # Check if global step limit was reached during training
+            if self._should_stop_for_max_steps():
+                break
+
+            # Run post-epoch operations (validation, logging, checkpointing)
+            should_stop = self._post_epoch_operations(
+                train_loader=train_loader,
+                val_loader=val_loader,
+                epoch=epoch,
+                train_loss=train_loss
+            )
+
+            # Check if training should stop early
+            if should_stop:
+                break
+
+    def _post_epoch_operations(
+            self,
+            train_loader: DataLoader,
+            val_loader: Optional[DataLoader],
+            epoch: int,
+            train_loss: float
+    ) -> bool:
+        """Execute post-epoch operations and return whether to stop training.
+
+        Args:
+            train_loader: DataLoader for training data.
+            val_loader: DataLoader for validation data (optional).
+            epoch: Current epoch number.
+            train_loss: Average training loss for this epoch.
+
+        Returns:
+            True if training should stop, False otherwise.
+        """
+        # Run validation if validation loader is provided
+        val_loss = self._validate(val_loader) if val_loader else None
+
+        # Log metrics and update learning rate scheduler
+        self._log_epoch_summary(
+            epoch=epoch,
+            train_loss=train_loss,
+            val_loss=val_loss
+        )
+        self._update_scheduler()
+
+        # Notify callbacks that epoch has ended
+        self.callbacks.on_epoch_end(self, epoch, train_loss, val_loss)
+
+        # Save checkpoint after callbacks have updated their state
+        self._save_epoch_checkpoint(
+            epoch=epoch,
+            train_loss=train_loss,
+            val_loss=val_loss
+        )
+
+        # Check if callbacks want to stop training early
+        return self.callbacks.should_stop_training(self)
+
+    def _should_stop_for_max_steps(self) -> bool:
+        """Check if training should stop due to reaching max_steps limit.
+
+        Returns:
+            True if max_steps is configured and has been reached.
+        """
+        if self.config.max_steps is None:
+            return False
+        return self.global_step >= self.config.max_steps
+
+    def _close_tensorboard_writer(self) -> None:
+        """Safely close the TensorBoard writer, handling errors gracefully."""
+        if not hasattr(self, 'writer') or self.writer is None:
+            return
+
+        try:
+            self.writer.close()
+        except Exception as e:
+            print(f"Warning: Failed to close TensorBoard writer: {e}")
+
+    def _train_one_epoch(
+            self,
+            train_loader: DataLoader,
+            epoch: int
+    ) -> float:
         """Train for one epoch.
 
         Args:
@@ -273,35 +393,103 @@ class Trainer:
         Returns:
             Average training loss for this epoch.
         """
+        # Set model to training mode (enables dropout, batch norm updates, etc.)
         self.model.train()
-        total_loss = 0.0
-        num_batches = len(train_loader)
 
+        num_batches = len(train_loader)
         if num_batches == 0:
             print("Warning: Training dataloader is empty, returning 0.0 loss")
             return 0.0
 
-        for step, batch in enumerate(train_loader):
-            # Callback: on_batch_start
-            self.callbacks.on_batch_start(self, step)
-
-            loss = self._train_one_step(batch)
-            total_loss += loss
-            self.current_step = step
-            self.global_step += 1
-
-            self._log_step_progress(epoch, step, num_batches, loss)
-            self._save_step_checkpoint(epoch, step)
-
-            # Callback: on_batch_end
-            self.callbacks.on_batch_end(self, step, loss)
-
-            # Check if max_steps reached
-            if self.config.max_steps is not None and self.global_step >= self.config.max_steps:
-                print(f"\nReached max_steps={self.config.max_steps}. Stopping training.")
-                return total_loss / (step + 1)
+        # Process all batches in this epoch
+        total_loss = self._process_epoch_batches(
+            train_loader=train_loader,
+            epoch=epoch,
+            num_batches=num_batches
+        )
 
         return total_loss / num_batches
+
+    def _process_epoch_batches(
+            self,
+            train_loader: DataLoader,
+            epoch: int,
+            num_batches: int
+    ) -> float:
+        """Process all batches in an epoch and return total loss.
+
+        Args:
+            train_loader: DataLoader for training data.
+            epoch: Current epoch number.
+            num_batches: Total number of batches in this epoch.
+
+        Returns:
+            Sum of losses across all processed batches.
+        """
+        total_loss = 0.0
+
+        for step, batch in enumerate(train_loader):
+            # Process one batch and update counters
+            loss = self._process_one_batch(
+                batch=batch,
+                step=step,
+                epoch=epoch,
+                num_batches=num_batches
+            )
+            total_loss += loss
+
+            # Check if global step limit has been reached
+            if self._should_stop_for_max_steps():
+                print(
+                    f"\nReached max_steps={self.config.max_steps}. "
+                    "Stopping training."
+                )
+                # Return average of batches processed so far
+                return total_loss / (step + 1) * num_batches
+
+        return total_loss
+
+    def _process_one_batch(
+            self,
+            batch: Dict[str, Tensor],
+            step: int,
+            epoch: int,
+            num_batches: int
+    ) -> float:
+        """Process one batch and perform all related operations.
+
+        Args:
+            batch: Dictionary containing batch data.
+            step: Current step number within epoch.
+            epoch: Current epoch number.
+            num_batches: Total number of batches in this epoch.
+
+        Returns:
+            Loss value for this batch.
+        """
+        # Notify callbacks that batch processing is starting
+        self.callbacks.on_batch_start(self, step)
+
+        # Execute forward pass, backward pass, and optimizer step
+        loss = self._train_one_step(batch)
+
+        # Update step counters
+        self.current_step = step
+        self.global_step += 1
+
+        # Log progress and save checkpoints if configured
+        self._log_step_progress(
+            epoch=epoch,
+            step=step,
+            num_batches=num_batches,
+            loss=loss
+        )
+        self._save_step_checkpoint(epoch=epoch, step=step)
+
+        # Notify callbacks that batch processing has ended
+        self.callbacks.on_batch_end(self, step, loss)
+
+        return loss
 
     def _train_one_step(self, batch: Dict[str, Tensor]) -> float:
         r"""Execute one training step (forward, backward, update).
@@ -482,41 +670,102 @@ class Trainer:
     # ========================================================================
 
     def _log_weight_monitor_updates(self, step: int) -> None:
-        """Log aggregate update diagnostics (decisive frozen detection)."""
+        """Log weight update diagnostics to TensorBoard and console.
+
+        Args:
+            step: Current global step number.
+        """
         assert self.weight_monitor is not None
-        upd_diag = self.weight_monitor.check_updates(self.model, self.optimizer)
+
+        # Collect update diagnostics from all parameters
+        upd_diag = self.weight_monitor.check_updates(
+            model=self.model,
+            optimizer=self.optimizer
+        )
         stats = WeightUpdateMonitor.aggregate_update_stats(upd_diag)
 
         if stats.get("count", 0.0) == 0.0:
             return
 
+        # Log aggregate statistics to TensorBoard
+        self._log_update_stats_to_tensorboard(stats=stats, step=step)
+
+        # Log top-K parameters with smallest updates
+        self._log_topk_frozen_params(upd_diag=upd_diag, step=step)
+
+        # Print console warnings if frozen parameters detected
+        self._print_frozen_param_warnings(
+            upd_diag=upd_diag,
+            stats=stats,
+            step=step
+        )
+
+    def _log_update_stats_to_tensorboard(
+            self,
+            stats: Dict[str, float],
+            step: int
+    ) -> None:
+        """Log aggregate update statistics to TensorBoard.
+
+        Args:
+            stats: Dictionary of aggregated update statistics.
+            step: Current global step number.
+        """
         self.writer.add_scalar("monitor/update_ratio_median", stats["median"], step)
         self.writer.add_scalar("monitor/update_ratio_p95", stats["p95"], step)
         self.writer.add_scalar("monitor/update_ratio_min", stats["min"], step)
         self.writer.add_scalar("monitor/update_ratio_max", stats["max"], step)
         self.writer.add_scalar("monitor/frozen_count", stats["frozen_count"], step)
 
-        # Optional: top-K per param (adds K tags)
+    def _log_topk_frozen_params(
+            self,
+            upd_diag: Dict[str, Any],
+            step: int
+    ) -> None:
+        """Log top-K parameters with smallest update ratios to TensorBoard.
+
+        Args:
+            upd_diag: Per-parameter update diagnostics.
+            step: Current global step number.
+        """
         for name, val in WeightUpdateMonitor.top_k_smallest_updates(
             upd_diag, k=self.config.monitor_topk
         ):
             self.writer.add_scalar(f"monitor/topk_frozen/{name}", val, step)
 
-        # Console warnings for frozen weights (only if detected)
-        if stats["frozen_count"] > 0:
-            frozen_params = [
-                (name, diag.update_ratio)
-                for name, diag in upd_diag.items()
-                if diag.is_frozen
-            ]
-            frozen_params.sort(key=lambda x: x[1])
+    def _print_frozen_param_warnings(
+            self,
+            upd_diag: Dict[str, Any],
+            stats: Dict[str, float],
+            step: int
+    ) -> None:
+        """Print console warnings for frozen parameters if detected.
 
-            print(f"  ⚠️  Step {step}: {stats['frozen_count']:.0f} frozen params "
-                  f"(update_ratio <= {self.config.frozen_update_ratio_threshold:.0e} "
-                  f"for {self.config.frozen_patience_steps} consecutive steps)")
+        Args:
+            upd_diag: Per-parameter update diagnostics.
+            stats: Dictionary of aggregated update statistics.
+            step: Current global step number.
+        """
+        if stats["frozen_count"] == 0:
+            return
 
-            for name, ratio in frozen_params[:self.config.monitor_topk]:
-                print(f"      {name}: {ratio:.2e}")
+        # Collect and sort frozen parameters by update ratio
+        frozen_params = sorted(
+            [(name, diag.update_ratio) for name, diag in upd_diag.items() if diag.is_frozen],
+            key=lambda x: x[1]
+        )
+
+        # Print summary warning
+        threshold = self.config.frozen_update_ratio_threshold
+        patience = self.config.frozen_patience_steps
+        print(
+            f"  WARNING: Step {step}: {stats['frozen_count']:.0f} frozen params "
+            f"(update_ratio <= {threshold:.0e} for {patience} consecutive steps)"
+        )
+
+        # Print top-K frozen parameters
+        for name, ratio in frozen_params[:self.config.monitor_topk]:
+            print(f"      {name}: {ratio:.2e}")
 
     def _log_epoch_summary(
             self,
@@ -574,22 +823,41 @@ class Trainer:
             self,
             epoch: int,
             train_loss: float,
-            val_loss: Optional[float]
+            val_loss: Optional[float] = None
     ) -> None:
-        """Save checkpoint at end of epoch if configured."""
+        """Save checkpoint at end of epoch if configured.
+
+        Args:
+            epoch: Current epoch number.
+            train_loss: Average training loss for this epoch.
+            val_loss: Average validation loss for this epoch, or None if validation
+                was not performed.
+        """
         if not self.config.snapshot_per_epoch:
             return
 
-        self.save_snapshot(epoch, step=0, loss=val_loss or train_loss)
+        # --------------------------------------------------------------------------------
+        # Loss Selection for Checkpoint Tracking
+        #
+        # Use val_loss if available, otherwise fall back to train_loss.
+        # CRITICAL: Use explicit None check, not 'or' operator.
+        # Bug: 'val_loss or train_loss' treats 0.0 as falsy, incorrectly falling back
+        # to train_loss even when validation succeeded with perfect loss.
+        # --------------------------------------------------------------------------------
+        current_loss = val_loss if val_loss is not None else train_loss
+
+        # Save checkpoint with current loss
+        self.save_snapshot(epoch=epoch, step=0, loss=current_loss)
 
         # Update best model tracking
-        current_loss = val_loss if val_loss is not None else train_loss
         if current_loss < self.best_val_loss:
             self.best_val_loss = current_loss
 
-        # Cleanup old snapshots
+        # Cleanup old snapshots if retention limit is configured
         if self.config.keep_last_n_snapshots > 0:
-            self.cleanup_old_snapshots(self.config.keep_last_n_snapshots)
+            self.cleanup_old_snapshots(
+                keep_last_n=self.config.keep_last_n_snapshots
+            )
 
     def save_snapshot(
             self,
@@ -611,22 +879,44 @@ class Trainer:
         """
         ensure_directory_exists(self.snapshots_dir)
 
-        # Callback: collect extra state from callbacks
-        callback_state = self.callbacks.on_snapshot_save(self, epoch, step)
+        # Collect and merge callback state into extra_state
+        extra_state = self._merge_callback_state(extra_state, epoch, step)
 
-        # Merge callback state with extra_state
-        if extra_state is None:
-            extra_state = {}
-        if callback_state:
-            extra_state['callback_state'] = callback_state
-
+        # Build checkpoint dictionary and determine save path
         checkpoint = self._build_checkpoint_dict(epoch, step, loss, extra_state)
-        filename = build_snapshot_filename(epoch, step)
-        filepath = self.snapshots_dir / filename
+        filepath = self.snapshots_dir / build_snapshot_filename(epoch, step)
 
+        # Save checkpoint to disk
         torch.save(checkpoint, filepath)
         print(f"Snapshot saved: {filepath}")
         return filepath
+
+    def _merge_callback_state(
+            self,
+            extra_state: Optional[Dict[str, Any]],
+            epoch: int,
+            step: int
+    ) -> Dict[str, Any]:
+        """Merge callback state into extra_state dictionary.
+
+        Args:
+            extra_state: Additional state to save (optional).
+            epoch: Current epoch number.
+            step: Current step within epoch.
+
+        Returns:
+            Merged extra_state dictionary with callback state.
+        """
+        # Initialize extra_state if None
+        if extra_state is None:
+            extra_state = {}
+
+        # Collect callback state and merge if present
+        callback_state = self.callbacks.on_snapshot_save(self, epoch, step)
+        if callback_state:
+            extra_state['callback_state'] = callback_state
+
+        return extra_state
 
     def _build_checkpoint_dict(
             self,

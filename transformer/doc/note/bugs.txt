@@ -1,7 +1,5 @@
-Yes, both are still present.
 
-Transformer.generate() does not call self.eval() in model.py lines 559–612.
-val_loss or train_loss remains in trainer.py lines 573–584.
+Remaining Issues:
 
 [P2] Attention Padding Mask (NOT IMPLEMENTED)
      Status: Documented but not implemented
@@ -25,3 +23,94 @@ val_loss or train_loss remains in trainer.py lines 573–584.
      wasting attention mass and contaminating representations
 
      File: common.py lines 399-519
+
+
+
+
+Root Cause Analysis
+
+  1. Model is severely underpowered for WikiText-103
+
+  Current: 16M params (d=256, h=4, L=4, d_ff=512)
+  Dataset: ~118M tokens (WikiText-103)
+
+  Comparison to baselines:
+  - GPT-2 Small: 117M params, WikiText-103 perplexity: ~35-40
+  - Your model: 16M params, perplexity: ~70
+
+  Your model is 7× smaller than GPT-2 Small, which already struggles with WikiText-103.
+
+  2. Sequence length mismatch
+
+  Config: max_seq_len = 256
+  Actual data: sequences up to 1063 tokens
+  Warning in log: "Token indices sequence length is longer than the specified maximum sequence length"
+
+  This truncates context, preventing the model from learning long-range dependencies.
+
+  3. Training configuration issues
+
+  - d_ff=512: Should be 4× d_model (1024, not 512) per Transformer paper
+  - max_seq_len=256: Too short for WikiText-103
+  - No warmup: LR scheduler jumps straight to 3e-4
+
+  ---
+  Recommendations
+
+  Option A: Scale up the model (Recommended)
+
+  For WikiText-103, you need a significantly larger model:
+
+  # Minimum viable config for WikiText-103
+  d_model = 512      # 2× current
+  num_heads = 8      # 2× current
+  num_layers = 6     # 1.5× current
+  d_ff = 2048        # 4× d_model
+  max_seq_len = 512  # 2× current
+  # Results in ~45-50M params
+
+  This should achieve perplexity ~50-60 with proper training.
+
+  Option B: Switch to WikiText-2
+
+  Your current 16M model is better sized for WikiText-2 (~2M tokens):
+
+  python training/train_lm.py --dataset wikitext --epochs 10
+
+  Expected perplexity: ~30-40 (much better than current 70)
+
+  Option C: Significantly scale up for good WikiText-103 results
+
+  To match GPT-2 Small performance (~35-40 perplexity):
+
+  d_model = 768      # 3× current
+  num_heads = 12
+  num_layers = 12    # 3× current
+  d_ff = 3072        # 4× d_model
+  max_seq_len = 1024
+  # Results in ~117M params (like GPT-2 Small)
+
+  ---
+  Other improvements to apply:
+
+  1. Fix d_ff ratio: Change from 512 to 4 × d_model
+  2. Fix max_seq_len: Set to at least 512, ideally 1024
+  3. Add LR warmup: Warmup for 2000-4000 steps
+  4. Lower initial LR: 3e-4 → 6e-4 peak with warmup
+  5. Save model config in checkpoints: Currently missing
+
+    Your poor model performance (perplexity ~70, incoherent text) was likely caused by MULTIPLE issues:
+
+  1. ✅ Fixed bugs (EOS learning, eval mode) - these are now resolved
+  2. ❌ Model too small (16M params for WikiText-103) - still needs fixing
+  3. ❌ Incorrect hyperparameters (d_ff=512 instead of 1024) - still needs fixing
+  4. ❌ Short context (max_seq_len=256) - still needs fixing
+
+  Recommended Next Steps:
+
+  1. Start fresh training with bug fixes and proper model size
+  2. Use the improvements I outlined earlier:
+    - Scale up model (Option A or C from earlier analysis)
+    - Fix d_ff ratio (4× d_model)
+    - Increase max_seq_len to 512-1024
+    - Add LR warmup

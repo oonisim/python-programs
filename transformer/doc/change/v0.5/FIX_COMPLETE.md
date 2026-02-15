@@ -20,3 +20,8 @@
    - Added self.eval() to evaluate() and generate() methods
    - Disables dropout for deterministic evaluation/generation
    - Files: model.py, lm.py
+
+✅ val_loss or train_loss bug (FIXED)
+   - Bug: Used 'val_loss or train_loss' which fails when val_loss=0.0
+   - Fix: Changed to 'val_loss if val_loss is not None else train_loss'
+   - File: trainer.py line 605
