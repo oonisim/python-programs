@@ -34,13 +34,32 @@ from tokenization import Tokenizer
 
 
 class LanguageModelDataset(Dataset):
-    """Dataset for language modeling.
+    """Dataset for language modeling with non-overlapping block chunking.
 
     For language modeling, input and target are the same sequence shifted by 1:
     - Input:  [t0, t1, t2, ..., t_{n-1}]
     - Target: [t1, t2, t3, ..., t_n]
 
     The model learns to predict the next token given previous tokens.
+
+    IMPORTANT - Block Chunking (stride = seq_len):
+    -----------------------------------------------
+    This implementation uses NON-OVERLAPPING chunks (stride = seq_len), which is
+    standard for GPT-style LM training.
+
+    Previous bug: Used stride=1 sliding window, creating ~N sequences (one per token).
+    - With 118M tokens, seq_len=512: created 118M sequences → 3.6M batches/epoch
+    - Result: ~32 days per epoch at 4,740 steps/hour
+
+    Current fix: Block chunking with stride=seq_len creates ~N/seq_len sequences.
+    - With 118M tokens, seq_len=512: creates 230K sequences → 7.2K batches/epoch
+    - Result: ~1.5 hours per epoch (512x faster)
+
+    Why block chunking?
+    - Efficient: Processes each token exactly once per epoch
+    - Standard practice: Used by GPT-2, GPT-3, and all modern LM training
+    - No data correlation: Adjacent batches come from different text regions
+    - Sliding window (stride=1) is only used for evaluation, not training
     """
 
     def __init__(self, tokens: Tensor, seq_len: int):
@@ -54,22 +73,44 @@ class LanguageModelDataset(Dataset):
         self.seq_len = seq_len
 
     def __len__(self) -> int:
-        """Number of complete sequences available.
+        """Number of complete sequences available (non-overlapping chunks).
 
-        For each sample, we need seq_len tokens for input and seq_len tokens for target (shifted by 1).
-        The target ends at idx + seq_len, so we need tokens up to that index.
-        Valid indices: 0 <= idx < len(tokens) - seq_len
+        Uses block chunking with stride = seq_len (no overlap).
+        Each sample needs seq_len + 1 tokens total:
+          - input_ids:  tokens[start : start + seq_len]         (seq_len tokens)
+          - target_ids: tokens[start + 1 : start + seq_len + 1] (seq_len tokens)
+
+        Valid start positions must satisfy: start + seq_len + 1 <= len(tokens)
+        Max valid start: max_start = len(tokens) - (seq_len + 1)
+        Number of non-overlapping chunks: (max_start // seq_len) + 1
+
+        Example with N=1025 tokens, seq_len=256:
+            max_start = 1025 - 257 = 768
+            chunks = (768 // 256) + 1 = 4
+            - Chunk 0: start=0,   tokens[0:256],   targets[1:257]     ✓
+            - Chunk 1: start=256, tokens[256:512], targets[257:513]   ✓
+            - Chunk 2: start=512, tokens[512:768], targets[513:769]   ✓
+            - Chunk 3: start=768, tokens[768:1024], targets[769:1025] ✓
         """
-        return max(0, len(self.tokens) - self.seq_len)
+        n = len(self.tokens)
+        max_start = n - (self.seq_len + 1)
+        if max_start < 0:
+            return 0
+        return (max_start // self.seq_len) + 1
 
     def __getitem__(self, idx: int) -> tuple[Tensor, Tensor]:
-        """Get input-target pair.
+        """Get input-target pair from non-overlapping block chunks.
+
+        Args:
+            idx: Chunk index (not token position). Valid range: [0, __len__())
 
         Returns:
             Tuple of (input_ids, target_ids) where target is shifted by 1.
+            Each chunk starts at position (idx * seq_len).
         """
-        input_ids = self.tokens[idx : idx + self.seq_len]
-        target_ids = self.tokens[idx + 1 : idx + self.seq_len + 1]
+        start = idx * self.seq_len
+        input_ids = self.tokens[start : start + self.seq_len]
+        target_ids = self.tokens[start + 1 : start + self.seq_len + 1]
         return input_ids, target_ids
 
 
@@ -187,7 +228,8 @@ class LanguageModelDataLoaderFactory:
             dataset,
             batch_size=self.config.batch_size,
             shuffle=True,
-            num_workers=self.config.num_workers
+            num_workers=self.config.num_workers,
+            drop_last=True  # Drop final incomplete batch to keep batch sizes consistent
         )
 
     def get_val_loader(self) -> DataLoader:
@@ -252,11 +294,15 @@ class LanguageModelDataLoaderFactory:
 
         if self._train_tokens is not None:
             stats["train_tokens"] = len(self._train_tokens)
-            stats["train_sequences"] = len(self._train_tokens) - self.config.seq_len
+            # Calculate number of non-overlapping chunks using same formula as __len__
+            max_start = len(self._train_tokens) - (self.config.seq_len + 1)
+            stats["train_sequences"] = 0 if max_start < 0 else (max_start // self.config.seq_len) + 1
 
         if self._val_tokens is not None:
             stats["val_tokens"] = len(self._val_tokens)
-            stats["val_sequences"] = len(self._val_tokens) - self.config.seq_len
+            # Calculate number of non-overlapping chunks using same formula as __len__
+            max_start = len(self._val_tokens) - (self.config.seq_len + 1)
+            stats["val_sequences"] = 0 if max_start < 0 else (max_start // self.config.seq_len) + 1
 
         return stats
 

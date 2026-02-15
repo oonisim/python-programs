@@ -41,7 +41,9 @@ EPOCHS=20
 BATCH_SIZE=32
 LR="3e-4"
 WARMUP=0
-SNAPSHOT_INTERVAL=5000
+SNAPSHOT_INTERVAL=10000
+MONITOR_INTERVAL=10000
+SANITY_CHECK_INTERVAL=10000
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -72,6 +74,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --snapshot)
             SNAPSHOT_INTERVAL="$2"
+            shift 2
+            ;;
+        --monitor_interval)
+            MONITOR_INTERVAL="$2"
+            shift 2
+            ;;
+        --sanity_check_interval)
+            SANITY_CHECK_INTERVAL="$2"
             shift 2
             ;;
         --help|-h)
@@ -120,6 +130,8 @@ echo "Batch size:          ${BATCH_SIZE}"
 echo "Learning rate:       ${LR}"
 echo "Warmup steps:        ${WARMUP}"
 echo "Snapshot interval:   ${SNAPSHOT_INTERVAL}"
+echo "Monitor interval:    ${MONITOR_INTERVAL}"
+echo "Sanity check interval: ${SANITY_CHECK_INTERVAL}"
 echo "Log file:            ${LOG_FILE}"
 echo "========================================================================"
 echo ""
@@ -133,11 +145,12 @@ CMD=(
     --lr "${LR}"
     --warmup_steps "${WARMUP}"
     --snapshot_interval "${SNAPSHOT_INTERVAL}"
+    --sanity_check_interval "${SANITY_CHECK_INTERVAL}"
     --gradient_monitor
-    --gradient_monitor_interval 5000
+    --gradient_monitor_interval "${MONITOR_INTERVAL}"
     --early_stopping
     --weight_monitor
-    --weight_monitor_interval 5000
+    --weight_monitor_interval "${MONITOR_INTERVAL}"
     --yes
 )
 
