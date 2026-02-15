@@ -1,21 +1,28 @@
-Findings (new, ordered by severity)
+● The Warmup Problem Explained:
 
-(No critical bugs currently identified)
+  With warmup_steps=1000:
 
-  The remaining known issues from prior rounds have been FIXED:
-  ┌──────────────────────────────────────────────┬───────────────────┬──────────┐
-  │                    Issue                     │     File:Line     │  Status  │
-  ├──────────────────────────────────────────────┼───────────────────┼──────────┤
-  │ generate() missing source_pad_mask parameter │ model.py:569-650  │ ✅ FIXED │
-  ├──────────────────────────────────────────────┼───────────────────┼──────────┤
-  │ evaluate() doesn't restore training mode     │ model.py:560-572  │ ✅ FIXED │
-  ├──────────────────────────────────────────────┼───────────────────┼──────────┤
-  │ Missing space in error message               │ model.py:603-606  │ ✅ FIXED │
-  ├──────────────────────────────────────────────┼───────────────────┼──────────┤
-  │ Invalid pylint directive (missing colon)     │ lm.py:367         │ ✅ FIXED │
-  ├──────────────────────────────────────────────┼───────────────────┼──────────┤
-  │ Off-by-one in get_stats()                    │ loader.py:255,259 │ ✅ FIXED │
-  └──────────────────────────────────────────────┴───────────────────┴──────────┘
+  At step 100, the LR multiplier would be:
+  lr_multiplier = current_step / warmup_steps = 100 / 1000 = 0.1
+  actual_lr = 0.0003 × 0.1 = 0.00003  # 10x smaller!
+
+  At step 500:
+  lr_multiplier = 500 / 1000 = 0.5
+  actual_lr = 0.0003 × 0.5 = 0.00015  # Still 2x smaller!
+
+  At steps 0-999, the LR was too small → Almost no weight updates → Loss stayed near log(V)
+
+  Summary:
+
+  ┌──────────────────┬─────────────────┬──────────────────┬────────────────┐
+  │  Configuration   │   Step 100 LR   │ Loss at step 100 │     Result     │
+  ├──────────────────┼─────────────────┼──────────────────┼────────────────┤
+  │ With warmup=1000 │ 0.00003 (3e-05) │ ~10.9 (stuck)    │ ❌ No learning │
+  ├──────────────────┼─────────────────┼──────────────────┼────────────────┤
+  │ With warmup=0    │ 0.0003 (3e-04)  │ 6.73 (dropping)  │ ✅ Learning!   │
+  └──────────────────┴─────────────────┴──────────────────┴────────────────┘
+
+  The fix: Disabled warmup so LR starts at full 0.0003 from step 0, allowing immediate learning.
 
 
 Root Cause Analysis
