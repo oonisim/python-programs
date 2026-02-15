@@ -1,32 +1,4 @@
 
-Remaining Issues:
-
-[P2] Attention Padding Mask (NOT IMPLEMENTED)
-     Status: Documented but not implemented
-
-     What exists:
-     - Documentation in loader_translation.py (lines 122-129) explains why
-       padding masks are needed for attention
-
-     What's missing:
-     1. translation_collate_fn() doesn't create/return padding masks
-        Need: source_pad_mask = (source_padded == source_pad_id)
-
-     2. ScaledDotProductAttention.forward() has no padding_mask parameter
-        Current: forward(q, k, v, return_similarities=False)
-        Need: forward(q, k, v, padding_mask=None, return_similarities=False)
-
-     3. No mask application before softmax in attention computation
-        Need: similarities.masked_fill(padding_mask, float('-inf'))
-
-     Impact: Padded tokens are attended to in variable-length batches,
-     wasting attention mass and contaminating representations
-
-     File: common.py lines 399-519
-
-
-
-
 Root Cause Analysis
 
   1. Model is severely underpowered for WikiText-103
@@ -101,7 +73,7 @@ Root Cause Analysis
 
     Your poor model performance (perplexity ~70, incoherent text) was likely caused by MULTIPLE issues:
 
-  1. ✅ Fixed bugs (EOS learning, eval mode) - these are now resolved
+  1. ✅ Fixed bugs (EOS learning, eval mode, padding mask) - these are now resolved
   2. ❌ Model too small (16M params for WikiText-103) - still needs fixing
   3. ❌ Incorrect hyperparameters (d_ff=512 instead of 1024) - still needs fixing
   4. ❌ Short context (max_seq_len=256) - still needs fixing
@@ -114,3 +86,4 @@ Root Cause Analysis
     - Fix d_ff ratio (4× d_model)
     - Increase max_seq_len to 512-1024
     - Add LR warmup
+

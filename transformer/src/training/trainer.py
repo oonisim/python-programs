@@ -498,7 +498,8 @@ class Trainer:
         $$ \\mathcal{L} = -\\frac{1}{N} \\sum_{i=1}^{N} \\log P(y_i | x_i) $$
 
         Args:
-            batch: Dictionary containing 'source_ids' and 'target_ids'.
+            batch: Dictionary containing 'source_ids', 'target_ids', and optionally
+                'source_pad_mask'.
 
         Returns:
             Loss value for this step.
@@ -506,12 +507,21 @@ class Trainer:
         source_ids = batch["source_ids"].to(self.device)
         target_ids = batch["target_ids"].to(self.device)
 
+        # Extract optional source padding mask
+        source_pad_mask = batch.get("source_pad_mask")
+        if source_pad_mask is not None:
+            source_pad_mask = source_pad_mask.to(self.device)
+
         # Shift target for teacher forcing: input is [:-1], target is [1:]
         decoder_input = target_ids[:, :-1]
         decoder_target = target_ids[:, 1:]
 
         self.optimizer.zero_grad()
-        log_probabilities = self.model.forward(x=source_ids, y=decoder_input)
+        log_probabilities = self.model.forward(
+            x=source_ids,
+            y=decoder_input,
+            source_pad_mask=source_pad_mask
+        )
 
         loss = self._compute_loss(log_probabilities, decoder_target)
 
@@ -584,10 +594,19 @@ class Trainer:
             source_ids = batch["source_ids"].to(self.device)
             target_ids = batch["target_ids"].to(self.device)
 
+            # Extract optional source padding mask
+            source_pad_mask = batch.get("source_pad_mask")
+            if source_pad_mask is not None:
+                source_pad_mask = source_pad_mask.to(self.device)
+
             decoder_input = target_ids[:, :-1]
             decoder_target = target_ids[:, 1:]
 
-            log_probabilities = self.model.forward(x=source_ids, y=decoder_input)
+            log_probabilities = self.model.forward(
+                x=source_ids,
+                y=decoder_input,
+                source_pad_mask=source_pad_mask
+            )
             loss = self._compute_loss(log_probabilities, decoder_target)
             total_loss += loss.item()
             num_batches += 1

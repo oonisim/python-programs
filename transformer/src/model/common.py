@@ -435,6 +435,7 @@ class ScaledDotProductAttention(nn.Module):     # pylint: disable=too-few-public
             q: Tensor,
             k: Tensor,
             v: Tensor,
+            padding_mask: Optional[Tensor] = None,
             return_similarities: bool = False
     ):
         """Calculate the scaled dot product attention.
@@ -445,6 +446,9 @@ class ScaledDotProductAttention(nn.Module):     # pylint: disable=too-few-public
             q: query of shape (B,h,Tq,d_k)
             k: key of shape (B,h,Tk,d_k)
             v: value of shape (B,h,Tk,d_v)
+            padding_mask: optional key padding mask of shape (B, 1, 1, Tk) or (B, Tk)
+                where True indicates padding positions to be masked out.
+                If shape is (B, Tk), it will be reshaped to (B, 1, 1, Tk).
             return_similarities: flag to return similarity (q to k) scores too.
         """
         if q.ndim != 4:
@@ -515,6 +519,31 @@ class ScaledDotProductAttention(nn.Module):     # pylint: disable=too-few-public
             assert similarities.shape == (_B, _H, _Tq, _Tk)
             # mask() set -inf
             # assert torch.all(torch.isfinite(similarities))
+
+        # --------------------------------------------------------------------------------
+        # Apply padding mask to prevent attention to padding tokens
+        # --------------------------------------------------------------------------------
+        # Padding mask prevents queries from attending to padded key positions.
+        # This is critical for variable-length sequences to ensure:
+        # 1. Attention mass is not wasted on meaningless padding tokens
+        # 2. Padding tokens don't contaminate real token representations
+        # 3. Same sentence produces same attention distribution regardless of padding length
+        #
+        # The mask is applied by setting attention scores to -inf for padded positions,
+        # causing softmax to assign them zero probability.
+        # --------------------------------------------------------------------------------
+        if padding_mask is not None:
+            # Reshape padding_mask to (B, 1, 1, Tk) for broadcasting if needed
+            if padding_mask.ndim == 2:
+                padding_mask = padding_mask.unsqueeze(1).unsqueeze(2)  # (B, Tk) -> (B, 1, 1, Tk)
+
+            assert padding_mask.shape == (_B, 1, 1, _Tk), \
+                f"Expected padding_mask shape ({_B}, 1, 1, {_Tk}), got {padding_mask.shape}"
+
+            # Mask out padding positions by setting similarities to -inf
+            # Broadcasting: (B, H, Tq, Tk) with (B, 1, 1, Tk) -> (B, H, Tq, Tk)
+            similarities = similarities.masked_fill(padding_mask, float('-inf'))
+            assert similarities.shape == (_B, _H, _Tq, _Tk)
 
         # --------------------------------------------------------------------------------
         # Softmax normalization so that dim=-1 (q to k similarity) becomes probability.
@@ -656,7 +685,8 @@ class MultiHeadAttention(nn.Module):
             self,
             q: Tensor,
             k: Tensor,
-            v: Tensor
+            v: Tensor,
+            padding_mask: Optional[Tensor] = None
     ):
         """Run multi head attention
         Note: the sequence lengths of Encoder and Decoder can be different Cross Attention.
@@ -678,6 +708,8 @@ class MultiHeadAttention(nn.Module):
             q: input embedding vectors of shape (B,Tq,D)
             k: input embedding vectors of shape (B,Tk,D)
             v: input embedding vectors of shape (B,Tk,D)
+            padding_mask: optional key padding mask of shape (B, Tk) or (B, 1, 1, Tk)
+                where True indicates padding positions to be masked out.
 
 
         Returns: Attention values of shape (B,T,D)
@@ -724,9 +756,14 @@ class MultiHeadAttention(nn.Module):
         v = split(x=v, h=self.H)    # (B, H, T, d_k)
 
         # --------------------------------------------------------------------------------
-        # Calculate self attention values
+        # Calculate self attention values with optional padding mask
         # --------------------------------------------------------------------------------
-        attentions: Tensor = self.scaled_dot_product_attention(q=q, k=k, v=v)
+        attentions: Tensor = self.scaled_dot_product_attention(
+            q=q,
+            k=k,
+            v=v,
+            padding_mask=padding_mask
+        )
         assert attentions.shape == (_B, self.H, _Tq, self.d_k)
 
         # --------------------------------------------------------------------------------

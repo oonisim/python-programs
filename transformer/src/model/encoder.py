@@ -1,5 +1,7 @@
 """Module of the Encoder stack in the Transformers Model
 """
+from typing import Optional
+
 import torch
 from torch import (
     Tensor,
@@ -83,7 +85,11 @@ class EncodeLayer(nn.Module):
         )
         self.dropout_feedforward: nn.Module = nn.Dropout(p=p_drop)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(
+            self,
+            x: Tensor,
+            source_pad_mask: Optional[Tensor] = None
+    ) -> Tensor:
         """Encode.
         Citation:
         > The encoder is composed of a stack of N = 6 identical layers. Each layer has
@@ -103,6 +109,8 @@ class EncodeLayer(nn.Module):
 
         Args:
             x: embedding vector of shape (B,T,D)
+            source_pad_mask: optional padding mask of shape (B, T) where True indicates
+                padding positions to be masked out in self-attention.
         """
         # Update:
         # Original paper applied Layer Normalization after Residual Connection which is
@@ -126,7 +134,14 @@ class EncodeLayer(nn.Module):
 
         # TODO: Verify _q, _k, _v refer to the same memory location without copy.
         _q = _k = _v = self.layer_norm_input(x)
-        x = x + self.dropout_bidirectional(self.bidirectional_attention(q=_q, k=_k, v=_v))
+        x = x + self.dropout_bidirectional(
+            self.bidirectional_attention(
+                q=_q,
+                k=_k,
+                v=_v,
+                padding_mask=source_pad_mask
+            )
+        )
 
         # --------------------------------------------------------------------------------
         # Post Normalization in the original paper. Replaced with Pre Norm as in Update:
@@ -199,11 +214,17 @@ class Encoder(nn.Module):
             ) for _layer in range(num_layers)
         ])
 
-    def forward(self, x: Tensor):
+    def forward(
+            self,
+            x: Tensor,
+            source_pad_mask: Optional[Tensor] = None
+    ):
         """Encode
         Args:
             x: embedding vectors of shape (B, T, D).
                 Embedding and positional encoding are applied in model.py.
+            source_pad_mask: optional padding mask of shape (B, T) where True indicates
+                padding positions to be masked out in attention.
         """
         assert torch.is_tensor(x) and x.ndim == 3   # shape (B, T, D)
         _B, _T, _D = x.shape        # pylint: disable=invalid-name
@@ -217,7 +238,7 @@ class Encoder(nn.Module):
         # N x Encode Layers
         # --------------------------------------------------------------------------------
         for _layer in self.layers:
-            x = _layer(x)
+            x = _layer(x=x, source_pad_mask=source_pad_mask)
 
         assert x.shape == (_B, _T, self.D)
         return x

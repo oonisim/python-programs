@@ -430,7 +430,8 @@ class Transformer(nn.Module):
     def forward(
             self,
             x: Tensor,
-            y: Tensor
+            y: Tensor,
+            source_pad_mask: Optional[Tensor] = None
     ) -> Tensor:
         """Run Transformer encoder/decoder
         DO NOT place non-differentiable functions e.g, argmax in forward.
@@ -440,6 +441,9 @@ class Transformer(nn.Module):
         Args:
             x: Encoder source sequences as token indices of shape (B, Te).
             y: Decoder target sequences as token indices of shape (B, Td).
+            source_pad_mask: optional padding mask of shape (B, Te) for encoder
+                sequence, where True indicates padding positions to be masked out
+                in attention.
 
         Returns: Log probabilities of shape (B, T, V) for training with NLLLoss.
                  DO NOT pass to CrossEntropyLoss as it expects logits.
@@ -494,7 +498,7 @@ class Transformer(nn.Module):
         # --------------------------------------------------------------------------------
         x: Tensor = self.encoder_dropout(x + self.encoder_positional_encoding(x))
 
-        memory: Tensor = self.encoder(x=x)
+        memory: Tensor = self.encoder(x=x, source_pad_mask=source_pad_mask)
 
         # --------------------------------------------------------------------------------
         # Output/Decoder Embeddings multiplied by sqrt(d_model).
@@ -514,8 +518,9 @@ class Transformer(nn.Module):
 
         # --------------------------------------------------------------------------------
         # Decoder layers with cross attention to encoder output (memory).
+        # Pass source_pad_mask to prevent attending to padded encoder positions.
         # --------------------------------------------------------------------------------
-        y = self.decoder(y=y, memory=memory)
+        y = self.decoder(y=y, memory=memory, source_pad_mask=source_pad_mask)
 
         # --------------------------------------------------------------------------------
         # Projection to vocabulary log probabilities.

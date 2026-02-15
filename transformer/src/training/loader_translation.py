@@ -89,8 +89,10 @@ def translation_collate_fn(
         target_pad_id: Padding token ID for target sequences.
 
     Returns:
-        Dict with padded "source_ids" (B, Ts) and "target_ids" (B, Tt).
-        Padded positions in target_ids are set to LABEL_IGNORE_VALUE.
+        Dict with:
+        - "source_ids" (B, Ts): Padded source sequences
+        - "target_ids" (B, Tt): Padded target sequences with padding masked
+        - "source_pad_mask" (B, Ts): Boolean mask (True for padding positions)
     """
     # --------------------------------------------------------------------------------
     # Padding:
@@ -116,6 +118,18 @@ def translation_collate_fn(
     )
 
     # --------------------------------------------------------------------------------
+    # Create padding masks for attention
+    # --------------------------------------------------------------------------------
+    # Source padding mask: identifies padding positions in source sequences
+    # Shape: (B, Ts) where True indicates padding token
+    # This mask prevents attention mechanism from attending to padding tokens
+    source_pad_mask = (source_padded == source_pad_id)
+
+    # Target padding mask: identifies padding positions in target sequences
+    # Used for masking loss calculation (not for attention masking)
+    target_pad_mask = (target_padded == target_pad_id)
+
+    # --------------------------------------------------------------------------------
     # Mask targets labels with IGNORE_VALUE where the values are pad token id.
     # Then, the loss function ignores those labels for loss calculation.
     #
@@ -131,7 +145,6 @@ def translation_collate_fn(
     # Apply a key-padding mask (set attention logits to -inf for PAD key positions)
     # to address the issue.
     # --------------------------------------------------------------------------------
-    pad_mask = (target_padded == target_pad_id)
 
     # --------------------------------------------------------------------------------
     # CRITICAL: Do NOT use pad_token_id as the target mask value for GPT like tokenizers.
@@ -148,9 +161,13 @@ def translation_collate_fn(
     # or the concept of "Sequence" or "Boundary".
     # Therefore, it can keep generating forever or only stop at max length.
     # --------------------------------------------------------------------------------
-    target_padded = target_padded.masked_fill(pad_mask, LABEL_IGNORE_VALUE)
+    target_padded = target_padded.masked_fill(target_pad_mask, LABEL_IGNORE_VALUE)
 
-    return {"source_ids": source_padded, "target_ids": target_padded}
+    return {
+        "source_ids": source_padded,
+        "target_ids": target_padded,
+        "source_pad_mask": source_pad_mask
+    }
 
 
 class TranslationDataLoaderFactory:
