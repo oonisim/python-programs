@@ -117,3 +117,24 @@
    - Updated training script with preset support
    - Expected perplexity: ~50-60 on WikiText-103
    - Files: train_lm.py, run_train_lm.sh, doc/note/option_a_training.md
+
+✅ Source Padding Mask in generate() (FIXED)
+   - Problem: generate() had no source_pad_mask parameter
+   - Without it, encoder and cross-attention attended to padding tokens
+   - Could corrupt outputs when generating from padded source batches
+   - Solution: Added source_pad_mask parameter (Optional)
+   - Propagated mask to encoder and decoder for proper masking
+   - File: model.py (generate method)
+
+✅ evaluate() Training Mode Restoration (FIXED)
+   - Problem: evaluate() called self.eval() without restoring training mode
+   - If called during training, dropout stayed disabled afterward
+   - Solution: Save/restore training state with try-finally block
+   - Same pattern as generate() method
+   - File: model.py (evaluate method)
+
+✅ Minor Fixes (COMPLETE)
+   - Fixed missing space in error message (model.py:603-606)
+   - Fixed invalid pylint directive: added missing colon (lm.py:367)
+   - Fixed off-by-one in get_stats(): removed extra -1 (loader.py:255,259)
+   - All model tests pass (4/4)

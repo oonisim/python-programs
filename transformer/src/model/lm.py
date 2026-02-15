@@ -364,7 +364,7 @@ class LanguageModel(nn.Module):
                 max_length - prompt.shape[1]
             )
 
-            # pylint disable=unused-variable
+            # pylint: disable=unused-variable
             for generation_step in range(number_of_tokens_to_generate):
                 # -----------------------------------------------------------------
                 # STEP 2A: PREPARE MODEL INPUT (SLIDING WINDOW)

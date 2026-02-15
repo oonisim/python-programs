@@ -557,13 +557,21 @@ class Transformer(nn.Module):
                 "Move your inputs explicitly with tensor.to(device)."
             )
 
-        # Bug fix: Switch to eval mode to disable dropout for consistent evaluation
-        # Without this, dropout remains active if called during training, producing noisy metrics
+        # Bug fix: Preserve training mode state across evaluation
+        # Without this, if evaluate() is called during training, the model stays in eval mode
+        # after evaluation completes, causing dropout to remain disabled for subsequent training.
+        was_training = self.training
         self.eval()
 
-        log_probabilities = self.forward(x=x, y=y)
-        predictions = torch.argmax(log_probabilities, dim=-1)
-        return predictions
+        try:
+            log_probabilities = self.forward(x=x, y=y)
+            predictions = torch.argmax(log_probabilities, dim=-1)
+            return predictions
+
+        finally:
+            # Restore training mode if model was in training before evaluation
+            if was_training:
+                self.train()
 
     @torch.no_grad()
     def generate(
@@ -571,14 +579,19 @@ class Transformer(nn.Module):
             x: Tensor,
             start_token: int,
             end_token: int,
-            max_length: int = DECODER_MAX_TIME_STEPS
+            max_length: int = DECODER_MAX_TIME_STEPS,
+            source_pad_mask: Optional[Tensor] = None
     ) -> Tensor:
         """Autoregressively generate output sequence from source x.
+
         Args:
             x: Source sequence of shape (B, Te)
             start_token: Token index to start generation (e.g., <START>)
             end_token: Token index to stop generation (e.g., <END>)
             max_length: Maximum number of tokens to generate
+            source_pad_mask: Optional padding mask for source sequence (B, Te).
+                True indicates padding positions that should not be attended to.
+                If None, all positions are attended to (no masking).
 
         Returns: Generated token indices of shape (B, Td) where Td <= max_length
         """
@@ -597,7 +610,7 @@ class Transformer(nn.Module):
         # Warn the user about device/dtype mismatches instead of moving/casting.
         if x.device != self._device():
             raise RuntimeError(
-                f"Input tensor x is on {x.device} but model on {self._device()}."
+                f"Input tensor x is on {x.device} but model on {self._device()}. "
                 "Move your inputs explicitly to the desired device."
             )
 
@@ -620,7 +633,7 @@ class Transformer(nn.Module):
             # Encode source sequence once
             x = self.input_embedding(indices=x)
             x = self.encoder_dropout(x + self.encoder_positional_encoding(x))
-            memory = self.encoder(x=x)
+            memory = self.encoder(x=x, source_pad_mask=source_pad_mask)
 
             # Start with <START> token for each sequence in batch
             y = torch.full((_B, 1), start_token, dtype=torch.long, device=x.device)
@@ -630,8 +643,12 @@ class Transformer(nn.Module):
                 y_emb = self.output_embedding(indices=y)
                 y_emb = self.decoder_dropout(y_emb + self.decoder_positional_encoding(y_emb))
 
-                # Apply decoder, then final normalization before projection (matches forward() behavior)
-                decoder_output = self.decoder(y=y_emb, memory=memory)
+                # Apply decoder with source padding mask for cross-attention
+                decoder_output = self.decoder(
+                    y=y_emb,
+                    memory=memory,
+                    source_pad_mask=source_pad_mask
+                )
                 log_probabilities = self.projection(y=self.final_decoder_norm(decoder_output))
 
                 next_token = torch.argmax(log_probabilities[:, -1, :], dim=-1, keepdim=True)

@@ -252,11 +252,11 @@ class LanguageModelDataLoaderFactory:
 
         if self._train_tokens is not None:
             stats["train_tokens"] = len(self._train_tokens)
-            stats["train_sequences"] = len(self._train_tokens) - self.config.seq_len - 1
+            stats["train_sequences"] = len(self._train_tokens) - self.config.seq_len
 
         if self._val_tokens is not None:
             stats["val_tokens"] = len(self._val_tokens)
-            stats["val_sequences"] = len(self._val_tokens) - self.config.seq_len - 1
+            stats["val_sequences"] = len(self._val_tokens) - self.config.seq_len
 
         return stats
 
