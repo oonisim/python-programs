@@ -163,6 +163,7 @@ class TrainingConfig:
     gradient_clip: float = 1.0
     log_interval: int = 100
     snapshot_interval: int = 0
+    sanity_check_interval: int = 0  # Weight/gradient validation interval (0 = disabled)
     keep_last_n_snapshots: int = 3
     delete_snapshots_after_training: bool = True
 
@@ -502,6 +503,7 @@ class LanguageModelTrainingDirector:
             gradient_clip=self.training_config.gradient_clip,
             log_interval=self.training_config.log_interval,
             snapshot_interval=self.training_config.snapshot_interval,
+            sanity_check_interval=self.training_config.sanity_check_interval,
             snapshot_per_epoch=True,
             keep_last_n_snapshots=self.training_config.keep_last_n_snapshots,
             delete_snapshots_after_training=self.training_config.delete_snapshots_after_training,
@@ -916,6 +918,15 @@ def parse_args():
         )
     )
     train_group.add_argument(
+        "--sanity_check_interval", type=int, default=0,
+        metavar="N",
+        help=(
+            "Run weight and gradient validation (sanity checks) every N steps. "
+            "Checks for NaN/Inf values in weights and gradients. "
+            "0 disables sanity checks. Default: 0"
+        )
+    )
+    train_group.add_argument(
         "--keep_last_n_snapshots", type=int, default=3,
         metavar="N",
         help=(
@@ -1179,6 +1190,7 @@ def main():
         min_lr_ratio=args.min_lr_ratio,
         gradient_clip=args.gradient_clip,
         snapshot_interval=args.snapshot_interval,
+        sanity_check_interval=args.sanity_check_interval,
         keep_last_n_snapshots=args.keep_last_n_snapshots,
         delete_snapshots_after_training=args.delete_snapshots_after_training,
         enable_gradient_monitor=args.gradient_monitor,

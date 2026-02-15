@@ -94,6 +94,7 @@ class TrainerConfig:
     keep_last_n_snapshots: int = 5
     delete_snapshots_after_training: bool = True
     max_steps: Optional[int] = None  # Stop training after N steps (None = no limit)
+    sanity_check_interval: int = 0  # Run weight/gradient validation every N steps (0 to disable)
 
     # Scheduler stepping policy
     # False = step once per epoch (default).
@@ -768,8 +769,8 @@ class Trainer:
         """Log training progress at step level."""
         self.writer.add_scalar("train/step_loss", loss, self.global_step)
 
-        # Periodic weight and gradient validation every 1000 steps
-        if self.global_step % 1000 == 0 and self.global_step > 0:
+        # Periodic weight and gradient validation (sanity checks)
+        if self.config.sanity_check_interval > 0 and self.global_step % self.config.sanity_check_interval == 0 and self.global_step > 0:
             is_valid_weights, invalid_params = self._check_weights_valid()
             is_valid_grads, invalid_grads = self._check_gradients_valid()
 
