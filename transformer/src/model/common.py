@@ -362,7 +362,7 @@ def calculate_attention_values(
     return similarities @ values     # (B,h,Tq,Tk) @ (B,h,Tk,d_v) -> (B,h,Tq,d_v)
 
 
-class LayerNormalization(nn.Module):
+class LayerNormalization(nn.Module):    # pylint: disable=too-few-public-methods
     """Class to implement LayerNormalization"""
     def __init__(self, features: int, eps: float = 1e-6) -> None:
         """Initialization of the class"""
@@ -373,7 +373,7 @@ class LayerNormalization(nn.Module):
 
     # pylint: disable=anomalous-backslash-in-string
     def forward(self, x: Tensor):
-        """Run Layer Normalization
+        r"""Run Layer Normalization
         https://docs.pytorch.org/docs/stable/generated/torch.nn.LayerNorm.html
         $$ y = \gamma \frac{x - \mathbb{E}[x]}{\sqrt{\mathrm{Var}[x] + \epsilon}} + \beta $$
 
@@ -396,7 +396,7 @@ class LayerNormalization(nn.Module):
         return y
 
 
-class ScaledDotProductAttention(nn.Module):
+class ScaledDotProductAttention(nn.Module):     # pylint: disable=too-few-public-methods
     """
     Class to implement Scaled Dot Product Attention (Figure 2 left in the paper).
     > 3.2.3
@@ -416,7 +416,10 @@ class ScaledDotProductAttention(nn.Module):
         mask_matrix: Optional[Tensor] = None
         super().__init__()
         if do_mask:
+            # This is for Decoder self attention to prevent future leak.
+            # The mask matrix is the same for all batches and heads.
             # shape:(T, T)
+            self.do_mask: bool = do_mask
             mask_matrix = torch.tril(torch.ones(max_time_steps, max_time_steps)) == 0
         else:
             mask_matrix = None
@@ -487,7 +490,24 @@ class ScaledDotProductAttention(nn.Module):
             # because the attention is only within the same sequence.
             # In the cross attention, the sequence length of Tq and Tk can be different
             # because the attention is between different sequences.
-            assert _Tq == _Tk, "causal mask requires equal query/key lengths"
+            if _Tk != _Tq:
+                if self.do_mask:
+                    # Decoder may have different sequence length between Q and K because of
+                    # Encoder may generate K,V whose sequence length Tk is different from
+                    # the Tq of the Decoder at Cross Attention. However, currently does not
+                    # support such case. Need future customisation to accept it.
+                    raise ValueError(
+                        "Decoder (do_mask=True) does not support different sequence lengths "
+                        f"between Q and K now, got Tq:[{_Tq}] != Tk:[{_Tk}]."
+                    )
+
+                # do_mask is False means Encoder self attention, and the sequence length T
+                # of Q and K should be the same.
+                raise RuntimeError(
+                    "Encoder Causal Attention (do_mask=False) requires the same sequence "
+                    f"length between Q and K, got Tq:[{_Tq}] and Tk:[{_Tk}]."
+                )
+
             similarities = mask(
                 similarities=similarities,      # shape:(B,h,T,T)
                 mask_matrix=self.mask_matrix    # shape:(T,T)
@@ -560,7 +580,7 @@ class MultiHeadAttention(nn.Module):
         """Dimension (number of features) per head."""
         return self._d_k
 
-    def __init__(
+    def __init__(   # pylint: disable=too-many-arguments
             self,
             i_layer: int = 0,
             num_heads: int = NUM_HEADS,
@@ -730,11 +750,11 @@ class MultiHeadAttention(nn.Module):
         return attentions
 
 
-class PositionwiseFeedForward(nn.Module):
+class PositionwiseFeedForward(nn.Module):   # pylint: disable=too-few-public-methods
     """Class to implementation of Position-wise Feed-Forward Networks.
     This is a single hidden layer nural network with ReLU activation.
     """
-    def __init__(
+    def __init__(   # pylint: disable=too-many-arguments
             self,
             i_layer: int = 0,
             d_model: int = DIM_MODEL,
@@ -794,7 +814,7 @@ class PositionwiseFeedForward(nn.Module):
         return y
 
 
-class InputEmbedding(nn.Module):
+class InputEmbedding(nn.Module):    # pylint: disable=too-few-public-methods
     """Class to implement the input embedding.
     Citation:
     > 3.4 Embeddings and Softmax:
@@ -843,7 +863,7 @@ class InputEmbedding(nn.Module):
         return x
 
 
-class PositionalEncoding(nn.Module):
+class PositionalEncoding(nn.Module):    # pylint: disable=too-few-public-methods
     """Class to implement the positional encoding.
     Taken from https://nlp.seas.harvard.edu/annotated-transformer/
     The responsibility of this class is to provide position encodings,
@@ -900,7 +920,7 @@ class PositionalEncoding(nn.Module):
         return y
 
 
-class Projection(nn.Module):
+class Projection(nn.Module):    # pylint: disable=too-few-public-methods
     """
     Class to project the predictions of shape (B, T, D) to vocabulary probabilities of shape (B, T).
 

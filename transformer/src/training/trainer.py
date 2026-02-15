@@ -225,32 +225,43 @@ class Trainer:
         # Callback: on_train_start
         self.callbacks.on_train_start(self)
 
-        for epoch in range(start_epoch, num_epochs):
-            self.current_epoch = epoch
+        try:
+            for epoch in range(start_epoch, num_epochs):
+                self.current_epoch = epoch
 
-            # Callback: on_epoch_start
-            self.callbacks.on_epoch_start(self, epoch)
+                # Callback: on_epoch_start
+                self.callbacks.on_epoch_start(self, epoch)
 
-            train_loss = self._train_one_epoch(train_loader, epoch)
+                train_loss = self._train_one_epoch(train_loader, epoch)
 
-            # Check if max_steps was reached during the epoch
-            if self.config.max_steps is not None and self.global_step >= self.config.max_steps:
-                break
+                # Check if max_steps was reached during the epoch
+                if self.config.max_steps is not None and self.global_step >= self.config.max_steps:
+                    break
 
-            val_loss = self._validate(val_loader) if val_loader else None
+                val_loss = self._validate(val_loader) if val_loader else None
 
-            self._log_epoch_summary(epoch, train_loss, val_loss)
-            self._save_epoch_checkpoint(epoch, train_loss, val_loss)
-            self._update_scheduler()
+                self._log_epoch_summary(epoch, train_loss, val_loss)
+                self._update_scheduler()
 
-            # Callback: on_epoch_end
-            self.callbacks.on_epoch_end(self, epoch, train_loss, val_loss)
+                # Callback: on_epoch_end (must be called before saving checkpoint so callback state is current)
+                self.callbacks.on_epoch_end(self, epoch, train_loss, val_loss)
 
-            # Callback: should_stop_training
-            if self.callbacks.should_stop_training(self):
-                break
+                # Save epoch checkpoint after callbacks have updated their state
+                self._save_epoch_checkpoint(epoch, train_loss, val_loss)
 
-        return self._finalize_training()
+                # Callback: should_stop_training
+                if self.callbacks.should_stop_training(self):
+                    break
+
+            return self._finalize_training()
+
+        finally:
+            # Ensure writer is always closed, even on exception
+            if hasattr(self, 'writer') and self.writer is not None:
+                try:
+                    self.writer.close()
+                except Exception as e:
+                    print(f"Warning: Failed to close TensorBoard writer: {e}")
 
     def _train_one_epoch(self, train_loader: DataLoader, epoch: int) -> float:
         """Train for one epoch.
@@ -289,7 +300,7 @@ class Trainer:
         return total_loss / num_batches
 
     def _train_one_step(self, batch: Dict[str, Tensor]) -> float:
-        """Execute one training step (forward, backward, update).
+        r"""Execute one training step (forward, backward, update).
 
         The loss is computed using Negative Log-Likelihood:
         $$ \\mathcal{L} = -\\frac{1}{N} \\sum_{i=1}^{N} \\log P(y_i | x_i) $$
@@ -375,6 +386,7 @@ class Trainer:
         """
         self.model.eval()
         total_loss = 0.0
+        num_batches = 0
 
         for batch in val_loader:
             source_ids = batch["source_ids"].to(self.device)
@@ -386,8 +398,13 @@ class Trainer:
             log_probabilities = self.model.forward(x=source_ids, y=decoder_input)
             loss = self._compute_loss(log_probabilities, decoder_target)
             total_loss += loss.item()
+            num_batches += 1
 
-        return total_loss / len(val_loader)
+        if num_batches == 0:
+            print("Warning: Validation dataloader is empty, returning 0.0 loss")
+            return 0.0
+
+        return total_loss / num_batches
 
     # ================================================================================
     # Logging Methods
@@ -702,7 +719,13 @@ class Trainer:
         if self.config.delete_snapshots_after_training:
             self._delete_all_snapshots()
 
-        self.writer.close()
+        # Close writer if not already closed (normal completion path)
+        if hasattr(self, 'writer') and self.writer is not None:
+            try:
+                self.writer.close()
+                self.writer = None
+            except Exception:
+                pass  # Already closed or error, ignore
 
         result = {
             "model_path": model_path,
@@ -797,7 +820,7 @@ class LanguageModelTrainer(Trainer):
     """
 
     def _train_one_step(self, batch) -> float:
-        """Execute one training step for language model.
+        r"""Execute one training step for language model.
 
         The loss is computed using Negative Log-Likelihood:
         $$ \\mathcal{L} = -\\frac{1}{N} \\sum_{i=1}^{N} \\log P(x_t | x_{<t}) $$

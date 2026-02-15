@@ -5,6 +5,11 @@
 # Example: ./run_train_lm.sh wikitext 20 1000
 # Default: wikitext-103 (largest available)
 
+# Get script directory and set PYTHONPATH to src/
+SCRIPT_DIR=$(dirname "$(realpath "$0")")
+PROJECT_ROOT=$(realpath "${SCRIPT_DIR}/..")
+export PYTHONPATH="${PROJECT_ROOT}/src"
+
 DATASET=${1:-wikitext-103}
 EPOCHS=${2:-10}
 SNAPSHOT_INTERVAL=${3:-5000}
@@ -25,7 +30,7 @@ echo "  Log file: ${LOG_FILE}"
 echo ""
 
 # Run training with all monitoring enabled (all intervals set to 5000)
-nohup python -u training/train_lm.py \
+nohup python -u "${PROJECT_ROOT}/src/training/train_lm.py" \
     --dataset "${DATASET}" \
     --epochs "${EPOCHS}" \
     --snapshot_interval "${SNAPSHOT_INTERVAL}" \

@@ -324,12 +324,14 @@ class TranslationTrainingDirector:
             encoder_pwff_dimension=mc.encoder_d_ff,
             encoder_dropout_ratio=mc.dropout,
             encoder_layers=mc.encoder_num_layers,
+            encoder_num_heads=mc.encoder_num_heads,
             decoder_vocabulary_size=self.target_tokenizer.vocab_size,
             decoder_max_time_steps=mc.max_seq_len,
             decoder_model_dimension=mc.d_model,
             decoder_pwff_dimension=mc.decoder_d_ff,
             decoder_dropout_ratio=mc.dropout,
             decoder_layers=mc.decoder_num_layers,
+            decoder_num_heads=mc.decoder_num_heads,
         )
 
         self.model.start_token = self.target_tokenizer.eos_token_id

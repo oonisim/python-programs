@@ -1,10 +1,22 @@
 """Transformer package - Model architecture and training infrastructure.
 
 Directory structure:
-- model/: Model architecture components (Transformer, LanguageModel, etc.)
-- training/: Training infrastructure (Trainer, callbacks, data loaders)
-- test/: Test suite
+- src/model/: Model architecture components (Transformer, LanguageModel, etc.)
+- src/training/: Training infrastructure (Trainer, callbacks, data loaders)
+- src/test/: Test suite
+- run/: Execution scripts (with PYTHONPATH set to src/)
+
+To use this package, ensure PYTHONPATH includes the src/ directory:
+  export PYTHONPATH=/path/to/transformer/src
 """
+
+import sys
+from pathlib import Path
+
+# Add src directory to path if not already there
+_src_dir = Path(__file__).parent / "src"
+if str(_src_dir) not in sys.path:
+    sys.path.insert(0, str(_src_dir))
 
 # Re-export from model and training subdirectories
 from model.constant import (

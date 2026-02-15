@@ -274,8 +274,11 @@ class CallbackList:
 
     def on_snapshot_load(self, trainer: 'Trainer', checkpoint: Dict[str, Any]) -> None:
         """Allow callbacks to restore state from checkpoint."""
-        extra_state = checkpoint.get('callback_state', {})
+        # Callback state is stored in extra_state['callback_state']
+        extra_state = checkpoint.get('extra_state', {})
+        callback_state = extra_state.get('callback_state', {})
+
         for callback in self.callbacks:
             callback_name = callback.__class__.__name__
-            if callback_name in extra_state:
-                callback.on_snapshot_load(trainer, extra_state[callback_name])
+            if callback_name in callback_state:
+                callback.on_snapshot_load(trainer, callback_state[callback_name])

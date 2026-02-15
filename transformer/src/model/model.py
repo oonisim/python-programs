@@ -44,9 +44,9 @@ from model.decoder import (
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-
 class Transformer(nn.Module):
     """Class to implement the Google Transformer Model"""
+    # pylint: disable=too-many-arguments
     def __init__(
             self,
             data_type = TYPE_FLOAT,
@@ -56,12 +56,14 @@ class Transformer(nn.Module):
             encoder_pwff_dimension: int = ENCODER_PWFF_DIM,
             encoder_dropout_ratio: float = ENCODER_DROPOUT_RATIO,
             encoder_layers: int = ENCODER_LAYERS,
+            encoder_num_heads: int = NUM_HEADS,
             decoder_max_time_steps: int = DECODER_MAX_TIME_STEPS,
             decoder_vocabulary_size: int = DECODER_MAX_TOKENS,
             decoder_model_dimension: int = DIM_MODEL,
             decoder_pwff_dimension: int = DECODER_PWFF_DIM,
             decoder_dropout_ratio: float = DECODER_DROPOUT_RATIO,
             decoder_layers: int = DECODER_LAYERS,
+            decoder_num_heads: int = NUM_HEADS,
             decoder_tie_weights: bool = True,
     ):
         """
@@ -90,12 +92,14 @@ class Transformer(nn.Module):
             encoder_pwff_dimension: point-wise feed forward internal dimension
             encoder_dropout_ratio: dropout ratio to use in encoder layers
             encoder_layers: number of encoder layers in the Encoder.
+            encoder_num_heads: number of attention heads in encoder (must divide encoder_model_dimension)
             decoder_vocabulary_size: max number of tokens in the decoder tokenizer
             decoder_max_time_steps: max sequence length T of decoder layers
             decoder_model_dimension: embedding vector dimension D in decoder layers.
             decoder_pwff_dimension: point-wise feed forward internal dimension
             decoder_dropout_ratio: dropout ratio to use in decoder layers
             decoder_layers: number of decoder layers in the Decoder.
+            decoder_num_heads: number of attention heads in decoder (must divide decoder_model_dimension)
             decoder_tie_weights: whether to share weights between input embedding and output projection.
         """
         super().__init__()
@@ -143,7 +147,7 @@ class Transformer(nn.Module):
         self.encoder: nn.Module = Encoder(
             vocabulary_size=encoder_vocabulary_size,
             num_layers=encoder_layers,
-            num_heads=NUM_HEADS,
+            num_heads=encoder_num_heads,
             d_model=encoder_model_dimension,
             dtype=data_type,
             d_ff=encoder_pwff_dimension,
@@ -204,7 +208,7 @@ class Transformer(nn.Module):
         self.decoder: nn.Module = Decoder(
             vocabulary_size=decoder_vocabulary_size,
             num_layers=decoder_layers,
-            num_heads=NUM_HEADS,
+            num_heads=decoder_num_heads,
             d_model=decoder_model_dimension,
             dtype=data_type,
             d_ff=decoder_pwff_dimension,
@@ -278,7 +282,7 @@ class Transformer(nn.Module):
             # num_classes=NUM_CLASSES,
             num_classes=decoder_vocabulary_size,
             dtype=data_type,
-            bias=False if decoder_tie_weights else True
+            bias=False if decoder_tie_weights else True # pylint: disable=simplifiable-if-expression
         )
 
         if decoder_tie_weights:
@@ -602,7 +606,11 @@ class Transformer(nn.Module):
             # Get prediction for the next token
             y_emb = self.output_embedding(indices=y)
             y_emb = self.decoder_dropout(y_emb + self.decoder_positional_encoding(y_emb))
-            log_probabilities = self.projection(y=self.decoder(y=y_emb, memory=memory))
+
+            # Apply decoder, then final normalization before projection (matches forward() behavior)
+            decoder_output = self.decoder(y=y_emb, memory=memory)
+            log_probabilities = self.projection(y=self.final_decoder_norm(decoder_output))
+
             next_token = torch.argmax(log_probabilities[:, -1, :], dim=-1, keepdim=True)
 
             # Append predicted token to sequence

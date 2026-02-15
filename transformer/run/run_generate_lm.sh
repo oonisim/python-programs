@@ -2,6 +2,11 @@
 
 # Interactive text generation script for trained language models
 
+# Get script directory and set PYTHONPATH to src/
+SCRIPT_DIR=$(dirname "$(realpath "$0")")
+PROJECT_ROOT=$(realpath "${SCRIPT_DIR}/..")
+export PYTHONPATH="${PROJECT_ROOT}/src"
+
 usage() {
     cat << EOF
 Usage: $0 -c CHECKPOINT [-t TEMPERATURE] [-p TOP_P] [-l MAX_LENGTH]
@@ -69,7 +74,7 @@ echo "  Top-p: $TOP_P"
 echo "  Max length: $MAX_LENGTH"
 echo ""
 
-python generate_lm.py \
+python "${SCRIPT_DIR}/generate_lm.py" \
     --checkpoint_file "$CHECKPOINT" \
     --interactive \
     --temperature "$TEMPERATURE" \

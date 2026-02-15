@@ -10,11 +10,11 @@ DIR=$(realpath $(dirname "${0}"))
 # Project root is one level up from run/
 PROJECT_ROOT=$(realpath "${DIR}/..")
 
-# Test directory
-TEST_DIR="${PROJECT_ROOT}/test"
+# Source directory containing model, training, and test modules
+SRC_DIR="${PROJECT_ROOT}/src"
 
-# Set PYTHONPATH to include project root and test directory
-export PYTHONPATH="${PROJECT_ROOT}:${TEST_DIR}"
+# Set PYTHONPATH to src directory so modules can be imported as 'from model', 'from training', etc.
+export PYTHONPATH="${SRC_DIR}"
 
 # Run pytest on test directory
-pytest "${TEST_DIR}" "$@"
+python3 -m pytest "${SRC_DIR}/test" "$@"

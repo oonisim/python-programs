@@ -61,7 +61,7 @@ class LanguageModel(nn.Module):
     Example tokenizer configuration (GPT-2):
         model.end_token = tokenizer.eos_token_id  # 50256
     """
-
+    # pylint: disable=too-many-positional-arguments
     def __init__(
             self,
             vocab_size: int,
@@ -166,7 +166,7 @@ class LanguageModel(nn.Module):
         return False
 
     def forward(self, x: Tensor) -> Tensor:
-        """Forward pass for training.
+        r"""Forward pass for training.
 
         Computes log probabilities for next token prediction at each position.
         $$ \\log P(x_t | x_{<t}) $$
@@ -203,6 +203,7 @@ class LanguageModel(nn.Module):
         log_probabilities: Tensor = self.projection(y=hidden)
         return log_probabilities
 
+    # pylint: disable=too-many-positional-arguments
     @torch.no_grad()
     def generate(
             self,
@@ -322,6 +323,7 @@ class LanguageModel(nn.Module):
             max_length - prompt.shape[1]
         )
 
+        # pylint disable=unused-variable
         for generation_step in range(number_of_tokens_to_generate):
             # ---------------------------------------------------------------------
             # STEP 2A: PREPARE MODEL INPUT (SLIDING WINDOW)
