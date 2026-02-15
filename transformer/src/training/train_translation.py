@@ -68,6 +68,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from transformers import GPT2Tokenizer
 
 from model.model import Transformer
+from model.constant import LABEL_IGNORE_VALUE
 from training.loader_translation import TranslationDataLoaderFactory, DataLoaderConfig
 from training.trainer import Trainer, TrainerConfig
 from training.train_lm import TiktokenAdapter, TOKENIZER_CONFIGS
@@ -189,8 +190,13 @@ class TranslationTrainingDirector:
         )
 
     def _run_config_path(self) -> Path:
-        """Path to the saved run configuration file."""
-        return Path(self._model_name()) / "snapshots" / "run_config.json"
+        """Path to the saved run configuration file.
+
+        Saves to result_dir to match trainer's snapshot location.
+        Bug fix: Previously saved to {model_name}/snapshots/ outside result_dir,
+        causing resume to silently miss the config when trainer uses result/{model_name}/.
+        """
+        return Path("result") / self._model_name() / "snapshots" / "run_config.json"
 
     def _save_run_config(self) -> None:
         """Save run configuration to disk for safe resume."""
@@ -207,7 +213,8 @@ class TranslationTrainingDirector:
             "training_config": asdict(self.training_config),
         }
         config_path.write_text(json.dumps(config, indent=2))
-        print(f"  Run config saved: {config_path}")
+        model_name = self._model_name()
+        print(f"  Run config saved for training run [{model_name}]: {config_path}")
 
     def _load_run_config(self) -> None:
         """Load saved run configuration, overriding CLI args."""
@@ -359,7 +366,17 @@ class TranslationTrainingDirector:
         # Model returns log-probabilities. Do NOT use CrossEntropyLoss as
         # it expects logits and internally applies log-softmax + NLLLoss.
         criterion = nn.NLLLoss(
-            ignore_index=self.target_tokenizer.pad_token_id
+            # BUG: Using PAD which can be set to EOS causes the model to never learn to generate
+            # EOS tokens, as the loss ignores those positions.
+            # The fix is to ensure the tokenizer has a dedicated PAD token different from EOS,
+            # or to use ignore_index=-100 and manually mask padded positions in labels.
+            # ignore_index=self.target_tokenizer.pad_token_id
+            #
+            # NOTE: ignore_index is not an index into labels but a target label value that
+            # the loss treats as “masked out”.
+            # Ensure pad_token_id != eos_token_id in tokenizer to avoid unlearnable EOS tokens
+            # ignore_index=self.target_tokenizer.pad_token_id
+            ignore_index=LABEL_IGNORE_VALUE
         )
 
         trainer_config = TrainerConfig(

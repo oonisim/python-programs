@@ -10,6 +10,16 @@ DECODER_MAX_TOKENS: int = 10240
 TYPE_FLOAT: torch.Tensor.dtype = torch.float32
 
 # --------------------------------------------------------------------------------
+# Training / Loss
+# --------------------------------------------------------------------------------
+# Label value used to ignore tokens in loss calculation (e.g., padding tokens).
+# When a label is set to this value, the corresponding position is masked out
+# and does not contribute to the loss or gradients.
+# This is used with nn.NLLLoss(ignore_index=LABEL_IGNORE_VALUE).
+# PyTorch convention: -100 is the standard ignore index value.
+LABEL_IGNORE_VALUE: int = -100
+
+# --------------------------------------------------------------------------------
 # Encoding
 # --------------------------------------------------------------------------------
 POSITION_ENCODE_DENOMINATOR_BASE: int = 10000

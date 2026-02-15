@@ -324,6 +324,10 @@ class LanguageModel(nn.Module):
         # STEP 1: PREPARE INPUT BATCH
         # =========================================================================
 
+        # Bug fix: Switch to eval mode to disable dropout for consistent generation
+        # Without this, dropout remains active if called during training, producing noisy outputs
+        self.eval()
+
         # Handle single sequence input by adding batch dimension
         # Language models process batches (multiple sequences simultaneously)
         # If user provides single sequence, we reshape to batch of size 1

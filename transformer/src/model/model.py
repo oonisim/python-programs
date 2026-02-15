@@ -552,6 +552,10 @@ class Transformer(nn.Module):
                 "Move your inputs explicitly with tensor.to(device)."
             )
 
+        # Bug fix: Switch to eval mode to disable dropout for consistent evaluation
+        # Without this, dropout remains active if called during training, producing noisy metrics
+        self.eval()
+
         log_probabilities = self.forward(x=x, y=y)
         predictions = torch.argmax(log_probabilities, dim=-1)
         return predictions
@@ -600,6 +604,10 @@ class Transformer(nn.Module):
             )
 
         _B = x.shape[0]     # pylint: disable=invalid-name
+
+        # Bug fix: Switch to eval mode to disable dropout for consistent generation
+        # Without this, dropout remains active if called during training, producing noisy outputs
+        self.eval()
 
         # Encode source sequence once
         x = self.input_embedding(indices=x)

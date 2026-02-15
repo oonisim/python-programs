@@ -211,6 +211,11 @@ class TranslationDataLoaderFactory:
         src_eos = self.source_tokenizer.eos_token_id
         tgt_eos = self.target_tokenizer.eos_token_id
 
+        # Bug fix: Use EOS as BOS (START token) for target sequences
+        # GPT-2 style tokenizers don't have a separate BOS token
+        # Without BOS, the model never learns to predict the first target token
+        tgt_bos = tgt_eos
+
         pairs = []
         for item in data:
             translation = item["translation"]
@@ -225,7 +230,8 @@ class TranslationDataLoaderFactory:
 
             # Truncate to max_seq_len - 1 to leave room for EOS
             src_ids = src_ids[: max_len - 1] + [src_eos]
-            tgt_ids = tgt_ids[: max_len - 1] + [tgt_eos]
+            # Prepend BOS and append EOS to target (truncate to max_len - 2 for both)
+            tgt_ids = [tgt_bos] + tgt_ids[: max_len - 2] + [tgt_eos]
 
             pairs.append((
                 torch.tensor(src_ids, dtype=torch.long),

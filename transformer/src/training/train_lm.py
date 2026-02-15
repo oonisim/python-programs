@@ -68,8 +68,10 @@ from torch import nn
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from transformers import GPT2Tokenizer
+import tiktoken
 
 from model.lm import LanguageModel
+from model.constant import LABEL_IGNORE_VALUE
 from training.loader import LanguageModelDataLoaderFactory, DataLoaderConfig
 from training.trainer import LanguageModelTrainer, TrainerConfig
 from training.trainer_early_stopping import EarlyStoppingCallback
@@ -142,7 +144,6 @@ class TiktokenAdapter:
     """Adapter for tiktoken to match the Tokenizer protocol in loader.py."""
 
     def __init__(self, encoding_name: str):
-        import tiktoken
         self._enc = tiktoken.get_encoding(encoding_name)
         self._eot_id = self._enc.eot_token
 
@@ -230,8 +231,13 @@ class LanguageModelTrainingDirector:
         return self._execute_training()
 
     def _run_config_path(self) -> Path:
-        """Path to the saved run configuration file."""
-        return Path(f"lm_{self.dataset_key}") / "snapshots" / "run_config.json"
+        """Path to the saved run configuration file.
+
+        Saves to result_dir to match trainer's snapshot location.
+        Bug fix: Previously saved to lm_{dataset_key}/snapshots/ outside result_dir,
+        causing resume to silently miss the config when trainer uses result/lm_{dataset_key}/.
+        """
+        return Path("result") / f"lm_{self.dataset_key}" / "snapshots" / "run_config.json"
 
     def _save_run_config(self) -> None:
         """Save run configuration to disk for safe resume."""
@@ -245,7 +251,7 @@ class LanguageModelTrainingDirector:
             "training_config": asdict(self.training_config),
         }
         config_path.write_text(json.dumps(config, indent=2))
-        print(f"  Run config saved: {config_path}")
+        print(f"  Run config saved for training run [lm_{self.dataset_key}]: {config_path}")
 
     def _load_run_config(self) -> None:
         """Load saved run configuration, overriding CLI args."""
@@ -390,7 +396,19 @@ class LanguageModelTrainingDirector:
 
         # Model returns log-probabilities. Do NOT use CrossEntropyLoss as
         # it expects logits and internally applies log-softmax + NLLLoss.
-        criterion = nn.NLLLoss(ignore_index=self.tokenizer.pad_token_id)
+        criterion = nn.NLLLoss(
+            # BUG: Using PAD which can be set to EOS causes the model to never learn to generate
+            # EOS tokens, as the loss ignores those positions.
+            # The fix is to ensure the tokenizer has a dedicated PAD token different from EOS,
+            # or to use ignore_index=-100 and manually mask padded positions in labels.
+            # ignore_index=self.target_tokenizer.pad_token_id
+            #
+            # NOTE: ignore_index is not an index into labels but a target label value that
+            # the loss treats as “masked out”.
+            # Ensure pad_token_id != eos_token_id in tokenizer to avoid unlearnable EOS tokens
+            # ignore_index=self.tokenizer.pad_token_id
+            ignore_index=LABEL_IGNORE_VALUE
+        )
 
         trainer_config = TrainerConfig(
             model_name=f"lm_{self.dataset_key}",
