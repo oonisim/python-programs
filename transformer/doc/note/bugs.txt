@@ -1,6 +1,20 @@
-[P2] generate() does not validate max_length <= decoder_max_time_steps, which can blow up inside positional encoding mid‑generation. File: model.py
-[P2] LanguageModelDataset.__len__ is off by one and discards a valid last sample, including the len(tokens) == seq_len + 1 case. File: loader.py 
-[P2] LanguageModel.generate doesn’t validate temperature (<=0 → NaN/inf scores). File: lm.py 
-[P2] top_k is unvalidated, so invalid values crash torch.topk. File: lm.py 
-[P2] top_p is unvalidated; out‑of‑range values can mask all tokens and yield NaNs. File: lm.py.
-[P3] max_length < prompt_len silently returns the prompt unchanged. File: lm.py.
+Remaining Issues
+
+  HIGH: LanguageModelTrainer._validate() — Division by zero (line 885)
+  return total_loss / len(val_loader)
+  The base Trainer._validate() (line 403) correctly guards with if num_batches == 0, but the LanguageModelTrainer override does not. If val_loader is empty, this crashes.
+
+  HIGH: Missing --weight_decay and --gradient_clip CLI args in train_lm.py
+  TrainingConfig has weight_decay=0.1 and gradient_clip=1.0 (lines 99-100) and they're used in model building (lines 383, 397), but there are no CLI args to set them. The TrainingConfig constructor at line
+  1001 doesn't pass them either, so they always use defaults. Not a bug per se (defaults are used), but users can't tune these from CLI. train_translation.py has the same gap.
+
+  MEDIUM: Missing weight-tying shape assertion in LanguageModel (lm.py:153)
+  Transformer has an explicit assert verifying embedding/projection weight shapes match before tying. LanguageModel at line 153 just assigns self.projection.projection.weight =
+  self.embedding.embedding.weight without verification. Shapes will always match given the constructor, but the assertion would catch future refactoring mistakes.
+
+  LOW: Double-bracket typo in assertion messages
+  - encoder.py:212: got [{_D}]]." — extra ]
+  - decoder.py:307: got [{_D}]]." — extra ]
+
+  LOW: Causal mask error message says "Encoder Causal Attention" (common.py:507)
+  The do_mask=False branch says "Encoder Causal Attention" which is a misnomer — encoders use bidirectional, not causal attention. Should say "Encoder Self-Attention".
