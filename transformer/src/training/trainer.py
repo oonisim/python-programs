@@ -113,6 +113,9 @@ class TrainerConfig:
     frozen_patience_steps: int = 3  # Require N consecutive tiny updates to flag frozen
 
 
+# ================================================================================
+# Seq2Seq Trainer e.g, Language Translation with Teacher Forcing
+# ================================================================================
 class Trainer:
     """Trainer class for model training with checkpoint management.
 
@@ -1203,6 +1206,9 @@ class Trainer:
         return deleted
 
 
+# ================================================================================
+# Decoder Only Model Trainer (e.g. GPT-style)
+# ================================================================================
 class LanguageModelTrainer(Trainer):
     """Trainer subclass for decoder-only Language Models (GPT-style).
 
@@ -1225,7 +1231,7 @@ class LanguageModelTrainer(Trainer):
         trainer.train(train_loader, val_loader, num_epochs=10)
     """
 
-    def _train_one_step(self, batch) -> float:
+    def _train_one_step(self, batch: Tensor) -> float:
         r"""Execute one training step for language model.
 
         The loss is computed using Negative Log-Likelihood:
@@ -1242,19 +1248,23 @@ class LanguageModelTrainer(Trainer):
         target_ids = target_ids.to(self.device)
 
         self.optimizer.zero_grad()
-        log_probabilities = self.model.forward(input_ids)
+        log_probabilities: Tensor = self.model(input_ids)
 
-        loss = self._compute_loss(log_probabilities, target_ids)
+        loss: Tensor = self._compute_loss(log_probabilities, target_ids)
 
         # Callback: on_forward_end
         self.callbacks.on_forward_end(self, loss)
 
+        # Back-propagate gradients to populates param.grad for each parameter.
+        # No weight change yet.
         loss.backward()
 
         # Callback: on_backward_end (gradients computed, not yet clipped)
         self.callbacks.on_backward_end(self)
 
         self._clip_gradients()
+
+        # Update weights using the gradients in param.grad according to the optimizer rule.
         self.optimizer.step()
 
         # Monitor actual weight updates AFTER step (frozen weight detection only)
