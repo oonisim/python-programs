@@ -775,7 +775,11 @@ class PositionwiseFeedForward(nn.Module):   # pylint: disable=too-few-public-met
             in_features=d_model, out_features=d_ff, bias=bias, dtype=dtype
         )
         # Weight initialization for ReLU
-        torch.nn.init.zeros_(self.W1.bias)
+        # Guard against bias=False:
+        # When bias=False is passed, W1.bias is None and torch.nn.init.zeros_(self.W1.bias)
+        # will crash with AttributeError.
+        if bias and self.W1.bias is not None:
+            torch.nn.init.zeros_(self.W1.bias)
         torch.nn.init.kaiming_normal_(
             self.W1.weight, a=0, mode='fan_in', nonlinearity='relu'
         )

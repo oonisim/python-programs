@@ -576,6 +576,24 @@ def parse_args():
         help="Learning rate for AdamW optimizer. Default: 3e-4",
     )
     train_group.add_argument(
+        "--weight_decay", type=float, default=0.1,
+        metavar="RATE",
+        help=(
+            "Weight decay (L2 penalty) for AdamW optimizer. Regularizes "
+            "model weights to prevent overfitting. Typical range: 0.0 to 0.3. "
+            "Default: 0.1"
+        ),
+    )
+    train_group.add_argument(
+        "--gradient_clip", type=float, default=1.0,
+        metavar="MAX_NORM",
+        help=(
+            "Maximum gradient norm for gradient clipping. Prevents exploding "
+            "gradients by scaling down large gradients. 0 disables clipping. "
+            "Typical range: 0.5 to 5.0. Default: 1.0"
+        ),
+    )
+    train_group.add_argument(
         "--resume", action="store_true",
         help=(
             "Resume training from the latest checkpoint. The script "
@@ -717,6 +735,8 @@ def main():
         epochs=args.epochs,
         batch_size=args.batch_size,
         learning_rate=args.lr,
+        weight_decay=args.weight_decay,
+        gradient_clip=args.gradient_clip,
         snapshot_interval=args.snapshot_interval,
         keep_last_n_snapshots=args.keep_last_n_snapshots,
         delete_snapshots_after_training=args.delete_snapshots_after_training,

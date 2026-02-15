@@ -3,9 +3,6 @@ HIGH: PositionwiseFeedForward — unguarded self.W1.bias access (common.py:778)
   If bias=False is passed, W1.bias is None and this crashes with AttributeError. Currently safe because both Encoder and Decoder pass bias=True (model.py:156, 216), so this never triggers in practice. But
   it's a latent bug — anyone calling PositionwiseFeedForward(bias=False) will crash.
 
-  MEDIUM: Missing --weight_decay and --gradient_clip CLI args
-  Both train_lm.py and train_translation.py lack CLI flags for these. TrainingConfig has weight_decay=0.1 and gradient_clip=1.0 as defaults, and they're used in optimizer/trainer creation, but users can't
-  tune them from the command line.
 
   LOW: Extra space in error message (model.py:579)
   raise ValueError(msg )  # trailing space before )
@@ -13,3 +10,4 @@ HIGH: PositionwiseFeedForward — unguarded self.W1.bias access (common.py:778)
 [P2] Attention has no padding mask support; padded tokens will be attended to in variable‑length batches. File: common.py lines 399–519.
 [P2] top_k still lacks an upper‑bound check (> vocab_size) and can crash torch.topk. File: lm.py lines 433–438.
 [P2] _train_one_epoch can divide by zero or error when len(train_loader) is 0 or undefined. File: trainer.py lines 276–300.
+

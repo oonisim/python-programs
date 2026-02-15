@@ -576,7 +576,7 @@ class Transformer(nn.Module):
         if x.ndim != 2:
             msg: str = f"expected x.shape (B, T), got {x.shape}."
             logger.error(msg)
-            raise ValueError(msg )
+            raise ValueError(msg)
 
         # Validate max_length to prevent positional encoding overflow
         if max_length > self.decoder_max_time_steps:
