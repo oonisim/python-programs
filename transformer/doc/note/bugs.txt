@@ -33,6 +33,112 @@ If you paste:
 I can tell you exactly how to change it so an epoch is a reasonable length.
 
 
+output patsted
+  1) len(train_loader)
+  len(train_loader) = 3,684,989
+  Context:
+  - Total tokens: 117,920,140
+  - Sequence length: 512
+  - Batch size: 32
+  - Sequences in dataset: 117,919,628
+  2) Dataset block/stride logic (from src/training/loader.py:56-73)
+  def __len__(self) -> int:
+      """Number of complete sequences available."""
+      return max(0, len(self.tokens) - self.seq_len)  # ← Creates N - seq_len sequences
+  def __getitem__(self, idx: int) -> tuple[Tensor, Tensor]:
+      """Get input-target pair."""
+      input_ids = self.tokens[idx : idx + self.seq_len]      # ← idx can be any position
+      target_ids = self.tokens[idx + 1 : idx + self.seq_len + 1]
+      return input_ids, target_ids
+
+
+
+GPT
+You’ve found the root cause: you are using a **stride of 1 token** (sliding window). That makes the dataset size ~\(N-\text{seq\_len}\) ≈ **117.9 million sequences**, and with batch=32 you get **3.68 million steps per epoch** — hence “weeks per epoch.”
+
+This is not “wrong” mathematically, but it’s **impractical** for training and massively redundant.
+
+## Why it’s so slow
+Your dataset creates one training example for **every token position**:
+
+- example 0 uses tokens `[0:512]`
+- example 1 uses tokens `[1:513]`
+- …
+- huge overlap: consecutive examples share **511/512 tokens**
+
+So you’re doing ~512× more work than needed for roughly the same training signal.
+
+---
+
+## Fix (standard GPT training): block packing with stride = seq_len
+Use non-overlapping blocks (or large stride):
+
+### Option A (recommended): stride = seq_len (non-overlapping)
+Number of sequences becomes roughly \(N/\text{seq\_len}\):
+- \(117,920,140 / 512 \approx 230,313\) sequences
+- steps per epoch with batch 32: ~7,197 steps
+That’s **hours**, not weeks.
+
+Implementation:
+
+```python
+class LMDataset(Dataset):
+    def __init__(self, tokens: Tensor, seq_len: int):
+        self.tokens = tokens
+        self.seq_len = seq_len
+        self.stride = seq_len  # non-overlapping
+
+        # maximum start index so we can take input_len=seq_len and target_len=seq_len
+        self.max_start = len(self.tokens) - (self.seq_len + 1)
+
+    def __len__(self) -> int:
+        if self.max_start < 0:
+            return 0
+        return (self.max_start // self.stride) + 1
+
+    def __getitem__(self, i: int):
+        idx = i * self.stride
+        input_ids = self.tokens[idx : idx + self.seq_len]
+        target_ids = self.tokens[idx + 1 : idx + self.seq_len + 1]
+        return input_ids, target_ids
+```
+
+### Option B: stride = seq_len // 2 (some overlap)
+Sometimes used to increase sample diversity without extreme redundancy.
+- doubles sequences vs Option A.
+
+Set:
+```python
+self.stride = seq_len // 2
+```
+
+### Option C: random start indices (good for large corpora)
+Instead of enumerating all windows, sample random windows each epoch:
+- epoch length becomes whatever you want (fixed steps)
+- avoids deterministic ordering bias
+- common for very large corpora
+
+---
+
+## Expected epoch time after the fix
+Right now you’re at ~4,700 steps/hour (from earlier estimate).
+
+With Option A (~7,200 steps/epoch):
+- epoch time ≈ 7,200 / 4,700 ≈ **1.5 hours**
+
+(Actual speed may change slightly, but you’ll be in the right ballpark.)
+
+---
+
+## Bottom line
+Your training isn’t stuck; your **dataset stride is the problem**. Change from stride=1 to stride=seq_len (or similar), and your epoch time will drop from **weeks to ~hours**, with much less redundant computation and typically similar or better learning efficiency.
+
+
+
+-----------
+
+
+
 
 
 
