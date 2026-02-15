@@ -578,6 +578,13 @@ class Transformer(nn.Module):
             logger.error(msg)
             raise ValueError(msg )
 
+        # Validate max_length to prevent positional encoding overflow
+        if max_length > self.decoder_max_time_steps:
+            raise ValueError(
+                f"max_length ({max_length}) exceeds decoder_max_time_steps "
+                f"({self.decoder_max_time_steps}). Positional encoding will fail."
+            )
+
         # Warn the user about device/dtype mismatches instead of moving/casting.
         if x.device != self._device():
             raise RuntimeError(

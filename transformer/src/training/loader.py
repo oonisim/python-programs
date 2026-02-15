@@ -70,8 +70,13 @@ class LanguageModelDataset(Dataset):
         self.seq_len = seq_len
 
     def __len__(self) -> int:
-        """Number of complete sequences available."""
-        return max(0, len(self.tokens) - self.seq_len - 1)
+        """Number of complete sequences available.
+
+        For each sample, we need seq_len tokens for input and seq_len tokens for target (shifted by 1).
+        The target ends at idx + seq_len, so we need tokens up to that index.
+        Valid indices: 0 <= idx < len(tokens) - seq_len
+        """
+        return max(0, len(self.tokens) - self.seq_len)
 
     def __getitem__(self, idx: int) -> tuple[Tensor, Tensor]:
         """Get input-target pair.

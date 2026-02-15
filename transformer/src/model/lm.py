@@ -286,6 +286,31 @@ class LanguageModel(nn.Module):
                 "consider increasing max_seq_len or truncating inputs."
             )
 
+        # Validate generation parameters
+        if max_length < prompt_len:
+            raise ValueError(
+                f"max_length ({max_length}) must be >= prompt_len ({prompt_len}). "
+                "Cannot generate fewer tokens than the prompt."
+            )
+
+        if temperature <= 0:
+            raise ValueError(
+                f"temperature must be > 0, got {temperature}. "
+                "Zero or negative temperature causes NaN/inf in softmax."
+            )
+
+        if top_k is not None and top_k <= 0:
+            raise ValueError(
+                f"top_k must be > 0 if specified, got {top_k}. "
+                "Invalid top_k crashes torch.topk."
+            )
+
+        if top_p is not None and not (0.0 < top_p <= 1.0):
+            raise ValueError(
+                f"top_p must be in (0.0, 1.0] if specified, got {top_p}. "
+                "Out-of-range values can mask all tokens causing NaN."
+            )
+
         # =========================================================================
         # STEP 1: PREPARE INPUT BATCH
         # =========================================================================
