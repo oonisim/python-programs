@@ -1,9 +1,15 @@
 Findings (new, ordered by severity)
 
-[P2] Decoder input still contains LABEL_IGNORE_VALUE from padding mask; this will crash embeddings on padded batches. File: loader_translation.py lines 149–166.
-[P2] No target padding mask for decoder self‑attention, so padded target tokens can be attended to. File: decoder.py lines 193–200.
-[P3] Transformer.evaluate()/generate() switch to eval but never restore training mode. File: model.py lines 560–616.
-[P3] LanguageModel.generate() switches to eval but never restores training mode. File: lm.py lines 327–330.
+P2: EOS/BOS get masked when pad_token_id == eos_token_id
+translation_collate_fn builds target_pad_mask by comparing target_padded == target_pad_id, then masks those positions to LABEL_IGNORE_VALUE. If pad_token_id == eos_token_id (true for tiktoken adapter), this masks all EOS tokens, including the real EOS at sequence end and BOS (which is set to EOS). That makes EOS unlearnable even after the ignore_index fix.
+transformer/src/training/loader_translation.py:128-164
+
+P2: Source EOS can be treated as padding and masked out
+source_pad_mask is created with (source_padded == source_pad_id). If pad_token_id == eos_token_id, the appended EOS token (and any real EOS in text) is masked out in encoder attention. This effectively removes the end‑of‑sequence marker from the encoder context.
+transformer/src/training/loader_translation.py:123-127
+
+
+
 
 Root Cause Analysis
 
