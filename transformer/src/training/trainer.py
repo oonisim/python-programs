@@ -95,6 +95,11 @@ class TrainerConfig:
     delete_snapshots_after_training: bool = True
     max_steps: Optional[int] = None  # Stop training after N steps (None = no limit)
 
+    # Scheduler stepping policy
+    # False = step once per epoch (default).
+    # True = step every batch (required for step-based warmup schedules).
+    step_scheduler_per_batch: bool = False
+
     # Weight update monitoring (defensive, aggregate only, ~4MB memory)
     # Monitors: 1) gradient health (after clipping), 2) actual Δw after step
     # Uses sampled elements (sample_size per param) instead of full clones
@@ -617,6 +622,10 @@ class Trainer:
         self._clip_gradients()
         self.optimizer.step()
 
+        # Step scheduler per batch if configured (e.g., warmup schedules)
+        if self.scheduler is not None and self.config.step_scheduler_per_batch:
+            self.scheduler.step()
+
         # Monitor actual weight updates AFTER step (frozen weight detection only)
         if self.weight_monitor and (self.global_step % self.config.weight_monitor_interval == 0):
             self._log_weight_monitor_updates(self.global_step)
@@ -651,7 +660,7 @@ class Trainer:
 
     def _update_scheduler(self) -> None:
         """Update learning rate scheduler if present."""
-        if self.scheduler is not None:
+        if self.scheduler is not None and not self.config.step_scheduler_per_batch:
             self.scheduler.step()
 
     # ================================================================================

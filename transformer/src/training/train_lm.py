@@ -513,6 +513,7 @@ class LanguageModelTrainingDirector:
             exploding_grad_threshold=self.training_config.exploding_grad_threshold,
             frozen_update_ratio_threshold=self.training_config.frozen_update_ratio_threshold,
             frozen_patience_steps=self.training_config.frozen_patience_steps,
+            step_scheduler_per_batch=self.training_config.warmup_steps > 0,
         )
 
         # Build callbacks
