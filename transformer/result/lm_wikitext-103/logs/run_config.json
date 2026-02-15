@@ -1,0 +1,43 @@
+{
+  "dataset_key": "wikitext-103",
+  "tokenizer_name": "gpt2",
+  "max_samples": null,
+  "model_config": {
+    "d_model": 256,
+    "num_heads": 4,
+    "num_layers": 4,
+    "d_ff": 512,
+    "max_seq_len": 256,
+    "dropout": 0.1
+  },
+  "training_config": {
+    "epochs": 10,
+    "batch_size": 32,
+    "learning_rate": 0.0003,
+    "weight_decay": 0.1,
+    "gradient_clip": 1.0,
+    "log_interval": 100,
+    "snapshot_interval": 10000,
+    "sanity_check_interval": 10000,
+    "keep_last_n_snapshots": 3,
+    "delete_snapshots_after_training": true,
+    "warmup_steps": 0,
+    "min_lr_ratio": 0.1,
+    "enable_gradient_monitor": true,
+    "gradient_monitor_interval": 10000,
+    "enable_early_stopping": true,
+    "early_stop_patience": 5,
+    "early_stop_min_delta": 0.001,
+    "early_stop_restore_best": true,
+    "early_stop_overfit_patience": 0,
+    "early_stop_overfit_min_delta": 0.01,
+    "enable_weight_monitor": true,
+    "weight_monitor_interval": 10000,
+    "weight_monitor_sample_size": 1024,
+    "monitor_topk": 5,
+    "vanishing_grad_threshold": 1e-07,
+    "exploding_grad_threshold": 100.0,
+    "frozen_update_ratio_threshold": 1e-12,
+    "frozen_patience_steps": 3
+  }
+}

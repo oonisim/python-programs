@@ -1,0 +1,14 @@
+  python -u /home/masa/repository/python-programs/transformer/src/training/train_lm.py \
+    --dataset wikitext-103 \
+    --epochs 10 \
+    --batch_size 32 \
+    --lr 3e-4 \
+    --warmup_steps 0 \
+    --snapshot_interval 10000 \
+    --sanity_check_interval 10000 \
+    --gradient_monitor \
+    --gradient_monitor_interval 10000 \
+    --early_stopping \
+    --weight_monitor \
+    --weight_monitor_interval 10000 \
+    --yes

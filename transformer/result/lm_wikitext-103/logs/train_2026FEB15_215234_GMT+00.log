@@ -1,0 +1,598 @@
+============================================================
+Language Model Training
+============================================================
+Dataset: wikitext-103
+Device: cuda
+Model: d=256, h=4, L=4
+Training: epochs=10, batch=32, lr=0.0003
+
+  Train tokens: 117,920,140
+  Val tokens: 247,289
+  Train sequences: 460,625
+  Early stopping enabled (patience=5)
+Weight update monitoring enabled (sample_size=1024, interval=10000 steps)
+
+============================================================
+Training...
+============================================================
+Training on cuda for 10 epochs
+Gradient flow monitoring enabled: decoder (4 layers)
+  Monitor at snapshots: True
+  Monitor interval: 10000
+  Monitor at epochs: False
+  Norm type: l2
+  Epoch 0 | Step 1/14394 | Loss: 10.8955
+  Epoch 0 | Step 100/14394 | Loss: 7.3246
+  Epoch 0 | Step 200/14394 | Loss: 6.8887
+  Epoch 0 | Step 300/14394 | Loss: 6.6139
+  Epoch 0 | Step 400/14394 | Loss: 6.3433
+  Epoch 0 | Step 500/14394 | Loss: 6.1814
+  Epoch 0 | Step 600/14394 | Loss: 6.1284
+  Epoch 0 | Step 700/14394 | Loss: 6.0710
+  Epoch 0 | Step 800/14394 | Loss: 5.9584
+  Epoch 0 | Step 900/14394 | Loss: 5.9414
+  Epoch 0 | Step 1000/14394 | Loss: 5.9238
+  Epoch 0 | Step 1100/14394 | Loss: 5.6955
+  Epoch 0 | Step 1200/14394 | Loss: 5.8603
+  Epoch 0 | Step 1300/14394 | Loss: 5.6856
+  Epoch 0 | Step 1400/14394 | Loss: 5.6413
+  Epoch 0 | Step 1500/14394 | Loss: 5.8077
+  Epoch 0 | Step 1600/14394 | Loss: 5.7094
+  Epoch 0 | Step 1700/14394 | Loss: 5.6366
+  Epoch 0 | Step 1800/14394 | Loss: 5.4962
+  Epoch 0 | Step 1900/14394 | Loss: 5.5860
+  Epoch 0 | Step 2000/14394 | Loss: 5.5893
+  Epoch 0 | Step 2100/14394 | Loss: 5.4864
+  Epoch 0 | Step 2200/14394 | Loss: 5.6051
+  Epoch 0 | Step 2300/14394 | Loss: 5.3757
+  Epoch 0 | Step 2400/14394 | Loss: 5.5332
+  Epoch 0 | Step 2500/14394 | Loss: 5.3542
+  Epoch 0 | Step 2600/14394 | Loss: 5.4885
+  Epoch 0 | Step 2700/14394 | Loss: 5.3403
+  Epoch 0 | Step 2800/14394 | Loss: 5.3030
+  Epoch 0 | Step 2900/14394 | Loss: 5.3078
+  Epoch 0 | Step 3000/14394 | Loss: 5.3755
+  Epoch 0 | Step 3100/14394 | Loss: 5.3522
+  Epoch 0 | Step 3200/14394 | Loss: 5.4593
+  Epoch 0 | Step 3300/14394 | Loss: 5.2815
+  Epoch 0 | Step 3400/14394 | Loss: 5.2060
+  Epoch 0 | Step 3500/14394 | Loss: 5.1900
+  Epoch 0 | Step 3600/14394 | Loss: 5.1943
+  Epoch 0 | Step 3700/14394 | Loss: 5.1000
+  Epoch 0 | Step 3800/14394 | Loss: 5.2596
+  Epoch 0 | Step 3900/14394 | Loss: 5.3049
+  Epoch 0 | Step 4000/14394 | Loss: 5.0278
+  Epoch 0 | Step 4100/14394 | Loss: 5.2006
+  Epoch 0 | Step 4200/14394 | Loss: 5.1069
+  Epoch 0 | Step 4300/14394 | Loss: 5.1051
+  Epoch 0 | Step 4400/14394 | Loss: 5.1354
+  Epoch 0 | Step 4500/14394 | Loss: 5.0664
+  Epoch 0 | Step 4600/14394 | Loss: 5.1588
+  Epoch 0 | Step 4700/14394 | Loss: 5.0709
+  Epoch 0 | Step 4800/14394 | Loss: 5.1038
+  Epoch 0 | Step 4900/14394 | Loss: 4.9398
+  Epoch 0 | Step 5000/14394 | Loss: 5.2392
+
+======================================================================
+SANITY CHECK AT STEP 5000
+======================================================================
+Current LR: 3.00e-04
+Input shape: torch.Size([32, 256])
+Target shape: torch.Size([32, 256])
+Non-ignored labels: 8192/8192 (100.0%)
+Sequence length T: 256
+======================================================================
+
+  Epoch 0 | Step 5100/14394 | Loss: 5.0830
+  Epoch 0 | Step 5200/14394 | Loss: 5.0949
+  Epoch 0 | Step 5300/14394 | Loss: 5.0144
+  Epoch 0 | Step 5400/14394 | Loss: 5.0699
+  Epoch 0 | Step 5500/14394 | Loss: 4.9617
+  Epoch 0 | Step 5600/14394 | Loss: 4.9708
+  Epoch 0 | Step 5700/14394 | Loss: 4.8392
+  Epoch 0 | Step 5800/14394 | Loss: 5.0015
+  Epoch 0 | Step 5900/14394 | Loss: 4.9919
+  Epoch 0 | Step 6000/14394 | Loss: 5.0092
+  Epoch 0 | Step 6100/14394 | Loss: 4.8255
+  Epoch 0 | Step 6200/14394 | Loss: 4.8177
+  Epoch 0 | Step 6300/14394 | Loss: 4.7880
+  Epoch 0 | Step 6400/14394 | Loss: 4.9425
+  Epoch 0 | Step 6500/14394 | Loss: 4.8634
+  Epoch 0 | Step 6600/14394 | Loss: 4.9565
+  Epoch 0 | Step 6700/14394 | Loss: 4.9889
+  Epoch 0 | Step 6800/14394 | Loss: 5.0715
+  Epoch 0 | Step 6900/14394 | Loss: 4.9424
+  Epoch 0 | Step 7000/14394 | Loss: 4.7530
+  Epoch 0 | Step 7100/14394 | Loss: 4.8091
+  Epoch 0 | Step 7200/14394 | Loss: 4.8768
+  Epoch 0 | Step 7300/14394 | Loss: 5.0544
+  Epoch 0 | Step 7400/14394 | Loss: 4.9141
+  Epoch 0 | Step 7500/14394 | Loss: 4.8547
+  Epoch 0 | Step 7600/14394 | Loss: 4.7044
+  Epoch 0 | Step 7700/14394 | Loss: 4.8028
+  Epoch 0 | Step 7800/14394 | Loss: 4.7595
+  Epoch 0 | Step 7900/14394 | Loss: 4.8657
+  Epoch 0 | Step 8000/14394 | Loss: 4.7720
+  Epoch 0 | Step 8100/14394 | Loss: 4.6442
+  Epoch 0 | Step 8200/14394 | Loss: 4.8583
+  Epoch 0 | Step 8300/14394 | Loss: 4.7878
+  Epoch 0 | Step 8400/14394 | Loss: 4.6910
+  Epoch 0 | Step 8500/14394 | Loss: 4.7191
+  Epoch 0 | Step 8600/14394 | Loss: 4.8147
+  Epoch 0 | Step 8700/14394 | Loss: 4.7762
+  Epoch 0 | Step 8800/14394 | Loss: 4.9106
+  Epoch 0 | Step 8900/14394 | Loss: 4.8061
+  Epoch 0 | Step 9000/14394 | Loss: 4.9154
+  Epoch 0 | Step 9100/14394 | Loss: 4.7238
+  Epoch 0 | Step 9200/14394 | Loss: 4.7905
+  Epoch 0 | Step 9300/14394 | Loss: 4.8264
+  Epoch 0 | Step 9400/14394 | Loss: 4.9802
+  Epoch 0 | Step 9500/14394 | Loss: 4.9076
+  Epoch 0 | Step 9600/14394 | Loss: 4.8499
+  Epoch 0 | Step 9700/14394 | Loss: 4.8030
+  Epoch 0 | Step 9800/14394 | Loss: 4.9155
+  Epoch 0 | Step 9900/14394 | Loss: 4.8379
+  ✓ Validation at step 10000: All weights and gradients valid
+  Epoch 0 | Step 10000/14394 | Loss: 4.7913
+  Gradient flow stats saved with snapshot:
+    Block: decoder
+    Mean gain: 1.0950
+    Healthy: 3, Damping: 0, Amplifying: 0
+Snapshot saved: result/lm_wikitext-103/snapshots/snapshot_epoch_0000_step_009999_20260215_221903.pt
+
+======================================================================
+SANITY CHECK AT STEP 10000
+======================================================================
+Current LR: 3.00e-04
+Input shape: torch.Size([32, 256])
+Target shape: torch.Size([32, 256])
+Non-ignored labels: 8192/8192 (100.0%)
+Sequence length T: 256
+======================================================================
+
+  Epoch 0 | Step 10100/14394 | Loss: 4.7991
+  Epoch 0 | Step 10200/14394 | Loss: 4.8654
+  Epoch 0 | Step 10300/14394 | Loss: 4.9227
+  Epoch 0 | Step 10400/14394 | Loss: 4.7880
+  Epoch 0 | Step 10500/14394 | Loss: 4.8082
+  Epoch 0 | Step 10600/14394 | Loss: 4.8104
+  Epoch 0 | Step 10700/14394 | Loss: 4.8356
+  Epoch 0 | Step 10800/14394 | Loss: 4.7542
+  Epoch 0 | Step 10900/14394 | Loss: 4.7525
+  Epoch 0 | Step 11000/14394 | Loss: 4.6720
+  Epoch 0 | Step 11100/14394 | Loss: 4.5637
+  Epoch 0 | Step 11200/14394 | Loss: 4.8223
+  Epoch 0 | Step 11300/14394 | Loss: 4.6385
+  Epoch 0 | Step 11400/14394 | Loss: 4.5364
+  Epoch 0 | Step 11500/14394 | Loss: 4.7540
+  Epoch 0 | Step 11600/14394 | Loss: 4.5901
+  Epoch 0 | Step 11700/14394 | Loss: 4.8885
+  Epoch 0 | Step 11800/14394 | Loss: 4.6391
+  Epoch 0 | Step 11900/14394 | Loss: 4.8305
+  Epoch 0 | Step 12000/14394 | Loss: 4.7929
+  Epoch 0 | Step 12100/14394 | Loss: 4.6087
+  Epoch 0 | Step 12200/14394 | Loss: 4.7631
+  Epoch 0 | Step 12300/14394 | Loss: 4.7125
+  Epoch 0 | Step 12400/14394 | Loss: 4.7216
+  Epoch 0 | Step 12500/14394 | Loss: 4.7822
+  Epoch 0 | Step 12600/14394 | Loss: 4.6416
+  Epoch 0 | Step 12700/14394 | Loss: 4.7361
+  Epoch 0 | Step 12800/14394 | Loss: 4.7873
+  Epoch 0 | Step 12900/14394 | Loss: 4.8211
+  Epoch 0 | Step 13000/14394 | Loss: 4.7243
+  Epoch 0 | Step 13100/14394 | Loss: 4.8149
+  Epoch 0 | Step 13200/14394 | Loss: 4.7092
+  Epoch 0 | Step 13300/14394 | Loss: 4.7249
+  Epoch 0 | Step 13400/14394 | Loss: 4.7201
+  Epoch 0 | Step 13500/14394 | Loss: 4.5060
+  Epoch 0 | Step 13600/14394 | Loss: 4.6561
+  Epoch 0 | Step 13700/14394 | Loss: 4.6039
+  Epoch 0 | Step 13800/14394 | Loss: 4.6243
+  Epoch 0 | Step 13900/14394 | Loss: 4.6684
+  Epoch 0 | Step 14000/14394 | Loss: 4.6475
+  Epoch 0 | Step 14100/14394 | Loss: 4.5478
+  Epoch 0 | Step 14200/14394 | Loss: 4.6835
+  Epoch 0 | Step 14300/14394 | Loss: 4.5983
+Epoch 0 | Train Loss: 5.0782 | Val Loss: 4.4228
+  Early stopping: new best loss 4.4228 at epoch 0
+  Gradient flow stats saved with snapshot:
+    Block: decoder
+    Mean gain: 1.1472
+    Healthy: 3, Damping: 0, Amplifying: 0
+Snapshot saved: result/lm_wikitext-103/snapshots/snapshot_epoch_0000_step_000000_20260215_223006.pt
+  Epoch 1 | Step 1/14394 | Loss: 4.4386
+  Epoch 1 | Step 100/14394 | Loss: 4.7016
+  Epoch 1 | Step 200/14394 | Loss: 4.7281
+  Epoch 1 | Step 300/14394 | Loss: 4.5414
+  Epoch 1 | Step 400/14394 | Loss: 4.6311
+  Epoch 1 | Step 500/14394 | Loss: 4.5389
+  Epoch 1 | Step 600/14394 | Loss: 4.7764
+
+======================================================================
+SANITY CHECK AT STEP 15000
+======================================================================
+Current LR: 2.93e-04
+Input shape: torch.Size([32, 256])
+Target shape: torch.Size([32, 256])
+Non-ignored labels: 8192/8192 (100.0%)
+Sequence length T: 256
+======================================================================
+
+  Epoch 1 | Step 700/14394 | Loss: 4.7232
+  Epoch 1 | Step 800/14394 | Loss: 4.6065
+  Epoch 1 | Step 900/14394 | Loss: 4.6218
+  Epoch 1 | Step 1000/14394 | Loss: 4.5922
+  Epoch 1 | Step 1100/14394 | Loss: 4.6661
+  Epoch 1 | Step 1200/14394 | Loss: 4.5709
+  Epoch 1 | Step 1300/14394 | Loss: 4.6754
+  Epoch 1 | Step 1400/14394 | Loss: 4.7103
+  Epoch 1 | Step 1500/14394 | Loss: 4.6323
+  Epoch 1 | Step 1600/14394 | Loss: 4.6184
+  Epoch 1 | Step 1700/14394 | Loss: 4.6254
+  Epoch 1 | Step 1800/14394 | Loss: 4.5224
+  Epoch 1 | Step 1900/14394 | Loss: 4.5684
+  Epoch 1 | Step 2000/14394 | Loss: 4.4362
+  Epoch 1 | Step 2100/14394 | Loss: 4.7292
+  Epoch 1 | Step 2200/14394 | Loss: 4.6460
+  Epoch 1 | Step 2300/14394 | Loss: 4.4610
+  Epoch 1 | Step 2400/14394 | Loss: 4.5190
+  Epoch 1 | Step 2500/14394 | Loss: 4.3076
+  Epoch 1 | Step 2600/14394 | Loss: 4.7352
+  Epoch 1 | Step 2700/14394 | Loss: 4.5744
+  Epoch 1 | Step 2800/14394 | Loss: 4.5472
+  Epoch 1 | Step 2900/14394 | Loss: 4.7658
+  Epoch 1 | Step 3000/14394 | Loss: 4.6994
+  Epoch 1 | Step 3100/14394 | Loss: 4.5376
+  Epoch 1 | Step 3200/14394 | Loss: 4.5814
+  Epoch 1 | Step 3300/14394 | Loss: 4.3971
+  Epoch 1 | Step 3400/14394 | Loss: 4.5544
+  Epoch 1 | Step 3500/14394 | Loss: 4.5643
+  Epoch 1 | Step 3600/14394 | Loss: 4.5034
+  Epoch 1 | Step 3700/14394 | Loss: 4.5501
+  Epoch 1 | Step 3800/14394 | Loss: 4.5906
+  Epoch 1 | Step 3900/14394 | Loss: 4.7016
+  Epoch 1 | Step 4000/14394 | Loss: 4.6708
+  Epoch 1 | Step 4100/14394 | Loss: 4.6742
+  Epoch 1 | Step 4200/14394 | Loss: 4.5084
+  Epoch 1 | Step 4300/14394 | Loss: 4.5903
+  Epoch 1 | Step 4400/14394 | Loss: 4.7748
+  Epoch 1 | Step 4500/14394 | Loss: 4.6950
+  Epoch 1 | Step 4600/14394 | Loss: 4.5706
+  Epoch 1 | Step 4700/14394 | Loss: 4.5639
+  Epoch 1 | Step 4800/14394 | Loss: 4.5853
+  Epoch 1 | Step 4900/14394 | Loss: 4.5955
+  Epoch 1 | Step 5000/14394 | Loss: 4.6262
+  Epoch 1 | Step 5100/14394 | Loss: 4.4313
+  Epoch 1 | Step 5200/14394 | Loss: 4.5009
+  Epoch 1 | Step 5300/14394 | Loss: 4.4159
+  Epoch 1 | Step 5400/14394 | Loss: 4.4627
+  Epoch 1 | Step 5500/14394 | Loss: 4.4937
+  Epoch 1 | Step 5600/14394 | Loss: 4.5725
+  ✓ Validation at step 20000: All weights and gradients valid
+
+======================================================================
+SANITY CHECK AT STEP 20000
+======================================================================
+Current LR: 2.93e-04
+Input shape: torch.Size([32, 256])
+Target shape: torch.Size([32, 256])
+Non-ignored labels: 8192/8192 (100.0%)
+Sequence length T: 256
+======================================================================
+
+  Epoch 1 | Step 5700/14394 | Loss: 4.4897
+  Epoch 1 | Step 5800/14394 | Loss: 4.6147
+  Epoch 1 | Step 5900/14394 | Loss: 4.5787
+  Epoch 1 | Step 6000/14394 | Loss: 4.8300
+  Epoch 1 | Step 6100/14394 | Loss: 4.3958
+  Epoch 1 | Step 6200/14394 | Loss: 4.5526
+  Epoch 1 | Step 6300/14394 | Loss: 4.4837
+  Epoch 1 | Step 6400/14394 | Loss: 4.5677
+  Epoch 1 | Step 6500/14394 | Loss: 4.6721
+  Epoch 1 | Step 6600/14394 | Loss: 4.6539
+  Epoch 1 | Step 6700/14394 | Loss: 4.5031
+  Epoch 1 | Step 6800/14394 | Loss: 4.6104
+  Epoch 1 | Step 6900/14394 | Loss: 4.4346
+  Epoch 1 | Step 7000/14394 | Loss: 4.5030
+  Epoch 1 | Step 7100/14394 | Loss: 4.6073
+  Epoch 1 | Step 7200/14394 | Loss: 4.6713
+  Epoch 1 | Step 7300/14394 | Loss: 4.5232
+  Epoch 1 | Step 7400/14394 | Loss: 4.5744
+  Epoch 1 | Step 7500/14394 | Loss: 4.5976
+  Epoch 1 | Step 7600/14394 | Loss: 4.5482
+  Epoch 1 | Step 7700/14394 | Loss: 4.5721
+  Epoch 1 | Step 7800/14394 | Loss: 4.6643
+  Epoch 1 | Step 7900/14394 | Loss: 4.3941
+  Epoch 1 | Step 8000/14394 | Loss: 4.4422
+  Epoch 1 | Step 8100/14394 | Loss: 4.5512
+  Epoch 1 | Step 8200/14394 | Loss: 4.5969
+  Epoch 1 | Step 8300/14394 | Loss: 4.6987
+  Epoch 1 | Step 8400/14394 | Loss: 4.4327
+  Epoch 1 | Step 8500/14394 | Loss: 4.6547
+  Epoch 1 | Step 8600/14394 | Loss: 4.4902
+  Epoch 1 | Step 8700/14394 | Loss: 4.6947
+  Epoch 1 | Step 8800/14394 | Loss: 4.4032
+  Epoch 1 | Step 8900/14394 | Loss: 4.5329
+  Epoch 1 | Step 9000/14394 | Loss: 4.5299
+  Epoch 1 | Step 9100/14394 | Loss: 4.5204
+  Epoch 1 | Step 9200/14394 | Loss: 4.6488
+  Epoch 1 | Step 9300/14394 | Loss: 4.5731
+  Epoch 1 | Step 9400/14394 | Loss: 4.5876
+  Epoch 1 | Step 9500/14394 | Loss: 4.6996
+  Epoch 1 | Step 9600/14394 | Loss: 4.6804
+  Epoch 1 | Step 9700/14394 | Loss: 4.5226
+  Epoch 1 | Step 9800/14394 | Loss: 4.3570
+  Epoch 1 | Step 9900/14394 | Loss: 4.5266
+  Epoch 1 | Step 10000/14394 | Loss: 4.5747
+  Gradient flow stats saved with snapshot:
+    Block: decoder
+    Mean gain: 1.1764
+    Healthy: 3, Damping: 0, Amplifying: 0
+Snapshot saved: result/lm_wikitext-103/snapshots/snapshot_epoch_0001_step_009999_20260215_225516.pt
+  Epoch 1 | Step 10100/14394 | Loss: 4.5070
+  Epoch 1 | Step 10200/14394 | Loss: 4.5127
+  Epoch 1 | Step 10300/14394 | Loss: 4.3574
+  Epoch 1 | Step 10400/14394 | Loss: 4.6152
+  Epoch 1 | Step 10500/14394 | Loss: 4.5640
+  Epoch 1 | Step 10600/14394 | Loss: 4.4599
+
+======================================================================
+SANITY CHECK AT STEP 25000
+======================================================================
+Current LR: 2.93e-04
+Input shape: torch.Size([32, 256])
+Target shape: torch.Size([32, 256])
+Non-ignored labels: 8192/8192 (100.0%)
+Sequence length T: 256
+======================================================================
+
+  Epoch 1 | Step 10700/14394 | Loss: 4.5881
+  Epoch 1 | Step 10800/14394 | Loss: 4.4935
+  Epoch 1 | Step 10900/14394 | Loss: 4.6908
+  Epoch 1 | Step 11000/14394 | Loss: 4.3737
+  Epoch 1 | Step 11100/14394 | Loss: 4.5625
+  Epoch 1 | Step 11200/14394 | Loss: 4.5186
+  Epoch 1 | Step 11300/14394 | Loss: 4.6901
+  Epoch 1 | Step 11400/14394 | Loss: 4.6556
+  Epoch 1 | Step 11500/14394 | Loss: 4.2950
+  Epoch 1 | Step 11600/14394 | Loss: 4.7212
+  Epoch 1 | Step 11700/14394 | Loss: 4.5141
+  Epoch 1 | Step 11800/14394 | Loss: 4.5006
+  Epoch 1 | Step 11900/14394 | Loss: 4.3399
+  Epoch 1 | Step 12000/14394 | Loss: 4.5006
+  Epoch 1 | Step 12100/14394 | Loss: 4.4981
+  Epoch 1 | Step 12200/14394 | Loss: 4.5375
+  Epoch 1 | Step 12300/14394 | Loss: 4.4617
+  Epoch 1 | Step 12400/14394 | Loss: 4.4436
+  Epoch 1 | Step 12500/14394 | Loss: 4.5316
+  Epoch 1 | Step 12600/14394 | Loss: 4.5524
+  Epoch 1 | Step 12700/14394 | Loss: 4.3500
+  Epoch 1 | Step 12800/14394 | Loss: 4.3229
+  Epoch 1 | Step 12900/14394 | Loss: 4.6250
+  Epoch 1 | Step 13000/14394 | Loss: 4.3975
+  Epoch 1 | Step 13100/14394 | Loss: 4.5767
+  Epoch 1 | Step 13200/14394 | Loss: 4.4870
+  Epoch 1 | Step 13300/14394 | Loss: 4.4968
+  Epoch 1 | Step 13400/14394 | Loss: 4.5662
+  Epoch 1 | Step 13500/14394 | Loss: 4.5052
+  Epoch 1 | Step 13600/14394 | Loss: 4.6815
+  Epoch 1 | Step 13700/14394 | Loss: 4.5432
+  Epoch 1 | Step 13800/14394 | Loss: 4.4322
+  Epoch 1 | Step 13900/14394 | Loss: 4.5075
+  Epoch 1 | Step 14000/14394 | Loss: 4.5782
+  Epoch 1 | Step 14100/14394 | Loss: 4.7529
+  Epoch 1 | Step 14200/14394 | Loss: 4.4186
+  Epoch 1 | Step 14300/14394 | Loss: 4.6918
+Epoch 1 | Train Loss: 4.5492 | Val Loss: 4.2732
+  Early stopping: new best loss 4.2732 at epoch 1
+  Gradient flow stats saved with snapshot:
+    Block: decoder
+    Mean gain: 1.1940
+    Healthy: 3, Damping: 0, Amplifying: 0
+Snapshot saved: result/lm_wikitext-103/snapshots/snapshot_epoch_0001_step_000000_20260215_230626.pt
+Cleaned up 1 old snapshots
+  Epoch 2 | Step 1/14394 | Loss: 4.4456
+  Epoch 2 | Step 100/14394 | Loss: 4.5079
+  Epoch 2 | Step 200/14394 | Loss: 4.1926
+  Epoch 2 | Step 300/14394 | Loss: 4.3695
+  Epoch 2 | Step 400/14394 | Loss: 4.4335
+  Epoch 2 | Step 500/14394 | Loss: 4.4268
+  Epoch 2 | Step 600/14394 | Loss: 4.5424
+  Epoch 2 | Step 700/14394 | Loss: 4.2822
+  Epoch 2 | Step 800/14394 | Loss: 4.4911
+  Epoch 2 | Step 900/14394 | Loss: 4.4732
+  Epoch 2 | Step 1000/14394 | Loss: 4.5737
+  Epoch 2 | Step 1100/14394 | Loss: 4.5781
+  Epoch 2 | Step 1200/14394 | Loss: 4.4856
+  ✓ Validation at step 30000: All weights and gradients valid
+
+======================================================================
+SANITY CHECK AT STEP 30000
+======================================================================
+Current LR: 2.71e-04
+Input shape: torch.Size([32, 256])
+Target shape: torch.Size([32, 256])
+Non-ignored labels: 8192/8192 (100.0%)
+Sequence length T: 256
+======================================================================
+
+  Epoch 2 | Step 1300/14394 | Loss: 4.5406
+  Epoch 2 | Step 1400/14394 | Loss: 4.5560
+  Epoch 2 | Step 1500/14394 | Loss: 4.5148
+  Epoch 2 | Step 1600/14394 | Loss: 4.3596
+  Epoch 2 | Step 1700/14394 | Loss: 4.4391
+  Epoch 2 | Step 1800/14394 | Loss: 4.3735
+  Epoch 2 | Step 1900/14394 | Loss: 4.6242
+  Epoch 2 | Step 2000/14394 | Loss: 4.4331
+  Epoch 2 | Step 2100/14394 | Loss: 4.4762
+  Epoch 2 | Step 2200/14394 | Loss: 4.3354
+  Epoch 2 | Step 2300/14394 | Loss: 4.4109
+  Epoch 2 | Step 2400/14394 | Loss: 4.5631
+  Epoch 2 | Step 2500/14394 | Loss: 4.1305
+  Epoch 2 | Step 2600/14394 | Loss: 4.5727
+  Epoch 2 | Step 2700/14394 | Loss: 4.4819
+  Epoch 2 | Step 2800/14394 | Loss: 4.3851
+  Epoch 2 | Step 2900/14394 | Loss: 4.5449
+  Epoch 2 | Step 3000/14394 | Loss: 4.4748
+  Epoch 2 | Step 3100/14394 | Loss: 4.5033
+  Epoch 2 | Step 3200/14394 | Loss: 4.3756
+  Epoch 2 | Step 3300/14394 | Loss: 4.3592
+  Epoch 2 | Step 3400/14394 | Loss: 4.3779
+  Epoch 2 | Step 3500/14394 | Loss: 4.3880
+  Epoch 2 | Step 3600/14394 | Loss: 4.5124
+  Epoch 2 | Step 3700/14394 | Loss: 4.4436
+  Epoch 2 | Step 3800/14394 | Loss: 4.5196
+  Epoch 2 | Step 3900/14394 | Loss: 4.5037
+  Epoch 2 | Step 4000/14394 | Loss: 4.4404
+  Epoch 2 | Step 4100/14394 | Loss: 4.1758
+  Epoch 2 | Step 4200/14394 | Loss: 4.5524
+  Epoch 2 | Step 4300/14394 | Loss: 4.6657
+  Epoch 2 | Step 4400/14394 | Loss: 4.5333
+  Epoch 2 | Step 4500/14394 | Loss: 4.3256
+  Epoch 2 | Step 4600/14394 | Loss: 4.6398
+  Epoch 2 | Step 4700/14394 | Loss: 4.3907
+  Epoch 2 | Step 4800/14394 | Loss: 4.5091
+  Epoch 2 | Step 4900/14394 | Loss: 4.6531
+  Epoch 2 | Step 5000/14394 | Loss: 4.4523
+  Epoch 2 | Step 5100/14394 | Loss: 4.5251
+  Epoch 2 | Step 5200/14394 | Loss: 4.3814
+  Epoch 2 | Step 5300/14394 | Loss: 4.5521
+  Epoch 2 | Step 5400/14394 | Loss: 4.4295
+  Epoch 2 | Step 5500/14394 | Loss: 4.3882
+  Epoch 2 | Step 5600/14394 | Loss: 4.5068
+  Epoch 2 | Step 5700/14394 | Loss: 4.2600
+  Epoch 2 | Step 5800/14394 | Loss: 4.5568
+  Epoch 2 | Step 5900/14394 | Loss: 4.5583
+  Epoch 2 | Step 6000/14394 | Loss: 4.5995
+  Epoch 2 | Step 6100/14394 | Loss: 4.3915
+  Epoch 2 | Step 6200/14394 | Loss: 4.5286
+
+======================================================================
+SANITY CHECK AT STEP 35000
+======================================================================
+Current LR: 2.71e-04
+Input shape: torch.Size([32, 256])
+Target shape: torch.Size([32, 256])
+Non-ignored labels: 8192/8192 (100.0%)
+Sequence length T: 256
+======================================================================
+
+  Epoch 2 | Step 6300/14394 | Loss: 4.3605
+  Epoch 2 | Step 6400/14394 | Loss: 4.5354
+  Epoch 2 | Step 6500/14394 | Loss: 4.5111
+  Epoch 2 | Step 6600/14394 | Loss: 4.4485
+  Epoch 2 | Step 6700/14394 | Loss: 4.4637
+  Epoch 2 | Step 6800/14394 | Loss: 4.3372
+  Epoch 2 | Step 6900/14394 | Loss: 4.3945
+  Epoch 2 | Step 7000/14394 | Loss: 4.4565
+  Epoch 2 | Step 7100/14394 | Loss: 4.5990
+  Epoch 2 | Step 7200/14394 | Loss: 4.3175
+  Epoch 2 | Step 7300/14394 | Loss: 4.4214
+  Epoch 2 | Step 7400/14394 | Loss: 4.5503
+  Epoch 2 | Step 7500/14394 | Loss: 4.4178
+  Epoch 2 | Step 7600/14394 | Loss: 4.5805
+  Epoch 2 | Step 7700/14394 | Loss: 4.3215
+  Epoch 2 | Step 7800/14394 | Loss: 4.3953
+  Epoch 2 | Step 7900/14394 | Loss: 4.6937
+  Epoch 2 | Step 8000/14394 | Loss: 4.4249
+  Epoch 2 | Step 8100/14394 | Loss: 4.4495
+  Epoch 2 | Step 8200/14394 | Loss: 4.6660
+  Epoch 2 | Step 8300/14394 | Loss: 4.3611
+  Epoch 2 | Step 8400/14394 | Loss: 4.4352
+  Epoch 2 | Step 8500/14394 | Loss: 4.4374
+  Epoch 2 | Step 8600/14394 | Loss: 4.5295
+  Epoch 2 | Step 8700/14394 | Loss: 4.3958
+  Epoch 2 | Step 8800/14394 | Loss: 4.4638
+  Epoch 2 | Step 8900/14394 | Loss: 4.4312
+  Epoch 2 | Step 9000/14394 | Loss: 4.6091
+  Epoch 2 | Step 9100/14394 | Loss: 4.3909
+  Epoch 2 | Step 9200/14394 | Loss: 4.4699
+  Epoch 2 | Step 9300/14394 | Loss: 4.4456
+  Epoch 2 | Step 9400/14394 | Loss: 4.4911
+  Epoch 2 | Step 9500/14394 | Loss: 4.4901
+  Epoch 2 | Step 9600/14394 | Loss: 4.6527
+  Epoch 2 | Step 9700/14394 | Loss: 4.3744
+  Epoch 2 | Step 9800/14394 | Loss: 4.4467
+  Epoch 2 | Step 9900/14394 | Loss: 4.4961
+  Epoch 2 | Step 10000/14394 | Loss: 4.4779
+  Gradient flow stats saved with snapshot:
+    Block: decoder
+    Mean gain: 1.1837
+    Healthy: 3, Damping: 0, Amplifying: 0
+Snapshot saved: result/lm_wikitext-103/snapshots/snapshot_epoch_0002_step_009999_20260215_233142.pt
+Cleaned up 1 old snapshots
+  Epoch 2 | Step 10100/14394 | Loss: 4.4204
+  Epoch 2 | Step 10200/14394 | Loss: 4.4463
+  Epoch 2 | Step 10300/14394 | Loss: 4.3186
+  Epoch 2 | Step 10400/14394 | Loss: 4.4449
+  Epoch 2 | Step 10500/14394 | Loss: 4.4120
+  Epoch 2 | Step 10600/14394 | Loss: 4.4135
+  Epoch 2 | Step 10700/14394 | Loss: 4.5083
+  Epoch 2 | Step 10800/14394 | Loss: 4.4418
+  Epoch 2 | Step 10900/14394 | Loss: 4.3749
+  Epoch 2 | Step 11000/14394 | Loss: 4.4824
+  Epoch 2 | Step 11100/14394 | Loss: 4.4835
+  Epoch 2 | Step 11200/14394 | Loss: 4.4198
+  ✓ Validation at step 40000: All weights and gradients valid
+
+======================================================================
+SANITY CHECK AT STEP 40000
+======================================================================
+Current LR: 2.71e-04
+Input shape: torch.Size([32, 256])
+Target shape: torch.Size([32, 256])
+Non-ignored labels: 8192/8192 (100.0%)
+Sequence length T: 256
+======================================================================
+
+  Epoch 2 | Step 11300/14394 | Loss: 4.4152
+  Epoch 2 | Step 11400/14394 | Loss: 4.4213
+  Epoch 2 | Step 11500/14394 | Loss: 4.3127
+  Epoch 2 | Step 11600/14394 | Loss: 4.4464
+  Epoch 2 | Step 11700/14394 | Loss: 4.3532
+  Epoch 2 | Step 11800/14394 | Loss: 4.4521
+  Epoch 2 | Step 11900/14394 | Loss: 4.5307
+  Epoch 2 | Step 12000/14394 | Loss: 4.3983
+  Epoch 2 | Step 12100/14394 | Loss: 4.4617
+  Epoch 2 | Step 12200/14394 | Loss: 4.3759
+  Epoch 2 | Step 12300/14394 | Loss: 4.2465
+  Epoch 2 | Step 12400/14394 | Loss: 4.4348
+  Epoch 2 | Step 12500/14394 | Loss: 4.4056
+  Epoch 2 | Step 12600/14394 | Loss: 4.4085
+  Epoch 2 | Step 12700/14394 | Loss: 4.4933
+  Epoch 2 | Step 12800/14394 | Loss: 4.4498
+  Epoch 2 | Step 12900/14394 | Loss: 4.2663
+  Epoch 2 | Step 13000/14394 | Loss: 4.3777
+  Epoch 2 | Step 13100/14394 | Loss: 4.2876
+  Epoch 2 | Step 13200/14394 | Loss: 4.5519
+  Epoch 2 | Step 13300/14394 | Loss: 4.6247
+  Epoch 2 | Step 13400/14394 | Loss: 4.6183
+  Epoch 2 | Step 13500/14394 | Loss: 4.2982
+  Epoch 2 | Step 13600/14394 | Loss: 4.5172
+  Epoch 2 | Step 13700/14394 | Loss: 4.3836
+  Epoch 2 | Step 13800/14394 | Loss: 4.4844
+  Epoch 2 | Step 13900/14394 | Loss: 4.3006
+  Epoch 2 | Step 14000/14394 | Loss: 4.4259
+  Epoch 2 | Step 14100/14394 | Loss: 4.4043
+  Epoch 2 | Step 14200/14394 | Loss: 4.3261
+  Epoch 2 | Step 14300/14394 | Loss: 4.4900
+Epoch 2 | Train Loss: 4.4575 | Val Loss: 4.2125
+  Early stopping: new best loss 4.2125 at epoch 2
+  Gradient flow stats saved with snapshot:
+    Block: decoder
+    Mean gain: 1.1447
+    Healthy: 3, Damping: 0, Amplifying: 0
+Snapshot saved: result/lm_wikitext-103/snapshots/snapshot_epoch_0002_step_000000_20260215_234246.pt
+Cleaned up 1 old snapshots
+  Epoch 3 | Step 1/14394 | Loss: 4.3519
+  Epoch 3 | Step 100/14394 | Loss: 4.4072
+  Epoch 3 | Step 200/14394 | Loss: 4.5255
+  Epoch 3 | Step 300/14394 | Loss: 4.2463
+  Epoch 3 | Step 400/14394 | Loss: 4.4852
+  Epoch 3 | Step 500/14394 | Loss: 4.4595
+  Epoch 3 | Step 600/14394 | Loss: 4.3506
+  Epoch 3 | Step 700/14394 | Loss: 4.3763
+  Epoch 3 | Step 800/14394 | Loss: 4.4982
+  Epoch 3 | Step 900/14394 | Loss: 4.3975
+  Epoch 3 | Step 1000/14394 | Loss: 4.4216
+  Epoch 3 | Step 1100/14394 | Loss: 4.6278
