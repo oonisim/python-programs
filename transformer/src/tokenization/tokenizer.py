@@ -4,6 +4,7 @@ from typing import (
     Optional,
     Protocol
 )
+
 import tiktoken
 
 

@@ -35,6 +35,7 @@ from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, Dataset
 from datasets import load_dataset
 
+from model.constant import LABEL_IGNORE_VALUE
 from tokenization import Tokenizer
 
 
@@ -80,13 +81,17 @@ def translation_collate_fn(
 ) -> dict[str, Tensor]:
     """Collate function that pads source and target to max length in batch.
 
+    Masks padded positions in targets with LABEL_IGNORE_VALUE to prevent them
+    from contributing to loss when pad_token_id==eos_token_id.
+
     Args:
-        batch: List of dicts with "source_ids" and "target_ids".
+        batch: List of dicts with "source_ids" and "target_ids"
         source_pad_id: Padding token ID for source sequences.
         target_pad_id: Padding token ID for target sequences.
 
     Returns:
         Dict with padded "source_ids" (B, Ts) and "target_ids" (B, Tt).
+        Padded positions in target_ids are set to LABEL_IGNORE_VALUE.
     """
     source_seqs = [item["source_ids"] for item in batch]
     target_seqs = [item["target_ids"] for item in batch]
@@ -97,6 +102,12 @@ def translation_collate_fn(
     target_padded = pad_sequence(
         target_seqs, batch_first=True, padding_value=target_pad_id
     )
+
+    # Mask padded positions in targets to prevent them from contributing to loss
+    # This is critical when pad_token_id==eos_token_id (GPT-2 default)
+    # Without this, EOS tokens would be ignored in loss calculation
+    pad_mask = (target_padded == target_pad_id)
+    target_padded = target_padded.masked_fill(pad_mask, LABEL_IGNORE_VALUE)
 
     return {"source_ids": source_padded, "target_ids": target_padded}
 

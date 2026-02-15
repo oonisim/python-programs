@@ -1,20 +1,29 @@
-  5. EOS Learning Fix (train_lm.py, train_translation.py)
+Fixed Issues:
 
-  ✅ Correct ⚠️ INCOMPLETE
-  - Changed ignore_index=pad_token_id → ignore_index=LABEL_IGNORE_VALUE
-  - Comprehensive comments explain the bug
-  - CRITICAL MISSING PIECE: Actual masking logic not yet implemented!
+✅ EOS Learning Fix (COMPLETE)
+   - Changed ignore_index=pad_token_id → ignore_index=LABEL_IGNORE_VALUE (-100)
+   - Implemented masking logic in translation_collate_fn() to replace padded
+     positions with LABEL_IGNORE_VALUE
+   - Model can now properly learn to generate EOS tokens
+   - Files: train_lm.py, train_translation.py, loader_translation.py, constant.py
 
-  ⚠️ What's Missing:
+✅ Translation BOS Token (COMPLETE)
+   - Added BOS token (EOS as START) to target sequences
+   - Model now learns to predict first target token
+   - File: loader_translation.py
 
-  The labels still contain pad_token_id values. We need to mask them to -100:
+✅ run_config.json Path (COMPLETE)
+   - Fixed to save in result/{model_name}/snapshots/ matching trainer location
+   - Resume no longer silently misses config
+   - Files: train_lm.py, train_translation.py
 
-  # In trainer._train_one_step() or collate function:
-  pad_mask = (decoder_target == pad_token_id)
-  decoder_target = decoder_target.masked_fill(pad_mask, LABEL_IGNORE_VALUE)
+✅ eval() Mode Missing (COMPLETE)
+   - Added self.eval() to evaluate() and generate() methods
+   - Disables dropout for deterministic evaluation/generation
+   - Files: model.py, lm.py
 
-  Without this, nothing is ignored and the fix has no effect yet.
+Remaining Issues:
 
-[P2] Attention has no padding mask support; padded tokens will be attended to in variable‑length batches. File: common.py lines 399–519.
-[P2] Translation training skips learning the first target token because there is no BOS/START token in target_ids before shifting. File: trainer.py lines 317–319.
-[P2] EOS is effectively ignored during translation loss because pad_token is set to EOS and used as ignore_index, so the model never learns to end sequences. File: train_translation.py lines 255–263.
+[P2] Attention has no padding mask support
+     Padded tokens will be attended to in variable-length batches.
+     File: common.py lines 399-519
