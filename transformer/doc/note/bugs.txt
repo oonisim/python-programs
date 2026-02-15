@@ -1,3 +1,41 @@
+You can estimate it directly from your **throughput**:
+
+\[
+\text{epoch time} \approx \frac{\text{steps per epoch}}{\text{steps processed per hour}}
+\]
+
+From your log:
+- steps per epoch: **3,684,989**
+
+After ~5 hours you were around step ~23,700 (from the snippet), so:
+
+- steps/hour \(\approx 23{,}700 / 5 \approx 4{,}740\)
+- epoch hours \(\approx 3{,}684{,}989 / 4{,}740 \approx 777\) hours
+  \(\approx 32\) days
+
+So at the current rate, **one epoch would take on the order of weeks**, not hours.
+
+That strongly suggests your “steps per epoch” is not what you think (likely your dataset is generating an enormous number of training windows, e.g., sliding by 1 token). For GPT-style LM training you normally chunk into fixed blocks with a stride equal to the block size (or similar), giving far fewer steps.
+
+### What to do
+1) Print how many batches your DataLoader actually has:
+```python
+print("len(train_loader) =", len(train_loader))
+```
+
+2) Check your dataset windowing/stride:
+- If you create sequences with stride 1 (sliding window), you’ll get ~one sequence per token → millions of batches → epoch takes forever.
+- Use block chunking with stride = block_size (e.g., 512), not 1.
+
+If you paste:
+- `len(train_loader)`
+- your dataset’s block/stride logic
+I can tell you exactly how to change it so an epoch is a reasonable length.
+
+
+
+
+
 Evidence in code
 
 Scheduler creation uses warmup in train_lm.py (warmup steps are based on total steps).
