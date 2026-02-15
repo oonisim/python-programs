@@ -10,7 +10,7 @@ This module contains the transformer model architecture:
 """
 
 # Core components
-from model.common import (
+from .common import (
     MultiHeadAttention,
     PositionwiseFeedForward,
     PositionalEncoding,
@@ -21,13 +21,13 @@ from model.common import (
 )
 
 # Model architectures
-from model.encoder import Encoder, EncodeLayer
-from model.decoder import Decoder, DecodeLayer
-from model.model import Transformer
-from model.lm import LanguageModel
+from .encoder import Encoder, EncodeLayer
+from .decoder import Decoder, DecodeLayer
+from .model import Transformer
+from .lm import LanguageModel
 
 # Constants
-from model.constant import *
+from .constant import *
 
 __all__ = [
     # Core components

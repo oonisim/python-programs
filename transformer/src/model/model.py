@@ -11,7 +11,7 @@ from torch import (
     nn
 )
 
-from model.constant import (
+from .constant import (
     TYPE_FLOAT,
     ENCODER_MAX_TIME_STEPS,
     ENCODER_MAX_TOKENS,
@@ -29,15 +29,15 @@ from model.constant import (
     # This is the same as the decoder vocabulary size.
     # NUM_CLASSES,    # pylint: disable=unused-import
 )
-from model.common import (
+from .common import (
     InputEmbedding,
     PositionalEncoding,
     Projection,
 )
-from model.encoder import (
+from .encoder import (
     Encoder
 )
-from model.decoder import (
+from .decoder import (
     Decoder
 )
 
