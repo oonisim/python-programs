@@ -207,6 +207,24 @@ class DecodeLayer(nn.Module):
             x = x + self.dropout_cross(self.cross_attention(q=_q, k=_k, v=_v))
         else:
             # Decoder-only mode (GPT-style LM with no cross attention)
+            # ```
+            # hidden = self.decoder(y=x, memory=None)  # ← memory=None skips cross-attention
+            # ```
+            # --------------------------------------------------------------------------------
+            # [Frozen Weights]
+            # When memory==None, cross-attention is skipped, which means the cross-attention
+            # parameters are not part of the computational graph and do not receive gradients
+            # during backpropagation.
+            #
+            # This means 48 cross-attention parameters never receive gradients:
+            # - 4 layers × (Wq, Wk, Wv, Wo + biases) = 32 params
+            # - Plus associated layer norms = 16 params
+            # - Total = 48 "frozen" params
+            # They remain at their initial values and do not update during training, that
+            # causes Frozen Weights.
+            #
+            # This is expected because they aren't part of the computational graph.
+            # --------------------------------------------------------------------------------
             pass
 
         #--------------------------------------------------------------------------------

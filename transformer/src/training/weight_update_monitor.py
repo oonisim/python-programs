@@ -178,12 +178,22 @@ class WeightUpdateMonitor:
         model: nn.Module,
         optimizer: torch.optim.Optimizer,
     ) -> Dict[str, UpdateDiagnostics]:
-        """Computes update diagnostics after optimizer.step() using sampled Δw."""
+        """Computes update diagnostics after optimizer.step() using sampled Δw.
+
+        Note: Only monitors parameters that received gradients in the backward pass.
+        Parameters without gradients (e.g., unused cross-attention in decoder-only models)
+        are automatically skipped to avoid false "frozen" warnings.
+        """
         lr_map = self._learning_rate_by_param_id(optimizer)
         out: Dict[str, UpdateDiagnostics] = {}
 
         for name, p in model.named_parameters():
             if not p.requires_grad:
+                continue
+
+            # Skip parameters that didn't receive gradients (not in computational graph)
+            # This filters out unused modules like cross-attention in decoder-only LMs
+            if p.grad is None or p.grad.abs().sum().item() == 0:
                 continue
 
             lr = lr_map.get(id(p))
