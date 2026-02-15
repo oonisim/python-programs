@@ -40,7 +40,7 @@ DATASET="wikitext-103"
 EPOCHS=20
 BATCH_SIZE=32
 LR="3e-4"
-WARMUP=1000
+WARMUP=0
 SNAPSHOT_INTERVAL=5000
 
 # Parse arguments
@@ -134,10 +134,10 @@ CMD=(
     --warmup_steps "${WARMUP}"
     --snapshot_interval "${SNAPSHOT_INTERVAL}"
     --gradient_monitor
-    --gradient_monitor_interval 10000
+    --gradient_monitor_interval 500
     --early_stopping
     --weight_monitor
-    --weight_monitor_interval 10000
+    --weight_monitor_interval 500
     --yes
 )
 

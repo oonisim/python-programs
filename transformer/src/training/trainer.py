@@ -1247,6 +1247,20 @@ class LanguageModelTrainer(Trainer):
         input_ids = input_ids.to(self.device)
         target_ids = target_ids.to(self.device)
 
+        # DEBUG: Sanity check at step 100
+        if self.global_step == 100:
+            print("\n" + "="*70)
+            print("SANITY CHECK AT STEP 100")
+            print("="*70)
+            print(f"Current LR: {self.optimizer.param_groups[0]['lr']:.2e}")
+            print(f"Input shape: {input_ids.shape}")
+            print(f"Target shape: {target_ids.shape}")
+            non_ignored = (target_ids != -100).sum().item()
+            total = target_ids.numel()
+            print(f"Non-ignored labels: {non_ignored}/{total} ({100*non_ignored/total:.1f}%)")
+            print(f"Sequence length T: {input_ids.shape[1]}")
+            print("="*70 + "\n")
+
         self.optimizer.zero_grad()
         log_probabilities: Tensor = self.model(input_ids)
 
