@@ -1,3 +1,17 @@
+P2: Padding mask corrupts decoder_input (invalid token ids)
+Translation collate replaces padded target positions with LABEL_IGNORE_VALUE (e.g., -100). Then decoder_input = target_ids[:, :-1] feeds these -100 values into the embedding, which will raise index errors whenever there is padding. Masking should apply to decoder_target only, not decoder_input.
+
+/Users/oonisim/home/repository/git/oonisim/python-programs/transformer/src/training/loader_translation.py:96-111
+P3 : generate() switches to eval but never restores train mode
+Transformer.generate() calls self.eval() but does not restore the previous training mode. If called during training, the model remains in eval for subsequent steps unless the caller re‑enables train mode.
+
+/Users/oonisim/home/repository/git/oonisim/python-programs/transformer/src/model/model.py:608-612
+P3: LanguageModel.generate() switches to eval but never restores train mode
+LanguageModel.generate() calls self.eval() but does not restore the prior mode. If invoked mid‑training, dropout stays disabled afterward unless the caller manually calls train().
+
+
+/Users/oonisim/home/repository/git/oonisim/python-programs/transformer/src/model/lm.py:329-32
+
 
 Root Cause Analysis
 
