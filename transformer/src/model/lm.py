@@ -324,280 +324,289 @@ class LanguageModel(nn.Module):
         # STEP 1: PREPARE INPUT BATCH
         # =========================================================================
 
-        # Bug fix: Switch to eval mode to disable dropout for consistent generation
-        # Without this, dropout remains active if called during training, producing noisy outputs
+        # Bug fix: Preserve training mode state across generation
+        # Without this, if generate() is called during training, the model stays in eval mode
+        # after generation completes, causing dropout to remain disabled for subsequent training.
+        was_training = self.training
         self.eval()
 
-        # Handle single sequence input by adding batch dimension
-        # Language models process batches (multiple sequences simultaneously)
-        # If user provides single sequence, we reshape to batch of size 1
-        if prompt.ndim == 1:
-            # Input shape: (sequence_length,)
-            # Example: [2045, 318, 257] - three tokens
-            prompt = prompt.unsqueeze(0)
-            # Output shape: (1, sequence_length)
-            # Example: [[2045, 318, 257]] - batch of 1 sequence
+        try:
+            # Handle single sequence input by adding batch dimension
+            # Language models process batches (multiple sequences simultaneously)
+            # If user provides single sequence, we reshape to batch of size 1
+            if prompt.ndim == 1:
+                # Input shape: (sequence_length,)
+                # Example: [2045, 318, 257] - three tokens
+                prompt = prompt.unsqueeze(0)
+                # Output shape: (1, sequence_length)
+                # Example: [[2045, 318, 257]] - batch of 1 sequence
 
-        # batch_size: number of sequences to generate in parallel.
-        # Example: If prompt.shape = (4, 10), batch_size = 4
-        #          (generating 4 different sequences in parallel)
-        batch_size: int = prompt.shape[0]
+            # batch_size: number of sequences to generate in parallel.
+            # Example: If prompt.shape = (4, 10), batch_size = 4
+            #          (generating 4 different sequences in parallel)
+            batch_size: int = prompt.shape[0]
 
-        # Clone prompt to create working copy
-        # We'll append generated tokens to this as we go
-        # Clone ensures we don't modify the original prompt tensor
-        # generated_sequence shape: (batch_size, prompt_length)
-        # This will grow: (batch_size, prompt_length + 1), etc.
-        generated_sequence: Tensor = prompt.clone()
+            # Clone prompt to create working copy
+            # We'll append generated tokens to this as we go
+            # Clone ensures we don't modify the original prompt tensor
+            # generated_sequence shape: (batch_size, prompt_length)
+            # This will grow: (batch_size, prompt_length + 1), etc.
+            generated_sequence: Tensor = prompt.clone()
 
-        # =========================================================================
-        # STEP 2: AUTOREGRESSIVE GENERATION LOOP
-        # =========================================================================
+            # =====================================================================
+            # STEP 2: AUTOREGRESSIVE GENERATION LOOP
+            # =====================================================================
 
-        # Generate tokens one at a time until we reach max_length
-        # The range determines how many NEW tokens to generate
-        # If prompt has 10 tokens and max_length=100, we generate 90 more
-        number_of_tokens_to_generate: int = (
-            max_length - prompt.shape[1]
-        )
-
-        # pylint disable=unused-variable
-        for generation_step in range(number_of_tokens_to_generate):
-            # ---------------------------------------------------------------------
-            # STEP 2A: PREPARE MODEL INPUT (SLIDING WINDOW)
-            # ---------------------------------------------------------------------
-
-            # Extract the most recent tokens that fit in model's context window
-            # Language models have maximum sequence length (e.g., 2048 tokens for GPT-2)
-            # If our generated sequence exceeds this, we only feed the last N tokens
-
-            # Why? Transformer attention is O(n²) in sequence length
-            # Feeding 10,000 tokens would be computationally prohibitive
-            # So we use a sliding window of the most recent context
-
-            # model_input_sequence
-            # Shape:(batch_size, min(current_length, max_seq_len))
-            model_input_sequence: Tensor = (
-                generated_sequence[:, -self.max_seq_len:]
+            # Generate tokens one at a time until we reach max_length
+            # The range determines how many NEW tokens to generate
+            # If prompt has 10 tokens and max_length=100, we generate 90 more
+            number_of_tokens_to_generate: int = (
+                max_length - prompt.shape[1]
             )
 
-            # Example progression:
-            # Step 1: generated_sequence has 10 tokens → use all 10
-            # Step 50: generated_sequence has 60 tokens → use all 60
-            # Step 2000: generated_sequence has 2010 tokens → use last 2048 only
-            #            (if max_seq_len = 2048)
+            # pylint disable=unused-variable
+            for generation_step in range(number_of_tokens_to_generate):
+                # -----------------------------------------------------------------
+                # STEP 2A: PREPARE MODEL INPUT (SLIDING WINDOW)
+                # -----------------------------------------------------------------
 
-            # ---------------------------------------------------------------------
-            # STEP 2B: GET MODEL PREDICTIONS
-            # ---------------------------------------------------------------------
+                # Extract the most recent tokens that fit in model's context window
+                # Language models have maximum sequence length (e.g., 2048 tokens for GPT-2)
+                # If our generated sequence exceeds this, we only feed the last N tokens
 
-            # Forward pass through the neural network
-            # Input: Token sequence of shape (batch_size, sequence_length)
-            # Output: Probability distribution over vocabulary for EACH position
+                # Why? Transformer attention is O(n²) in sequence length
+                # Feeding 10,000 tokens would be computationally prohibitive
+                # So we use a sliding window of the most recent context
 
-            # log_probabilities_all_positions
-            # Shape: (batch_size, sequence_length, vocabulary_size)
-            log_probabilities_all_positions: Tensor = self.forward(x=model_input_sequence)
-
-            # Example with vocabulary_size=50,000:
-            # If input has 10 tokens, output is (batch_size, 10, 50000)
-            # Each of the 10 positions gets a 50,000-dim probability distribution
-
-            # We only care about the LAST position (the next token to generate)
-            # All previous positions are already decided (they're in our prompt/generated text)
-            # next_token_log_probabilities: the model's prediction for what comes next
-            # Shape: (batch_size, vocabulary_size)
-            next_token_log_probabilities: Tensor = log_probabilities_all_positions[:, -1, :]
-
-            # ---------------------------------------------------------------------
-            # STEP 2C: APPLY TEMPERATURE SCALING
-            # ---------------------------------------------------------------------
-
-            # Temperature controls the "sharpness" of the probability distribution
-            #
-            # Mathematical effect:
-            #   P(token) ∝ exp(logit / temperature)
-            #
-            # Low temperature (τ < 1):
-            #   - Sharpens distribution (makes high-prob tokens even higher)
-            #   - Model becomes more confident/deterministic
-            #   - Example: "The capital of France is ___"
-            #              With τ=0.1, "Paris" might have 99% probability
-            #
-            # High temperature (τ > 1):
-            #   - Flattens distribution (makes all tokens more equally likely)
-            #   - Model becomes more random/creative
-            #   - Example: With τ=2.0, "Paris" might only have 40% probability,
-            #              giving more chance to alternatives like "Lyon", "Marseille"
-
-            # next_token_scores: after temperature scaling, values are no longer
-            # log-probabilities. They are unnormalized scores fed to softmax.
-            # softmax(log_probs / T) = softmax(logits / T) due to shift-invariance.
-            # Shape: (batch_size, vocabulary_size)
-            next_token_scores: Tensor = next_token_log_probabilities / temperature
-
-            # ---------------------------------------------------------------------
-            # STEP 2D: APPLY TOP-K FILTERING (OPTIONAL)
-            # ---------------------------------------------------------------------
-
-            # Top-K sampling: Keep only the K most likely tokens, zero out the rest
-            # This prevents sampling from the "long tail" of very unlikely tokens
-
-            if top_k is not None:
-                # Find the K highest score values for each sequence in batch
-                # top_k_values Shape: (batch_size, top_k)
-                top_k_values: Tensor
-                top_k_values, _ = torch.topk(input=next_token_scores, k=top_k)
-
-                # Extract the K-th highest value (the threshold)
-                # Tokens with scores below this threshold will be masked out
-                # threshold_value_per_sequence Shape: (batch_size, 1)
-                # Example: If top_k=50, this is the 50th highest score
-                threshold_value_per_sequence: Tensor = top_k_values[:, -1, None]
-
-                # Mask out (set to -infinity) all tokens below the threshold
-                # Why -infinity? Because after softmax, exp(-∞) = 0 probability
-                next_token_scores[
-                    next_token_scores < threshold_value_per_sequence
-                ] = float('-inf')
-
-                # Result: Only top-k tokens remain as candidates
-                # Example: With vocabulary_size=50,000 and top_k=50,
-                #          49,950 tokens now have -∞ scores (zero probability)
-
-            # ---------------------------------------------------------------------
-            # STEP 2E: APPLY TOP-P (NUCLEUS) FILTERING (OPTIONAL)
-            # ---------------------------------------------------------------------
-
-            # Top-P (nucleus) sampling: Keep smallest set of tokens that sum to P% probability
-            # This is ADAPTIVE - the number of kept tokens changes based on confidence
-
-            # Why better than top-k?
-            # - When model is confident: Keeps few tokens (sharp distribution)
-            # - When model is uncertain: Keeps many tokens (flat distribution)
-
-            # Example:
-            # Scenario 1 (confident): "The capital of France is ___"
-            #   - "Paris" has 80% probability
-            #   - With top_p=0.9, we keep "Paris" + a few alternatives = 3 tokens
-            #
-            # Scenario 2 (uncertain): "The color of the ___"
-            #   - Top token only has 15% probability (many plausible colors)
-            #   - With top_p=0.9, we might keep 20 tokens to reach 90% mass
-
-            if top_p is not None:
-                # This function implements nucleus sampling
-                # Masks out tokens outside the nucleus (cumulative probability < top_p)
-                next_token_scores: Tensor = self._apply_top_p(
-                    scores=next_token_scores, top_p=top_p
+                # model_input_sequence
+                # Shape:(batch_size, min(current_length, max_seq_len))
+                model_input_sequence: Tensor = (
+                    generated_sequence[:, -self.max_seq_len:]
                 )
 
-            # ---------------------------------------------------------------------
-            # STEP 2F: CONVERT SCORES TO PROBABILITIES
-            # ---------------------------------------------------------------------
+                # Example progression:
+                # Step 1: generated_sequence has 10 tokens → use all 10
+                # Step 50: generated_sequence has 60 tokens → use all 60
+                # Step 2000: generated_sequence has 2010 tokens → use last 2048 only
+                #            (if max_seq_len = 2048)
 
-            # Softmax converts unnormalized scores to probabilities
-            #
-            # Mathematical formula:
-            #   P(token_i) = exp(score_i) / Σ_j exp(score_j)
-            #
-            # Properties:
-            #   - All probabilities are between 0 and 1
-            #   - All probabilities sum to 1
-            #   - Higher scores → higher probabilities
+                # -----------------------------------------------------------------
+                # STEP 2B: GET MODEL PREDICTIONS
+                # -----------------------------------------------------------------
 
-            # next_token_probabilities
-            # Shape: (batch_size, vocabulary_size)
-            # Each row is a probability distribution over the vocabulary
-            #
-            # Example values after softmax:
-            # [0.45, 0.23, 0.12, 0.08, 0.05, 0.03, 0.02, 0.01, 0.01, 0.00, ...]
-            # (sums to 1.0, all values between 0 and 1)
-            #
-            # Note: Tokens that were masked with -∞ now have probability 0
-            # because exp(-∞) = 0
-            next_token_probabilities: Tensor = torch.softmax(
-                input=next_token_scores, dim=-1
-            )
+                # Forward pass through the neural network
+                # Input: Token sequence of shape (batch_size, sequence_length)
+                # Output: Probability distribution over vocabulary for EACH position
 
-            # ---------------------------------------------------------------------
-            # STEP 2G: SAMPLE NEXT TOKEN
-            # ---------------------------------------------------------------------
+                # log_probabilities_all_positions
+                # Shape: (batch_size, sequence_length, vocabulary_size)
+                log_probabilities_all_positions: Tensor = self.forward(x=model_input_sequence)
 
-            # Multinomial sampling: Randomly choose one token according to probabilities
-            # This is the stochastic (random) part of text generation
+                # Example with vocabulary_size=50,000:
+                # If input has 10 tokens, output is (batch_size, 10, 50000)
+                # Each of the 10 positions gets a 50,000-dim probability distribution
 
-            # Why sample instead of taking argmax (most likely token)?
-            # - Argmax is deterministic: Same input always gives same output
-            # - Sampling adds diversity: Can generate different texts from same prompt
-            # - Allows model to explore creative/unexpected continuations
+                # We only care about the LAST position (the next token to generate)
+                # All previous positions are already decided (they're in our prompt/generated text)
+                # next_token_log_probabilities: the model's prediction for what comes next
+                # Shape: (batch_size, vocabulary_size)
+                next_token_log_probabilities: Tensor = log_probabilities_all_positions[:, -1, :]
 
-            # next_token Shape: (batch_size, 1)
-            # Each sequence in batch gets one sampled token
-            next_token: Tensor = torch.multinomial(
-                input=next_token_probabilities, num_samples=1
-            )
+                # -----------------------------------------------------------------
+                # STEP 2C: APPLY TEMPERATURE SCALING
+                # -----------------------------------------------------------------
 
-            # Example:
-            # If probabilities = [0.45, 0.23, 0.12, 0.08, ...]
-            # Token 0 is sampled 45% of the time
-            # Token 1 is sampled 23% of the time
-            # Token 2 is sampled 12% of the time
-            # etc.
+                # Temperature controls the "sharpness" of the probability distribution
+                #
+                # Mathematical effect:
+                #   P(token) ∝ exp(logit / temperature)
+                #
+                # Low temperature (τ < 1):
+                #   - Sharpens distribution (makes high-prob tokens even higher)
+                #   - Model becomes more confident/deterministic
+                #   - Example: "The capital of France is ___"
+                #              With τ=0.1, "Paris" might have 99% probability
+                #
+                # High temperature (τ > 1):
+                #   - Flattens distribution (makes all tokens more equally likely)
+                #   - Model becomes more random/creative
+                #   - Example: With τ=2.0, "Paris" might only have 40% probability,
+                #              giving more chance to alternatives like "Lyon", "Marseille"
 
-            # ---------------------------------------------------------------------
-            # STEP 2H: APPEND TOKEN TO SEQUENCE
-            # ---------------------------------------------------------------------
+                # next_token_scores: after temperature scaling, values are no longer
+                # log-probabilities. They are unnormalized scores fed to softmax.
+                # softmax(log_probs / T) = softmax(logits / T) due to shift-invariance.
+                # Shape: (batch_size, vocabulary_size)
+                next_token_scores: Tensor = next_token_log_probabilities / temperature
 
-            # Concatenate the newly sampled token to our growing sequence
-            # This token becomes part of the context for the next generation step
+                # ---------------------------------------------------------------------
+                # STEP 2D: APPLY TOP-K FILTERING (OPTIONAL)
+                # ---------------------------------------------------------------------
 
-            # generated_sequence Shape: (batch_size, length + 1)
-            generated_sequence = torch.cat(
-                tensors=[generated_sequence, next_token], dim=1
-            )
+                # Top-K sampling: Keep only the K most likely tokens, zero out the rest
+                # This prevents sampling from the "long tail" of very unlikely tokens
 
-            # Example progression:
-            # Step 0: [2045, 318, 257]           (prompt: "This is a")
-            # Step 1: [2045, 318, 257, 1332]     (added "good")
-            # Step 2: [2045, 318, 257, 1332, 1110]  (added "idea")
-            # Step 3: [2045, 318, 257, 1332, 1110, 13]  (added ".")
+                if top_k is not None:
+                    # Find the K highest score values for each sequence in batch
+                    # top_k_values Shape: (batch_size, top_k)
+                    top_k_values: Tensor
+                    top_k_values, _ = torch.topk(input=next_token_scores, k=top_k)
 
-            # ---------------------------------------------------------------------
-            # STEP 2I: CHECK FOR EARLY STOPPING
-            # ---------------------------------------------------------------------
+                    # Extract the K-th highest value (the threshold)
+                    # Tokens with scores below this threshold will be masked out
+                    # threshold_value_per_sequence Shape: (batch_size, 1)
+                    # Example: If top_k=50, this is the 50th highest score
+                    threshold_value_per_sequence: Tensor = top_k_values[:, -1, None]
 
-            # End-of-sequence (EOS) token signals natural completion
-            # Common in many tasks: translation, summarization, dialogue
+                    # Mask out (set to -infinity) all tokens below the threshold
+                    # Why -infinity? Because after softmax, exp(-∞) = 0 probability
+                    next_token_scores[
+                        next_token_scores < threshold_value_per_sequence
+                    ] = float('-inf')
 
-            # Example EOS tokens:
-            # - "<|endoftext|>" in GPT models
-            # - "</s>" in many encoder-decoder models
-            # - Custom tokens like "<END>"
+                    # Result: Only top-k tokens remain as candidates
+                    # Example: With vocabulary_size=50,000 and top_k=50,
+                    #          49,950 tokens now have -∞ scores (zero probability)
 
-            if self.end_token is not None:
-                # Check if ALL sequences in batch generated the EOS token
-                # .all() ensures we only stop when every sequence is done
-                # (for batch processing, we continue until all are complete)
+                # -----------------------------------------------------------------
+                # STEP 2E: APPLY TOP-P (NUCLEUS) FILTERING (OPTIONAL)
+                # -----------------------------------------------------------------
 
-                all_sequences_ended: bool = (next_token == self.end_token).all()
+                # Top-P (nucleus) sampling: Keep smallest set of tokens that sum to P% probability
+                # This is ADAPTIVE - the number of kept tokens changes based on confidence
 
-                if all_sequences_ended:
-                    # All sequences have naturally concluded
-                    # No need to generate more tokens
-                    break
+                # Why better than top-k?
+                # - When model is confident: Keeps few tokens (sharp distribution)
+                # - When model is uncertain: Keeps many tokens (flat distribution)
 
-            # If not all sequences ended, continue to next generation step
+                # Example:
+                # Scenario 1 (confident): "The capital of France is ___"
+                #   - "Paris" has 80% probability
+                #   - With top_p=0.9, we keep "Paris" + a few alternatives = 3 tokens
+                #
+                # Scenario 2 (uncertain): "The color of the ___"
+                #   - Top token only has 15% probability (many plausible colors)
+                #   - With top_p=0.9, we might keep 20 tokens to reach 90% mass
 
-        # =========================================================================
-        # STEP 3: RETURN GENERATED SEQUENCE
-        # =========================================================================
+                if top_p is not None:
+                    # This function implements nucleus sampling
+                    # Masks out tokens outside the nucleus (cumulative probability < top_p)
+                    next_token_scores: Tensor = self._apply_top_p(
+                        scores=next_token_scores, top_p=top_p
+                    )
 
-        # Return the complete generated sequence
-        # This includes both the original prompt AND all generated tokens
-        # generated_sequence Shape: (batch_size, final_length)
-        # where final_length ≤ max_length
-        return generated_sequence
+                # ---------------------------------------------------------------------
+                # STEP 2F: CONVERT SCORES TO PROBABILITIES
+                # ---------------------------------------------------------------------
+
+                # Softmax converts unnormalized scores to probabilities
+                #
+                # Mathematical formula:
+                #   P(token_i) = exp(score_i) / Σ_j exp(score_j)
+                #
+                # Properties:
+                #   - All probabilities are between 0 and 1
+                #   - All probabilities sum to 1
+                #   - Higher scores → higher probabilities
+
+                # next_token_probabilities
+                # Shape: (batch_size, vocabulary_size)
+                # Each row is a probability distribution over the vocabulary
+                #
+                # Example values after softmax:
+                # [0.45, 0.23, 0.12, 0.08, 0.05, 0.03, 0.02, 0.01, 0.01, 0.00, ...]
+                # (sums to 1.0, all values between 0 and 1)
+                #
+                # Note: Tokens that were masked with -∞ now have probability 0
+                # because exp(-∞) = 0
+                next_token_probabilities: Tensor = torch.softmax(
+                    input=next_token_scores, dim=-1
+                )
+
+                # -----------------------------------------------------------------
+                # STEP 2G: SAMPLE NEXT TOKEN
+                # -----------------------------------------------------------------
+
+                # Multinomial sampling: Randomly choose one token according to probabilities
+                # This is the stochastic (random) part of text generation
+
+                # Why sample instead of taking argmax (most likely token)?
+                # - Argmax is deterministic: Same input always gives same output
+                # - Sampling adds diversity: Can generate different texts from same prompt
+                # - Allows model to explore creative/unexpected continuations
+
+                # next_token Shape: (batch_size, 1)
+                # Each sequence in batch gets one sampled token
+                next_token: Tensor = torch.multinomial(
+                    input=next_token_probabilities, num_samples=1
+                )
+
+                # Example:
+                # If probabilities = [0.45, 0.23, 0.12, 0.08, ...]
+                # Token 0 is sampled 45% of the time
+                # Token 1 is sampled 23% of the time
+                # Token 2 is sampled 12% of the time
+                # etc.
+
+                # ---------------------------------------------------------------------
+                # STEP 2H: APPEND TOKEN TO SEQUENCE
+                # ---------------------------------------------------------------------
+
+                # Concatenate the newly sampled token to our growing sequence
+                # This token becomes part of the context for the next generation step
+
+                # generated_sequence Shape: (batch_size, length + 1)
+                generated_sequence = torch.cat(
+                    tensors=[generated_sequence, next_token], dim=1
+                )
+
+                # Example progression:
+                # Step 0: [2045, 318, 257]           (prompt: "This is a")
+                # Step 1: [2045, 318, 257, 1332]     (added "good")
+                # Step 2: [2045, 318, 257, 1332, 1110]  (added "idea")
+                # Step 3: [2045, 318, 257, 1332, 1110, 13]  (added ".")
+
+                # ---------------------------------------------------------------------
+                # STEP 2I: CHECK FOR EARLY STOPPING
+                # ---------------------------------------------------------------------
+
+                # End-of-sequence (EOS) token signals natural completion
+                # Common in many tasks: translation, summarization, dialogue
+
+                # Example EOS tokens:
+                # - "<|endoftext|>" in GPT models
+                # - "</s>" in many encoder-decoder models
+                # - Custom tokens like "<END>"
+
+                if self.end_token is not None:
+                    # Check if ALL sequences in batch generated the EOS token
+                    # .all() ensures we only stop when every sequence is done
+                    # (for batch processing, we continue until all are complete)
+
+                    all_sequences_ended: bool = (next_token == self.end_token).all()
+
+                    if all_sequences_ended:
+                        # All sequences have naturally concluded
+                        # No need to generate more tokens
+                        break
+
+                # If not all sequences ended, continue to next generation step
+
+            # =====================================================================
+            # STEP 3: RETURN GENERATED SEQUENCE
+            # =====================================================================
+
+            # Return the complete generated sequence
+            # This includes both the original prompt AND all generated tokens
+            # generated_sequence Shape: (batch_size, final_length)
+            # where final_length ≤ max_length
+            return generated_sequence
+
+        finally:
+            # Restore original training mode
+            # This ensures dropout is re-enabled if model was in training mode
+            if was_training:
+                self.train()
 
 
     def _apply_top_p(

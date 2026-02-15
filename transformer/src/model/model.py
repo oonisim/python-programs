@@ -612,32 +612,40 @@ class Transformer(nn.Module):
 
         # Bug fix: Switch to eval mode to disable dropout for consistent generation
         # Without this, dropout remains active if called during training, producing noisy outputs
+        # Save training state and restore after generation to avoid side effects
+        was_training = self.training
         self.eval()
 
-        # Encode source sequence once
-        x = self.input_embedding(indices=x)
-        x = self.encoder_dropout(x + self.encoder_positional_encoding(x))
-        memory = self.encoder(x=x)
+        try:
+            # Encode source sequence once
+            x = self.input_embedding(indices=x)
+            x = self.encoder_dropout(x + self.encoder_positional_encoding(x))
+            memory = self.encoder(x=x)
 
-        # Start with <START> token for each sequence in batch
-        y = torch.full((_B, 1), start_token, dtype=torch.long, device=x.device)
+            # Start with <START> token for each sequence in batch
+            y = torch.full((_B, 1), start_token, dtype=torch.long, device=x.device)
 
-        for _ in range(max_length - 1):
-            # Get prediction for the next token
-            y_emb = self.output_embedding(indices=y)
-            y_emb = self.decoder_dropout(y_emb + self.decoder_positional_encoding(y_emb))
+            for _ in range(max_length - 1):
+                # Get prediction for the next token
+                y_emb = self.output_embedding(indices=y)
+                y_emb = self.decoder_dropout(y_emb + self.decoder_positional_encoding(y_emb))
 
-            # Apply decoder, then final normalization before projection (matches forward() behavior)
-            decoder_output = self.decoder(y=y_emb, memory=memory)
-            log_probabilities = self.projection(y=self.final_decoder_norm(decoder_output))
+                # Apply decoder, then final normalization before projection (matches forward() behavior)
+                decoder_output = self.decoder(y=y_emb, memory=memory)
+                log_probabilities = self.projection(y=self.final_decoder_norm(decoder_output))
 
-            next_token = torch.argmax(log_probabilities[:, -1, :], dim=-1, keepdim=True)
+                next_token = torch.argmax(log_probabilities[:, -1, :], dim=-1, keepdim=True)
 
-            # Append predicted token to sequence
-            y = torch.cat([y, next_token], dim=1)
+                # Append predicted token to sequence
+                y = torch.cat([y, next_token], dim=1)
 
-            # Stop if all sequences have produced end_token
-            if (next_token == end_token).all():
-                break
+                # Stop if all sequences have produced end_token
+                if (next_token == end_token).all():
+                    break
 
-        return y
+            return y
+
+        finally:
+            # Restore training mode if model was in training before generation
+            if was_training:
+                self.train()

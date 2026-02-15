@@ -65,6 +65,7 @@ from training.utility import (
 )
 from training.trainer_callback import CallbackList, TrainerCallback
 from training.weight_update_monitor import WeightUpdateMonitor
+from model.constant import LABEL_IGNORE_VALUE
 
 
 @dataclass
@@ -498,26 +499,103 @@ class Trainer:
         $$ \\mathcal{L} = -\\frac{1}{N} \\sum_{i=1}^{N} \\log P(y_i | x_i) $$
 
         Args:
-            batch: Dictionary containing 'source_ids', 'target_ids', and optionally
-                'source_pad_mask'.
+            batch: Dictionary containing 'source_ids', 'target_ids', 'source_pad_mask',
+                and optionally 'target_pad_mask'.
 
         Returns:
             Loss value for this step.
         """
+        # --------------------------------------------------------------------------------
+        # For EN to ES translation task:
+        # source_ids: English sequences (encoder input)
+        # target_ids: Spanish sequences with <BOS> prepended and <EOS> appended
+        #
+        # decoder_input = target_ids[:, :-1]:
+        # Spanish sequence WITHOUT the last token used as decoder input
+        # decoder_target = target_ids[:, 1:]:
+        # Spanish sequence WITHOUT the first token used for loss calculation
+        #
+        # Example:
+        # Original texts:
+        # - English: "The cat sat"
+        # - Spanish: "El gato sentó"
+        #
+        # After tokenization:
+        # source_ids = [101, 2003, 4860, 102]               # "The cat sat <EOS>"
+        # target_ids = [50256, 2573, 5721, 3242, 50256]     # "<BOS> El gato sentó <EOS>"
+        #
+        # In trainer (teacher forcing):
+        # decoder_input  = [50256, 2573, 5721, 3242]        # "<BOS> El gato sentó"
+        # decoder_target = [2573, 5721, 3242, 50256]        # "El gato sentó <EOS>"
+        # --------------------------------------------------------------------------------
         source_ids = batch["source_ids"].to(self.device)
         target_ids = batch["target_ids"].to(self.device)
 
-        # Extract optional source padding mask
+        # Extract optional source padding mask for attention
         source_pad_mask = batch.get("source_pad_mask")
         if source_pad_mask is not None:
             source_pad_mask = source_pad_mask.to(self.device)
 
-        # Shift target for teacher forcing: input is [:-1], target is [1:]
-        decoder_input = target_ids[:, :-1]
-        decoder_target = target_ids[:, 1:]
+        # Extract optional target padding mask for loss masking
+        target_pad_mask = batch.get("target_pad_mask")
+        if target_pad_mask is not None:
+            target_pad_mask = target_pad_mask.to(self.device)
+
+        # --------------------------------------------------------------------------------
+        # Shift target for teacher forcing
+        # --------------------------------------------------------------------------------
+        # decoder_input = target_ids[:, :-1]  <- uses clean token IDs for embedding
+        # decoder_target = target_ids[:, 1:]  <- will be masked for loss calculation
+        #
+        # CRITICAL: target_ids must contain valid token IDs (not LABEL_IGNORE_VALUE)
+        # for embedding lookup. Masking is applied to decoder_target only.
+        # --------------------------------------------------------------------------------
+        decoder_input = target_ids[:, :-1]  # Source tokens to predict next. Shape: (B, T-1)
+        decoder_target = target_ids[:, 1:]  # Next tokens as target labels. Shape: (B, T-1)
+
+        # --------------------------------------------------------------------------------
+        # Apply padding mask to decoder_target for loss calculation
+        # --------------------------------------------------------------------------------
+        # Mask targets labels with IGNORE_VALUE where the values are pad token id.
+        # Then, the loss function ignores those labels for loss calculation.
+        #
+        # CRITICAL: Do NOT use pad_token_id as the target mask value for GPT like tokenizers.
+        # GPT like tokenizers has no PAD or EOS tokens. Hence, people will set up as
+        # pad_token_id = eos_token_id = eot_token_id.
+        #
+        # The Loss calculation will ignore the legitimate EOS label in targets.
+        # The source positions that have correct EOS tokens cannot contribute to the model
+        # training and the model will never learn to predict EOS (End of Sequence).
+        #
+        # EOS is the token that teaches the model where/how to end a sequence.
+        # In corpora for GPT like models, the EOS/EOT token is a document boundary.
+        # Without learning EOS, the model has no understanding of the idea of "End",
+        # or the concept of "Sequence" or "Boundary".
+        # Therefore, it can keep generating forever or only stop at max length.
+        #
+        # Another side effect: the same sentence padded to length 64 vs 128 can produce
+        # different attention distributions and different outputs, even when the real tokens
+        # are identical.
+        # --------------------------------------------------------------------------------
+        # NOTE:
+        # Padding must be handled at the attention level (not just in the loss) as well.
+        # If PAD tokens are included as keys/values (K,V) and not masked, queries (Q) from
+        # real tokens can attend to PAD positions. This wastes attention mass and can
+        # contaminate real-token representations as attention-weighted sum includes PAD.
+        #
+        # Apply a key-padding mask (set attention logits to -inf for PAD key positions)
+        # to address the issue.
+        # --------------------------------------------------------------------------------
+        if target_pad_mask is not None:
+            # Shift target_pad_mask to match decoder_target
+            target_pad_mask_shifted = target_pad_mask[:, 1:]
+            decoder_target = decoder_target.masked_fill(
+                target_pad_mask_shifted,
+                LABEL_IGNORE_VALUE
+            )
 
         self.optimizer.zero_grad()
-        log_probabilities = self.model.forward(
+        log_probabilities = self.model(
             x=source_ids,
             y=decoder_input,
             source_pad_mask=source_pad_mask
@@ -594,13 +672,28 @@ class Trainer:
             source_ids = batch["source_ids"].to(self.device)
             target_ids = batch["target_ids"].to(self.device)
 
-            # Extract optional source padding mask
+            # Shift target for teacher forcing
+            decoder_input = target_ids[:, :-1]
+            decoder_target = target_ids[:, 1:]
+
+            # Extract optional source padding mask for attention
             source_pad_mask = batch.get("source_pad_mask")
             if source_pad_mask is not None:
                 source_pad_mask = source_pad_mask.to(self.device)
 
-            decoder_input = target_ids[:, :-1]
-            decoder_target = target_ids[:, 1:]
+            # Extract optional target padding mask for loss masking
+            target_pad_mask = batch.get("target_pad_mask")
+            if target_pad_mask is not None:
+                target_pad_mask = target_pad_mask.to(self.device)
+
+            # Apply padding mask to decoder_target for loss calculation
+            if target_pad_mask is not None:
+                # Shift target_pad_mask to match decoder_target
+                target_pad_mask_shifted = target_pad_mask[:, 1:]
+                decoder_target = decoder_target.masked_fill(
+                    target_pad_mask_shifted,
+                    LABEL_IGNORE_VALUE
+                )
 
             log_probabilities = self.model.forward(
                 x=source_ids,

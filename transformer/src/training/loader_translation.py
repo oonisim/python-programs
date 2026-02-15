@@ -35,7 +35,6 @@ from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, Dataset
 from datasets import load_dataset
 
-from model.constant import LABEL_IGNORE_VALUE
 from tokenization import Tokenizer
 
 
@@ -80,8 +79,7 @@ def translation_collate_fn(
         target_pad_id: int
 ) -> dict[str, Tensor]:
     """Collate function that pads source and target to max length in batch.
-    Masks padded positions in targets with LABEL_IGNORE_VALUE to prevent them
-    from contributing to loss when pad_token_id==eos_token_id.
+    Creates padding masks for attention and loss computation.
 
     Args:
         batch: List of dicts with "source_ids" and "target_ids"
@@ -91,8 +89,9 @@ def translation_collate_fn(
     Returns:
         Dict with:
         - "source_ids" (B, Ts): Padded source sequences
-        - "target_ids" (B, Tt): Padded target sequences with padding masked
+        - "target_ids" (B, Tt): Padded target sequences (clean, not masked)
         - "source_pad_mask" (B, Ts): Boolean mask (True for padding positions)
+        - "target_pad_mask" (B, Tt): Boolean mask (True for padding positions)
     """
     # --------------------------------------------------------------------------------
     # Padding:
@@ -118,7 +117,7 @@ def translation_collate_fn(
     )
 
     # --------------------------------------------------------------------------------
-    # Create padding masks for attention
+    # Create padding masks for attention and loss computation
     # --------------------------------------------------------------------------------
     # Source padding mask: identifies padding positions in source sequences
     # Shape: (B, Ts) where True indicates padding token
@@ -126,47 +125,27 @@ def translation_collate_fn(
     source_pad_mask = (source_padded == source_pad_id)
 
     # Target padding mask: identifies padding positions in target sequences
-    # Used for masking loss calculation (not for attention masking)
+    # Shape: (B, Tt) where True indicates padding token
+    # This mask is used in trainer to mask loss calculation
     target_pad_mask = (target_padded == target_pad_id)
 
     # --------------------------------------------------------------------------------
-    # Mask targets labels with IGNORE_VALUE where the values are pad token id.
-    # Then, the loss function ignores those labels for loss calculation.
-    #
-    # Padding must be handled at the attention level (not just in the loss).
-    # If PAD tokens are included as keys/values (K,V) and not masked, queries (Q) from
-    # real tokens can attend to PAD positions. This wastes attention mass and can
-    # contaminate real-token representations as attention-weighted sum includes PAD.
-    #
-    # Another side effect: the same sentence padded to length 64 vs 128 can produce
-    # different attention distributions and different outputs, even when the real tokens
-    # are identical.
-    #
-    # Apply a key-padding mask (set attention logits to -inf for PAD key positions)
-    # to address the issue.
+    # CRITICAL: Do NOT mask target_padded here with LABEL_IGNORE_VALUE
     # --------------------------------------------------------------------------------
-
-    # --------------------------------------------------------------------------------
-    # CRITICAL: Do NOT use pad_token_id as the target mask value for GPT like tokenizers.
-    # GPT like tokenizers has no PAD or EOS tokens. Hence, people will set up as
-    # pad_token_id = eos_token_id = eot_token_id.
+    # Masking must happen in trainer AFTER shifting:
+    # 1. decoder_input = target_ids[:, :-1]  <- needs clean token IDs for embedding
+    # 2. decoder_target = target_ids[:, 1:]  <- can be masked for loss calculation
     #
-    # The Loss calculation will ignore the legitimate EOS label in targets.
-    # The source positions that have correct EOS tokens cannot contribute to the model
-    # training and the model will never learn to predict EOS (End of Sequence).
+    # If we mask here, decoder_input will contain LABEL_IGNORE_VALUE (-100) which
+    # will cause index errors when fed to embedding layer.
     #
-    # EOS is the token that teaches the model where/how to end a sequence.
-    # In corpora for GPT like models, the EOS/EOT token is a document boundary.
-    # Without learning EOS, the model has no understanding of the idea of "End",
-    # or the concept of "Sequence" or "Boundary".
-    # Therefore, it can keep generating forever or only stop at max length.
+    # The trainer will apply masking to decoder_target only, not decoder_input.
     # --------------------------------------------------------------------------------
-    target_padded = target_padded.masked_fill(target_pad_mask, LABEL_IGNORE_VALUE)
-
     return {
         "source_ids": source_padded,
         "target_ids": target_padded,
-        "source_pad_mask": source_pad_mask
+        "source_pad_mask": source_pad_mask,
+        "target_pad_mask": target_pad_mask
     }
 
 
