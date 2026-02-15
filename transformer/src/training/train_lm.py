@@ -67,7 +67,7 @@ from typing import Optional
 import torch
 from torch import nn
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.optim.lr_scheduler import CosineAnnealingLR, LambdaLR
 
 from tokenization import (
     TiktokenAdapter,
@@ -88,6 +88,55 @@ from training.trainer_gradient_monitor import GradientMonitorCallback
 # Logging
 # --------------------------------------------------------------------------------
 logger: logging.Logger = logging.getLogger(__name__)
+
+
+# --------------------------------------------------------------------------------
+# Learning Rate Scheduler with Warmup
+# --------------------------------------------------------------------------------
+def get_cosine_schedule_with_warmup(
+        optimizer,
+        num_warmup_steps: int,
+        num_training_steps: int,
+        min_lr_ratio: float = 0.1
+):
+    """
+    Create a learning rate scheduler with linear warmup and cosine decay.
+
+    Args:
+        optimizer: The optimizer to schedule.
+        num_warmup_steps: Number of steps for linear warmup.
+        num_training_steps: Total number of training steps.
+        min_lr_ratio: Minimum learning rate as a fraction of initial LR (default: 0.1).
+
+    Returns:
+        LambdaLR scheduler that applies warmup + cosine decay.
+
+    Example:
+        # Warmup for 2000 steps, then cosine decay to 10% of peak LR
+        scheduler = get_cosine_schedule_with_warmup(
+            optimizer,
+            num_warmup_steps=2000,
+            num_training_steps=50000,
+            min_lr_ratio=0.1
+        )
+    """
+    import math
+
+    def lr_lambda(current_step: int):
+        # Linear warmup
+        if current_step < num_warmup_steps:
+            return float(current_step) / float(max(1, num_warmup_steps))
+
+        # Cosine decay after warmup
+        progress = float(current_step - num_warmup_steps) / float(
+            max(1, num_training_steps - num_warmup_steps)
+        )
+        cosine_decay = 0.5 * (1.0 + math.cos(math.pi * progress))
+
+        # Scale between min_lr_ratio and 1.0
+        return min_lr_ratio + (1.0 - min_lr_ratio) * cosine_decay
+
+    return LambdaLR(optimizer, lr_lambda)
 
 
 # --------------------------------------------------------------------------------
@@ -116,6 +165,11 @@ class TrainingConfig:
     snapshot_interval: int = 0
     keep_last_n_snapshots: int = 3
     delete_snapshots_after_training: bool = True
+
+    # Learning rate scheduler
+    warmup_steps: int = 1000  # Number of warmup steps (0 = no warmup)
+    min_lr_ratio: float = 0.1  # Minimum LR as fraction of peak LR
+
     # Callback options
     enable_gradient_monitor: bool = False
     gradient_monitor_interval: int = 0  # Monitor every N steps (0 = at snapshots only)
@@ -140,6 +194,37 @@ class TrainingConfig:
 DATASET_CONFIGS = {
     "wikitext": ("wikitext", "wikitext-2-raw-v1"),
     "wikitext-103": ("wikitext", "wikitext-103-raw-v1"),
+}
+
+# Model architecture presets for different scales
+MODEL_PRESETS = {
+    "tiny": {
+        "d_model": 256,
+        "num_heads": 4,
+        "num_layers": 4,
+        "d_ff": 1024,  # 4× d_model (fixed from previous 512)
+        "max_seq_len": 256,
+        "params": "~16M",
+        "description": "Original tiny model, suitable for WikiText-2"
+    },
+    "small": {
+        "d_model": 512,
+        "num_heads": 8,
+        "num_layers": 6,
+        "d_ff": 2048,  # 4× d_model
+        "max_seq_len": 512,
+        "params": "~45-50M",
+        "description": "Option A: Balanced model for WikiText-103, expected perplexity ~50-60"
+    },
+    "medium": {
+        "d_model": 768,
+        "num_heads": 12,
+        "num_layers": 12,
+        "d_ff": 3072,  # 4× d_model
+        "max_seq_len": 1024,
+        "params": "~117M",
+        "description": "Option C: GPT-2 Small equivalent, expected perplexity ~35-40"
+    },
 }
 
 # --------------------------------------------------------------------------------
@@ -369,10 +454,30 @@ class LanguageModelTrainingDirector:
             weight_decay=self.training_config.weight_decay
         )
 
-        scheduler = CosineAnnealingLR(
-            optimizer,
-            T_max=self.training_config.epochs
-        )
+        # Calculate total training steps for scheduler
+        # Note: This is approximate. Actual steps depend on dataset size.
+        train_loader = self.data_factory.get_train_loader()
+        steps_per_epoch = len(train_loader)
+        total_steps = steps_per_epoch * self.training_config.epochs
+
+        # Create scheduler with optional warmup
+        if self.training_config.warmup_steps > 0:
+            scheduler = get_cosine_schedule_with_warmup(
+                optimizer,
+                num_warmup_steps=self.training_config.warmup_steps,
+                num_training_steps=total_steps,
+                min_lr_ratio=self.training_config.min_lr_ratio
+            )
+            logger.info(
+                f"  Using warmup scheduler: {self.training_config.warmup_steps} steps warmup, "
+                f"{total_steps} total steps"
+            )
+        else:
+            scheduler = CosineAnnealingLR(
+                optimizer,
+                T_max=self.training_config.epochs
+            )
+            logger.info("  Using CosineAnnealingLR (no warmup)")
 
         # Model returns log-probabilities. Do NOT use CrossEntropyLoss as
         # it expects logits and internally applies log-softmax + NLLLoss.
@@ -750,6 +855,24 @@ def parse_args():
         )
     )
     train_group.add_argument(
+        "--warmup_steps", type=int, default=1000,
+        metavar="STEPS",
+        help=(
+            "Number of warmup steps for learning rate scheduler. LR linearly "
+            "increases from 0 to peak LR over this many steps, then cosine decays. "
+            "Recommended: 2000-4000 for large models. 0 = no warmup. Default: 1000"
+        )
+    )
+    train_group.add_argument(
+        "--min_lr_ratio", type=float, default=0.1,
+        metavar="RATIO",
+        help=(
+            "Minimum learning rate as a fraction of peak LR during cosine decay. "
+            "Final LR = peak_lr * min_lr_ratio. Typical range: 0.0 to 0.1. "
+            "Default: 0.1"
+        )
+    )
+    train_group.add_argument(
         "--gradient_clip", type=float, default=1.0,
         metavar="MAX_NORM",
         help=(
@@ -915,6 +1038,18 @@ def parse_args():
         "but slower training and more memory."
     )
     model_group.add_argument(
+        "--model_preset", type=str, default=None,
+        choices=list(MODEL_PRESETS.keys()),
+        metavar="PRESET",
+        help=(
+            "Use a predefined model configuration preset. "
+            "Choices: 'tiny' (~16M params), 'small' (~45-50M params, Option A), "
+            "'medium' (~117M params, Option C / GPT-2 Small). "
+            "Individual args (--d_model, etc.) override preset values. "
+            "Default: None (use individual args)"
+        )
+    )
+    model_group.add_argument(
         "--d_model", type=int, default=256,
         metavar="DIM",
         help=(
@@ -1007,6 +1142,24 @@ def main():
         print(HELP_TEXT)
         sys.exit(0)
 
+    # Apply model preset if specified
+    if args.model_preset:
+        preset = MODEL_PRESETS[args.model_preset]
+        # Override with preset values if individual args are at default
+        if args.d_model == 256:  # default value
+            args.d_model = preset["d_model"]
+        if args.num_heads == 4:
+            args.num_heads = preset["num_heads"]
+        if args.num_layers == 4:
+            args.num_layers = preset["num_layers"]
+        if args.d_ff == 512:
+            args.d_ff = preset["d_ff"]
+        if args.max_seq_len == 256:
+            args.max_seq_len = preset["max_seq_len"]
+        print(f"Using model preset '{args.model_preset}': {preset['description']}")
+        print(f"  d_model={args.d_model}, num_heads={args.num_heads}, "
+              f"num_layers={args.num_layers}, d_ff={args.d_ff}, max_seq_len={args.max_seq_len}")
+
     model_config = ModelConfig(
         d_model=args.d_model,
         num_heads=args.num_heads,
@@ -1021,6 +1174,8 @@ def main():
         batch_size=args.batch_size,
         learning_rate=args.lr,
         weight_decay=args.weight_decay,
+        warmup_steps=args.warmup_steps,
+        min_lr_ratio=args.min_lr_ratio,
         gradient_clip=args.gradient_clip,
         snapshot_interval=args.snapshot_interval,
         keep_last_n_snapshots=args.keep_last_n_snapshots,
