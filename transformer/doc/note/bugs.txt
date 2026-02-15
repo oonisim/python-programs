@@ -1,3 +1,17 @@
+Evidence in code
+
+Scheduler creation uses warmup in train_lm.py (warmup steps are based on total steps).
+Scheduler stepping happens in Trainer._post_epoch_operations() once per epoch in trainer.py.
+So your observation is consistent, but the actual bug is that warmup is implemented as step‑based while the scheduler is epoch‑stepped.
+
+Why disabling warmup “fixes” it
+With warmup off, you fall back to CosineAnnealingLR, which is intended to be stepped per epoch, so it behaves correctly. That’s why you see immediate learning.
+
+Bottom line
+Warmup isn’t “too big”; it’s being applied at the wrong cadence (epochs instead of steps). That’s why loss stays stuck near 10.
+
+If you want, I can propose the exact change to step the warmup scheduler per batch (without applying it to the cosine‑per‑epoch path).
+
 ● The Warmup Problem Explained:
 
   With warmup_steps=1000:
@@ -23,6 +37,22 @@
   └──────────────────┴─────────────────┴──────────────────┴────────────────┘
 
   The fix: Disabled warmup so LR starts at full 0.0003 from step 0, allowing immediate learning.
+
+
+ The remaining known issues from prior rounds are:
+  ┌──────────────────────────────────────────┬───────────────────┬──────────┐
+  │                  Issue                   │     File:Line     │ Severity │
+  ├──────────────────────────────────────────┼───────────────────┼──────────┤
+  │ evaluate() doesn't restore training mode │ model.py:562      │ MEDIUM   │
+  ├──────────────────────────────────────────┼───────────────────┼──────────┤
+  │ Missing space in error message           │ model.py:600-601  │ LOW      │
+  ├──────────────────────────────────────────┼───────────────────┼──────────┤
+  │ Invalid pylint directive (missing colon) │ lm.py:364         │ LOW      │
+  ├──────────────────────────────────────────┼───────────────────┼──────────┤
+  │ Off-by-one in get_stats()                │ loader.py:255,259 │ LOW      │
+  └──────────────────────────────────────────┴───────────────────┴──────────┘
+  No new issues beyond these. Would you like me to fix the evaluate() one?
+
 
 
 Root Cause Analysis
