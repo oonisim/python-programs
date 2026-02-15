@@ -18,3 +18,9 @@ Remaining Issues
 
   LOW: Causal mask error message says "Encoder Causal Attention" (common.py:507)
   The do_mask=False branch says "Encoder Causal Attention" which is a misnomer — encoders use bidirectional, not causal attention. Should say "Encoder Self-Attention".
+
+
+  Findings (new, ordered by severity)
+
+  [P2] Empty train_loader leads to ZeroDivisionError in _train_one_epoch. File: trainer.py lines 276–300.
+  [P2] top_k validation misses the upper bound (top_k > vocab_size) which crashes torch.topk. File: lm.py lines 433–438.
