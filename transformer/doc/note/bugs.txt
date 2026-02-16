@@ -122,6 +122,12 @@ Decoder self-attention is causal-only and does not accept a target padding mask.
 
 
 
+   test_translation_source_pad_mask_does_not_mask_real_eos_when_pad_equals_eos
+
+  Location: src/test/test_training_pitfalls.py
+
+  What it tests: When pad_token_id == eos_token_id, the source padding mask should not hide real EOS tokens.
+
 source_ids[0] = [1, 2, 0]     # Original length 3, 0 is real EOS
   source_ids[1] = [5, 0, 0]     # Original length 2, first 0 is real EOS, second is padding
   mask =          [[F, F, F],
@@ -132,11 +138,6 @@ source_ids[0] = [1, 2, 0]     # Original length 3, 0 is real EOS
   The test appears to have a flaw - it's checking that padding tokens (which happen to be eos_id) should not be masked, which defeats the purpose of masking. Let me check if this test should be marked as xfail or if there's documentation
   about it:
 
-   test_translation_source_pad_mask_does_not_mask_real_eos_when_pad_equals_eos
-
-  Location: src/test/test_training_pitfalls.py
-
-  What it tests: When pad_token_id == eos_token_id, the source padding mask should not hide real EOS tokens.
 
   Why it fails:
   # Test creates sequences:

@@ -97,10 +97,19 @@ def test_translation_padding_does_not_mask_real_eos_when_pad_equals_eos():
 
 
 def test_translation_source_pad_mask_does_not_mask_real_eos_when_pad_equals_eos():
-    """Source padding mask should not hide real EOS tokens."""
+    """Source padding mask should only hide artificial padding.
+
+    When pad_token_id == eos_token_id, the only reliable way to identify padding
+    is by sequence length (positions beyond the original length). This test
+    asserts that real tokens (including EOS) are not masked, and only the
+    padded positions are masked.
+    """
     pad_id = 0
     eos_id = 0  # Simulate pad == eos
 
+    # Two source sequences of different lengths:
+    # - seq0 length 3, last token is real EOS
+    # - seq1 length 2, last token is real EOS, and padding is added to length 3
     batch = [
         {"source_ids": torch.tensor([1, 2, eos_id]), "target_ids": torch.tensor([3, 4])},
         {"source_ids": torch.tensor([5, eos_id]), "target_ids": torch.tensor([6, 7])},
@@ -112,8 +121,14 @@ def test_translation_source_pad_mask_does_not_mask_real_eos_when_pad_equals_eos(
         target_pad_id=pad_id,
     )
     source_pad_mask = out["source_pad_mask"]
-    source_ids = out["source_ids"]
 
-    # EOS positions should not be marked as padding.
-    eos_positions = source_ids == eos_id
-    assert torch.all(source_pad_mask[eos_positions] == 0)
+    # Expected mask by length (not by token value):
+    # seq0 length 3 -> no padding
+    # seq1 length 2 -> last position is padding
+    expected_mask = torch.tensor(
+        [[False, False, False],
+         [False, False, True]],
+        dtype=torch.bool,
+    )
+
+    assert torch.equal(source_pad_mask, expected_mask)
