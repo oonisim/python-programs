@@ -82,6 +82,7 @@ from training.loader import LanguageModelDataLoaderFactory, DataLoaderConfig
 from training.trainer import LanguageModelTrainer, TrainerConfig
 from training.trainer_early_stopping import EarlyStoppingCallback
 from training.trainer_gradient_monitor import GradientMonitorCallback
+from training.weight_update_monitor_callback import WeightUpdateMonitorCallback
 
 
 # --------------------------------------------------------------------------------
@@ -442,6 +443,20 @@ class LanguageModelTrainingDirector:
             callbacks.append(gradient_monitor)
             logger.info("  Gradient monitoring enabled")
 
+        # Weight update monitor callback
+        if self.training_config.enable_weight_monitor:
+            weight_monitor = WeightUpdateMonitorCallback(
+                monitor_interval=self.training_config.weight_monitor_interval,
+                sample_size=self.training_config.weight_monitor_sample_size,
+                vanishing_grad_threshold=self.training_config.vanishing_grad_threshold,
+                exploding_grad_threshold=self.training_config.exploding_grad_threshold,
+                frozen_update_ratio_threshold=self.training_config.frozen_update_ratio_threshold,
+                frozen_patience_steps=self.training_config.frozen_patience_steps,
+                monitor_topk=self.training_config.monitor_topk,
+            )
+            callbacks.append(weight_monitor)
+            logger.info("  Weight update monitoring enabled")
+
         return callbacks
 
     def _build_trainer(self) -> None:
@@ -507,14 +522,6 @@ class LanguageModelTrainingDirector:
             snapshot_per_epoch=True,
             keep_last_n_snapshots=self.training_config.keep_last_n_snapshots,
             delete_snapshots_after_training=self.training_config.delete_snapshots_after_training,
-            enable_weight_monitor=self.training_config.enable_weight_monitor,
-            weight_monitor_interval=self.training_config.weight_monitor_interval,
-            weight_monitor_sample_size=self.training_config.weight_monitor_sample_size,
-            monitor_topk=self.training_config.monitor_topk,
-            vanishing_grad_threshold=self.training_config.vanishing_grad_threshold,
-            exploding_grad_threshold=self.training_config.exploding_grad_threshold,
-            frozen_update_ratio_threshold=self.training_config.frozen_update_ratio_threshold,
-            frozen_patience_steps=self.training_config.frozen_patience_steps,
             step_scheduler_per_batch=self.training_config.warmup_steps > 0,
         )
 
