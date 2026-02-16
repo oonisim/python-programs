@@ -27,7 +27,7 @@ Usage:
     val_loader = factory.get_val_loader()
 """
 from dataclasses import dataclass
-from typing import Optional, Protocol
+from typing import Optional
 
 import torch
 from torch import Tensor

@@ -63,7 +63,10 @@ from training.utility import (
     delete_files_by_pattern,
     cleanup_old_files,
 )
-from training.trainer_callback import CallbackList, TrainerCallback
+from training.trainer_callback import (
+    CallbackList,
+    TrainerCallback
+)
 from training.ema_loss_monitor import EMALossMonitor
 from model.constant import LABEL_IGNORE_VALUE
 
@@ -153,9 +156,19 @@ class Trainer:
         self.scheduler = scheduler
         self.config = config or TrainerConfig()
 
+        # Training parameters
+        self.current_epoch: int = -1
+        self.current_step: int = -1
+        self.global_step: int = -1
+        self.best_val_loss: float = float("inf")
+        self.training_history: List[Dict[str, Any]] = []
+
+        # Auxiliary components
+        self.writer: SummaryWriter
+
         # Setup device and callbacks
-        self.device = self._setup_device(device)
-        self.callbacks = CallbackList(callbacks or [])
+        self.device: torch.device = self._setup_device(device)
+        self.callbacks: CallbackList = CallbackList(callbacks or [])
 
         # Initialize directory structure and training state
         self._setup_directories()
@@ -181,7 +194,7 @@ class Trainer:
     def _setup_model_and_logging(self) -> None:
         """Move model to device and initialize TensorBoard logging."""
         self.model.to(self.device)
-        self.writer = SummaryWriter(log_dir=self.model_root_dir / "runs")
+        self.writer: SummaryWriter = SummaryWriter(log_dir=str(self.model_root_dir / "runs"))
 
     def _setup_directories(self) -> None:
         """Create directory structure for snapshots, models, and logs."""
@@ -307,12 +320,15 @@ class Trainer:
 
     def _post_epoch_operations(
             self,
-            train_loader: DataLoader,
+            train_loader: DataLoader,   # pylint: disable=unused-argument
             val_loader: Optional[DataLoader],
             epoch: int,
             train_loss: float
     ) -> bool:
         """Execute post-epoch operations and return whether to stop training.
+        Note:
+            Currently the train_loader argument is not used but keep it in the
+            signature for potential future use in callbacks.
 
         Args:
             train_loader: DataLoader for training data.
@@ -779,7 +795,11 @@ class Trainer:
             self.writer.add_scalar("train/loss_ema", ema_loss, self.global_step)
 
         # Periodic weight and gradient validation (sanity checks)
-        if self.config.sanity_check_interval > 0 and self.global_step % self.config.sanity_check_interval == 0 and self.global_step > 0:
+        if (
+                self.config.sanity_check_interval > 0 and \
+                self.global_step % self.config.sanity_check_interval == 0 and \
+                self.global_step > 0
+        ):
             is_valid_weights, invalid_params = self._check_weights_valid()
             is_valid_grads, invalid_grads = self._check_gradients_valid()
 
@@ -829,7 +849,7 @@ class Trainer:
         nan_param_count = 0
         inf_param_count = 0
 
-        for name, param in self.model.named_parameters():
+        for name, param in self.model.named_parameters():   # pylint: disable=unused-variable
             # Check for NaN/Inf in weights
             if torch.isnan(param.data).any():
                 nan_param_count += 1
