@@ -117,3 +117,47 @@ Here’s a focused review of the issues mentioned under `/doc`, and whether they
 P2: Target padding mask not applied in decoder self-attention
 Decoder self-attention is causal-only and does not accept a target padding mask. For variable-length target batches, padded target positions remain valid keys/values and can be attended to by real tokens, contaminating representations and gradients. source_pad_mask is applied only in cross-attention. Add a target_pad_mask path to DecodeLayer.forward and Decoder.forward, and pass the shifted target mask from the trainer so padded target tokens are masked in decoder self-attention as well.
 /Users/oonisim/home/repository/git/oonisim/python-programs/transformer/src/model/decoder.py:118-210
+
+
+
+
+
+source_ids[0] = [1, 2, 0]     # Original length 3, 0 is real EOS
+  source_ids[1] = [5, 0, 0]     # Original length 2, first 0 is real EOS, second is padding
+  mask =          [[F, F, F],
+                   [F, F, T]]
+
+  The test expects all EOS tokens (including padding) to not be masked, but position [1,2] is actual padding added by pad_sequence. The current implementation correctly masks it based on length.
+
+  The test appears to have a flaw - it's checking that padding tokens (which happen to be eos_id) should not be masked, which defeats the purpose of masking. Let me check if this test should be marked as xfail or if there's documentation
+  about it:
+
+   test_translation_source_pad_mask_does_not_mask_real_eos_when_pad_equals_eos
+
+  Location: src/test/test_training_pitfalls.py
+
+  What it tests: When pad_token_id == eos_token_id, the source padding mask should not hide real EOS tokens.
+
+  Why it fails:
+  # Test creates sequences:
+  batch[0]: source_ids = [1, 2, 0]  # 0 is real EOS (length 3)
+  batch[1]: source_ids = [5, 0]     # 0 is real EOS (length 2)
+
+  # After padding to max length (3):
+  source_ids[0] = [1, 2, 0]     # All real tokens
+  source_ids[1] = [5, 0, 0]     # First 0 is real EOS, second 0 is PADDING
+
+  # Current mask (based on sequence lengths):
+  mask = [[F, F, F],    # Batch 0: all real
+          [F, F, T]]    # Batch 1: last position is padding
+
+  # Test expects: All positions with token_id==0 should have mask=False
+  # But position [1,2] IS actual padding, so mask=True is correct!
+
+  The Issue: The test has a conceptual flaw. It expects that ALL tokens with value eos_id (including artificial padding) should not be masked. But the current implementation correctly distinguishes between:
+  - Real EOS: Position [1,1] - not masked ✓
+  - Padding that happens to be eos_id: Position [1,2] - correctly masked ✓
+
+  The implementation is working as intended. The test seems to be checking for an impossible requirement (distinguishing padding from real EOS purely by token value, which is impossible when they're the same value).
+
+  This is likely a test bug, not an implementation bug. The length-based masking approach in translation_collate_fn is the correct solution.
