@@ -6,6 +6,7 @@ is stepped once per batch (for warmup schedules) or once per epoch (default).
 Regression test for commit e990a7fc which fixed warmup stepping from per-epoch
 to per-batch.
 """
+import math
 import tempfile
 import torch
 from torch import nn
@@ -78,9 +79,9 @@ def _make_trainer(config, scheduler_fn):
         trainer._clip_gradients()
         trainer.optimizer.step()
 
-        # Step scheduler per batch if configured (mirrors trainer.py:626-627)
-        if trainer.scheduler is not None and trainer.config.step_scheduler_per_batch:
-            trainer.scheduler.step()
+        # CRITICAL: Call the real production scheduler logic
+        # Don't duplicate the if-check here - let _step_scheduler_if_configured handle it
+        trainer._step_scheduler_if_configured()
 
         return loss.item()
 
@@ -134,6 +135,9 @@ def test_warmup_lr_ramps_over_steps():
             enable_weight_monitor=False,
         )
 
+        # Use known peak LR for stronger assertion
+        peak_lr = 1e-3
+
         def make_scheduler(opt):
             return get_cosine_schedule_with_warmup(
                 opt, num_warmup_steps=5, num_training_steps=20
@@ -150,10 +154,42 @@ def test_warmup_lr_ramps_over_steps():
         trainer.train(train_loader=loader, num_epochs=1)
 
         final_lr = scheduler.get_last_lr()[0]
-        # After 10 steps with 5-step warmup, LR should have ramped up
-        assert final_lr > initial_lr * 0.5, (
-            f"Expected LR to ramp up during warmup, "
-            f"initial={initial_lr}, final={final_lr}"
+
+        # LEARNING RATE SCHEDULE EXPLANATION:
+        # ===================================
+        # This test uses a two-phase LR schedule from get_cosine_schedule_with_warmup():
+        #
+        # Phase 1 - Linear Warmup (steps 1-5):
+        #   Purpose: Gradually increase LR from 0 to peak to avoid early training instability
+        #   Formula: lr = (current_step / warmup_steps) * peak_lr
+        #   Result: Linear ramp from 0 → peak_lr
+        #
+        # Phase 2 - Cosine Annealing Decay (steps 6-20):
+        #   Purpose: Smoothly decay LR using cosine curve for better convergence
+        #   Formula: lr = min_lr + (peak_lr - min_lr) * cosine_decay
+        #            where cosine_decay = 0.5 * (1 + cos(π * progress))
+        #            and progress = steps_after_warmup / total_steps_after_warmup
+        #   Result: Smooth cosine curve from peak_lr → min_lr_ratio * peak_lr
+        #
+        # At step 10 (after 5 warmup + 5 decay steps), calculate expected LR:
+        warmup_steps = 5
+        total_steps = 20
+        current_step = 10
+        min_lr_ratio = 0.1  # Default in get_cosine_schedule_with_warmup
+
+        num_steps_after_warmup = current_step - warmup_steps  # 5
+        total_steps_after_warmup = total_steps - warmup_steps  # 15
+        progress = num_steps_after_warmup / total_steps_after_warmup  # 0.333
+        cosine_decay = 0.5 * (1.0 + math.cos(math.pi * progress))  # ≈ 0.75
+        expected_lr = peak_lr * (min_lr_ratio + (1 - min_lr_ratio) * cosine_decay)
+        # expected_lr ≈ 0.775 * peak_lr (77.5% of peak)
+
+        tolerance = 0.05  # Allow 5% numerical variation
+        assert final_lr > expected_lr * (1 - tolerance), (
+            f"Expected LR at step {current_step} to be ~{expected_lr:.6f} "
+            f"({expected_lr/peak_lr:.1%} of peak), got {final_lr:.6f} "
+            f"({final_lr/peak_lr:.1%} of peak). "
+            f"Schedule: {warmup_steps}-step warmup + cosine decay to {total_steps} steps."
         )
 
 
@@ -233,8 +269,8 @@ def test_warmup_completes_in_expected_steps():
             trainer._clip_gradients()
             trainer.optimizer.step()
 
-            if trainer.scheduler is not None and trainer.config.step_scheduler_per_batch:
-                trainer.scheduler.step()
+            # CRITICAL: Call the real production scheduler logic
+            trainer._step_scheduler_if_configured()
 
             lr_history.append(trainer.optimizer.param_groups[0]['lr'])
             return loss.item()

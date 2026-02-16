@@ -138,3 +138,13 @@
    - Fixed invalid pylint directive: added missing colon (lm.py:367)
    - Fixed off-by-one in get_stats(): removed extra -1 (loader.py:255,259)
    - All model tests pass (4/4)
+
+✅ Warmup Scheduler Test Coverage (FIXED)
+   - Problem: Tests duplicated scheduler.step() logic instead of calling production code
+   - Risk: Warmup scheduler could break without test detection (high regression risk)
+   - Solution: Extracted _step_scheduler_if_configured() method for tests to call
+   - Tests now exercise real production per-batch stepping logic
+   - Improved assertions: calculated expected LR (77.5%) instead of magic number (50%)
+   - Added detailed comments explaining two-phase schedule (linear warmup + cosine decay)
+   - File: trainer.py, test_scheduler_stepping.py
+   - See: doc/change/v0.5/WARMUP_SCHEDULER_TEST_COVERAGE_COMPLETE.md

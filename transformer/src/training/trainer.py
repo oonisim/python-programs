@@ -602,13 +602,24 @@ class Trainer:
         self.optimizer.step()
 
         # Step scheduler per batch if configured (e.g., warmup schedules)
-        if self.scheduler is not None and self.config.step_scheduler_per_batch:
-            self.scheduler.step()
+        self._step_scheduler_if_configured()
 
         # Callback: on_step_end
         self.callbacks.on_step_end(self)
 
         return loss.item()
+
+    def _step_scheduler_if_configured(self) -> None:
+        """Step the learning rate scheduler if per-batch stepping is enabled.
+
+        This method is extracted separately to ensure tests exercise the real
+        production scheduler stepping logic even when _train_one_step is patched.
+
+        Called by _train_one_step after optimizer.step() when
+        config.step_scheduler_per_batch=True (required for warmup schedules).
+        """
+        if self.scheduler is not None and self.config.step_scheduler_per_batch:
+            self.scheduler.step()
 
     def _compute_loss(self, log_probabilities: Tensor, targets: Tensor) -> Tensor:
         """Compute loss between predictions and targets.
