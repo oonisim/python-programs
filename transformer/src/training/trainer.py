@@ -64,7 +64,7 @@ from training.utility import (
     cleanup_old_files,
 )
 from training.trainer_callback import CallbackList, TrainerCallback
-from training.weight_update_monitor import WeightUpdateMonitor
+from training.ema_loss_monitor import EMALossMonitor
 from model.constant import LABEL_IGNORE_VALUE
 
 
@@ -101,22 +101,10 @@ class TrainerConfig:
     # True = step every batch (required for step-based warmup schedules).
     step_scheduler_per_batch: bool = False
 
-    # Weight update monitoring (defensive, aggregate only, ~4MB memory)
-    # Monitors: 1) gradient health (after clipping), 2) actual Δw after step
-    # Uses sampled elements (sample_size per param) instead of full clones
-    enable_weight_monitor: bool = True  # Enabled by default (adds ~1-2% overhead)
-    weight_monitor_interval: int = 100   # Check every N steps (>=1, reduces overhead)
-    weight_monitor_sample_size: int = 1024  # Elements sampled per param (~4KB each)
-    monitor_topk: int = 5  # Log top-K worst params (avoids TensorBoard tag explosion)
-
-    # Gradient health thresholds (applied to ||grad||_2 after clipping)
-    vanishing_grad_threshold: float = 1e-7  # Flag if ||grad|| <= this (too small)
-    exploding_grad_threshold: float = 1e2   # Flag if ||grad|| >= this (too large)
-
-    # Frozen weight detection (decisive: measures actual Δw after optimizer.step)
-    # update_ratio = ||Δw||/(||w||+ε) where Δw = w_new - w_old
-    frozen_update_ratio_threshold: float = 1e-12  # Flag if ratio <= this
-    frozen_patience_steps: int = 3  # Require N consecutive tiny updates to flag frozen
+    # EMA (Exponential Moving Average) loss tracking
+    # Provides smoothed loss visualization alongside raw step loss
+    enable_ema_loss: bool = True  # Toggle EMA tracking (negligible overhead)
+    ema_alpha: float = 0.99  # EMA decay factor: higher = more smoothing (0.95-0.999)
 
 
 # ================================================================================
@@ -175,7 +163,7 @@ class Trainer:
 
         # Setup model and monitoring systems
         self._setup_model_and_logging()
-        self._initialize_weight_monitor()
+        self._initialize_ema_monitor()
 
     def _setup_device(self, device: Optional[str]) -> torch.device:
         """Setup and return the compute device.
@@ -211,33 +199,23 @@ class Trainer:
         self.best_val_loss: float = float("inf")
         self.training_history: List[Dict[str, Any]] = []
 
-    def _initialize_weight_monitor(self) -> None:
-        """Initialize weight update monitoring system if enabled in config.
+    def _initialize_ema_monitor(self) -> None:
+        """Initialize EMA loss monitoring system if enabled in config.
 
-        The weight monitor tracks gradient statistics and parameter updates
-        to detect training issues like vanishing/exploding gradients and
-        frozen parameters.
+        The EMA monitor smooths noisy step-by-step loss values to reveal
+        underlying learning trends.
         """
-        self.weight_monitor: Optional[WeightUpdateMonitor] = None
+        self.ema_monitor: Optional[EMALossMonitor] = None
 
-        if not self.config.enable_weight_monitor:
+        if not self.config.enable_ema_loss:
             return
 
-        # Create monitor with configured thresholds
-        self.weight_monitor = WeightUpdateMonitor(
-            sample_size=self.config.weight_monitor_sample_size,
-            vanishing_grad_threshold=self.config.vanishing_grad_threshold,
-            exploding_grad_threshold=self.config.exploding_grad_threshold,
-            frozen_update_ratio_threshold=(
-                self.config.frozen_update_ratio_threshold
-            ),
-            frozen_patience_steps=self.config.frozen_patience_steps,
-        )
+        # Create EMA monitor with configured alpha
+        self.ema_monitor = EMALossMonitor(alpha=self.config.ema_alpha)
 
         print(
-            f"Weight update monitoring enabled "
-            f"(sample_size={self.config.weight_monitor_sample_size}, "
-            f"interval={self.config.weight_monitor_interval} steps)"
+            f"EMA loss monitoring enabled "
+            f"(alpha={self.config.ema_alpha})"
         )
 
     # ================================================================================
@@ -627,10 +605,6 @@ class Trainer:
         if self.scheduler is not None and self.config.step_scheduler_per_batch:
             self.scheduler.step()
 
-        # Monitor actual weight updates AFTER step (frozen weight detection only)
-        if self.weight_monitor and (self.global_step % self.config.weight_monitor_interval == 0):
-            self._log_weight_monitor_updates(self.global_step)
-
         # Callback: on_step_end
         self.callbacks.on_step_end(self)
 
@@ -769,6 +743,12 @@ class Trainer:
         """Log training progress at step level."""
         self.writer.add_scalar("train/step_loss", loss, self.global_step)
 
+        # Update and log EMA loss if enabled
+        ema_loss = None
+        if self.ema_monitor is not None:
+            ema_loss = self.ema_monitor.update(loss)
+            self.writer.add_scalar("train/loss_ema", ema_loss, self.global_step)
+
         # Periodic weight and gradient validation (sanity checks)
         if self.config.sanity_check_interval > 0 and self.global_step % self.config.sanity_check_interval == 0 and self.global_step > 0:
             is_valid_weights, invalid_params = self._check_weights_valid()
@@ -788,109 +768,10 @@ class Trainer:
                 print(f"  ✓ Validation at step {self.global_step}: All weights and gradients valid")
 
         if (step + 1) % self.config.log_interval == 0 or step == 0:
-            print(f"  Epoch {epoch} | Step {step + 1}/{num_batches} | Loss: {loss:.4f}")
-
-    # ========================================================================
-    # Weight Monitoring Methods (aggregate only, no per-parameter tags)
-    # ========================================================================
-
-    def _log_weight_monitor_updates(self, step: int) -> None:
-        """Log weight update diagnostics to TensorBoard and console.
-
-        Args:
-            step: Current global step number.
-        """
-        assert self.weight_monitor is not None
-
-        # Collect update diagnostics from all parameters
-        upd_diag = self.weight_monitor.check_updates(
-            model=self.model,
-            optimizer=self.optimizer
-        )
-        stats = WeightUpdateMonitor.aggregate_update_stats(upd_diag)
-
-        if stats.get("count", 0.0) == 0.0:
-            return
-
-        # Log aggregate statistics to TensorBoard
-        self._log_update_stats_to_tensorboard(stats=stats, step=step)
-
-        # Log top-K parameters with smallest updates
-        self._log_topk_frozen_params(upd_diag=upd_diag, step=step)
-
-        # Print console warnings if frozen parameters detected
-        self._print_frozen_param_warnings(
-            upd_diag=upd_diag,
-            stats=stats,
-            step=step
-        )
-
-    def _log_update_stats_to_tensorboard(
-            self,
-            stats: Dict[str, float],
-            step: int
-    ) -> None:
-        """Log aggregate update statistics to TensorBoard.
-
-        Args:
-            stats: Dictionary of aggregated update statistics.
-            step: Current global step number.
-        """
-        self.writer.add_scalar("monitor/update_ratio_median", stats["median"], step)
-        self.writer.add_scalar("monitor/update_ratio_p95", stats["p95"], step)
-        self.writer.add_scalar("monitor/update_ratio_min", stats["min"], step)
-        self.writer.add_scalar("monitor/update_ratio_max", stats["max"], step)
-        self.writer.add_scalar("monitor/frozen_count", stats["frozen_count"], step)
-
-    def _log_topk_frozen_params(
-            self,
-            upd_diag: Dict[str, Any],
-            step: int
-    ) -> None:
-        """Log top-K parameters with smallest update ratios to TensorBoard.
-
-        Args:
-            upd_diag: Per-parameter update diagnostics.
-            step: Current global step number.
-        """
-        for name, val in WeightUpdateMonitor.top_k_smallest_updates(
-            upd_diag, k=self.config.monitor_topk
-        ):
-            self.writer.add_scalar(f"monitor/topk_frozen/{name}", val, step)
-
-    def _print_frozen_param_warnings(
-            self,
-            upd_diag: Dict[str, Any],
-            stats: Dict[str, float],
-            step: int
-    ) -> None:
-        """Print console warnings for frozen parameters if detected.
-
-        Args:
-            upd_diag: Per-parameter update diagnostics.
-            stats: Dictionary of aggregated update statistics.
-            step: Current global step number.
-        """
-        if stats["frozen_count"] == 0:
-            return
-
-        # Collect and sort frozen parameters by update ratio
-        frozen_params = sorted(
-            [(name, diag.update_ratio) for name, diag in upd_diag.items() if diag.is_frozen],
-            key=lambda x: x[1]
-        )
-
-        # Print summary warning
-        threshold = self.config.frozen_update_ratio_threshold
-        patience = self.config.frozen_patience_steps
-        print(
-            f"  WARNING: Step {step}: {stats['frozen_count']:.0f} frozen params "
-            f"(update_ratio <= {threshold:.0e} for {patience} consecutive steps)"
-        )
-
-        # Print top-K frozen parameters
-        for name, ratio in frozen_params[:self.config.monitor_topk]:
-            print(f"      {name}: {ratio:.2e}")
+            msg = f"  Epoch {epoch} | Step {step + 1}/{num_batches} | Loss: {loss:.4f}"
+            if ema_loss is not None:
+                msg += f" | EMA: {ema_loss:.4f}"
+            print(msg)
 
     def _log_epoch_summary(
             self,
@@ -1064,6 +945,8 @@ class Trainer:
         }
         if self.scheduler is not None:
             checkpoint["scheduler_state_dict"] = self.scheduler.state_dict()
+        if self.ema_monitor is not None:
+            checkpoint["ema_state"] = self.ema_monitor.state_dict()
         if extra_state is not None:
             checkpoint["extra_state"] = extra_state
         return checkpoint
@@ -1105,6 +988,9 @@ class Trainer:
 
         if self.scheduler is not None and "scheduler_state_dict" in checkpoint:
             self.scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+
+        if self.ema_monitor is not None and "ema_state" in checkpoint:
+            self.ema_monitor.load_state_dict(checkpoint["ema_state"])
 
     def find_latest_snapshot(self) -> Optional[Path]:
         """Find the most recent snapshot file.
@@ -1290,10 +1176,6 @@ class LanguageModelTrainer(Trainer):
 
         # Update weights using the gradients in param.grad according to the optimizer rule.
         self.optimizer.step()
-
-        # Monitor actual weight updates AFTER step (frozen weight detection only)
-        if self.weight_monitor and (self.global_step % self.config.weight_monitor_interval == 0):
-            self._log_weight_monitor_updates(self.global_step)
 
         # Callback: on_step_end
         self.callbacks.on_step_end(self)
