@@ -161,3 +161,42 @@
      * Cross-attention: uses source_pad_mask ✓
    - Files: decoder.py, model.py, trainer.py, test_target_padding_mask.py
    - See: doc/change/v0.5/TARGET_PADDING_MASK_COMPLETE.md
+
+✅ PyTorch Best Practice: Use model(x) NOT model.forward(x) (FIXED)
+   - Problem: Code used model.forward(x) instead of model(x) in many places
+   - Why this matters: PyTorch's nn.Module.__call__() performs critical operations:
+     * Registers and calls hooks (forward_pre_hook, forward_hook)
+     * Properly handles autograd and gradient computation
+     * Manages module state and training/eval mode transitions
+     * Applies built-in PyTorch behaviors and optimizations
+   - Impact: Calling forward() directly bypasses these important mechanisms
+   - Solution: Changed all model.forward(x) calls to model(x)
+   - Files updated: 16 files (2 model files, 14 test files)
+     * src/model/lm.py: self.forward(x) → self(x)
+     * src/model/model.py: self.forward(x, y) → self(x, y)
+     * src/test/*.py: trainer.model.forward(x) → trainer.model(x)
+
+   **IMPORTANT - Always Follow This Pattern:**
+   ```python
+   # ✓ CORRECT - Use model() to invoke __call__
+   output = model(x)
+   output = self(x)
+   output = trainer.model(x)
+
+   # ✗ WRONG - Never call forward() directly
+   output = model.forward(x)
+   output = self.forward(x)
+   output = trainer.model.forward(x)
+   ```
+
+   **Exception**: Only define forward() method, never call it directly
+   ```python
+   class MyModel(nn.Module):
+       def forward(self, x):  # ✓ Define forward()
+           return self.layer(x)
+
+   # Usage:
+   model = MyModel()
+   output = model(x)  # ✓ Call model(), not model.forward()
+   ```
+
