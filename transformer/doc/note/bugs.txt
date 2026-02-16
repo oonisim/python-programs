@@ -24,9 +24,6 @@ For implementation guides, see:
 
 ================================================================================
 
-No open issues at this time.
-
-When new issues are discovered, add them here with format:
 
 [PRIORITY] Short issue description
 File: path/to/file.py:line
@@ -44,3 +41,52 @@ Suggested fix:
 ================================================================================
 Last updated: 2026-02-16
 ================================================================================
+
+
+This loosk wrong to update every batch step? Is this correct warm up LR rampingup?
+# Step scheduler per batch if configured (e.g., warmup schedules).
+        # Placed here (not inside _train_one_step) so it runs even when
+        # _train_one_step is overridden by subclasses or tests.
+        if self.scheduler is not None and self.config.step_scheduler_per_batch:
+            self.scheduler.step()
+
+Review Report: Scheduler Test Coverage Gaps
+
+Finding 1: Per-batch scheduler tests don’t exercise Trainer’s real code
+Severity: High (regression risk)
+Files: test_scheduler_stepping.py
+
+Where:
+
+_make_trainer() defines patched_train_step() that calls trainer.scheduler.step() directly.
+test_warmup_completes_in_expected_steps() defines another patched_train_step() with the same step logic.
+Why this is a problem:
+The tests replace Trainer._train_one_step, so the actual scheduling code in Trainer never runs. If the production scheduler step is removed or broken, these tests still pass because they’re testing their own local copy of the logic, not Trainer’s implementation.
+
+Affected tests:
+
+test_warmup_scheduler_steps_per_batch
+test_warmup_lr_ramps_over_steps
+test_warmup_completes_in_expected_steps
+Not affected:
+
+test_epoch_scheduler_steps_per_epoch_not_per_batch (uses _update_scheduler, which isn’t patched).
+Proposed fix (behavior-preserving):
+Move the per-batch scheduler.step() from _train_one_step into _process_one_batch in trainer.py. That way the tests can still patch _train_one_step for data-format reasons, while the real scheduler logic runs in _process_one_batch, which is not patched.
+
+Finding 2: Weak assertion in warmup LR ramp test
+Severity: Low
+File: test_scheduler_stepping.py
+
+Where: test_warmup_lr_ramps_over_steps()
+
+initial_lr = trainer.optimizer.param_groups[0]['lr']
+assert final_lr > initial_lr * 0.5
+Why this is weak:
+At initialization with warmup, LR can be 0.0. The assertion becomes final_lr > 0.0, which allows any positive LR, even if warmup is broken or trivial.
+
+Proposed fix:
+Compare to peak LR instead of initial LR, e.g.
+
+assert final_lr > peak_lr * 0.5
+If you want, I can propose specific code changes or a patch next.
