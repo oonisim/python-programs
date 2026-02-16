@@ -81,6 +81,9 @@ def translation_collate_fn(
     """Collate function that pads source and target to max length in batch.
     Creates padding masks for attention and loss computation.
 
+    Collate = Repackage sequences into batch tensors with padding.
+    This is called by DataLoader after fetching individual items from the dataset.
+
     Args:
         batch: List of dicts with "source_ids" and "target_ids"
         source_pad_id: Padding token ID for source sequences.

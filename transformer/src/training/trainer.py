@@ -678,12 +678,14 @@ class Trainer:
         num_batches = 0
 
         for batch in val_loader:
+            # See translation_collate_fn() in loader_translation.py for details
+            # about how a batch is constructed and what keys it contains.
             source_ids = batch["source_ids"].to(self.device)
             target_ids = batch["target_ids"].to(self.device)
 
-            # Shift target for teacher forcing
-            decoder_input = target_ids[:, :-1]
-            decoder_target = target_ids[:, 1:]
+            # Shift target for teacher forcing in validation as well
+            decoder_input = target_ids[:, :-1]  # Prev tokens of shape (B, T-1)
+            decoder_target = target_ids[:, 1:]  # Next tokens of Shape (B, T-1)
 
             # Extract optional source padding mask for attention
             source_pad_mask = batch.get("source_pad_mask")
