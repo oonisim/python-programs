@@ -541,37 +541,40 @@ class Trainer:
         decoder_target = target_ids[:, 1:]  # Next tokens as target labels. Shape: (B, T-1)
 
         # --------------------------------------------------------------------------------
-        # Apply padding mask to decoder_target for loss calculation
+        # Apply target padding mask to decoder_target for loss calculation
         # --------------------------------------------------------------------------------
-        # Mask targets labels with IGNORE_VALUE where the values are pad token id.
-        # Then, the loss function ignores those labels for loss calculation.
+        # Mask targets labels by IGNORE_VALUE when their values are pad token id.
+        # Then, the loss function ignores those labels from loss calculation.
         #
-        # CRITICAL: Do NOT use pad_token_id as the target mask value for GPT like tokenizers.
-        # GPT like tokenizers has no PAD or EOS tokens. Hence, people will set up as
-        # pad_token_id = eos_token_id = eot_token_id.
+        # CRITICAL:
+        # Do NOT use pad_token_id as the target mask value for GPT-like tokenizers.
+        # They usually do not define a dedicated PAD token by default.
+        # Hence, what people will do is pad_token_id = eos_token_id = eot_token_id.
+        # EOS is now the PAD token for the model to ignore in loss calculation.
         #
-        # The Loss calculation will ignore the legitimate EOS label in targets.
-        # The source positions that have correct EOS tokens cannot contribute to the model
-        # training and the model will never learn to predict EOS (End of Sequence).
+        # The decoder must learn P(EOS | last_token_in_sequence).
+        # This is how the decoder model learns the human notion of "End of Sequence",
+        # or Semantic Boundaries in general.
         #
-        # EOS is the token that teaches the model where/how to end a sequence.
-        # In corpora for GPT like models, the EOS/EOT token is a document boundary.
-        # Without learning EOS, the model has no understanding of the idea of "End",
-        # or the concept of "Sequence" or "Boundary".
-        # Therefore, it can keep generating forever or only stop at max length.
+        # EOS is the token that teaches the model where/how a sequence ends.
+        # In corpora for GPT-like models, the EOS token is a semantic boundary.
+        # Without learning it, the model has no understanding of "End",
+        # or the concept of "Sequence" or "Boundary". Decoder may keep generating or
+        # only stop at max length as it does not know "End".
         #
-        # Another side effect: the same sentence padded to length 64 vs 128 can produce
-        # different attention distributions and different outputs, even when the real tokens
-        # are identical.
+        # Another potential side effect:
+        # If padding masks or positional handling are incorrect, the same sentence
+        # padded to length 64 vs 128 may produce different attention distributions
+        # and different outputs, even when the real tokens are identical.
         # --------------------------------------------------------------------------------
-        # NOTE:
+        # NOTE: Padding Mask at Attention
         # Padding must be handled at the attention level (not just in the loss) as well.
         # If PAD tokens are included as keys/values (K,V) and not masked, queries (Q) from
         # real tokens can attend to PAD positions. This wastes attention mass and can
         # contaminate real-token representations as attention-weighted sum includes PAD.
         #
-        # Apply a key-padding mask (set attention logits to -inf for PAD key positions)
-        # to address the issue.
+        # To address it, apply a padding mask which is to set attention logits to -inf
+        # for PAD token positions.
         # --------------------------------------------------------------------------------
         # Prepare masks for both loss calculation and attention
         decoder_input_pad_mask = None  # For decoder self-attention
