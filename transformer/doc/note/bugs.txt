@@ -1,297 +1,46 @@
-You can estimate it directly from your **throughput**:
+================================================================================
+Training System - Open Issues and Backlogs
+================================================================================
 
-\[
-\text{epoch time} \approx \frac{\text{steps per epoch}}{\text{steps processed per hour}}
-\]
+Status: All previously tracked issues have been resolved ✅
 
-From your log:
-- steps per epoch: **3,684,989**
+This file tracks open issues that need fixing. Currently there are no open
+issues tracked in this file.
 
-After ~5 hours you were around step ~23,700 (from the snippet), so:
+For completed fixes, see:
+- doc/change/v0.5/FIX_COMPLETE.md
+- doc/change/v0.5/EMA_LOSS_MONITOR_COMPLETE.md
+- doc/change/v0.5/WIGHT_UPDATE_MONITOR_COMPLETE.md
+- doc/change/v0.5/OVERFITTING_DETECTION_COMPLETE.md
+- doc/change/v0.5/INTEGRATION_COMPLETE.md
 
-- steps/hour \(\approx 23{,}700 / 5 \approx 4{,}740\)
-- epoch hours \(\approx 3{,}684{,}989 / 4{,}740 \approx 777\) hours
-  \(\approx 32\) days
+For implementation guides, see:
+- doc/implementation/DATASET_CHUNKING.md
+- doc/implementation/EMA_LOSS_MONITOR.md
+- doc/implementation/WEIGHT_MONITOR_INTEGRATION.md
+- doc/implementation/GRADIENT_MONITOR.md
+- doc/implementation/OVERFITTING_DETECTION.md
+- doc/implementation/CALLBACKS.md
 
-So at the current rate, **one epoch would take on the order of weeks**, not hours.
+================================================================================
 
-That strongly suggests your “steps per epoch” is not what you think (likely your dataset is generating an enormous number of training windows, e.g., sliding by 1 token). For GPT-style LM training you normally chunk into fixed blocks with a stride equal to the block size (or similar), giving far fewer steps.
+No open issues at this time.
 
-### What to do
-1) Print how many batches your DataLoader actually has:
-```python
-print("len(train_loader) =", len(train_loader))
-```
+When new issues are discovered, add them here with format:
 
-2) Check your dataset windowing/stride:
-- If you create sequences with stride 1 (sliding window), you’ll get ~one sequence per token → millions of batches → epoch takes forever.
-- Use block chunking with stride = block_size (e.g., 512), not 1.
+[PRIORITY] Short issue description
+File: path/to/file.py:line
+Date: YYYY-MM-DD
 
-If you paste:
-- `len(train_loader)`
-- your dataset’s block/stride logic
-I can tell you exactly how to change it so an epoch is a reasonable length.
+Issue:
+  Detailed description of the problem
 
+Expected:
+  Expected behavior
 
-output patsted
-  1) len(train_loader)
-  len(train_loader) = 3,684,989
-  Context:
-  - Total tokens: 117,920,140
-  - Sequence length: 512
-  - Batch size: 32
-  - Sequences in dataset: 117,919,628
-  2) Dataset block/stride logic (from src/training/loader.py:56-73)
-  def __len__(self) -> int:
-      """Number of complete sequences available."""
-      return max(0, len(self.tokens) - self.seq_len)  # ← Creates N - seq_len sequences
-  def __getitem__(self, idx: int) -> tuple[Tensor, Tensor]:
-      """Get input-target pair."""
-      input_ids = self.tokens[idx : idx + self.seq_len]      # ← idx can be any position
-      target_ids = self.tokens[idx + 1 : idx + self.seq_len + 1]
-      return input_ids, target_ids
+Suggested fix:
+  Optional suggested solution
 
-
-
-GPT
-You’ve found the root cause: you are using a **stride of 1 token** (sliding window). That makes the dataset size ~\(N-\text{seq\_len}\) ≈ **117.9 million sequences**, and with batch=32 you get **3.68 million steps per epoch** — hence “weeks per epoch.”
-
-This is not “wrong” mathematically, but it’s **impractical** for training and massively redundant.
-
-## Why it’s so slow
-Your dataset creates one training example for **every token position**:
-
-- example 0 uses tokens `[0:512]`
-- example 1 uses tokens `[1:513]`
-- …
-- huge overlap: consecutive examples share **511/512 tokens**
-
-So you’re doing ~512× more work than needed for roughly the same training signal.
-
----
-
-## Fix (standard GPT training): block packing with stride = seq_len
-Use non-overlapping blocks (or large stride):
-
-### Option A (recommended): stride = seq_len (non-overlapping)
-Number of sequences becomes roughly \(N/\text{seq\_len}\):
-- \(117,920,140 / 512 \approx 230,313\) sequences
-- steps per epoch with batch 32: ~7,197 steps
-That’s **hours**, not weeks.
-
-Implementation:
-
-```python
-class LMDataset(Dataset):
-    def __init__(self, tokens: Tensor, seq_len: int):
-        self.tokens = tokens
-        self.seq_len = seq_len
-        self.stride = seq_len  # non-overlapping
-
-        # maximum start index so we can take input_len=seq_len and target_len=seq_len
-        self.max_start = len(self.tokens) - (self.seq_len + 1)
-
-    def __len__(self) -> int:
-        if self.max_start < 0:
-            return 0
-        return (self.max_start // self.stride) + 1
-
-    def __getitem__(self, i: int):
-        idx = i * self.stride
-        input_ids = self.tokens[idx : idx + self.seq_len]
-        target_ids = self.tokens[idx + 1 : idx + self.seq_len + 1]
-        return input_ids, target_ids
-```
-
-### Option B: stride = seq_len // 2 (some overlap)
-Sometimes used to increase sample diversity without extreme redundancy.
-- doubles sequences vs Option A.
-
-Set:
-```python
-self.stride = seq_len // 2
-```
-
-### Option C: random start indices (good for large corpora)
-Instead of enumerating all windows, sample random windows each epoch:
-- epoch length becomes whatever you want (fixed steps)
-- avoids deterministic ordering bias
-- common for very large corpora
-
----
-
-## Expected epoch time after the fix
-Right now you’re at ~4,700 steps/hour (from earlier estimate).
-
-With Option A (~7,200 steps/epoch):
-- epoch time ≈ 7,200 / 4,700 ≈ **1.5 hours**
-
-(Actual speed may change slightly, but you’ll be in the right ballpark.)
-
----
-
-## Bottom line
-Your training isn’t stuck; your **dataset stride is the problem**. Change from stride=1 to stride=seq_len (or similar), and your epoch time will drop from **weeks to ~hours**, with much less redundant computation and typically similar or better learning efficiency.
-
-
-
------------
-
-
-
-
-
-
-Evidence in code
-
-Scheduler creation uses warmup in train_lm.py (warmup steps are based on total steps).
-Scheduler stepping happens in Trainer._post_epoch_operations() once per epoch in trainer.py.
-So your observation is consistent, but the actual bug is that warmup is implemented as step‑based while the scheduler is epoch‑stepped.
-
-Why disabling warmup “fixes” it
-With warmup off, you fall back to CosineAnnealingLR, which is intended to be stepped per epoch, so it behaves correctly. That’s why you see immediate learning.
-
-Bottom line
-Warmup isn’t “too big”; it’s being applied at the wrong cadence (epochs instead of steps). That’s why loss stays stuck near 10.
-
-If you want, I can propose the exact change to step the warmup scheduler per batch (without applying it to the cosine‑per‑epoch path).
-
-● The Warmup Problem Explained:
-
-  With warmup_steps=1000:
-
-  At step 100, the LR multiplier would be:
-  lr_multiplier = current_step / warmup_steps = 100 / 1000 = 0.1
-  actual_lr = 0.0003 × 0.1 = 0.00003  # 10x smaller!
-
-  At step 500:
-  lr_multiplier = 500 / 1000 = 0.5
-  actual_lr = 0.0003 × 0.5 = 0.00015  # Still 2x smaller!
-
-  At steps 0-999, the LR was too small → Almost no weight updates → Loss stayed near log(V)
-
-  Summary:
-
-  ┌──────────────────┬─────────────────┬──────────────────┬────────────────┐
-  │  Configuration   │   Step 100 LR   │ Loss at step 100 │     Result     │
-  ├──────────────────┼─────────────────┼──────────────────┼────────────────┤
-  │ With warmup=1000 │ 0.00003 (3e-05) │ ~10.9 (stuck)    │ ❌ No learning │
-  ├──────────────────┼─────────────────┼──────────────────┼────────────────┤
-  │ With warmup=0    │ 0.0003 (3e-04)  │ 6.73 (dropping)  │ ✅ Learning!   │
-  └──────────────────┴─────────────────┴──────────────────┴────────────────┘
-
-  The fix: Disabled warmup so LR starts at full 0.0003 from step 0, allowing immediate learning.
-
-
- The remaining known issues from prior rounds are:
-  ┌──────────────────────────────────────────┬───────────────────┬──────────┐
-  │                  Issue                   │     File:Line     │ Severity │
-  ├──────────────────────────────────────────┼───────────────────┼──────────┤
-  │ evaluate() doesn't restore training mode │ model.py:562      │ MEDIUM   │
-  ├──────────────────────────────────────────┼───────────────────┼──────────┤
-  │ Missing space in error message           │ model.py:600-601  │ LOW      │
-  ├──────────────────────────────────────────┼───────────────────┼──────────┤
-  │ Invalid pylint directive (missing colon) │ lm.py:364         │ LOW      │
-  ├──────────────────────────────────────────┼───────────────────┼──────────┤
-  │ Off-by-one in get_stats()                │ loader.py:255,259 │ LOW      │
-  └──────────────────────────────────────────┴───────────────────┴──────────┘
-  No new issues beyond these. Would you like me to fix the evaluate() one?
-
-
-
-Root Cause Analysis
-
-  1. Model is severely underpowered for WikiText-103
-
-  Current: 16M params (d=256, h=4, L=4, d_ff=512)
-  Dataset: ~118M tokens (WikiText-103)
-
-  Comparison to baselines:
-  - GPT-2 Small: 117M params, WikiText-103 perplexity: ~35-40
-  - Your model: 16M params, perplexity: ~70
-
-  Your model is 7× smaller than GPT-2 Small, which already struggles with WikiText-103.
-
-  2. Sequence length mismatch
-
-  Config: max_seq_len = 256
-  Actual data: sequences up to 1063 tokens
-  Warning in log: "Token indices sequence length is longer than the specified maximum sequence length"
-
-  This truncates context, preventing the model from learning long-range dependencies.
-
-  3. Training configuration issues
-
-  - d_ff=512: Should be 4× d_model (1024, not 512) per Transformer paper
-  - max_seq_len=256: Too short for WikiText-103
-  - No warmup: LR scheduler jumps straight to 3e-4
-
-  ---
-  Recommendations
-
-  Option A: Scale up the model (Recommended)
-
-  For WikiText-103, you need a significantly larger model:
-
-  # Minimum viable config for WikiText-103
-  d_model = 512      # 2× current
-  num_heads = 8      # 2× current
-  num_layers = 6     # 1.5× current
-  d_ff = 2048        # 4× d_model
-  max_seq_len = 512  # 2× current
-  # Results in ~45-50M params
-
-  This should achieve perplexity ~50-60 with proper training.
-
-  Option B: Switch to WikiText-2
-
-  Your current 16M model is better sized for WikiText-2 (~2M tokens):
-
-  python training/train_lm.py --dataset wikitext --epochs 10
-
-  Expected perplexity: ~30-40 (much better than current 70)
-
-  Option C: Significantly scale up for good WikiText-103 results
-
-  To match GPT-2 Small performance (~35-40 perplexity):
-
-  d_model = 768      # 3× current
-  num_heads = 12
-  num_layers = 12    # 3× current
-  d_ff = 3072        # 4× d_model
-  max_seq_len = 1024
-  # Results in ~117M params (like GPT-2 Small)
-
-  ---
-  Other improvements to apply:
-
-  1. ✅ Fix d_ff ratio: Changed from 512 to 4 × d_model (2048) - IMPLEMENTED
-  2. ✅ Fix max_seq_len: Increased to 512 for Option A - IMPLEMENTED
-  3. ✅ Add LR warmup: Warmup for 1000-4000 steps - IMPLEMENTED
-  4. ✅ Proper LR: 3e-4 default, 6e-4 with warmup available - IMPLEMENTED
-  5. ❌ Save model config in checkpoints: Currently missing
-
-    Your poor model performance (perplexity ~70, incoherent text) was likely caused by MULTIPLE issues:
-
-  1. ✅ Fixed bugs (EOS learning, eval mode, padding mask, EOS masking) - RESOLVED
-  2. ✅ Model too small (16M params for WikiText-103) - Option A implemented (45-50M)
-  3. ✅ Incorrect hyperparameters (d_ff=512 instead of 1024) - Fixed in Option A
-  4. ✅ Short context (max_seq_len=256) - Fixed in Option A (512)
-
-  Current Status (After All Fixes):
-
-  Option A is now FULLY IMPLEMENTED and ready to use:
-    - Model preset: --model_preset small
-    - Parameters: ~45-50M (3× original)
-    - d_ff ratio: 2048 (4× d_model) ✓
-    - max_seq_len: 512 (2× original) ✓
-    - LR warmup: 1000 steps default ✓
-    - Expected perplexity: ~50-60 on WikiText-103
-
-  Usage:
-    ./run/run_train_lm.sh --preset small
-    ./run/run_train_lm.sh --preset small --warmup 4000 --lr 6e-4
-
-  See doc/note/option_a_training.md for complete guide.
-
-
+================================================================================
+Last updated: 2026-02-16
+================================================================================
