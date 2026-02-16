@@ -148,3 +148,16 @@
    - Added detailed comments explaining two-phase schedule (linear warmup + cosine decay)
    - File: trainer.py, test_scheduler_stepping.py
    - See: doc/change/v0.5/WARMUP_SCHEDULER_TEST_COVERAGE_COMPLETE.md
+
+✅ Target Padding Mask in Decoder Self-Attention (FIXED - P2)
+   - Problem: Decoder self-attention did not apply target_pad_mask
+   - Impact: Padded target tokens contaminated real token representations in variable-length batches
+   - Solution: Added target_pad_mask parameter to DecodeLayer, Decoder, and Transformer
+   - Mask is now applied in decoder causal self-attention (prevents attending to padding)
+   - Updated Trainer to shift and pass target_pad_mask to model
+   - Completes padding mask implementation for all attention types:
+     * Encoder self-attention: uses source_pad_mask ✓
+     * Decoder self-attention: uses target_pad_mask ✓ (THIS FIX)
+     * Cross-attention: uses source_pad_mask ✓
+   - Files: decoder.py, model.py, trainer.py, test_target_padding_mask.py
+   - See: doc/change/v0.5/TARGET_PADDING_MASK_COMPLETE.md

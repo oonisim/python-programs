@@ -16,6 +16,7 @@ For completed fixes, see:
 - doc/change/v0.5/WARMUP_SCHEDULER_TEST_COVERAGE_COMPLETE.md
 - doc/change/v0.5/LM_SCHEDULER_STEPPING_FIX_COMPLETE.md
 - doc/change/v0.5/TRANSLATION_PAD_MASK_TEST_FIX_COMPLETE.md
+- doc/change/v0.5/TARGET_PADDING_MASK_COMPLETE.md
 
 For implementation guides, see:
 - doc/implementation/DATASET_CHUNKING.md
@@ -47,8 +48,8 @@ Last updated: 2026-02-16
 Here’s a focused review of the issues mentioned under `/doc`, and whether they’re resolved for seq2seq training via `train_translation.py` + `model.py`.
 
 **Summary**
-- Most doc‑listed issues are resolved in the current seq2seq path.
-- One important padding issue remains: decoder self‑attention does **not** use `target_pad_mask`, so padded target tokens can still be attended to inside the decoder.
+- All doc-listed issues are now resolved for seq2seq training via `train_translation.py` + `model.py`.
+- ✅ FIXED (2026-02-16): Target padding mask now properly applied in decoder self-attention.
 
 **Doc Issues vs Current Seq2Seq Code**
 
@@ -60,8 +61,8 @@ Here’s a focused review of the issues mentioned under `/doc`, and whether they
 
 2. **Attention attending to PAD tokens**
 - **Doc:** `doc/change/v0.5/FIX_COMPLETE.md` (Attention Padding Mask implemented)
-- **Status:** Partially resolved.
-- **Resolved for encoder/cross‑attention:** Yes.
+- **Status:** ✅ FULLY RESOLVED (2026-02-16)
+- **Resolved for encoder/cross-attention:** Yes.
   - `translation_collate_fn` returns `source_pad_mask`.
   - `Trainer._train_one_step` forwards `source_pad_mask` into model.
   - `ScaledDotProductAttention` accepts `padding_mask`.
@@ -70,8 +71,12 @@ Here’s a focused review of the issues mentioned under `/doc`, and whether they
   - `/Users/oonisim/home/repository/git/oonisim/python-programs/transformer/src/model/common.py`
   - `/Users/oonisim/home/repository/git/oonisim/python-programs/transformer/src/model/encoder.py`
   - `/Users/oonisim/home/repository/git/oonisim/python-programs/transformer/src/model/model.py`
-- **Still unresolved for decoder self‑attention:** `DecodeLayer` does not accept or apply `target_pad_mask` for causal self‑attention. Only `source_pad_mask` is used for cross‑attention.
-  - `/Users/oonisim/home/repository/git/oonisim/python-programs/transformer/src/model/decoder.py`
+- **✅ FIXED - Decoder self-attention:** `DecodeLayer` now accepts and applies `target_pad_mask` for causal self-attention.
+  - `Trainer` shifts and passes `target_pad_mask` to model.
+  - All attention types now properly masked: encoder self-attention, decoder self-attention, cross-attention.
+  - `/Users/onishima/Documents/home/python-programs/transformer/src/model/decoder.py`
+  - `/Users/onishima/Documents/home/python-programs/transformer/src/training/trainer.py`
+  - See: `doc/change/v0.5/TARGET_PADDING_MASK_COMPLETE.md`
 
 3. **EOS/BOS masked when `pad_token_id == eos_token_id`**
 - **Doc:** `doc/change/v0.5/FIX_COMPLETE.md` (masking by length, not by token ID)
@@ -111,21 +116,11 @@ Here’s a focused review of the issues mentioned under `/doc`, and whether they
 - **Evidence:** Both `generate()` and `evaluate()` save/restore training state.
   - `/Users/oonisim/home/repository/git/oonisim/python-programs/transformer/src/model/model.py`
 
-**Key remaining issue (seq2seq)**
-- **Target padding mask not applied in decoder self‑attention.**
-  - Impact: decoder can attend to padded target positions, contaminating token representations for variable‑length batches.
-  - Location: `/Users/oonisim/home/repository/git/oonisim/python-programs/transformer/src/model/decoder.py`
+================================================================================
+Test Issues
+================================================================================
 
-
-P2: Target padding mask not applied in decoder self-attention
-Decoder self-attention is causal-only and does not accept a target padding mask. For variable-length target batches, padded target positions remain valid keys/values and can be attended to by real tokens, contaminating representations and gradients. source_pad_mask is applied only in cross-attention. Add a target_pad_mask path to DecodeLayer.forward and Decoder.forward, and pass the shifted target mask from the trainer so padded target tokens are masked in decoder self-attention as well.
-/Users/oonisim/home/repository/git/oonisim/python-programs/transformer/src/model/decoder.py:118-210
-
-
-
-
-
-   test_translation_source_pad_mask_does_not_mask_real_eos_when_pad_equals_eos
+test_translation_source_pad_mask_does_not_mask_real_eos_when_pad_equals_eos
 
   Location: src/test/test_training_pitfalls.py
 

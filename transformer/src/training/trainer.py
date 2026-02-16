@@ -573,8 +573,15 @@ class Trainer:
         # Apply a key-padding mask (set attention logits to -inf for PAD key positions)
         # to address the issue.
         # --------------------------------------------------------------------------------
+        # Prepare masks for both loss calculation and attention
+        decoder_input_pad_mask = None  # For decoder self-attention
         if target_pad_mask is not None:
-            # Shift target_pad_mask to match decoder_target
+            # Shift target_pad_mask to match decoder_input for attention masking
+            # decoder_input = target_ids[:, :-1], so mask should also drop last position
+            decoder_input_pad_mask = target_pad_mask[:, :-1]
+
+            # Shift target_pad_mask to match decoder_target for loss masking
+            # decoder_target = target_ids[:, 1:], so mask should also drop first position
             target_pad_mask_shifted = target_pad_mask[:, 1:]
             decoder_target = decoder_target.masked_fill(
                 target_pad_mask_shifted,
@@ -585,7 +592,8 @@ class Trainer:
         log_probabilities = self.model(
             x=source_ids,
             y=decoder_input,
-            source_pad_mask=source_pad_mask
+            source_pad_mask=source_pad_mask,
+            target_pad_mask=decoder_input_pad_mask
         )
 
         loss = self._compute_loss(log_probabilities, decoder_target)
@@ -684,19 +692,24 @@ class Trainer:
             if target_pad_mask is not None:
                 target_pad_mask = target_pad_mask.to(self.device)
 
-            # Apply padding mask to decoder_target for loss calculation
+            # Prepare masks for both loss calculation and attention
+            decoder_input_pad_mask = None  # For decoder self-attention
             if target_pad_mask is not None:
-                # Shift target_pad_mask to match decoder_target
+                # Shift target_pad_mask to match decoder_input for attention masking
+                decoder_input_pad_mask = target_pad_mask[:, :-1]
+
+                # Shift target_pad_mask to match decoder_target for loss masking
                 target_pad_mask_shifted = target_pad_mask[:, 1:]
                 decoder_target = decoder_target.masked_fill(
                     target_pad_mask_shifted,
                     LABEL_IGNORE_VALUE
                 )
 
-            log_probabilities = self.model.forward(
+            log_probabilities = self.model(
                 x=source_ids,
                 y=decoder_input,
-                source_pad_mask=source_pad_mask
+                source_pad_mask=source_pad_mask,
+                target_pad_mask=decoder_input_pad_mask
             )
             loss = self._compute_loss(log_probabilities, decoder_target)
             total_loss += loss.item()
@@ -1122,7 +1135,7 @@ class LanguageModelTrainer(Trainer):
     Unlike Trainer which expects encoder-decoder models with source_ids and
     target_ids, LanguageModelTrainer handles language models where:
     - Batch is a tuple (input_ids, target_ids) where target is input shifted by 1
-    - Model.forward(x) takes only input, no source/memory
+    - Model(x) takes only input, no source/memory
 
     Usage:
         from scratch.lm import LanguageModel
@@ -1215,7 +1228,7 @@ class LanguageModelTrainer(Trainer):
             input_ids = input_ids.to(self.device)
             target_ids = target_ids.to(self.device)
 
-            log_probabilities = self.model.forward(input_ids)
+            log_probabilities = self.model(input_ids)
             loss = self._compute_loss(log_probabilities, target_ids)
             total_loss += loss.item()
             num_batches += 1

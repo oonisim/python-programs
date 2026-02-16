@@ -16,7 +16,7 @@ Usage:
     model = LanguageModel(vocab_size=tokenizer.vocab_size)
 
     # Training: get log probabilities
-    log_probabilities = model.forward(input_ids)  # (B, T, V)
+    log_probabilities = model(input_ids)  # (B, T, V)
     loss = criterion(log_probabilities.view(-1, V), target.view(-1))
 
     # Inference: generate text
@@ -400,7 +400,8 @@ class LanguageModel(nn.Module):
 
                 # log_probabilities_all_positions
                 # Shape: (batch_size, sequence_length, vocabulary_size)
-                log_probabilities_all_positions: Tensor = self.forward(x=model_input_sequence)
+                # Use self() instead of self.forward() to properly invoke __call__
+                log_probabilities_all_positions: Tensor = self(x=model_input_sequence)
 
                 # Example with vocabulary_size=50,000:
                 # If input has 10 tokens, output is (batch_size, 10, 50000)

@@ -77,7 +77,7 @@ def test_no_prev_weights_with_callbacks():
             y_batch = y_batch.to(trainer.device)
 
             trainer.optimizer.zero_grad()
-            output = trainer.model.forward(x_batch)
+            output = trainer.model(x_batch)
             loss = trainer.criterion(output, y_batch)
 
             trainer.callbacks.on_forward_end(trainer, loss)
@@ -154,7 +154,7 @@ def test_no_prev_weights_after_multiple_epochs():
             y_batch = y_batch.to(trainer.device)
 
             trainer.optimizer.zero_grad()
-            output = trainer.model.forward(x_batch)
+            output = trainer.model(x_batch)
             loss = trainer.criterion(output, y_batch)
 
             trainer.callbacks.on_forward_end(trainer, loss)
@@ -178,7 +178,7 @@ def test_no_prev_weights_after_multiple_epochs():
                 y_batch = y_batch.to(trainer.device)
 
                 with torch.no_grad():
-                    output = trainer.model.forward(x_batch)
+                    output = trainer.model(x_batch)
                     loss = trainer.criterion(output, y_batch)
                     total_loss += loss.item()
 
@@ -250,7 +250,7 @@ def test_memory_footprint_with_callbacks():
             y_batch = y_batch.to(trainer.device)
 
             trainer.optimizer.zero_grad()
-            output = trainer.model.forward(x_batch)
+            output = trainer.model(x_batch)
             loss = trainer.criterion(output, y_batch)
 
             trainer.callbacks.on_forward_end(trainer, loss)
@@ -274,7 +274,7 @@ def test_memory_footprint_with_callbacks():
                 y_batch = y_batch.to(trainer.device)
 
                 with torch.no_grad():
-                    output = trainer.model.forward(x_batch)
+                    output = trainer.model(x_batch)
                     loss = trainer.criterion(output, y_batch)
                     total_loss += loss.item()
 
@@ -379,7 +379,7 @@ def test_log_weight_updates_not_called():
             y_batch = y_batch.to(trainer.device)
 
             trainer.optimizer.zero_grad()
-            output = trainer.model.forward(x_batch)
+            output = trainer.model(x_batch)
             loss = trainer.criterion(output, y_batch)
 
             trainer.callbacks.on_forward_end(trainer, loss)

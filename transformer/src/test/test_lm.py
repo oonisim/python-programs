@@ -26,7 +26,7 @@ def test_language_model_forward_shape():
     x = torch.zeros(2, 5, dtype=torch.long)
 
     # Expected: log-probabilities shape (B, T, V) with V=vocab_size.
-    out = model.forward(x)
+    out = model(x)
     assert out.shape == (2, 5, 50)
 
 

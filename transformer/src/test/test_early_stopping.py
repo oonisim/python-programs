@@ -83,7 +83,7 @@ def test_early_stopping_triggers():
             y = y.to(trainer.device)
 
             trainer.optimizer.zero_grad()
-            output = trainer.model.forward(x)
+            output = trainer.model(x)
             loss = trainer.criterion(output, y)
             loss.backward()
             trainer._clip_gradients()
@@ -102,7 +102,7 @@ def test_early_stopping_triggers():
                 x, y = batch
                 x = x.to(trainer.device)
                 y = y.to(trainer.device)
-                output = trainer.model.forward(x)
+                output = trainer.model(x)
                 loss = trainer.criterion(output, y)
                 total_loss += loss.item()
             return total_loss / len(val_loader)
@@ -175,7 +175,7 @@ def test_early_stopping_restores_best_weights():
             x = x.to(trainer.device)
             y = y.to(trainer.device)
             trainer.optimizer.zero_grad()
-            output = trainer.model.forward(x)
+            output = trainer.model(x)
             loss = trainer.criterion(output, y)
             loss.backward()
             trainer._clip_gradients()
@@ -190,7 +190,7 @@ def test_early_stopping_restores_best_weights():
                 x, y = batch
                 x = x.to(trainer.device)
                 y = y.to(trainer.device)
-                output = trainer.model.forward(x)
+                output = trainer.model(x)
                 loss = trainer.criterion(output, y)
                 total_loss += loss.item()
             return total_loss / len(val_loader)
@@ -249,7 +249,7 @@ def test_no_early_stopping_when_disabled():
             x = x.to(trainer.device)
             y = y.to(trainer.device)
             trainer.optimizer.zero_grad()
-            output = trainer.model.forward(x)
+            output = trainer.model(x)
             loss = trainer.criterion(output, y)
             loss.backward()
             trainer.optimizer.step()
@@ -263,7 +263,7 @@ def test_no_early_stopping_when_disabled():
                 x, y = batch
                 x = x.to(trainer.device)
                 y = y.to(trainer.device)
-                output = trainer.model.forward(x)
+                output = trainer.model(x)
                 loss = trainer.criterion(output, y)
                 total_loss += loss.item()
             return total_loss / len(val_loader)

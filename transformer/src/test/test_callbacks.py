@@ -145,7 +145,7 @@ def test_callback_hooks_are_called():
             x = x.to(trainer.device)
             y = y.to(trainer.device)
             trainer.optimizer.zero_grad()
-            output = trainer.model.forward(x)
+            output = trainer.model(x)
             loss = trainer.criterion(output, y)
 
             # Manually trigger callbacks to match trainer flow
@@ -223,7 +223,7 @@ def test_multiple_callbacks():
             x = x.to(trainer.device)
             y = y.to(trainer.device)
             trainer.optimizer.zero_grad()
-            output = trainer.model.forward(x)
+            output = trainer.model(x)
             loss = trainer.criterion(output, y)
             trainer.callbacks.on_forward_end(trainer, loss)
             loss.backward()
@@ -299,7 +299,7 @@ def test_callback_can_stop_training():
             x = x.to(trainer.device)
             y = y.to(trainer.device)
             trainer.optimizer.zero_grad()
-            output = trainer.model.forward(x)
+            output = trainer.model(x)
             loss = trainer.criterion(output, y)
             loss.backward()
             trainer.optimizer.step()

@@ -168,7 +168,8 @@ class DecodeLayer(nn.Module):
             self,
             x: Tensor,
             memory: Tensor = None,
-            source_pad_mask: Optional[Tensor] = None
+            source_pad_mask: Optional[Tensor] = None,
+            target_pad_mask: Optional[Tensor] = None
     ) -> Tensor:
         """Decode with optional cross-attention.
         Args:
@@ -178,6 +179,9 @@ class DecodeLayer(nn.Module):
             source_pad_mask: optional padding mask of shape (B, Tk) for encoder
                 sequence, where True indicates padding positions to be masked out
                 in cross-attention.
+            target_pad_mask: optional padding mask of shape (B, Tq) for decoder
+                sequence, where True indicates padding positions to be masked out
+                in causal self-attention.
         """
         # > 3.2.3
         # > In "encoder-decoder attention" layers, the queries come from the previous decoder
@@ -193,10 +197,19 @@ class DecodeLayer(nn.Module):
         #--------------------------------------------------------------------------------
         # 1. Masked Self-Attention (causal): Q, K, V come from Decoder Sequence (x).
         # x = x + attention is Skip connection.
-        # No padding mask needed here as causal mask already prevents future attention.
+        # Apply target padding mask to prevent attention to padded target tokens.
+        # The causal mask (upper triangular) prevents future attention, while
+        # target_pad_mask prevents attention to padded positions in variable-length batches.
         #--------------------------------------------------------------------------------
         _q = _k = _v = self.layer_norm_input(x)
-        x = x + self.dropout_causal(self.causal_self_attention(q=_q, k=_k, v=_v))
+        x = x + self.dropout_causal(
+            self.causal_self_attention(
+                q=_q,
+                k=_k,
+                v=_v,
+                padding_mask=target_pad_mask
+            )
+        )
 
         #--------------------------------------------------------------------------------
         # 2. Decoder Q to Encoder K Cross Attention (skipped for decoder-only mode).
@@ -319,7 +332,8 @@ class Decoder(nn.Module):
             self,
             y: Tensor,
             memory: Tensor = None,
-            source_pad_mask: Optional[Tensor] = None
+            source_pad_mask: Optional[Tensor] = None,
+            target_pad_mask: Optional[Tensor] = None
     ) -> Tensor:
         """Decode the input embeddings.
         The memory (embeddings of the source sequence) is regarded as a prompt or context
@@ -336,6 +350,9 @@ class Decoder(nn.Module):
             source_pad_mask: optional padding mask of shape (B, Tk) for encoder
                 sequence, where True indicates padding positions to be masked out
                 in cross-attention.
+            target_pad_mask: optional padding mask of shape (B, Tq) for decoder
+                sequence, where True indicates padding positions to be masked out
+                in causal self-attention.
 
         Returns: Decoder next token predictions of shape (B, T, D)
         """
@@ -384,7 +401,12 @@ class Decoder(nn.Module):
         # output, not layer-by-layer correspondence.
         # --------------------------------------------------------------------------------
         for _layer in self.layers:
-            y = _layer(x=y, memory=memory, source_pad_mask=source_pad_mask)
+            y = _layer(
+                x=y,
+                memory=memory,
+                source_pad_mask=source_pad_mask,
+                target_pad_mask=target_pad_mask
+            )
 
         assert y.shape == (_B, _T, self.D)
         return y

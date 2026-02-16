@@ -89,7 +89,7 @@ def test_gradient_monitor_with_decoder_layers():
             y_batch = y_batch.to(trainer.device)
 
             trainer.optimizer.zero_grad()
-            output = trainer.model.forward(x_batch)
+            output = trainer.model(x_batch)
             # Flatten for loss
             output_flat = output.reshape(-1, output.size(-1))
             target_flat = y_batch.reshape(-1)
@@ -198,7 +198,7 @@ def test_gradient_monitor_with_encoder_layers():
             y_batch = y_batch.to(trainer.device)
 
             trainer.optimizer.zero_grad()
-            output = trainer.model.forward(x_batch)
+            output = trainer.model(x_batch)
             output_flat = output.reshape(-1, output.size(-1))
             target_flat = y_batch.reshape(-1)
             loss = trainer.criterion(output_flat, target_flat)
@@ -299,7 +299,7 @@ def test_multiple_callbacks_with_real_model():
             y_batch = y_batch.to(trainer.device)
 
             trainer.optimizer.zero_grad()
-            output = trainer.model.forward(x_batch)
+            output = trainer.model(x_batch)
             output_flat = output.reshape(-1, output.size(-1))
             target_flat = y_batch.reshape(-1)
             loss = trainer.criterion(output_flat, target_flat)
@@ -325,7 +325,7 @@ def test_multiple_callbacks_with_real_model():
                 y_batch = y_batch.to(trainer.device)
 
                 with torch.no_grad():
-                    output = trainer.model.forward(x_batch)
+                    output = trainer.model(x_batch)
                     output_flat = output.reshape(-1, output.size(-1))
                     target_flat = y_batch.reshape(-1)
                     loss = trainer.criterion(output_flat, target_flat)

@@ -98,7 +98,7 @@ def test_callback_state_saved_in_snapshot():
             y_batch = y_batch.to(trainer.device)
 
             trainer.optimizer.zero_grad()
-            output = trainer.model.forward(x_batch)
+            output = trainer.model(x_batch)
             loss = trainer.criterion(output, y_batch)
 
             trainer.callbacks.on_forward_end(trainer, loss)
@@ -203,7 +203,7 @@ def test_callback_state_restored_from_snapshot():
             y_batch = y_batch.to(trainer1.device)
 
             trainer1.optimizer.zero_grad()
-            output = trainer1.model.forward(x_batch)
+            output = trainer1.model(x_batch)
             loss = trainer1.criterion(output, y_batch)
 
             trainer1.callbacks.on_forward_end(trainer1, loss)
@@ -330,7 +330,7 @@ def test_early_stopping_state_persistence():
             y_batch = y_batch.to(trainer1.device)
 
             trainer1.optimizer.zero_grad()
-            output = trainer1.model.forward(x_batch)
+            output = trainer1.model(x_batch)
             loss = trainer1.criterion(output, y_batch)
 
             trainer1.callbacks.on_forward_end(trainer1, loss)
@@ -354,7 +354,7 @@ def test_early_stopping_state_persistence():
                 y_batch = y_batch.to(trainer1.device)
 
                 with torch.no_grad():
-                    output = trainer1.model.forward(x_batch)
+                    output = trainer1.model(x_batch)
                     loss = trainer1.criterion(output, y_batch)
                     total_loss += loss.item()
 

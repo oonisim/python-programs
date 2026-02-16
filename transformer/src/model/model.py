@@ -431,7 +431,8 @@ class Transformer(nn.Module):
             self,
             x: Tensor,
             y: Tensor,
-            source_pad_mask: Optional[Tensor] = None
+            source_pad_mask: Optional[Tensor] = None,
+            target_pad_mask: Optional[Tensor] = None
     ) -> Tensor:
         """Run Transformer encoder/decoder
         DO NOT place non-differentiable functions e.g, argmax in forward.
@@ -444,6 +445,9 @@ class Transformer(nn.Module):
             source_pad_mask: optional padding mask of shape (B, Te) for encoder
                 sequence, where True indicates padding positions to be masked out
                 in attention.
+            target_pad_mask: optional padding mask of shape (B, Td) for decoder
+                sequence, where True indicates padding positions to be masked out
+                in causal self-attention.
 
         Returns: Log probabilities of shape (B, T, V) for training with NLLLoss.
                  DO NOT pass to CrossEntropyLoss as it expects logits.
@@ -519,8 +523,14 @@ class Transformer(nn.Module):
         # --------------------------------------------------------------------------------
         # Decoder layers with cross attention to encoder output (memory).
         # Pass source_pad_mask to prevent attending to padded encoder positions.
+        # Pass target_pad_mask to prevent attending to padded decoder positions.
         # --------------------------------------------------------------------------------
-        y = self.decoder(y=y, memory=memory, source_pad_mask=source_pad_mask)
+        y = self.decoder(
+            y=y,
+            memory=memory,
+            source_pad_mask=source_pad_mask,
+            target_pad_mask=target_pad_mask
+        )
 
         # --------------------------------------------------------------------------------
         # Projection to vocabulary log probabilities.
@@ -564,7 +574,8 @@ class Transformer(nn.Module):
         self.eval()
 
         try:
-            log_probabilities = self.forward(x=x, y=y)
+            # Use self() instead of self.forward() to properly invoke __call__
+            log_probabilities = self(x=x, y=y)
             predictions = torch.argmax(log_probabilities, dim=-1)
             return predictions
 

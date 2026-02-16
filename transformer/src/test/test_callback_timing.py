@@ -128,7 +128,7 @@ def test_hook_timing_order():
             y_batch = y_batch.to(trainer.device)
 
             trainer.optimizer.zero_grad()
-            output = trainer.model.forward(x_batch)
+            output = trainer.model(x_batch)
             loss = trainer.criterion(output, y_batch)
 
             trainer.callbacks.on_forward_end(trainer, loss)
@@ -199,7 +199,7 @@ def test_gradients_accessible_at_backward_end():
             y_batch = y_batch.to(trainer.device)
 
             trainer.optimizer.zero_grad()
-            output = trainer.model.forward(x_batch)
+            output = trainer.model(x_batch)
             loss = trainer.criterion(output, y_batch)
 
             trainer.callbacks.on_forward_end(trainer, loss)
@@ -274,7 +274,7 @@ def test_weights_change_after_step():
             y_batch = y_batch.to(trainer.device)
 
             trainer.optimizer.zero_grad()
-            output = trainer.model.forward(x_batch)
+            output = trainer.model(x_batch)
             loss = trainer.criterion(output, y_batch)
 
             trainer.callbacks.on_forward_end(trainer, loss)
@@ -367,7 +367,7 @@ def test_gradient_clipping_after_backward_end():
             y_batch = y_batch.to(trainer.device)
 
             trainer.optimizer.zero_grad()
-            output = trainer.model.forward(x_batch)
+            output = trainer.model(x_batch)
             loss = trainer.criterion(output, y_batch)
 
             trainer.callbacks.on_forward_end(trainer, loss)

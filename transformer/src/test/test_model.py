@@ -23,7 +23,7 @@ def test_transformer_forward_shape():
     y = torch.zeros(batch, time_steps, dtype=torch.long)
 
     # Expected: log-probabilities shape (B, T, V) with V=NUM_CLASSES.
-    out = model.forward(x=x, y=y)
+    out = model(x=x, y=y)
     assert out.shape == (batch, time_steps, NUM_CLASSES)
 
 
@@ -36,7 +36,7 @@ def test_transformer_forward_invalid_x_shape():
 
     # Expected: ValueError because x must be 2D (B, T).
     with pytest.raises(ValueError):
-        model.forward(x=x, y=y)
+        model(x=x, y=y)
 
 
 def test_transformer_forward_invalid_y_shape():
@@ -48,7 +48,7 @@ def test_transformer_forward_invalid_y_shape():
 
     # Expected: ValueError because y must be 2D (B, T).
     with pytest.raises(ValueError):
-        model.forward(x=x, y=y)
+        model(x=x, y=y)
 
 
 def test_transformer_generate_shape():
