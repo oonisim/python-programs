@@ -200,3 +200,25 @@
    output = model(x)  # ✓ Call model(), not model.forward()
    ```
 
+✅ LanguageModelTrainer Scheduler Stepping (FIXED)
+   - Problem: LanguageModelTrainer._train_one_step() did not step scheduler per batch
+   - Impact: Warmup schedules did not work for language model training (train_lm.py)
+   - Root cause: Override of _train_one_step() forgot to call _step_scheduler_if_configured()
+   - Without fix: LR stays near zero for entire first epoch (warmup ignored)
+   - Solution: Added _step_scheduler_if_configured() call after optimizer.step()
+   - Files: trainer.py (LanguageModelTrainer._train_one_step)
+   - Tests: test_lm_scheduler_steps_per_batch_when_enabled now passes
+   - See: doc/change/v0.5/LM_SCHEDULER_STEPPING_FIX_COMPLETE.md
+
+✅ Translation Padding Mask Test (FIXED)
+   - Problem: Test expected impossible behavior (all eos_id tokens not masked)
+   - Test was wrong, implementation was correct
+   - When pad_token_id == eos_token_id, distinguishing by token value is impossible
+   - Solution: Fixed test to validate length-based masking (correct approach)
+   - Test now correctly verifies:
+     * Real EOS tokens at actual sequence end: not masked ✓
+     * Artificial padding tokens: correctly masked ✓
+   - Files: test_training_pitfalls.py (test_translation_source_pad_mask_does_not_mask_real_eos_when_pad_equals_eos)
+   - See: doc/change/v0.5/TRANSLATION_PAD_MASK_TEST_FIX_COMPLETE.md
+
+
