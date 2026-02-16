@@ -1188,6 +1188,9 @@ class LanguageModelTrainer(Trainer):
         # Update weights using the gradients in param.grad according to the optimizer rule.
         self.optimizer.step()
 
+        # Step scheduler per batch if configured (e.g., warmup schedules)
+        self._step_scheduler_if_configured()
+
         # Callback: on_step_end
         self.callbacks.on_step_end(self)
 

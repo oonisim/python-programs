@@ -50,7 +50,6 @@ def test_lm_scheduler_steps_per_batch_when_enabled():
     config = TrainerConfig(
         model_name="test_lm_scheduler",
         step_scheduler_per_batch=True,
-        enable_weight_monitor=False,
         snapshot_per_epoch=False,
         delete_snapshots_after_training=True,
     )

@@ -99,7 +99,6 @@ def test_warmup_scheduler_steps_per_batch():
             snapshot_per_epoch=False,
             delete_snapshots_after_training=True,
             step_scheduler_per_batch=True,
-            enable_weight_monitor=False,
         )
 
         def make_scheduler(opt):
@@ -132,7 +131,6 @@ def test_warmup_lr_ramps_over_steps():
             snapshot_per_epoch=False,
             delete_snapshots_after_training=True,
             step_scheduler_per_batch=True,
-            enable_weight_monitor=False,
         )
 
         # Use known peak LR for stronger assertion
@@ -203,7 +201,6 @@ def test_epoch_scheduler_steps_per_epoch_not_per_batch():
             snapshot_per_epoch=False,
             delete_snapshots_after_training=True,
             step_scheduler_per_batch=False,
-            enable_weight_monitor=False,
         )
 
         def make_scheduler(opt):
@@ -237,7 +234,6 @@ def test_warmup_completes_in_expected_steps():
             snapshot_per_epoch=False,
             delete_snapshots_after_training=True,
             step_scheduler_per_batch=True,
-            enable_weight_monitor=False,
         )
 
         model = DummyModel()
